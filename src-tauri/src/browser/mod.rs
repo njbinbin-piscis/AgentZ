@@ -794,6 +794,7 @@ impl BrowserManager {
         use chromiumoxide::cdp::browser_protocol::emulation::{
             ScreenOrientation, ScreenOrientationType, SetDeviceMetricsOverrideParams,
         };
+        use chromiumoxide::cdp::browser_protocol::network::SetUserAgentOverrideParams;
 
         let w = width.clamp(320, 3840);
         let h = height.clamp(200, 2160);
@@ -822,6 +823,16 @@ impl BrowserManager {
             page.execute(params)
                 .await
                 .context("set viewport failed")?;
+
+            // Set explicit desktop User-Agent to prevent sites from detecting
+            // this as a mobile/emulated environment via navigator.userAgent.
+            let ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+            let ua_params = SetUserAgentOverrideParams::builder()
+                .user_agent(ua)
+                .build()
+                .map_err(|e| anyhow::anyhow!(e))?;
+            let _ = page.execute(ua_params).await;
+
             // Force landscape orientation so sites that check orientation.type
             // don't fall back to mobile layout.
             let _ = page
