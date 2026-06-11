@@ -1108,7 +1108,7 @@ const en = {
       "Describe the task — Plan mode explores and builds a todo list… (Enter send, Shift+Enter newline, ↑↓ recall history)",
     send: "Send",
     stop: "Stop",
-    thinking: "Thinking…",
+    thinking: "Starting action…",
     llmBalanceError:
       "LLM account balance insufficient (402). Change the model in Settings or add credits, then retry.",
     teamSessionReadOnly: "Team sessions can only be continued in WorkZ; this one is read-only in CodeZ.",

@@ -1080,7 +1080,7 @@ const zh = {
       "描述任务，Plan 模式将探索代码并制定计划…（Enter 发送，Shift+Enter 换行，↑↓ 回顾历史发送）",
     send: "发送",
     stop: "停止",
-    thinking: "思考中…",
+    thinking: "开始行动…",
     llmBalanceError: "LLM 账户余额不足（402），请在设置中更换模型或充值后重试。",
     setupErrorHint: "模型服务未就绪（密钥缺失或无效）。请在设置中检查 API 密钥与模型。",
     teamSessionReadOnly: "团队会话只能在 WorkZ 中继续，CodeZ 中为只读。",
