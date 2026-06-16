@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listInstalledSkills } from "../../../services/tauri/workbench";
-import { clawHubApi, type ClawHubSkill } from "../../../services/tauri/clawhub";
+import {
+  clawHubApi,
+  type ClawHubSkill,
+  type SkillRegistry,
+} from "../../../services/tauri/clawhub";
+
+const REGISTRIES: SkillRegistry[] = ["skillhub", "clawhub"];
 
 export default function SkillsDiscoverView() {
   const { t } = useTranslation();
+  const [registry, setRegistry] = useState<SkillRegistry>("skillhub");
   const [installedSlugs, setInstalledSlugs] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ClawHubSkill[]>([]);
@@ -29,14 +36,15 @@ export default function SkillsDiscoverView() {
     setSearching(true);
     setSearchError(null);
     try {
-      const res = await clawHubApi.search(query, 20);
+      const res = await clawHubApi.search(query, 20, registry);
       setResults(res.items);
     } catch (e) {
       setSearchError(String(e));
+      setResults([]);
     } finally {
       setSearching(false);
     }
-  }, [query]);
+  }, [query, registry]);
 
   useEffect(() => {
     void doSearch();
@@ -47,7 +55,7 @@ export default function SkillsDiscoverView() {
       setBusySlug(skill.slug);
       setSearchError(null);
       try {
-        await clawHubApi.install(skill.slug, skill.version);
+        await clawHubApi.install(skill.slug, skill.version, registry);
         await refreshInstalled();
       } catch (e) {
         setSearchError(String(e));
@@ -55,14 +63,30 @@ export default function SkillsDiscoverView() {
         setBusySlug(null);
       }
     },
-    [refreshInstalled],
+    [refreshInstalled, registry],
   );
 
   return (
     <div className="agentz-settings-tabpanel">
       <section className="agentz-settings-section">
         <h3>{t("library.discoverSkillsTitle")}</h3>
-        <p className="agentz-settings-hint">{t("skills.marketHint")}</p>
+        <div className="agentz-skill-discover-tabs" role="tablist" aria-label={t("skills.registryTabs")}>
+          {REGISTRIES.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={registry === id}
+              className={`agentz-library-view${registry === id ? " active" : ""}`}
+              onClick={() => setRegistry(id)}
+            >
+              {t(`skills.registry.${id}`)}
+            </button>
+          ))}
+        </div>
+        <p className="agentz-settings-hint">
+          {registry === "skillhub" ? t("skills.skillhubHint") : t("skills.clawhubHint")}
+        </p>
         <div className="agentz-wb-search">
           <input
             value={query}
@@ -70,10 +94,10 @@ export default function SkillsDiscoverView() {
             onKeyDown={(e) => {
               if (e.key === "Enter") void doSearch();
             }}
-            placeholder={t("library.searchPlaceholder")}
+            placeholder={t("skills.searchPlaceholder")}
           />
           <button type="button" onClick={() => void doSearch()} disabled={searching}>
-            {searching ? t("library.searching") : t("library.search")}
+            {searching ? t("skills.searching") : t("skills.search")}
           </button>
         </div>
         {searchError && <div className="agentz-settings-error">{searchError}</div>}
@@ -84,7 +108,7 @@ export default function SkillsDiscoverView() {
           {results.map((r) => {
             const already = installedSlugs.has(r.slug);
             return (
-              <div key={r.slug} className="agentz-wb-row">
+              <div key={`${registry}:${r.slug}`} className="agentz-wb-row">
                 <div className="agentz-wb-info">
                   <strong>{r.name}</strong>
                   <span className="agentz-wb-meta">

@@ -1,0 +1,5091 @@
+{
+  "version": 2,
+  "audit_version": 1,
+  "source": "https://cnb.cool/codebuddy/marketplace.git",
+  "imported_at": "2026-06-16T09:41:20.913Z",
+  "skills": [
+    {
+      "id": "skills-security-check",
+      "plugin": "skills-security-check",
+      "sha": "601fe72dff92"
+    },
+    {
+      "id": "screen-reader-testing",
+      "plugin": "accessibility-compliance",
+      "sha": "8d5ff8d330b6"
+    },
+    {
+      "id": "wcag-audit-patterns",
+      "plugin": "accessibility-compliance",
+      "sha": "0ba1c8beb758"
+    },
+    {
+      "id": "browser-automation",
+      "plugin": "agent-browser",
+      "sha": "b27a1f3a32a4"
+    },
+    {
+      "id": "algorithmic-art",
+      "plugin": "algorithmic-art",
+      "sha": "9f352483172d"
+    },
+    {
+      "id": "fastapi-templates",
+      "plugin": "api-scaffolding",
+      "sha": "c43859ed38f9"
+    },
+    {
+      "id": "api-design-principles",
+      "plugin": "backend-development",
+      "sha": "80c5aac3bee8"
+    },
+    {
+      "id": "architecture-patterns",
+      "plugin": "backend-development",
+      "sha": "a89f814c9e13"
+    },
+    {
+      "id": "cqrs-implementation",
+      "plugin": "backend-development",
+      "sha": "7d6e10af75a3"
+    },
+    {
+      "id": "event-store-design",
+      "plugin": "backend-development",
+      "sha": "8442ac3cfd06"
+    },
+    {
+      "id": "microservices-patterns",
+      "plugin": "backend-development",
+      "sha": "918175141fdb"
+    },
+    {
+      "id": "projection-patterns",
+      "plugin": "backend-development",
+      "sha": "f0ab4a4c7cc8"
+    },
+    {
+      "id": "saga-orchestration",
+      "plugin": "backend-development",
+      "sha": "c0ae0850ecec"
+    },
+    {
+      "id": "temporal-python-testing",
+      "plugin": "backend-development",
+      "sha": "904df306a277"
+    },
+    {
+      "id": "workflow-orchestration-patterns",
+      "plugin": "backend-development",
+      "sha": "2ed1e5bb2b08"
+    },
+    {
+      "id": "defi-protocol-templates",
+      "plugin": "blockchain-web3",
+      "sha": "0876d7857447"
+    },
+    {
+      "id": "nft-standards",
+      "plugin": "blockchain-web3",
+      "sha": "0e3b3b938ea7"
+    },
+    {
+      "id": "solidity-security",
+      "plugin": "blockchain-web3",
+      "sha": "289da8c05f13"
+    },
+    {
+      "id": "web3-testing",
+      "plugin": "blockchain-web3",
+      "sha": "aa84f8e30644"
+    },
+    {
+      "id": "brand-guidelines",
+      "plugin": "brand-guidelines",
+      "sha": "f7f3c8d35f22"
+    },
+    {
+      "id": "data-storytelling",
+      "plugin": "business-analytics",
+      "sha": "10b2b37689ff"
+    },
+    {
+      "id": "kpi-dashboard-design",
+      "plugin": "business-analytics",
+      "sha": "9fdec265bccb"
+    },
+    {
+      "id": "canvas-design",
+      "plugin": "canvas-design",
+      "sha": "9bb167de0893"
+    },
+    {
+      "id": "changelog-generator",
+      "plugin": "changelog-generator",
+      "sha": "648889804d65"
+    },
+    {
+      "id": "deployment-pipeline-design",
+      "plugin": "cicd-automation",
+      "sha": "7c08331da377"
+    },
+    {
+      "id": "github-actions-templates",
+      "plugin": "cicd-automation",
+      "sha": "1646c1a3c15c"
+    },
+    {
+      "id": "gitlab-ci-patterns",
+      "plugin": "cicd-automation",
+      "sha": "ad5fdc026933"
+    },
+    {
+      "id": "secrets-management",
+      "plugin": "cicd-automation",
+      "sha": "9bd9bd8b0bc7"
+    },
+    {
+      "id": "cloudbase",
+      "plugin": "cloudbase",
+      "sha": "1ad48191046f"
+    },
+    {
+      "id": "cost-optimization",
+      "plugin": "cloud-infrastructure",
+      "sha": "0cabe184541e"
+    },
+    {
+      "id": "hybrid-cloud-networking",
+      "plugin": "cloud-infrastructure",
+      "sha": "4fe246403f9d"
+    },
+    {
+      "id": "istio-traffic-management",
+      "plugin": "cloud-infrastructure",
+      "sha": "8223f6ce46c0"
+    },
+    {
+      "id": "linkerd-patterns",
+      "plugin": "cloud-infrastructure",
+      "sha": "9b436e39ef89"
+    },
+    {
+      "id": "mtls-configuration",
+      "plugin": "cloud-infrastructure",
+      "sha": "34269a79da57"
+    },
+    {
+      "id": "multi-cloud-architecture",
+      "plugin": "cloud-infrastructure",
+      "sha": "c74f2463e20d"
+    },
+    {
+      "id": "service-mesh-observability",
+      "plugin": "cloud-infrastructure",
+      "sha": "143e90106008"
+    },
+    {
+      "id": "terraform-module-library",
+      "plugin": "cloud-infrastructure",
+      "sha": "346f5f86dd2b"
+    },
+    {
+      "id": "codebuddy-md-improver",
+      "plugin": "codebuddy-md-management",
+      "sha": "8303d4a2f81e"
+    },
+    {
+      "id": "competitive-ads-extractor",
+      "plugin": "competitive-ads-extractor",
+      "sha": "bd4f62602e75"
+    },
+    {
+      "id": "context-driven-development",
+      "plugin": "conductor",
+      "sha": "f7360c6aace1"
+    },
+    {
+      "id": "track-management",
+      "plugin": "conductor",
+      "sha": "330b4e552cfe"
+    },
+    {
+      "id": "workflow-patterns",
+      "plugin": "conductor",
+      "sha": "93ebaef8fd18"
+    },
+    {
+      "id": "content-research-writer",
+      "plugin": "content-research-writer",
+      "sha": "014c7ddb5cf5"
+    },
+    {
+      "id": "airflow-dag-patterns",
+      "plugin": "data-engineering",
+      "sha": "dfed157d51cf"
+    },
+    {
+      "id": "data-quality-frameworks",
+      "plugin": "data-engineering",
+      "sha": "1faa06acc2a6"
+    },
+    {
+      "id": "dbt-transformation-patterns",
+      "plugin": "data-engineering",
+      "sha": "6b8b961a3092"
+    },
+    {
+      "id": "spark-optimization",
+      "plugin": "data-engineering",
+      "sha": "06aa076c3e38"
+    },
+    {
+      "id": "postgresql",
+      "plugin": "database-design",
+      "sha": "ddac314a546a"
+    },
+    {
+      "id": "auth-implementation-patterns",
+      "plugin": "developer-essentials",
+      "sha": "3b4b7c7c7601"
+    },
+    {
+      "id": "bazel-build-optimization",
+      "plugin": "developer-essentials",
+      "sha": "2db3733bf8ef"
+    },
+    {
+      "id": "code-review-excellence",
+      "plugin": "developer-essentials",
+      "sha": "9aeffd27ff7c"
+    },
+    {
+      "id": "debugging-strategies",
+      "plugin": "developer-essentials",
+      "sha": "4f4a13356a06"
+    },
+    {
+      "id": "e2e-testing-patterns",
+      "plugin": "developer-essentials",
+      "sha": "0311ce9be1a8"
+    },
+    {
+      "id": "error-handling-patterns",
+      "plugin": "developer-essentials",
+      "sha": "daddd806b2df"
+    },
+    {
+      "id": "git-advanced-workflows",
+      "plugin": "developer-essentials",
+      "sha": "58f1b379955c"
+    },
+    {
+      "id": "monorepo-management",
+      "plugin": "developer-essentials",
+      "sha": "0f8a6010056d"
+    },
+    {
+      "id": "nx-workspace-patterns",
+      "plugin": "developer-essentials",
+      "sha": "b5ff952a9d23"
+    },
+    {
+      "id": "sql-optimization-patterns",
+      "plugin": "developer-essentials",
+      "sha": "38bf4e62d57b"
+    },
+    {
+      "id": "turborepo-caching",
+      "plugin": "developer-essentials",
+      "sha": "2d77b75cbdea"
+    },
+    {
+      "id": "developer-growth-analysis",
+      "plugin": "developer-growth-analysis",
+      "sha": "0680e495c650"
+    },
+    {
+      "id": "doc-coauthoring",
+      "plugin": "doc-coauthoring",
+      "sha": "647d7873c1d6"
+    },
+    {
+      "id": "architecture-decision-records",
+      "plugin": "documentation-generation",
+      "sha": "4ea421b2ef37"
+    },
+    {
+      "id": "changelog-automation",
+      "plugin": "documentation-generation",
+      "sha": "f761970599d2"
+    },
+    {
+      "id": "openapi-spec-generation",
+      "plugin": "documentation-generation",
+      "sha": "734b0441fb65"
+    },
+    {
+      "id": "docx",
+      "plugin": "docx",
+      "sha": "a1539dffa377"
+    },
+    {
+      "id": "domain-name-brainstormer",
+      "plugin": "domain-name-brainstormer",
+      "sha": "93dd1e753c9a"
+    },
+    {
+      "id": "angular-migration",
+      "plugin": "framework-migration",
+      "sha": "b5e2327f9e11"
+    },
+    {
+      "id": "database-migration",
+      "plugin": "framework-migration",
+      "sha": "7d59efb9b88c"
+    },
+    {
+      "id": "dependency-upgrade",
+      "plugin": "framework-migration",
+      "sha": "5ab12bcb6443"
+    },
+    {
+      "id": "react-modernization",
+      "plugin": "framework-migration",
+      "sha": "a74881aad48e"
+    },
+    {
+      "id": "frontend-design",
+      "plugin": "frontend-design",
+      "sha": "9b70d9a4f39a"
+    },
+    {
+      "id": "color-curator",
+      "plugin": "frontend-design-pro",
+      "sha": "ce181a4cb3ba"
+    },
+    {
+      "id": "design-wizard",
+      "plugin": "frontend-design-pro",
+      "sha": "04fb4f1a3cc5"
+    },
+    {
+      "id": "inspiration-analyzer",
+      "plugin": "frontend-design-pro",
+      "sha": "afa65a8bf083"
+    },
+    {
+      "id": "moodboard-creator",
+      "plugin": "frontend-design-pro",
+      "sha": "59cd50555d54"
+    },
+    {
+      "id": "trend-researcher",
+      "plugin": "frontend-design-pro",
+      "sha": "2aa4693300c1"
+    },
+    {
+      "id": "typography-selector",
+      "plugin": "frontend-design-pro",
+      "sha": "66aa81df8a22"
+    },
+    {
+      "id": "nextjs-app-router-patterns",
+      "plugin": "frontend-mobile-development",
+      "sha": "e58e4eecf0b6"
+    },
+    {
+      "id": "react-native-architecture",
+      "plugin": "frontend-mobile-development",
+      "sha": "45c7821cf400"
+    },
+    {
+      "id": "react-state-management",
+      "plugin": "frontend-mobile-development",
+      "sha": "68ae4ce93691"
+    },
+    {
+      "id": "tailwind-design-system",
+      "plugin": "frontend-mobile-development",
+      "sha": "b63fc83708ec"
+    },
+    {
+      "id": "godot-gdscript-patterns",
+      "plugin": "game-development",
+      "sha": "0b9a9b59a87d"
+    },
+    {
+      "id": "unity-ecs-patterns",
+      "plugin": "game-development",
+      "sha": "02553b068ca2"
+    },
+    {
+      "id": "writing-rules",
+      "plugin": "hookify",
+      "sha": "7ab0314bb4ce"
+    },
+    {
+      "id": "agent-mail",
+      "plugin": "hot-skills",
+      "sha": "5eabe6aaf819"
+    },
+    {
+      "id": "apple-notes",
+      "plugin": "hot-skills",
+      "sha": "df2d3d23deb5"
+    },
+    {
+      "id": "apple-reminders",
+      "plugin": "hot-skills",
+      "sha": "83908a476d65"
+    },
+    {
+      "id": "blogwatcher",
+      "plugin": "hot-skills",
+      "sha": "c03bd0d322c6"
+    },
+    {
+      "id": "find-skills",
+      "plugin": "hot-skills",
+      "sha": "b2a7a2077fa6"
+    },
+    {
+      "id": "gifgrep",
+      "plugin": "hot-skills",
+      "sha": "70d71e712400"
+    },
+    {
+      "id": "github",
+      "plugin": "hot-skills",
+      "sha": "f4253baed7ca"
+    },
+    {
+      "id": "gog",
+      "plugin": "hot-skills",
+      "sha": "a75914e9725c"
+    },
+    {
+      "id": "healthcheck",
+      "plugin": "hot-skills",
+      "sha": "9128c86a0a57"
+    },
+    {
+      "id": "himalaya",
+      "plugin": "hot-skills",
+      "sha": "c2f4d4ae3d08"
+    },
+    {
+      "id": "humanizer",
+      "plugin": "hot-skills",
+      "sha": "0a224b9deacf"
+    },
+    {
+      "id": "imsg",
+      "plugin": "hot-skills",
+      "sha": "a6b5228a941d"
+    },
+    {
+      "id": "mcporter",
+      "plugin": "hot-skills",
+      "sha": "2f7dd962cd40"
+    },
+    {
+      "id": "nano-banana-pro",
+      "plugin": "hot-skills",
+      "sha": "d309e6a9406c"
+    },
+    {
+      "id": "nano-pdf",
+      "plugin": "hot-skills",
+      "sha": "e1e05a5a428d"
+    },
+    {
+      "id": "obsidian",
+      "plugin": "hot-skills",
+      "sha": "fc8dd58373a0"
+    },
+    {
+      "id": "openai-image-gen",
+      "plugin": "hot-skills",
+      "sha": "de85c7ee805b"
+    },
+    {
+      "id": "openai-whisper",
+      "plugin": "hot-skills",
+      "sha": "9ad4628b0c73"
+    },
+    {
+      "id": "openai-whisper-api",
+      "plugin": "hot-skills",
+      "sha": "4ca9bd4f8d6d"
+    },
+    {
+      "id": "oracle",
+      "plugin": "hot-skills",
+      "sha": "472ef2dedfa1"
+    },
+    {
+      "id": "peekaboo",
+      "plugin": "hot-skills",
+      "sha": "b10d9edd1aa8"
+    },
+    {
+      "id": "qmd",
+      "plugin": "hot-skills",
+      "sha": "f808f8402449"
+    },
+    {
+      "id": "sag",
+      "plugin": "hot-skills",
+      "sha": "0e5d391e3b01"
+    },
+    {
+      "id": "skill-creator",
+      "plugin": "hot-skills",
+      "sha": "ac0538cdb79f"
+    },
+    {
+      "id": "skill-vetter",
+      "plugin": "hot-skills",
+      "sha": "fa07f594e515"
+    },
+    {
+      "id": "songsee",
+      "plugin": "hot-skills",
+      "sha": "ce5bc3792d5d"
+    },
+    {
+      "id": "summarize",
+      "plugin": "hot-skills",
+      "sha": "b60c6db00854"
+    },
+    {
+      "id": "things-mac",
+      "plugin": "hot-skills",
+      "sha": "c1a01799d411"
+    },
+    {
+      "id": "tmux",
+      "plugin": "hot-skills",
+      "sha": "af2bde4501d0"
+    },
+    {
+      "id": "trello",
+      "plugin": "hot-skills",
+      "sha": "0a15937950b1"
+    },
+    {
+      "id": "video-frames",
+      "plugin": "hot-skills",
+      "sha": "ec0534209884"
+    },
+    {
+      "id": "wacli",
+      "plugin": "hot-skills",
+      "sha": "ae491f49b90a"
+    },
+    {
+      "id": "weather",
+      "plugin": "hot-skills",
+      "sha": "73cef35e2734"
+    },
+    {
+      "id": "xiaohongshu",
+      "plugin": "hot-skills",
+      "sha": "6f7ad5f78965"
+    },
+    {
+      "id": "xurl",
+      "plugin": "hot-skills",
+      "sha": "7df51b63e80b"
+    },
+    {
+      "id": "employment-contract-templates",
+      "plugin": "hr-legal-compliance",
+      "sha": "61a072a481be"
+    },
+    {
+      "id": "gdpr-data-handling",
+      "plugin": "hr-legal-compliance",
+      "sha": "42a1fd426d32"
+    },
+    {
+      "id": "image-enhancer",
+      "plugin": "image-enhancer",
+      "sha": "02f6fb6ede69"
+    },
+    {
+      "id": "incident-runbook-templates",
+      "plugin": "incident-response",
+      "sha": "05b4a9321226"
+    },
+    {
+      "id": "on-call-handoff-patterns",
+      "plugin": "incident-response",
+      "sha": "c91f9ab41adb"
+    },
+    {
+      "id": "postmortem-writing",
+      "plugin": "incident-response",
+      "sha": "0c4833d09787"
+    },
+    {
+      "id": "internal-comms",
+      "plugin": "internal-comms",
+      "sha": "10f738e1dfd5"
+    },
+    {
+      "id": "invoice-organizer",
+      "plugin": "invoice-organizer",
+      "sha": "733016a22932"
+    },
+    {
+      "id": "javascript-testing-patterns",
+      "plugin": "javascript-typescript",
+      "sha": "040c02e5f67d"
+    },
+    {
+      "id": "modern-javascript-patterns",
+      "plugin": "javascript-typescript",
+      "sha": "1f15b467f786"
+    },
+    {
+      "id": "nodejs-backend-patterns",
+      "plugin": "javascript-typescript",
+      "sha": "48c8db548187"
+    },
+    {
+      "id": "typescript-advanced-types",
+      "plugin": "javascript-typescript",
+      "sha": "28b5d2ab8c7d"
+    },
+    {
+      "id": "gitops-workflow",
+      "plugin": "kubernetes-operations",
+      "sha": "45b399da5760"
+    },
+    {
+      "id": "helm-chart-scaffolding",
+      "plugin": "kubernetes-operations",
+      "sha": "75a9c01a61e1"
+    },
+    {
+      "id": "k8s-manifest-generator",
+      "plugin": "kubernetes-operations",
+      "sha": "bbd3718cf099"
+    },
+    {
+      "id": "k8s-security-policies",
+      "plugin": "kubernetes-operations",
+      "sha": "2df783044ea6"
+    },
+    {
+      "id": "lead-research-assistant",
+      "plugin": "lead-research-assistant",
+      "sha": "d673aae91a82"
+    },
+    {
+      "id": "lexiang-knowledge-base",
+      "plugin": "lexiang-knowledge",
+      "sha": "94fb932b5848"
+    },
+    {
+      "id": "embedding-strategies",
+      "plugin": "llm-application-dev",
+      "sha": "50f4b699ef9b"
+    },
+    {
+      "id": "hybrid-search-implementation",
+      "plugin": "llm-application-dev",
+      "sha": "a96dcaf3fdf9"
+    },
+    {
+      "id": "langchain-architecture",
+      "plugin": "llm-application-dev",
+      "sha": "4cb7b17e1a57"
+    },
+    {
+      "id": "llm-evaluation",
+      "plugin": "llm-application-dev",
+      "sha": "e3a45c8ee4a1"
+    },
+    {
+      "id": "prompt-engineering-patterns",
+      "plugin": "llm-application-dev",
+      "sha": "bee17db28445"
+    },
+    {
+      "id": "rag-implementation",
+      "plugin": "llm-application-dev",
+      "sha": "7b8497b2e366"
+    },
+    {
+      "id": "similarity-search-patterns",
+      "plugin": "llm-application-dev",
+      "sha": "44a0bda8004b"
+    },
+    {
+      "id": "vector-index-tuning",
+      "plugin": "llm-application-dev",
+      "sha": "9f6eb033b4e1"
+    },
+    {
+      "id": "lucide-icons",
+      "plugin": "lucide-icons",
+      "sha": "69fe85a3e16c"
+    },
+    {
+      "id": "ml-pipeline-workflow",
+      "plugin": "machine-learning-ops",
+      "sha": "dc611a01d58f"
+    },
+    {
+      "id": "mcp-builder",
+      "plugin": "mcp-builder",
+      "sha": "2f59cc4805c5"
+    },
+    {
+      "id": "meeting-insights-analyzer",
+      "plugin": "meeting-insights-analyzer",
+      "sha": "c6fe71263590"
+    },
+    {
+      "id": "app-router",
+      "plugin": "nextjs-expert",
+      "sha": "03e00cce6a12"
+    },
+    {
+      "id": "auth-patterns",
+      "plugin": "nextjs-expert",
+      "sha": "4cdf8014c013"
+    },
+    {
+      "id": "route-handlers",
+      "plugin": "nextjs-expert",
+      "sha": "bb2246185c9d"
+    },
+    {
+      "id": "server-actions",
+      "plugin": "nextjs-expert",
+      "sha": "70b8cf635848"
+    },
+    {
+      "id": "server-components",
+      "plugin": "nextjs-expert",
+      "sha": "3e24aaebc569"
+    },
+    {
+      "id": "distributed-tracing",
+      "plugin": "observability-monitoring",
+      "sha": "a6303e249cf5"
+    },
+    {
+      "id": "grafana-dashboards",
+      "plugin": "observability-monitoring",
+      "sha": "b09fa1a6389b"
+    },
+    {
+      "id": "prometheus-configuration",
+      "plugin": "observability-monitoring",
+      "sha": "e9454446ffd8"
+    },
+    {
+      "id": "slo-implementation",
+      "plugin": "observability-monitoring",
+      "sha": "cf29db4f2d73"
+    },
+    {
+      "id": "json-canvas",
+      "plugin": "obsidian-skills",
+      "sha": "83393b8994d3"
+    },
+    {
+      "id": "obsidian-bases",
+      "plugin": "obsidian-skills",
+      "sha": "8101671bf4dd"
+    },
+    {
+      "id": "obsidian-markdown",
+      "plugin": "obsidian-skills",
+      "sha": "cd86d2d31c77"
+    },
+    {
+      "id": "browser",
+      "plugin": "oh-my-codebuddy",
+      "sha": "043ebe204b3a"
+    },
+    {
+      "id": "codex",
+      "plugin": "oh-my-codebuddy",
+      "sha": "9d3c039f26df"
+    },
+    {
+      "id": "deep-research",
+      "plugin": "oh-my-codebuddy",
+      "sha": "49b8ab918596"
+    },
+    {
+      "id": "gemini",
+      "plugin": "oh-my-codebuddy",
+      "sha": "d8ed6fc3e939"
+    },
+    {
+      "id": "omc",
+      "plugin": "oh-my-codebuddy",
+      "sha": "e13adc0b3fae"
+    },
+    {
+      "id": "playwright",
+      "plugin": "oh-my-codebuddy",
+      "sha": "9f3fd871376c"
+    },
+    {
+      "id": "product-requirements",
+      "plugin": "oh-my-codebuddy",
+      "sha": "c947660086e4"
+    },
+    {
+      "id": "prototype-prompt-generator",
+      "plugin": "oh-my-codebuddy",
+      "sha": "6ea7b49168a2"
+    },
+    {
+      "id": "skill-install",
+      "plugin": "oh-my-codebuddy",
+      "sha": "9cd493943d32"
+    },
+    {
+      "id": "test-cases",
+      "plugin": "oh-my-codebuddy",
+      "sha": "895239216f37"
+    },
+    {
+      "id": "payload",
+      "plugin": "payload",
+      "sha": "ebcf2472e818"
+    },
+    {
+      "id": "billing-automation",
+      "plugin": "payment-processing",
+      "sha": "d4d4db617f97"
+    },
+    {
+      "id": "paypal-integration",
+      "plugin": "payment-processing",
+      "sha": "8573a547505b"
+    },
+    {
+      "id": "pci-compliance",
+      "plugin": "payment-processing",
+      "sha": "f64ddbb0ad52"
+    },
+    {
+      "id": "stripe-integration",
+      "plugin": "payment-processing",
+      "sha": "0e9a71c42fd3"
+    },
+    {
+      "id": "pdf",
+      "plugin": "pdf",
+      "sha": "f57cb9c93fe7"
+    },
+    {
+      "id": "playwright-cli",
+      "plugin": "playwright-cli",
+      "sha": "f6075b6b8122"
+    },
+    {
+      "id": "agent-development",
+      "plugin": "plugin-dev",
+      "sha": "ac20a17690f4"
+    },
+    {
+      "id": "command-development",
+      "plugin": "plugin-dev",
+      "sha": "633fa54cbdf1"
+    },
+    {
+      "id": "hook-development",
+      "plugin": "plugin-dev",
+      "sha": "353d381018e2"
+    },
+    {
+      "id": "mcp-integration",
+      "plugin": "plugin-dev",
+      "sha": "dde42052a64c"
+    },
+    {
+      "id": "plugin-settings",
+      "plugin": "plugin-dev",
+      "sha": "e0be752991d3"
+    },
+    {
+      "id": "plugin-structure",
+      "plugin": "plugin-dev",
+      "sha": "922f2c42b290"
+    },
+    {
+      "id": "skill-development",
+      "plugin": "plugin-dev",
+      "sha": "048547d27346"
+    },
+    {
+      "id": "plugin-discovery",
+      "plugin": "plugin-finder",
+      "sha": "03561f7c02a2"
+    },
+    {
+      "id": "content-generation",
+      "plugin": "ppt-writer",
+      "sha": "f24b8daa27a2"
+    },
+    {
+      "id": "ppt-design",
+      "plugin": "ppt-writer",
+      "sha": "bdd41417dde5"
+    },
+    {
+      "id": "pptx",
+      "plugin": "pptx",
+      "sha": "73bbcbcd9104"
+    },
+    {
+      "id": "async-python-patterns",
+      "plugin": "python-development",
+      "sha": "30b3256e6d72"
+    },
+    {
+      "id": "python-packaging",
+      "plugin": "python-development",
+      "sha": "c05b87f17f9b"
+    },
+    {
+      "id": "python-performance-optimization",
+      "plugin": "python-development",
+      "sha": "55ee552d32ea"
+    },
+    {
+      "id": "python-testing-patterns",
+      "plugin": "python-development",
+      "sha": "e0c41e2279a5"
+    },
+    {
+      "id": "uv-package-manager",
+      "plugin": "python-development",
+      "sha": "79ce0870ad58"
+    },
+    {
+      "id": "backtesting-frameworks",
+      "plugin": "quantitative-trading",
+      "sha": "4654e7149e14"
+    },
+    {
+      "id": "risk-metrics-calculation",
+      "plugin": "quantitative-trading",
+      "sha": "b5d6cc89a684"
+    },
+    {
+      "id": "raffle-winner-picker",
+      "plugin": "raffle-winner-picker",
+      "sha": "df7f7c90eef4"
+    },
+    {
+      "id": "attack-tree-construction",
+      "plugin": "security-scanning",
+      "sha": "7d827a2b9ad8"
+    },
+    {
+      "id": "sast-configuration",
+      "plugin": "security-scanning",
+      "sha": "5c593aa4fae1"
+    },
+    {
+      "id": "security-requirement-extraction",
+      "plugin": "security-scanning",
+      "sha": "b50e37295296"
+    },
+    {
+      "id": "stride-analysis-patterns",
+      "plugin": "security-scanning",
+      "sha": "e0091e7a1ad6"
+    },
+    {
+      "id": "threat-mitigation-mapping",
+      "plugin": "security-scanning",
+      "sha": "c42360dbc1b2"
+    },
+    {
+      "id": "bash-defensive-patterns",
+      "plugin": "shell-scripting",
+      "sha": "a5af8c80c308"
+    },
+    {
+      "id": "bats-testing-patterns",
+      "plugin": "shell-scripting",
+      "sha": "1469c7a389ab"
+    },
+    {
+      "id": "shellcheck-configuration",
+      "plugin": "shell-scripting",
+      "sha": "29f243079149"
+    },
+    {
+      "id": "skill-creator-2",
+      "plugin": "skill-creator",
+      "sha": "ff54a9547615"
+    },
+    {
+      "id": "slack-gif-creator",
+      "plugin": "slack-gif-creator",
+      "sha": "0c5b61f69069"
+    },
+    {
+      "id": "competitive-landscape",
+      "plugin": "startup-business-analyst",
+      "sha": "883f9e0a69b3"
+    },
+    {
+      "id": "market-sizing-analysis",
+      "plugin": "startup-business-analyst",
+      "sha": "5db779dee899"
+    },
+    {
+      "id": "startup-financial-modeling",
+      "plugin": "startup-business-analyst",
+      "sha": "837b9a213e6c"
+    },
+    {
+      "id": "startup-metrics-framework",
+      "plugin": "startup-business-analyst",
+      "sha": "a26dfa02c5ed"
+    },
+    {
+      "id": "team-composition-analysis",
+      "plugin": "startup-business-analyst",
+      "sha": "ce448517863a"
+    },
+    {
+      "id": "brainstorming",
+      "plugin": "superpowers",
+      "sha": "ab9772edd8f4"
+    },
+    {
+      "id": "dispatching-parallel-agents",
+      "plugin": "superpowers",
+      "sha": "1c557b0df9a3"
+    },
+    {
+      "id": "executing-plans",
+      "plugin": "superpowers",
+      "sha": "db328bd725e2"
+    },
+    {
+      "id": "finishing-a-development-branch",
+      "plugin": "superpowers",
+      "sha": "ad48721df9fa"
+    },
+    {
+      "id": "receiving-code-review",
+      "plugin": "superpowers",
+      "sha": "1ab3e001b39f"
+    },
+    {
+      "id": "requesting-code-review",
+      "plugin": "superpowers",
+      "sha": "98f7b66963f0"
+    },
+    {
+      "id": "subagent-driven-development",
+      "plugin": "superpowers",
+      "sha": "1df7347985b8"
+    },
+    {
+      "id": "systematic-debugging",
+      "plugin": "superpowers",
+      "sha": "d5e4c5757396"
+    },
+    {
+      "id": "test-driven-development",
+      "plugin": "superpowers",
+      "sha": "df8bf2ef8386"
+    },
+    {
+      "id": "using-git-worktrees",
+      "plugin": "superpowers",
+      "sha": "cd90d933003b"
+    },
+    {
+      "id": "using-superpowers",
+      "plugin": "superpowers",
+      "sha": "5b3772e33744"
+    },
+    {
+      "id": "verification-before-completion",
+      "plugin": "superpowers",
+      "sha": "4521d2476a17"
+    },
+    {
+      "id": "writing-plans",
+      "plugin": "superpowers",
+      "sha": "1174716b24e0"
+    },
+    {
+      "id": "writing-skills",
+      "plugin": "superpowers",
+      "sha": "2930e16c65d9"
+    },
+    {
+      "id": "browsing",
+      "plugin": "superpowers-chrome",
+      "sha": "ed2e03a33bf5"
+    },
+    {
+      "id": "go-concurrency-patterns",
+      "plugin": "systems-programming",
+      "sha": "64dcd6082192"
+    },
+    {
+      "id": "memory-safety-patterns",
+      "plugin": "systems-programming",
+      "sha": "2b56d3637f9a"
+    },
+    {
+      "id": "rust-async-patterns",
+      "plugin": "systems-programming",
+      "sha": "bf8c9b8fcc5a"
+    },
+    {
+      "id": "tailored-resume-generator",
+      "plugin": "tailored-resume-generator",
+      "sha": "fe6cf9940bc2"
+    },
+    {
+      "id": "template-skill",
+      "plugin": "template-skill",
+      "sha": "aadb3ed4e18a"
+    },
+    {
+      "id": "tencent-docs",
+      "plugin": "tencent-docs",
+      "sha": "24c60cb0b016"
+    },
+    {
+      "id": "theme-factory",
+      "plugin": "theme-factory",
+      "sha": "8e70c603a335"
+    },
+    {
+      "id": "tmap-jsapi-gl",
+      "plugin": "tmap-lbs-plugin",
+      "sha": "bbc2d44df75f"
+    },
+    {
+      "id": "tmap-lbs-skills",
+      "plugin": "tmap-lbs-plugin",
+      "sha": "43d309041665"
+    },
+    {
+      "id": "ui-ux-pro-max",
+      "plugin": "ui-ux-pro-max-skill",
+      "sha": "9ad0a4fb35a3"
+    },
+    {
+      "id": "video-downloader",
+      "plugin": "video-downloader",
+      "sha": "91a3d228cbae"
+    },
+    {
+      "id": "web-artifacts-builder",
+      "plugin": "web-artifacts-builder",
+      "sha": "fc5d078b8b85"
+    },
+    {
+      "id": "webapp-testing",
+      "plugin": "webapp-testing",
+      "sha": "a71271f620ff"
+    },
+    {
+      "id": "xlsx",
+      "plugin": "xlsx",
+      "sha": "f9c9f27e9cd1"
+    },
+    {
+      "id": "testbuddy-ext-skill",
+      "plugin": "testbuddy",
+      "sha": "f8323bc48e54"
+    },
+    {
+      "id": "testbuddy-skill",
+      "plugin": "testbuddy",
+      "sha": "dcf6c0269a60"
+    },
+    {
+      "id": "testx-case-deacy-skill",
+      "plugin": "testbuddy",
+      "sha": "0740112c5849"
+    },
+    {
+      "id": "alb-autotest-codegen",
+      "plugin": "tsmart",
+      "sha": "30396e86ee57"
+    },
+    {
+      "id": "cloudgame-codegen",
+      "plugin": "tsmart",
+      "sha": "dafc3ffa901c"
+    },
+    {
+      "id": "tcase-casegen-workflow",
+      "plugin": "tsmart",
+      "sha": "bca46f60ef7a"
+    },
+    {
+      "id": "tcase-codegen",
+      "plugin": "tsmart",
+      "sha": "1ac4c137f9eb"
+    },
+    {
+      "id": "testbuddy-skill-2",
+      "plugin": "tsmart",
+      "sha": "3a49da868e3e"
+    },
+    {
+      "id": "yottadb-function-testing",
+      "plugin": "tsmart",
+      "sha": "f796b67a2ee9"
+    },
+    {
+      "id": "add-tools",
+      "plugin": "wedata3",
+      "sha": "0f9da2dd456e"
+    },
+    {
+      "id": "discover-tools",
+      "plugin": "wedata3",
+      "sha": "184bd7d30e88"
+    },
+    {
+      "id": "modify-agent",
+      "plugin": "wedata3",
+      "sha": "a5a552a4a3ce"
+    },
+    {
+      "id": "wedata-deploy",
+      "plugin": "wedata3",
+      "sha": "7e0754dc9ea8"
+    },
+    {
+      "id": "wedata-local-mcp-example",
+      "plugin": "wedata3",
+      "sha": "48b777450a87"
+    },
+    {
+      "id": "wedata-quickstart",
+      "plugin": "wedata3",
+      "sha": "14ba116dcc9b"
+    }
+  ],
+  "agents": [
+    {
+      "id": "cb-ui-visual-validator",
+      "plugin": "accessibility-compliance",
+      "file": "ui-visual-validator.md"
+    },
+    {
+      "id": "cb-context-manager",
+      "plugin": "agent-orchestration",
+      "file": "context-manager.md"
+    },
+    {
+      "id": "cb-agent-sdk-verifier-py",
+      "plugin": "agent-sdk-dev",
+      "file": "agent-sdk-verifier-py.md"
+    },
+    {
+      "id": "cb-agent-sdk-verifier-ts",
+      "plugin": "agent-sdk-dev",
+      "file": "agent-sdk-verifier-ts.md"
+    },
+    {
+      "id": "cb-bmad-architect",
+      "plugin": "agent-team-agile-workflow",
+      "file": "bmad-architect.md"
+    },
+    {
+      "id": "cb-bmad-dev",
+      "plugin": "agent-team-agile-workflow",
+      "file": "bmad-dev.md"
+    },
+    {
+      "id": "cb-bmad-orchestrator",
+      "plugin": "agent-team-agile-workflow",
+      "file": "bmad-orchestrator.md"
+    },
+    {
+      "id": "cb-bmad-po",
+      "plugin": "agent-team-agile-workflow",
+      "file": "bmad-po.md"
+    },
+    {
+      "id": "cb-bmad-qa",
+      "plugin": "agent-team-agile-workflow",
+      "file": "bmad-qa.md"
+    },
+    {
+      "id": "cb-bmad-review",
+      "plugin": "agent-team-agile-workflow",
+      "file": "bmad-review.md"
+    },
+    {
+      "id": "cb-bmad-sm",
+      "plugin": "agent-team-agile-workflow",
+      "file": "bmad-sm.md"
+    },
+    {
+      "id": "cb-blockchain-developer",
+      "plugin": "agents-blockchain-web3",
+      "file": "blockchain-developer.md"
+    },
+    {
+      "id": "cb-hyperledger-fabric-developer",
+      "plugin": "agents-blockchain-web3",
+      "file": "hyperledger-fabric-developer.md"
+    },
+    {
+      "id": "cb-business-analyst",
+      "plugin": "agents-business-finance",
+      "file": "business-analyst.md"
+    },
+    {
+      "id": "cb-legal-advisor",
+      "plugin": "agents-business-finance",
+      "file": "legal-advisor.md"
+    },
+    {
+      "id": "cb-payment-integration",
+      "plugin": "agents-business-finance",
+      "file": "payment-integration.md"
+    },
+    {
+      "id": "cb-quant-analyst",
+      "plugin": "agents-business-finance",
+      "file": "quant-analyst.md"
+    },
+    {
+      "id": "cb-arbitrage-bot",
+      "plugin": "agents-crypto-trading",
+      "file": "arbitrage-bot.md"
+    },
+    {
+      "id": "cb-crypto-analyst",
+      "plugin": "agents-crypto-trading",
+      "file": "crypto-analyst.md"
+    },
+    {
+      "id": "cb-crypto-risk-manager",
+      "plugin": "agents-crypto-trading",
+      "file": "crypto-risk-manager.md"
+    },
+    {
+      "id": "cb-crypto-trader",
+      "plugin": "agents-crypto-trading",
+      "file": "crypto-trader.md"
+    },
+    {
+      "id": "cb-defi-strategist",
+      "plugin": "agents-crypto-trading",
+      "file": "defi-strategist.md"
+    },
+    {
+      "id": "cb-ai-engineer",
+      "plugin": "agents-data-ai",
+      "file": "ai-engineer.md"
+    },
+    {
+      "id": "cb-context-manager-2",
+      "plugin": "agents-data-ai",
+      "file": "context-manager.md"
+    },
+    {
+      "id": "cb-data-engineer",
+      "plugin": "agents-data-ai",
+      "file": "data-engineer.md"
+    },
+    {
+      "id": "cb-data-scientist",
+      "plugin": "agents-data-ai",
+      "file": "data-scientist.md"
+    },
+    {
+      "id": "cb-hackathon-ai-strategist",
+      "plugin": "agents-data-ai",
+      "file": "hackathon-ai-strategist.md"
+    },
+    {
+      "id": "cb-llms-maintainer",
+      "plugin": "agents-data-ai",
+      "file": "llms-maintainer.md"
+    },
+    {
+      "id": "cb-ml-engineer",
+      "plugin": "agents-data-ai",
+      "file": "ml-engineer.md"
+    },
+    {
+      "id": "cb-mlops-engineer",
+      "plugin": "agents-data-ai",
+      "file": "mlops-engineer.md"
+    },
+    {
+      "id": "cb-prompt-engineer",
+      "plugin": "agents-data-ai",
+      "file": "prompt-engineer.md"
+    },
+    {
+      "id": "cb-search-specialist",
+      "plugin": "agents-data-ai",
+      "file": "search-specialist.md"
+    },
+    {
+      "id": "cb-task-decomposition-expert",
+      "plugin": "agents-data-ai",
+      "file": "task-decomposition-expert.md"
+    },
+    {
+      "id": "cb-accessibility-specialist",
+      "plugin": "agents-design-experience",
+      "file": "accessibility-specialist.md"
+    },
+    {
+      "id": "cb-ui-ux-designer",
+      "plugin": "agents-design-experience",
+      "file": "ui-ux-designer.md"
+    },
+    {
+      "id": "cb-backend-architect",
+      "plugin": "agents-development-architecture",
+      "file": "backend-architect.md"
+    },
+    {
+      "id": "cb-directus-developer",
+      "plugin": "agents-development-architecture",
+      "file": "directus-developer.md"
+    },
+    {
+      "id": "cb-drupal-developer",
+      "plugin": "agents-development-architecture",
+      "file": "drupal-developer.md"
+    },
+    {
+      "id": "cb-frontend-developer",
+      "plugin": "agents-development-architecture",
+      "file": "frontend-developer.md"
+    },
+    {
+      "id": "cb-graphql-architect",
+      "plugin": "agents-development-architecture",
+      "file": "graphql-architect.md"
+    },
+    {
+      "id": "cb-ios-developer",
+      "plugin": "agents-development-architecture",
+      "file": "ios-developer.md"
+    },
+    {
+      "id": "cb-laravel-vue-developer",
+      "plugin": "agents-development-architecture",
+      "file": "laravel-vue-developer.md"
+    },
+    {
+      "id": "cb-mobile-developer",
+      "plugin": "agents-development-architecture",
+      "file": "mobile-developer.md"
+    },
+    {
+      "id": "cb-nextjs-app-router-developer",
+      "plugin": "agents-development-architecture",
+      "file": "nextjs-app-router-developer.md"
+    },
+    {
+      "id": "cb-react-performance-optimization",
+      "plugin": "agents-development-architecture",
+      "file": "react-performance-optimization.md"
+    },
+    {
+      "id": "cb-wordpress-developer",
+      "plugin": "agents-development-architecture",
+      "file": "wordpress-developer.md"
+    },
+    {
+      "id": "cb-cloud-architect",
+      "plugin": "agents-infrastructure-operations",
+      "file": "cloud-architect.md"
+    },
+    {
+      "id": "cb-database-admin",
+      "plugin": "agents-infrastructure-operations",
+      "file": "database-admin.md"
+    },
+    {
+      "id": "cb-database-optimization",
+      "plugin": "agents-infrastructure-operations",
+      "file": "database-optimization.md"
+    },
+    {
+      "id": "cb-database-optimizer",
+      "plugin": "agents-infrastructure-operations",
+      "file": "database-optimizer.md"
+    },
+    {
+      "id": "cb-deployment-engineer",
+      "plugin": "agents-infrastructure-operations",
+      "file": "deployment-engineer.md"
+    },
+    {
+      "id": "cb-devops-troubleshooter",
+      "plugin": "agents-infrastructure-operations",
+      "file": "devops-troubleshooter.md"
+    },
+    {
+      "id": "cb-network-engineer",
+      "plugin": "agents-infrastructure-operations",
+      "file": "network-engineer.md"
+    },
+    {
+      "id": "cb-terraform-specialist",
+      "plugin": "agents-infrastructure-operations",
+      "file": "terraform-specialist.md"
+    },
+    {
+      "id": "cb-c-developer",
+      "plugin": "agents-language-specialists",
+      "file": "c-developer.md"
+    },
+    {
+      "id": "cb-cpp-engineer",
+      "plugin": "agents-language-specialists",
+      "file": "cpp-engineer.md"
+    },
+    {
+      "id": "cb-golang-expert",
+      "plugin": "agents-language-specialists",
+      "file": "golang-expert.md"
+    },
+    {
+      "id": "cb-java-developer",
+      "plugin": "agents-language-specialists",
+      "file": "java-developer.md"
+    },
+    {
+      "id": "cb-javascript-developer",
+      "plugin": "agents-language-specialists",
+      "file": "javascript-developer.md"
+    },
+    {
+      "id": "cb-php-developer",
+      "plugin": "agents-language-specialists",
+      "file": "php-developer.md"
+    },
+    {
+      "id": "cb-python-expert",
+      "plugin": "agents-language-specialists",
+      "file": "python-expert.md"
+    },
+    {
+      "id": "cb-rails-expert",
+      "plugin": "agents-language-specialists",
+      "file": "rails-expert.md"
+    },
+    {
+      "id": "cb-ruby-expert",
+      "plugin": "agents-language-specialists",
+      "file": "ruby-expert.md"
+    },
+    {
+      "id": "cb-rust-expert",
+      "plugin": "agents-language-specialists",
+      "file": "rust-expert.md"
+    },
+    {
+      "id": "cb-sql-expert",
+      "plugin": "agents-language-specialists",
+      "file": "sql-expert.md"
+    },
+    {
+      "id": "cb-typescript-expert",
+      "plugin": "agents-language-specialists",
+      "file": "typescript-expert.md"
+    },
+    {
+      "id": "cb-api-security-audit",
+      "plugin": "agents-quality-security",
+      "file": "api-security-audit.md"
+    },
+    {
+      "id": "cb-architect-review",
+      "plugin": "agents-quality-security",
+      "file": "architect-review.md"
+    },
+    {
+      "id": "cb-code-reviewer",
+      "plugin": "agents-quality-security",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-command-expert",
+      "plugin": "agents-quality-security",
+      "file": "command-expert.md"
+    },
+    {
+      "id": "cb-debugger",
+      "plugin": "agents-quality-security",
+      "file": "debugger.md"
+    },
+    {
+      "id": "cb-dx-optimizer",
+      "plugin": "agents-quality-security",
+      "file": "dx-optimizer.md"
+    },
+    {
+      "id": "cb-error-detective",
+      "plugin": "agents-quality-security",
+      "file": "error-detective.md"
+    },
+    {
+      "id": "cb-incident-responder",
+      "plugin": "agents-quality-security",
+      "file": "incident-responder.md"
+    },
+    {
+      "id": "cb-mcp-security-auditor",
+      "plugin": "agents-quality-security",
+      "file": "mcp-security-auditor.md"
+    },
+    {
+      "id": "cb-mcp-server-architect",
+      "plugin": "agents-quality-security",
+      "file": "mcp-server-architect.md"
+    },
+    {
+      "id": "cb-mcp-testing-engineer",
+      "plugin": "agents-quality-security",
+      "file": "mcp-testing-engineer.md"
+    },
+    {
+      "id": "cb-performance-engineer",
+      "plugin": "agents-quality-security",
+      "file": "performance-engineer.md"
+    },
+    {
+      "id": "cb-review-agent",
+      "plugin": "agents-quality-security",
+      "file": "review-agent.md"
+    },
+    {
+      "id": "cb-security-auditor",
+      "plugin": "agents-quality-security",
+      "file": "security-auditor.md"
+    },
+    {
+      "id": "cb-test-automator",
+      "plugin": "agents-quality-security",
+      "file": "test-automator.md"
+    },
+    {
+      "id": "cb-content-marketer",
+      "plugin": "agents-sales-marketing",
+      "file": "content-marketer.md"
+    },
+    {
+      "id": "cb-customer-support",
+      "plugin": "agents-sales-marketing",
+      "file": "customer-support.md"
+    },
+    {
+      "id": "cb-risk-manager",
+      "plugin": "agents-sales-marketing",
+      "file": "risk-manager.md"
+    },
+    {
+      "id": "cb-sales-automator",
+      "plugin": "agents-sales-marketing",
+      "file": "sales-automator.md"
+    },
+    {
+      "id": "cb-social-media-clip-creator",
+      "plugin": "agents-sales-marketing",
+      "file": "social-media-clip-creator.md"
+    },
+    {
+      "id": "cb-social-media-copywriter",
+      "plugin": "agents-sales-marketing",
+      "file": "social-media-copywriter.md"
+    },
+    {
+      "id": "cb-academic-research-synthesizer",
+      "plugin": "agents-specialized-domains",
+      "file": "academic-research-synthesizer.md"
+    },
+    {
+      "id": "cb-academic-researcher",
+      "plugin": "agents-specialized-domains",
+      "file": "academic-researcher.md"
+    },
+    {
+      "id": "cb-agent-expert",
+      "plugin": "agents-specialized-domains",
+      "file": "agent-expert.md"
+    },
+    {
+      "id": "cb-api-documenter",
+      "plugin": "agents-specialized-domains",
+      "file": "api-documenter.md"
+    },
+    {
+      "id": "cb-audio-quality-controller",
+      "plugin": "agents-specialized-domains",
+      "file": "audio-quality-controller.md"
+    },
+    {
+      "id": "cb-comprehensive-researcher",
+      "plugin": "agents-specialized-domains",
+      "file": "comprehensive-researcher.md"
+    },
+    {
+      "id": "cb-connection-agent",
+      "plugin": "agents-specialized-domains",
+      "file": "connection-agent.md"
+    },
+    {
+      "id": "cb-data-analyst",
+      "plugin": "agents-specialized-domains",
+      "file": "data-analyst.md"
+    },
+    {
+      "id": "cb-docusaurus-expert",
+      "plugin": "agents-specialized-domains",
+      "file": "docusaurus-expert.md"
+    },
+    {
+      "id": "cb-episode-orchestrator",
+      "plugin": "agents-specialized-domains",
+      "file": "episode-orchestrator.md"
+    },
+    {
+      "id": "cb-game-developer",
+      "plugin": "agents-specialized-domains",
+      "file": "game-developer.md"
+    },
+    {
+      "id": "cb-legacy-modernizer",
+      "plugin": "agents-specialized-domains",
+      "file": "legacy-modernizer.md"
+    },
+    {
+      "id": "cb-markdown-syntax-formatter",
+      "plugin": "agents-specialized-domains",
+      "file": "markdown-syntax-formatter.md"
+    },
+    {
+      "id": "cb-market-research-analyst",
+      "plugin": "agents-specialized-domains",
+      "file": "market-research-analyst.md"
+    },
+    {
+      "id": "cb-mcp-deployment-orchestrator",
+      "plugin": "agents-specialized-domains",
+      "file": "mcp-deployment-orchestrator.md"
+    },
+    {
+      "id": "cb-mcp-expert",
+      "plugin": "agents-specialized-domains",
+      "file": "mcp-expert.md"
+    },
+    {
+      "id": "cb-mcp-registry-navigator",
+      "plugin": "agents-specialized-domains",
+      "file": "mcp-registry-navigator.md"
+    },
+    {
+      "id": "cb-metadata-agent",
+      "plugin": "agents-specialized-domains",
+      "file": "metadata-agent.md"
+    },
+    {
+      "id": "cb-moc-agent",
+      "plugin": "agents-specialized-domains",
+      "file": "moc-agent.md"
+    },
+    {
+      "id": "cb-ocr-grammar-fixer",
+      "plugin": "agents-specialized-domains",
+      "file": "ocr-grammar-fixer.md"
+    },
+    {
+      "id": "cb-ocr-quality-assurance",
+      "plugin": "agents-specialized-domains",
+      "file": "ocr-quality-assurance.md"
+    },
+    {
+      "id": "cb-podcast-content-analyzer",
+      "plugin": "agents-specialized-domains",
+      "file": "podcast-content-analyzer.md"
+    },
+    {
+      "id": "cb-podcast-metadata-specialist",
+      "plugin": "agents-specialized-domains",
+      "file": "podcast-metadata-specialist.md"
+    },
+    {
+      "id": "cb-podcast-transcriber",
+      "plugin": "agents-specialized-domains",
+      "file": "podcast-transcriber.md"
+    },
+    {
+      "id": "cb-podcast-trend-scout",
+      "plugin": "agents-specialized-domains",
+      "file": "podcast-trend-scout.md"
+    },
+    {
+      "id": "cb-project-supervisor-orchestrator",
+      "plugin": "agents-specialized-domains",
+      "file": "project-supervisor-orchestrator.md"
+    },
+    {
+      "id": "cb-query-clarifier",
+      "plugin": "agents-specialized-domains",
+      "file": "query-clarifier.md"
+    },
+    {
+      "id": "cb-report-generator",
+      "plugin": "agents-specialized-domains",
+      "file": "report-generator.md"
+    },
+    {
+      "id": "cb-research-brief-generator",
+      "plugin": "agents-specialized-domains",
+      "file": "research-brief-generator.md"
+    },
+    {
+      "id": "cb-research-coordinator",
+      "plugin": "agents-specialized-domains",
+      "file": "research-coordinator.md"
+    },
+    {
+      "id": "cb-research-orchestrator",
+      "plugin": "agents-specialized-domains",
+      "file": "research-orchestrator.md"
+    },
+    {
+      "id": "cb-research-synthesizer",
+      "plugin": "agents-specialized-domains",
+      "file": "research-synthesizer.md"
+    },
+    {
+      "id": "cb-seo-podcast-optimizer",
+      "plugin": "agents-specialized-domains",
+      "file": "seo-podcast-optimizer.md"
+    },
+    {
+      "id": "cb-tag-agent",
+      "plugin": "agents-specialized-domains",
+      "file": "tag-agent.md"
+    },
+    {
+      "id": "cb-technical-researcher",
+      "plugin": "agents-specialized-domains",
+      "file": "technical-researcher.md"
+    },
+    {
+      "id": "cb-text-comparison-validator",
+      "plugin": "agents-specialized-domains",
+      "file": "text-comparison-validator.md"
+    },
+    {
+      "id": "cb-timestamp-precision-specialist",
+      "plugin": "agents-specialized-domains",
+      "file": "timestamp-precision-specialist.md"
+    },
+    {
+      "id": "cb-twitter-ai-influencer-manager",
+      "plugin": "agents-specialized-domains",
+      "file": "twitter-ai-influencer-manager.md"
+    },
+    {
+      "id": "cb-url-context-validator",
+      "plugin": "agents-specialized-domains",
+      "file": "url-context-validator.md"
+    },
+    {
+      "id": "cb-url-link-extractor",
+      "plugin": "agents-specialized-domains",
+      "file": "url-link-extractor.md"
+    },
+    {
+      "id": "cb-visual-analysis-ocr",
+      "plugin": "agents-specialized-domains",
+      "file": "visual-analysis-ocr.md"
+    },
+    {
+      "id": "cb-backend-architect-2",
+      "plugin": "api-scaffolding",
+      "file": "backend-architect.md"
+    },
+    {
+      "id": "cb-django-pro",
+      "plugin": "api-scaffolding",
+      "file": "django-pro.md"
+    },
+    {
+      "id": "cb-fastapi-pro",
+      "plugin": "api-scaffolding",
+      "file": "fastapi-pro.md"
+    },
+    {
+      "id": "cb-graphql-architect-2",
+      "plugin": "api-scaffolding",
+      "file": "graphql-architect.md"
+    },
+    {
+      "id": "cb-api-documenter-2",
+      "plugin": "api-testing-observability",
+      "file": "api-documenter.md"
+    },
+    {
+      "id": "cb-frontend-developer-2",
+      "plugin": "application-performance",
+      "file": "frontend-developer.md"
+    },
+    {
+      "id": "cb-observability-engineer",
+      "plugin": "application-performance",
+      "file": "observability-engineer.md"
+    },
+    {
+      "id": "cb-performance-engineer-2",
+      "plugin": "application-performance",
+      "file": "performance-engineer.md"
+    },
+    {
+      "id": "cb-arm-cortex-expert",
+      "plugin": "arm-cortex-microcontrollers",
+      "file": "arm-cortex-expert.md"
+    },
+    {
+      "id": "cb-backend-architect-3",
+      "plugin": "backend-api-security",
+      "file": "backend-architect.md"
+    },
+    {
+      "id": "cb-backend-security-coder",
+      "plugin": "backend-api-security",
+      "file": "backend-security-coder.md"
+    },
+    {
+      "id": "cb-backend-architect-4",
+      "plugin": "backend-development",
+      "file": "backend-architect.md"
+    },
+    {
+      "id": "cb-event-sourcing-architect",
+      "plugin": "backend-development",
+      "file": "event-sourcing-architect.md"
+    },
+    {
+      "id": "cb-graphql-architect-3",
+      "plugin": "backend-development",
+      "file": "graphql-architect.md"
+    },
+    {
+      "id": "cb-tdd-orchestrator",
+      "plugin": "backend-development",
+      "file": "tdd-orchestrator.md"
+    },
+    {
+      "id": "cb-temporal-python-pro",
+      "plugin": "backend-development",
+      "file": "temporal-python-pro.md"
+    },
+    {
+      "id": "cb-blockchain-developer-2",
+      "plugin": "blockchain-web3",
+      "file": "blockchain-developer.md"
+    },
+    {
+      "id": "cb-business-analyst-2",
+      "plugin": "business-analytics",
+      "file": "business-analyst.md"
+    },
+    {
+      "id": "cb-c4-code",
+      "plugin": "c4-architecture",
+      "file": "c4-code.md"
+    },
+    {
+      "id": "cb-c4-component",
+      "plugin": "c4-architecture",
+      "file": "c4-component.md"
+    },
+    {
+      "id": "cb-c4-container",
+      "plugin": "c4-architecture",
+      "file": "c4-container.md"
+    },
+    {
+      "id": "cb-c4-context",
+      "plugin": "c4-architecture",
+      "file": "c4-context.md"
+    },
+    {
+      "id": "cb-cloud-architect-2",
+      "plugin": "cicd-automation",
+      "file": "cloud-architect.md"
+    },
+    {
+      "id": "cb-devops-troubleshooter-2",
+      "plugin": "cicd-automation",
+      "file": "devops-troubleshooter.md"
+    },
+    {
+      "id": "cb-kubernetes-architect",
+      "plugin": "cicd-automation",
+      "file": "kubernetes-architect.md"
+    },
+    {
+      "id": "cb-terraform-specialist-2",
+      "plugin": "cicd-automation",
+      "file": "terraform-specialist.md"
+    },
+    {
+      "id": "cb-cloud-architect-3",
+      "plugin": "cloud-infrastructure",
+      "file": "cloud-architect.md"
+    },
+    {
+      "id": "cb-deployment-engineer-2",
+      "plugin": "cloud-infrastructure",
+      "file": "deployment-engineer.md"
+    },
+    {
+      "id": "cb-hybrid-cloud-architect",
+      "plugin": "cloud-infrastructure",
+      "file": "hybrid-cloud-architect.md"
+    },
+    {
+      "id": "cb-kubernetes-architect-2",
+      "plugin": "cloud-infrastructure",
+      "file": "kubernetes-architect.md"
+    },
+    {
+      "id": "cb-network-engineer-2",
+      "plugin": "cloud-infrastructure",
+      "file": "network-engineer.md"
+    },
+    {
+      "id": "cb-service-mesh-expert",
+      "plugin": "cloud-infrastructure",
+      "file": "service-mesh-expert.md"
+    },
+    {
+      "id": "cb-terraform-specialist-3",
+      "plugin": "cloud-infrastructure",
+      "file": "terraform-specialist.md"
+    },
+    {
+      "id": "cb-code-reviewer-2",
+      "plugin": "code-documentation",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-docs-architect",
+      "plugin": "code-documentation",
+      "file": "docs-architect.md"
+    },
+    {
+      "id": "cb-tutorial-engineer",
+      "plugin": "code-documentation",
+      "file": "tutorial-engineer.md"
+    },
+    {
+      "id": "cb-code-reviewer-3",
+      "plugin": "code-refactoring",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-legacy-modernizer-2",
+      "plugin": "code-refactoring",
+      "file": "legacy-modernizer.md"
+    },
+    {
+      "id": "cb-architect-review-2",
+      "plugin": "code-review-ai",
+      "file": "architect-review.md"
+    },
+    {
+      "id": "cb-code-simplifier",
+      "plugin": "code-simplifier",
+      "file": "code-simplifier.md"
+    },
+    {
+      "id": "cb-code-reviewer-4",
+      "plugin": "codebase-cleanup",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-test-automator-2",
+      "plugin": "codebase-cleanup",
+      "file": "test-automator.md"
+    },
+    {
+      "id": "cb-architect-review-3",
+      "plugin": "comprehensive-review",
+      "file": "architect-review.md"
+    },
+    {
+      "id": "cb-code-reviewer-5",
+      "plugin": "comprehensive-review",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-security-auditor-2",
+      "plugin": "comprehensive-review",
+      "file": "security-auditor.md"
+    },
+    {
+      "id": "cb-conductor-validator",
+      "plugin": "conductor",
+      "file": "conductor-validator.md"
+    },
+    {
+      "id": "cb-content-marketer-2",
+      "plugin": "content-marketing",
+      "file": "content-marketer.md"
+    },
+    {
+      "id": "cb-search-specialist-2",
+      "plugin": "content-marketing",
+      "file": "search-specialist.md"
+    },
+    {
+      "id": "cb-context-manager-3",
+      "plugin": "context-management",
+      "file": "context-manager.md"
+    },
+    {
+      "id": "cb-customer-support-2",
+      "plugin": "customer-sales-automation",
+      "file": "customer-support.md"
+    },
+    {
+      "id": "cb-sales-automator-2",
+      "plugin": "customer-sales-automation",
+      "file": "sales-automator.md"
+    },
+    {
+      "id": "cb-backend-architect-5",
+      "plugin": "data-engineering",
+      "file": "backend-architect.md"
+    },
+    {
+      "id": "cb-data-engineer-2",
+      "plugin": "data-engineering",
+      "file": "data-engineer.md"
+    },
+    {
+      "id": "cb-backend-security-coder-2",
+      "plugin": "data-validation-suite",
+      "file": "backend-security-coder.md"
+    },
+    {
+      "id": "cb-backend-architect-6",
+      "plugin": "database-cloud-optimization",
+      "file": "backend-architect.md"
+    },
+    {
+      "id": "cb-cloud-architect-4",
+      "plugin": "database-cloud-optimization",
+      "file": "cloud-architect.md"
+    },
+    {
+      "id": "cb-database-architect",
+      "plugin": "database-cloud-optimization",
+      "file": "database-architect.md"
+    },
+    {
+      "id": "cb-database-optimizer-2",
+      "plugin": "database-cloud-optimization",
+      "file": "database-optimizer.md"
+    },
+    {
+      "id": "cb-database-architect-2",
+      "plugin": "database-design",
+      "file": "database-architect.md"
+    },
+    {
+      "id": "cb-sql-pro",
+      "plugin": "database-design",
+      "file": "sql-pro.md"
+    },
+    {
+      "id": "cb-database-admin-2",
+      "plugin": "database-migrations",
+      "file": "database-admin.md"
+    },
+    {
+      "id": "cb-database-optimizer-3",
+      "plugin": "database-migrations",
+      "file": "database-optimizer.md"
+    },
+    {
+      "id": "cb-debugger-2",
+      "plugin": "debugging-toolkit",
+      "file": "debugger.md"
+    },
+    {
+      "id": "cb-dx-optimizer-2",
+      "plugin": "debugging-toolkit",
+      "file": "dx-optimizer.md"
+    },
+    {
+      "id": "cb-legacy-modernizer-3",
+      "plugin": "dependency-management",
+      "file": "legacy-modernizer.md"
+    },
+    {
+      "id": "cb-deployment-engineer-3",
+      "plugin": "deployment-strategies",
+      "file": "deployment-engineer.md"
+    },
+    {
+      "id": "cb-terraform-specialist-4",
+      "plugin": "deployment-strategies",
+      "file": "terraform-specialist.md"
+    },
+    {
+      "id": "cb-cloud-architect-5",
+      "plugin": "deployment-validation",
+      "file": "cloud-architect.md"
+    },
+    {
+      "id": "cb-monorepo-architect",
+      "plugin": "developer-essentials",
+      "file": "monorepo-architect.md"
+    },
+    {
+      "id": "cb-bugfix-verify",
+      "plugin": "development-essentials",
+      "file": "bugfix-verify.md"
+    },
+    {
+      "id": "cb-bugfix",
+      "plugin": "development-essentials",
+      "file": "bugfix.md"
+    },
+    {
+      "id": "cb-code",
+      "plugin": "development-essentials",
+      "file": "code.md"
+    },
+    {
+      "id": "cb-debug",
+      "plugin": "development-essentials",
+      "file": "debug.md"
+    },
+    {
+      "id": "cb-optimize",
+      "plugin": "development-essentials",
+      "file": "optimize.md"
+    },
+    {
+      "id": "cb-devops-troubleshooter-3",
+      "plugin": "distributed-debugging",
+      "file": "devops-troubleshooter.md"
+    },
+    {
+      "id": "cb-error-detective-2",
+      "plugin": "distributed-debugging",
+      "file": "error-detective.md"
+    },
+    {
+      "id": "cb-api-documenter-3",
+      "plugin": "documentation-generation",
+      "file": "api-documenter.md"
+    },
+    {
+      "id": "cb-docs-architect-2",
+      "plugin": "documentation-generation",
+      "file": "docs-architect.md"
+    },
+    {
+      "id": "cb-mermaid-expert",
+      "plugin": "documentation-generation",
+      "file": "mermaid-expert.md"
+    },
+    {
+      "id": "cb-reference-builder",
+      "plugin": "documentation-generation",
+      "file": "reference-builder.md"
+    },
+    {
+      "id": "cb-tutorial-engineer-2",
+      "plugin": "documentation-generation",
+      "file": "tutorial-engineer.md"
+    },
+    {
+      "id": "cb-debugger-3",
+      "plugin": "error-debugging",
+      "file": "debugger.md"
+    },
+    {
+      "id": "cb-error-detective-3",
+      "plugin": "error-debugging",
+      "file": "error-detective.md"
+    },
+    {
+      "id": "cb-debugger-4",
+      "plugin": "error-diagnostics",
+      "file": "debugger.md"
+    },
+    {
+      "id": "cb-error-detective-4",
+      "plugin": "error-diagnostics",
+      "file": "error-detective.md"
+    },
+    {
+      "id": "cb-code-architect",
+      "plugin": "feature-dev",
+      "file": "code-architect.md"
+    },
+    {
+      "id": "cb-code-explorer",
+      "plugin": "feature-dev",
+      "file": "code-explorer.md"
+    },
+    {
+      "id": "cb-code-reviewer-6",
+      "plugin": "feature-dev",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-architect-review-4",
+      "plugin": "framework-migration",
+      "file": "architect-review.md"
+    },
+    {
+      "id": "cb-legacy-modernizer-4",
+      "plugin": "framework-migration",
+      "file": "legacy-modernizer.md"
+    },
+    {
+      "id": "cb-frontend-developer-3",
+      "plugin": "frontend-mobile-development",
+      "file": "frontend-developer.md"
+    },
+    {
+      "id": "cb-mobile-developer-2",
+      "plugin": "frontend-mobile-development",
+      "file": "mobile-developer.md"
+    },
+    {
+      "id": "cb-frontend-developer-4",
+      "plugin": "frontend-mobile-security",
+      "file": "frontend-developer.md"
+    },
+    {
+      "id": "cb-frontend-security-coder",
+      "plugin": "frontend-mobile-security",
+      "file": "frontend-security-coder.md"
+    },
+    {
+      "id": "cb-mobile-security-coder",
+      "plugin": "frontend-mobile-security",
+      "file": "mobile-security-coder.md"
+    },
+    {
+      "id": "cb-deployment-engineer-4",
+      "plugin": "full-stack-orchestration",
+      "file": "deployment-engineer.md"
+    },
+    {
+      "id": "cb-performance-engineer-3",
+      "plugin": "full-stack-orchestration",
+      "file": "performance-engineer.md"
+    },
+    {
+      "id": "cb-security-auditor-3",
+      "plugin": "full-stack-orchestration",
+      "file": "security-auditor.md"
+    },
+    {
+      "id": "cb-test-automator-3",
+      "plugin": "full-stack-orchestration",
+      "file": "test-automator.md"
+    },
+    {
+      "id": "cb-elixir-pro",
+      "plugin": "functional-programming",
+      "file": "elixir-pro.md"
+    },
+    {
+      "id": "cb-haskell-pro",
+      "plugin": "functional-programming",
+      "file": "haskell-pro.md"
+    },
+    {
+      "id": "cb-minecraft-bukkit-pro",
+      "plugin": "game-development",
+      "file": "minecraft-bukkit-pro.md"
+    },
+    {
+      "id": "cb-unity-developer",
+      "plugin": "game-development",
+      "file": "unity-developer.md"
+    },
+    {
+      "id": "cb-code-reviewer-7",
+      "plugin": "git-pr-workflows",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-conversation-analyzer",
+      "plugin": "hookify",
+      "file": "conversation-analyzer.md"
+    },
+    {
+      "id": "cb-hr-pro",
+      "plugin": "hr-legal-compliance",
+      "file": "hr-pro.md"
+    },
+    {
+      "id": "cb-legal-advisor-2",
+      "plugin": "hr-legal-compliance",
+      "file": "legal-advisor.md"
+    },
+    {
+      "id": "cb-devops-troubleshooter-4",
+      "plugin": "incident-response",
+      "file": "devops-troubleshooter.md"
+    },
+    {
+      "id": "cb-incident-responder-2",
+      "plugin": "incident-response",
+      "file": "incident-responder.md"
+    },
+    {
+      "id": "cb-javascript-pro",
+      "plugin": "javascript-typescript",
+      "file": "javascript-pro.md"
+    },
+    {
+      "id": "cb-typescript-pro",
+      "plugin": "javascript-typescript",
+      "file": "typescript-pro.md"
+    },
+    {
+      "id": "cb-julia-pro",
+      "plugin": "julia-development",
+      "file": "julia-pro.md"
+    },
+    {
+      "id": "cb-csharp-pro",
+      "plugin": "jvm-languages",
+      "file": "csharp-pro.md"
+    },
+    {
+      "id": "cb-java-pro",
+      "plugin": "jvm-languages",
+      "file": "java-pro.md"
+    },
+    {
+      "id": "cb-scala-pro",
+      "plugin": "jvm-languages",
+      "file": "scala-pro.md"
+    },
+    {
+      "id": "cb-kubernetes-architect-3",
+      "plugin": "kubernetes-operations",
+      "file": "kubernetes-architect.md"
+    },
+    {
+      "id": "cb-ai-engineer-2",
+      "plugin": "llm-application-dev",
+      "file": "ai-engineer.md"
+    },
+    {
+      "id": "cb-prompt-engineer-2",
+      "plugin": "llm-application-dev",
+      "file": "prompt-engineer.md"
+    },
+    {
+      "id": "cb-vector-database-engineer",
+      "plugin": "llm-application-dev",
+      "file": "vector-database-engineer.md"
+    },
+    {
+      "id": "cb-data-scientist-2",
+      "plugin": "machine-learning-ops",
+      "file": "data-scientist.md"
+    },
+    {
+      "id": "cb-ml-engineer-2",
+      "plugin": "machine-learning-ops",
+      "file": "ml-engineer.md"
+    },
+    {
+      "id": "cb-mlops-engineer-2",
+      "plugin": "machine-learning-ops",
+      "file": "mlops-engineer.md"
+    },
+    {
+      "id": "cb-backend-architect-7",
+      "plugin": "multi-platform-apps",
+      "file": "backend-architect.md"
+    },
+    {
+      "id": "cb-flutter-expert",
+      "plugin": "multi-platform-apps",
+      "file": "flutter-expert.md"
+    },
+    {
+      "id": "cb-frontend-developer-5",
+      "plugin": "multi-platform-apps",
+      "file": "frontend-developer.md"
+    },
+    {
+      "id": "cb-ios-developer-2",
+      "plugin": "multi-platform-apps",
+      "file": "ios-developer.md"
+    },
+    {
+      "id": "cb-mobile-developer-3",
+      "plugin": "multi-platform-apps",
+      "file": "mobile-developer.md"
+    },
+    {
+      "id": "cb-ui-ux-designer-2",
+      "plugin": "multi-platform-apps",
+      "file": "ui-ux-designer.md"
+    },
+    {
+      "id": "cb-database-optimizer-4",
+      "plugin": "observability-monitoring",
+      "file": "database-optimizer.md"
+    },
+    {
+      "id": "cb-network-engineer-3",
+      "plugin": "observability-monitoring",
+      "file": "network-engineer.md"
+    },
+    {
+      "id": "cb-observability-engineer-2",
+      "plugin": "observability-monitoring",
+      "file": "observability-engineer.md"
+    },
+    {
+      "id": "cb-performance-engineer-4",
+      "plugin": "observability-monitoring",
+      "file": "performance-engineer.md"
+    },
+    {
+      "id": "cb-document-writer",
+      "plugin": "oh-my-codebuddy",
+      "file": "document-writer.md"
+    },
+    {
+      "id": "cb-explore",
+      "plugin": "oh-my-codebuddy",
+      "file": "explore.md"
+    },
+    {
+      "id": "cb-frontend-ui-ux-engineer",
+      "plugin": "oh-my-codebuddy",
+      "file": "frontend-ui-ux-engineer.md"
+    },
+    {
+      "id": "cb-gh-repo-research",
+      "plugin": "oh-my-codebuddy",
+      "file": "gh-repo-research.md"
+    },
+    {
+      "id": "cb-librarian",
+      "plugin": "oh-my-codebuddy",
+      "file": "librarian.md"
+    },
+    {
+      "id": "cb-multimodal-looker",
+      "plugin": "oh-my-codebuddy",
+      "file": "multimodal-looker.md"
+    },
+    {
+      "id": "cb-oracle",
+      "plugin": "oh-my-codebuddy",
+      "file": "oracle.md"
+    },
+    {
+      "id": "cb-payment-integration-2",
+      "plugin": "payment-processing",
+      "file": "payment-integration.md"
+    },
+    {
+      "id": "cb-performance-engineer-5",
+      "plugin": "performance-testing-review",
+      "file": "performance-engineer.md"
+    },
+    {
+      "id": "cb-test-automator-4",
+      "plugin": "performance-testing-review",
+      "file": "test-automator.md"
+    },
+    {
+      "id": "cb-agent-creator",
+      "plugin": "plugin-dev",
+      "file": "agent-creator.md"
+    },
+    {
+      "id": "cb-plugin-validator",
+      "plugin": "plugin-dev",
+      "file": "plugin-validator.md"
+    },
+    {
+      "id": "cb-skill-reviewer",
+      "plugin": "plugin-dev",
+      "file": "skill-reviewer.md"
+    },
+    {
+      "id": "cb-plugin-recommender",
+      "plugin": "plugin-finder",
+      "file": "plugin-recommender.md"
+    },
+    {
+      "id": "cb-ppt-designer",
+      "plugin": "ppt-writer",
+      "file": "ppt-designer.md"
+    },
+    {
+      "id": "cb-code-reviewer-8",
+      "plugin": "pr-review-toolkit",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-code-simplifier-2",
+      "plugin": "pr-review-toolkit",
+      "file": "code-simplifier.md"
+    },
+    {
+      "id": "cb-comment-analyzer",
+      "plugin": "pr-review-toolkit",
+      "file": "comment-analyzer.md"
+    },
+    {
+      "id": "cb-pr-test-analyzer",
+      "plugin": "pr-review-toolkit",
+      "file": "pr-test-analyzer.md"
+    },
+    {
+      "id": "cb-silent-failure-hunter",
+      "plugin": "pr-review-toolkit",
+      "file": "silent-failure-hunter.md"
+    },
+    {
+      "id": "cb-type-design-analyzer",
+      "plugin": "pr-review-toolkit",
+      "file": "type-design-analyzer.md"
+    },
+    {
+      "id": "cb-django-pro-2",
+      "plugin": "python-development",
+      "file": "django-pro.md"
+    },
+    {
+      "id": "cb-fastapi-pro-2",
+      "plugin": "python-development",
+      "file": "fastapi-pro.md"
+    },
+    {
+      "id": "cb-python-pro",
+      "plugin": "python-development",
+      "file": "python-pro.md"
+    },
+    {
+      "id": "cb-quant-analyst-2",
+      "plugin": "quantitative-trading",
+      "file": "quant-analyst.md"
+    },
+    {
+      "id": "cb-risk-manager-2",
+      "plugin": "quantitative-trading",
+      "file": "risk-manager.md"
+    },
+    {
+      "id": "cb-explorer",
+      "plugin": "repomix-explorer",
+      "file": "explorer.md"
+    },
+    {
+      "id": "cb-requirements-code",
+      "plugin": "requirements-driven-workflow",
+      "file": "requirements-code.md"
+    },
+    {
+      "id": "cb-requirements-generate",
+      "plugin": "requirements-driven-workflow",
+      "file": "requirements-generate.md"
+    },
+    {
+      "id": "cb-requirements-review",
+      "plugin": "requirements-driven-workflow",
+      "file": "requirements-review.md"
+    },
+    {
+      "id": "cb-requirements-testing",
+      "plugin": "requirements-driven-workflow",
+      "file": "requirements-testing.md"
+    },
+    {
+      "id": "cb-batch-worker",
+      "plugin": "security-scan",
+      "file": "batch-worker.md"
+    },
+    {
+      "id": "cb-deep-scan",
+      "plugin": "security-scan",
+      "file": "deep-scan.md"
+    },
+    {
+      "id": "cb-quick-scan",
+      "plugin": "security-scan",
+      "file": "quick-scan.md"
+    },
+    {
+      "id": "cb-reconnaissance",
+      "plugin": "security-scan",
+      "file": "reconnaissance.md"
+    },
+    {
+      "id": "cb-remediation",
+      "plugin": "security-scan",
+      "file": "remediation.md"
+    },
+    {
+      "id": "cb-verification",
+      "plugin": "security-scan",
+      "file": "verification.md"
+    },
+    {
+      "id": "cb-security-auditor-4",
+      "plugin": "security-compliance",
+      "file": "security-auditor.md"
+    },
+    {
+      "id": "cb-security-auditor-5",
+      "plugin": "security-scanning",
+      "file": "security-auditor.md"
+    },
+    {
+      "id": "cb-threat-modeling-expert",
+      "plugin": "security-scanning",
+      "file": "threat-modeling-expert.md"
+    },
+    {
+      "id": "cb-seo-authority-builder",
+      "plugin": "seo-analysis-monitoring",
+      "file": "seo-authority-builder.md"
+    },
+    {
+      "id": "cb-seo-cannibalization-detector",
+      "plugin": "seo-analysis-monitoring",
+      "file": "seo-cannibalization-detector.md"
+    },
+    {
+      "id": "cb-seo-content-refresher",
+      "plugin": "seo-analysis-monitoring",
+      "file": "seo-content-refresher.md"
+    },
+    {
+      "id": "cb-seo-content-auditor",
+      "plugin": "seo-content-creation",
+      "file": "seo-content-auditor.md"
+    },
+    {
+      "id": "cb-seo-content-planner",
+      "plugin": "seo-content-creation",
+      "file": "seo-content-planner.md"
+    },
+    {
+      "id": "cb-seo-content-writer",
+      "plugin": "seo-content-creation",
+      "file": "seo-content-writer.md"
+    },
+    {
+      "id": "cb-seo-keyword-strategist",
+      "plugin": "seo-technical-optimization",
+      "file": "seo-keyword-strategist.md"
+    },
+    {
+      "id": "cb-seo-meta-optimizer",
+      "plugin": "seo-technical-optimization",
+      "file": "seo-meta-optimizer.md"
+    },
+    {
+      "id": "cb-seo-snippet-hunter",
+      "plugin": "seo-technical-optimization",
+      "file": "seo-snippet-hunter.md"
+    },
+    {
+      "id": "cb-seo-structure-architect",
+      "plugin": "seo-technical-optimization",
+      "file": "seo-structure-architect.md"
+    },
+    {
+      "id": "cb-bash-pro",
+      "plugin": "shell-scripting",
+      "file": "bash-pro.md"
+    },
+    {
+      "id": "cb-posix-shell-pro",
+      "plugin": "shell-scripting",
+      "file": "posix-shell-pro.md"
+    },
+    {
+      "id": "cb-analyzer",
+      "plugin": "skill-creator",
+      "file": "analyzer.md"
+    },
+    {
+      "id": "cb-comparator",
+      "plugin": "skill-creator",
+      "file": "comparator.md"
+    },
+    {
+      "id": "cb-grader",
+      "plugin": "skill-creator",
+      "file": "grader.md"
+    },
+    {
+      "id": "cb-startup-analyst",
+      "plugin": "startup-business-analyst",
+      "file": "startup-analyst.md"
+    },
+    {
+      "id": "cb-code-reviewer-9",
+      "plugin": "superpowers",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-browser-user",
+      "plugin": "superpowers-chrome",
+      "file": "browser-user.md"
+    },
+    {
+      "id": "cb-c-pro",
+      "plugin": "systems-programming",
+      "file": "c-pro.md"
+    },
+    {
+      "id": "cb-cpp-pro",
+      "plugin": "systems-programming",
+      "file": "cpp-pro.md"
+    },
+    {
+      "id": "cb-golang-pro",
+      "plugin": "systems-programming",
+      "file": "golang-pro.md"
+    },
+    {
+      "id": "cb-rust-pro",
+      "plugin": "systems-programming",
+      "file": "rust-pro.md"
+    },
+    {
+      "id": "cb-task-checker",
+      "plugin": "taskmaster",
+      "file": "task-checker.md"
+    },
+    {
+      "id": "cb-task-executor",
+      "plugin": "taskmaster",
+      "file": "task-executor.md"
+    },
+    {
+      "id": "cb-task-orchestrator",
+      "plugin": "taskmaster",
+      "file": "task-orchestrator.md"
+    },
+    {
+      "id": "cb-code-reviewer-10",
+      "plugin": "tdd-workflows",
+      "file": "code-reviewer.md"
+    },
+    {
+      "id": "cb-tdd-orchestrator-2",
+      "plugin": "tdd-workflows",
+      "file": "tdd-orchestrator.md"
+    },
+    {
+      "id": "cb-dx-optimizer-3",
+      "plugin": "team-collaboration",
+      "file": "dx-optimizer.md"
+    },
+    {
+      "id": "cb-debugger-5",
+      "plugin": "unit-testing",
+      "file": "debugger.md"
+    },
+    {
+      "id": "cb-test-automator-5",
+      "plugin": "unit-testing",
+      "file": "test-automator.md"
+    },
+    {
+      "id": "cb-php-pro",
+      "plugin": "web-scripting",
+      "file": "php-pro.md"
+    },
+    {
+      "id": "cb-ruby-pro",
+      "plugin": "web-scripting",
+      "file": "ruby-pro.md"
+    },
+    {
+      "id": "cb-alb-testcase-generator",
+      "plugin": "tsmart",
+      "file": "alb-testcase-generator.md"
+    },
+    {
+      "id": "cb-cloudgame-testcase-generator",
+      "plugin": "tsmart",
+      "file": "cloudgame-testcase-generator.md"
+    },
+    {
+      "id": "cb-tcase-testcase-generator",
+      "plugin": "tsmart",
+      "file": "tcase-testcase-generator.md"
+    },
+    {
+      "id": "cb-yottadb-testcase-generator",
+      "plugin": "tsmart",
+      "file": "yottadb-testcase-generator.md"
+    }
+  ],
+  "commands": [
+    {
+      "id": "cb-code_review",
+      "slash_id": "code_review",
+      "plugin": "atuin"
+    },
+    {
+      "id": "cb-accessibility-audit",
+      "slash_id": "accessibility-audit",
+      "plugin": "accessibility-compliance"
+    },
+    {
+      "id": "cb-improve-agent",
+      "slash_id": "improve-agent",
+      "plugin": "agent-orchestration"
+    },
+    {
+      "id": "cb-multi-agent-optimize",
+      "slash_id": "multi-agent-optimize",
+      "plugin": "agent-orchestration"
+    },
+    {
+      "id": "cb-new-sdk-app",
+      "slash_id": "new-sdk-app",
+      "plugin": "agent-sdk-dev"
+    },
+    {
+      "id": "cb-bmad-pilot",
+      "slash_id": "bmad-pilot",
+      "plugin": "agent-team-agile-workflow"
+    },
+    {
+      "id": "cb-api-mock",
+      "slash_id": "api-mock",
+      "plugin": "api-testing-observability"
+    },
+    {
+      "id": "cb-performance-optimization",
+      "slash_id": "performance-optimization",
+      "plugin": "application-performance"
+    },
+    {
+      "id": "cb-feature-development",
+      "slash_id": "feature-development",
+      "plugin": "backend-development"
+    },
+    {
+      "id": "cb-c4-architecture",
+      "slash_id": "c4-architecture",
+      "plugin": "c4-architecture"
+    },
+    {
+      "id": "cb-workflow-automate",
+      "slash_id": "workflow-automate",
+      "plugin": "cicd-automation"
+    },
+    {
+      "id": "cb-setup",
+      "slash_id": "setup",
+      "plugin": "claude-hud"
+    },
+    {
+      "id": "cb-code-explain",
+      "slash_id": "code-explain",
+      "plugin": "code-documentation"
+    },
+    {
+      "id": "cb-doc-generate",
+      "slash_id": "doc-generate",
+      "plugin": "code-documentation"
+    },
+    {
+      "id": "cb-context-restore",
+      "slash_id": "context-restore",
+      "plugin": "code-refactoring"
+    },
+    {
+      "id": "cb-refactor-clean",
+      "slash_id": "refactor-clean",
+      "plugin": "code-refactoring"
+    },
+    {
+      "id": "cb-tech-debt",
+      "slash_id": "tech-debt",
+      "plugin": "code-refactoring"
+    },
+    {
+      "id": "cb-code-review",
+      "slash_id": "code-review",
+      "plugin": "code-review"
+    },
+    {
+      "id": "cb-ai-review",
+      "slash_id": "ai-review",
+      "plugin": "code-review-ai"
+    },
+    {
+      "id": "cb-deps-audit",
+      "slash_id": "deps-audit",
+      "plugin": "codebase-cleanup"
+    },
+    {
+      "id": "cb-revise-codebuddy-md",
+      "slash_id": "revise-codebuddy-md",
+      "plugin": "codebuddy-md-management"
+    },
+    {
+      "id": "cb-design-rest-api",
+      "slash_id": "design-rest-api",
+      "plugin": "commands-api-development"
+    },
+    {
+      "id": "cb-doc-api",
+      "slash_id": "doc-api",
+      "plugin": "commands-api-development"
+    },
+    {
+      "id": "cb-generate-api-documentation",
+      "slash_id": "generate-api-documentation",
+      "plugin": "commands-api-development"
+    },
+    {
+      "id": "cb-implement-graphql-api",
+      "slash_id": "implement-graphql-api",
+      "plugin": "commands-api-development"
+    },
+    {
+      "id": "cb-act",
+      "slash_id": "act",
+      "plugin": "commands-automation-workflow"
+    },
+    {
+      "id": "cb-add-changelog",
+      "slash_id": "add-changelog",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-changelog-demo-command",
+      "slash_id": "changelog-demo-command",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-ci-setup",
+      "slash_id": "ci-setup",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-containerize-application",
+      "slash_id": "containerize-application",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-hotfix-deploy",
+      "slash_id": "hotfix-deploy",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-prepare-release",
+      "slash_id": "prepare-release",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-release",
+      "slash_id": "release",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-rollback-deploy",
+      "slash_id": "rollback-deploy",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-run-ci",
+      "slash_id": "run-ci",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-setup-automated-releases",
+      "slash_id": "setup-automated-releases",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-setup-kubernetes-deployment",
+      "slash_id": "setup-kubernetes-deployment",
+      "plugin": "commands-ci-deployment"
+    },
+    {
+      "id": "cb-add-mutation-testing",
+      "slash_id": "add-mutation-testing",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-add-property-based-testing",
+      "slash_id": "add-property-based-testing",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-check",
+      "slash_id": "check",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-clean",
+      "slash_id": "clean",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-code_analysis",
+      "slash_id": "code_analysis",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-e2e-setup",
+      "slash_id": "e2e-setup",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-generate-test-cases",
+      "slash_id": "generate-test-cases",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-generate-tests",
+      "slash_id": "generate-tests",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-optimize",
+      "slash_id": "optimize",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-repro-issue",
+      "slash_id": "repro-issue",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-setup-comprehensive-testing",
+      "slash_id": "setup-comprehensive-testing",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-setup-load-testing",
+      "slash_id": "setup-load-testing",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-setup-visual-testing",
+      "slash_id": "setup-visual-testing",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-tdd",
+      "slash_id": "tdd",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-test-changelog-automation",
+      "slash_id": "test-changelog-automation",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-test-coverage",
+      "slash_id": "test-coverage",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-testing_plan_integration",
+      "slash_id": "testing_plan_integration",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-write-tests",
+      "slash_id": "write-tests",
+      "plugin": "commands-code-analysis-testing"
+    },
+    {
+      "id": "cb-context-prime",
+      "slash_id": "context-prime",
+      "plugin": "commands-context-loading-priming"
+    },
+    {
+      "id": "cb-initref",
+      "slash_id": "initref",
+      "plugin": "commands-context-loading-priming"
+    },
+    {
+      "id": "cb-prime",
+      "slash_id": "prime",
+      "plugin": "commands-context-loading-priming"
+    },
+    {
+      "id": "cb-rsi",
+      "slash_id": "rsi",
+      "plugin": "commands-context-loading-priming"
+    },
+    {
+      "id": "cb-create-database-migrations",
+      "slash_id": "create-database-migrations",
+      "plugin": "commands-database-operations"
+    },
+    {
+      "id": "cb-design-database-schema",
+      "slash_id": "design-database-schema",
+      "plugin": "commands-database-operations"
+    },
+    {
+      "id": "cb-optimize-database-performance",
+      "slash_id": "optimize-database-performance",
+      "plugin": "commands-database-operations"
+    },
+    {
+      "id": "cb-add-to-changelog",
+      "slash_id": "add-to-changelog",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-create-architecture-documentation",
+      "slash_id": "create-architecture-documentation",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-create-docs",
+      "slash_id": "create-docs",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-create-onboarding-guide",
+      "slash_id": "create-onboarding-guide",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-docs",
+      "slash_id": "docs",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-explain-issue-fix",
+      "slash_id": "explain-issue-fix",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-load-llms-txt",
+      "slash_id": "load-llms-txt",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-migration-guide",
+      "slash_id": "migration-guide",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-troubleshooting-guide",
+      "slash_id": "troubleshooting-guide",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-update-docs",
+      "slash_id": "update-docs",
+      "plugin": "commands-documentation-changelogs"
+    },
+    {
+      "id": "cb-svelte-a11y",
+      "slash_id": "svelte-a11y",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-component",
+      "slash_id": "svelte-component",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-debug",
+      "slash_id": "svelte-debug",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-migrate",
+      "slash_id": "svelte-migrate",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-optimize",
+      "slash_id": "svelte-optimize",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-scaffold",
+      "slash_id": "svelte-scaffold",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-storybook-migrate",
+      "slash_id": "svelte-storybook-migrate",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-storybook-mock",
+      "slash_id": "svelte-storybook-mock",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-storybook-setup",
+      "slash_id": "svelte-storybook-setup",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-storybook-story",
+      "slash_id": "svelte-storybook-story",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-storybook-troubleshoot",
+      "slash_id": "svelte-storybook-troubleshoot",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-storybook",
+      "slash_id": "svelte-storybook",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-test-coverage",
+      "slash_id": "svelte-test-coverage",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-test-fix",
+      "slash_id": "svelte-test-fix",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-test-setup",
+      "slash_id": "svelte-test-setup",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-svelte-test",
+      "slash_id": "svelte-test",
+      "plugin": "commands-framework-svelte"
+    },
+    {
+      "id": "cb-unity-project-setup",
+      "slash_id": "unity-project-setup",
+      "plugin": "commands-game-development"
+    },
+    {
+      "id": "cb-bidirectional-sync",
+      "slash_id": "bidirectional-sync",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-bulk-import-issues",
+      "slash_id": "bulk-import-issues",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-cross-reference-manager",
+      "slash_id": "cross-reference-manager",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-issue-to-linear-task",
+      "slash_id": "issue-to-linear-task",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-linear-task-to-issue",
+      "slash_id": "linear-task-to-issue",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-sync-automation-setup",
+      "slash_id": "sync-automation-setup",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-sync-conflict-resolver",
+      "slash_id": "sync-conflict-resolver",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-sync-issues-to-linear",
+      "slash_id": "sync-issues-to-linear",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-sync-linear-to-issues",
+      "slash_id": "sync-linear-to-issues",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-sync-pr-to-task",
+      "slash_id": "sync-pr-to-task",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-sync-status",
+      "slash_id": "sync-status",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-task-from-pr",
+      "slash_id": "task-from-pr",
+      "plugin": "commands-integration-sync"
+    },
+    {
+      "id": "cb-five",
+      "slash_id": "five",
+      "plugin": "commands-miscellaneous"
+    },
+    {
+      "id": "cb-mermaid",
+      "slash_id": "mermaid",
+      "plugin": "commands-miscellaneous"
+    },
+    {
+      "id": "cb-use-stepper",
+      "slash_id": "use-stepper",
+      "plugin": "commands-miscellaneous"
+    },
+    {
+      "id": "cb-add-performance-monitoring",
+      "slash_id": "add-performance-monitoring",
+      "plugin": "commands-monitoring-observability"
+    },
+    {
+      "id": "cb-setup-monitoring-observability",
+      "slash_id": "setup-monitoring-observability",
+      "plugin": "commands-monitoring-observability"
+    },
+    {
+      "id": "cb-implement-caching-strategy",
+      "slash_id": "implement-caching-strategy",
+      "plugin": "commands-performance-optimization"
+    },
+    {
+      "id": "cb-optimize-build",
+      "slash_id": "optimize-build",
+      "plugin": "commands-performance-optimization"
+    },
+    {
+      "id": "cb-optimize-bundle-size",
+      "slash_id": "optimize-bundle-size",
+      "plugin": "commands-performance-optimization"
+    },
+    {
+      "id": "cb-performance-audit",
+      "slash_id": "performance-audit",
+      "plugin": "commands-performance-optimization"
+    },
+    {
+      "id": "cb-setup-cdn-optimization",
+      "slash_id": "setup-cdn-optimization",
+      "plugin": "commands-performance-optimization"
+    },
+    {
+      "id": "cb-system-behavior-simulator",
+      "slash_id": "system-behavior-simulator",
+      "plugin": "commands-performance-optimization"
+    },
+    {
+      "id": "cb-modernize-deps",
+      "slash_id": "modernize-deps",
+      "plugin": "commands-project-setup"
+    },
+    {
+      "id": "cb-setup-development-environment",
+      "slash_id": "setup-development-environment",
+      "plugin": "commands-project-setup"
+    },
+    {
+      "id": "cb-setup-formatting",
+      "slash_id": "setup-formatting",
+      "plugin": "commands-project-setup"
+    },
+    {
+      "id": "cb-setup-linting",
+      "slash_id": "setup-linting",
+      "plugin": "commands-project-setup"
+    },
+    {
+      "id": "cb-setup-monorepo",
+      "slash_id": "setup-monorepo",
+      "plugin": "commands-project-setup"
+    },
+    {
+      "id": "cb-setup-rate-limiting",
+      "slash_id": "setup-rate-limiting",
+      "plugin": "commands-project-setup"
+    },
+    {
+      "id": "cb-add-package",
+      "slash_id": "add-package",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-create-command",
+      "slash_id": "create-command",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-create-feature",
+      "slash_id": "create-feature",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-create-jtbd",
+      "slash_id": "create-jtbd",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-create-prd",
+      "slash_id": "create-prd",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-create-prp",
+      "slash_id": "create-prp",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-init-project",
+      "slash_id": "init-project",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-milestone-tracker",
+      "slash_id": "milestone-tracker",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-pac-configure",
+      "slash_id": "pac-configure",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-pac-create-epic",
+      "slash_id": "pac-create-epic",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-pac-create-ticket",
+      "slash_id": "pac-create-ticket",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-pac-update-status",
+      "slash_id": "pac-update-status",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-pac-validate",
+      "slash_id": "pac-validate",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-project-health-check",
+      "slash_id": "project-health-check",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-project-timeline-simulator",
+      "slash_id": "project-timeline-simulator",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-project-to-linear",
+      "slash_id": "project-to-linear",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-todo",
+      "slash_id": "todo",
+      "plugin": "commands-project-task-management"
+    },
+    {
+      "id": "cb-add-authentication-system",
+      "slash_id": "add-authentication-system",
+      "plugin": "commands-security-audit"
+    },
+    {
+      "id": "cb-dependency-audit",
+      "slash_id": "dependency-audit",
+      "plugin": "commands-security-audit"
+    },
+    {
+      "id": "cb-security-audit",
+      "slash_id": "security-audit",
+      "plugin": "commands-security-audit"
+    },
+    {
+      "id": "cb-security-hardening",
+      "slash_id": "security-hardening",
+      "plugin": "commands-security-audit"
+    },
+    {
+      "id": "cb-business-scenario-explorer",
+      "slash_id": "business-scenario-explorer",
+      "plugin": "commands-simulation-modeling"
+    },
+    {
+      "id": "cb-constraint-modeler",
+      "slash_id": "constraint-modeler",
+      "plugin": "commands-simulation-modeling"
+    },
+    {
+      "id": "cb-decision-tree-explorer",
+      "slash_id": "decision-tree-explorer",
+      "plugin": "commands-simulation-modeling"
+    },
+    {
+      "id": "cb-digital-twin-creator",
+      "slash_id": "digital-twin-creator",
+      "plugin": "commands-simulation-modeling"
+    },
+    {
+      "id": "cb-future-scenario-generator",
+      "slash_id": "future-scenario-generator",
+      "plugin": "commands-simulation-modeling"
+    },
+    {
+      "id": "cb-market-response-modeler",
+      "slash_id": "market-response-modeler",
+      "plugin": "commands-simulation-modeling"
+    },
+    {
+      "id": "cb-simulation-calibrator",
+      "slash_id": "simulation-calibrator",
+      "plugin": "commands-simulation-modeling"
+    },
+    {
+      "id": "cb-timeline-compressor",
+      "slash_id": "timeline-compressor",
+      "plugin": "commands-simulation-modeling"
+    },
+    {
+      "id": "cb-architecture-review",
+      "slash_id": "architecture-review",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-decision-quality-analyzer",
+      "slash_id": "decision-quality-analyzer",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-dependency-mapper",
+      "slash_id": "dependency-mapper",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-estimate-assistant",
+      "slash_id": "estimate-assistant",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-issue-triage",
+      "slash_id": "issue-triage",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-memory-spring-cleaning",
+      "slash_id": "memory-spring-cleaning",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-migration-assistant",
+      "slash_id": "migration-assistant",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-retrospective-analyzer",
+      "slash_id": "retrospective-analyzer",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-session-learning-capture",
+      "slash_id": "session-learning-capture",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-sprint-planning",
+      "slash_id": "sprint-planning",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-standup-report",
+      "slash_id": "standup-report",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-team-workload-balancer",
+      "slash_id": "team-workload-balancer",
+      "plugin": "commands-team-collaboration"
+    },
+    {
+      "id": "cb-migrate-to-typescript",
+      "slash_id": "migrate-to-typescript",
+      "plugin": "commands-typescript-migration"
+    },
+    {
+      "id": "cb-all-tools",
+      "slash_id": "all-tools",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-architecture-scenario-explorer",
+      "slash_id": "architecture-scenario-explorer",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-check-file",
+      "slash_id": "check-file",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-clean-branches",
+      "slash_id": "clean-branches",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-code-permutation-tester",
+      "slash_id": "code-permutation-tester",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-code-to-task",
+      "slash_id": "code-to-task",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-debug-error",
+      "slash_id": "debug-error",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-directory-deep-dive",
+      "slash_id": "directory-deep-dive",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-explain-code",
+      "slash_id": "explain-code",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-generate-linear-worklog",
+      "slash_id": "generate-linear-worklog",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-git-status",
+      "slash_id": "git-status",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-refactor-code",
+      "slash_id": "refactor-code",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-ultra-think",
+      "slash_id": "ultra-think",
+      "plugin": "commands-utilities-debugging"
+    },
+    {
+      "id": "cb-bug-fix",
+      "slash_id": "bug-fix",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-commit-fast",
+      "slash_id": "commit-fast",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-commit",
+      "slash_id": "commit",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-create-pr",
+      "slash_id": "create-pr",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-create-pull-request",
+      "slash_id": "create-pull-request",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-create-worktrees",
+      "slash_id": "create-worktrees",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-fix-github-issue",
+      "slash_id": "fix-github-issue",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-fix-issue",
+      "slash_id": "fix-issue",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-fix-pr",
+      "slash_id": "fix-pr",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-husky",
+      "slash_id": "husky",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-pr-review",
+      "slash_id": "pr-review",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-update-branch-name",
+      "slash_id": "update-branch-name",
+      "plugin": "commands-version-control-git"
+    },
+    {
+      "id": "cb-find",
+      "slash_id": "find",
+      "plugin": "commands-workflow-orchestration"
+    },
+    {
+      "id": "cb-log",
+      "slash_id": "log",
+      "plugin": "commands-workflow-orchestration"
+    },
+    {
+      "id": "cb-move",
+      "slash_id": "move",
+      "plugin": "commands-workflow-orchestration"
+    },
+    {
+      "id": "cb-remove",
+      "slash_id": "remove",
+      "plugin": "commands-workflow-orchestration"
+    },
+    {
+      "id": "cb-report",
+      "slash_id": "report",
+      "plugin": "commands-workflow-orchestration"
+    },
+    {
+      "id": "cb-resume",
+      "slash_id": "resume",
+      "plugin": "commands-workflow-orchestration"
+    },
+    {
+      "id": "cb-start",
+      "slash_id": "start",
+      "plugin": "commands-workflow-orchestration"
+    },
+    {
+      "id": "cb-status",
+      "slash_id": "status",
+      "plugin": "commands-workflow-orchestration"
+    },
+    {
+      "id": "cb-sync",
+      "slash_id": "sync",
+      "plugin": "commands-workflow-orchestration"
+    },
+    {
+      "id": "cb-clean_gone",
+      "slash_id": "clean_gone",
+      "plugin": "commit-commands"
+    },
+    {
+      "id": "cb-commit-push-pr",
+      "slash_id": "commit-push-pr",
+      "plugin": "commit-commands"
+    },
+    {
+      "id": "cb-full-review",
+      "slash_id": "full-review",
+      "plugin": "comprehensive-review"
+    },
+    {
+      "id": "cb-implement",
+      "slash_id": "implement",
+      "plugin": "conductor"
+    },
+    {
+      "id": "cb-manage",
+      "slash_id": "manage",
+      "plugin": "conductor"
+    },
+    {
+      "id": "cb-new-track",
+      "slash_id": "new-track",
+      "plugin": "conductor"
+    },
+    {
+      "id": "cb-revert",
+      "slash_id": "revert",
+      "plugin": "conductor"
+    },
+    {
+      "id": "cb-context-save",
+      "slash_id": "context-save",
+      "plugin": "context-management"
+    },
+    {
+      "id": "cb-data-driven-feature",
+      "slash_id": "data-driven-feature",
+      "plugin": "data-engineering"
+    },
+    {
+      "id": "cb-data-pipeline",
+      "slash_id": "data-pipeline",
+      "plugin": "data-engineering"
+    },
+    {
+      "id": "cb-cost-optimize",
+      "slash_id": "cost-optimize",
+      "plugin": "database-cloud-optimization"
+    },
+    {
+      "id": "cb-migration-observability",
+      "slash_id": "migration-observability",
+      "plugin": "database-migrations"
+    },
+    {
+      "id": "cb-sql-migrations",
+      "slash_id": "sql-migrations",
+      "plugin": "database-migrations"
+    },
+    {
+      "id": "cb-smart-debug",
+      "slash_id": "smart-debug",
+      "plugin": "debugging-toolkit"
+    },
+    {
+      "id": "cb-config-validate",
+      "slash_id": "config-validate",
+      "plugin": "deployment-validation"
+    },
+    {
+      "id": "cb-ask",
+      "slash_id": "ask",
+      "plugin": "development-essentials"
+    },
+    {
+      "id": "cb-bugfix",
+      "slash_id": "bugfix",
+      "plugin": "development-essentials"
+    },
+    {
+      "id": "cb-code",
+      "slash_id": "code",
+      "plugin": "development-essentials"
+    },
+    {
+      "id": "cb-debug",
+      "slash_id": "debug",
+      "plugin": "development-essentials"
+    },
+    {
+      "id": "cb-enhance-prompt",
+      "slash_id": "enhance-prompt",
+      "plugin": "development-essentials"
+    },
+    {
+      "id": "cb-test",
+      "slash_id": "test",
+      "plugin": "development-essentials"
+    },
+    {
+      "id": "cb-think",
+      "slash_id": "think",
+      "plugin": "development-essentials"
+    },
+    {
+      "id": "cb-debug-trace",
+      "slash_id": "debug-trace",
+      "plugin": "distributed-debugging"
+    },
+    {
+      "id": "cb-error-analysis",
+      "slash_id": "error-analysis",
+      "plugin": "error-debugging"
+    },
+    {
+      "id": "cb-error-trace",
+      "slash_id": "error-trace",
+      "plugin": "error-debugging"
+    },
+    {
+      "id": "cb-multi-agent-review",
+      "slash_id": "multi-agent-review",
+      "plugin": "error-debugging"
+    },
+    {
+      "id": "cb-feature-dev",
+      "slash_id": "feature-dev",
+      "plugin": "feature-dev"
+    },
+    {
+      "id": "cb-code-migrate",
+      "slash_id": "code-migrate",
+      "plugin": "framework-migration"
+    },
+    {
+      "id": "cb-deps-upgrade",
+      "slash_id": "deps-upgrade",
+      "plugin": "framework-migration"
+    },
+    {
+      "id": "cb-legacy-modernize",
+      "slash_id": "legacy-modernize",
+      "plugin": "framework-migration"
+    },
+    {
+      "id": "cb-analyze-site",
+      "slash_id": "analyze-site",
+      "plugin": "frontend-design-pro"
+    },
+    {
+      "id": "cb-design",
+      "slash_id": "design",
+      "plugin": "frontend-design-pro"
+    },
+    {
+      "id": "cb-review-2",
+      "slash_id": "review",
+      "plugin": "frontend-design-pro"
+    },
+    {
+      "id": "cb-component-scaffold",
+      "slash_id": "component-scaffold",
+      "plugin": "frontend-mobile-development"
+    },
+    {
+      "id": "cb-xss-scan",
+      "slash_id": "xss-scan",
+      "plugin": "frontend-mobile-security"
+    },
+    {
+      "id": "cb-full-stack-feature",
+      "slash_id": "full-stack-feature",
+      "plugin": "full-stack-orchestration"
+    },
+    {
+      "id": "cb-git-workflow",
+      "slash_id": "git-workflow",
+      "plugin": "git-pr-workflows"
+    },
+    {
+      "id": "cb-onboard",
+      "slash_id": "onboard",
+      "plugin": "git-pr-workflows"
+    },
+    {
+      "id": "cb-pr-enhance-2",
+      "slash_id": "pr-enhance",
+      "plugin": "git-pr-workflows"
+    },
+    {
+      "id": "cb-configure",
+      "slash_id": "configure",
+      "plugin": "hookify"
+    },
+    {
+      "id": "cb-help",
+      "slash_id": "help",
+      "plugin": "hookify"
+    },
+    {
+      "id": "cb-hookify",
+      "slash_id": "hookify",
+      "plugin": "hookify"
+    },
+    {
+      "id": "cb-list",
+      "slash_id": "list",
+      "plugin": "hookify"
+    },
+    {
+      "id": "cb-incident-response",
+      "slash_id": "incident-response",
+      "plugin": "incident-response"
+    },
+    {
+      "id": "cb-smart-fix",
+      "slash_id": "smart-fix",
+      "plugin": "incident-response"
+    },
+    {
+      "id": "cb-big-features-interview",
+      "slash_id": "big-features-interview",
+      "plugin": "interview"
+    },
+    {
+      "id": "cb-typescript-scaffold",
+      "slash_id": "typescript-scaffold",
+      "plugin": "javascript-typescript"
+    },
+    {
+      "id": "cb-ai-assistant",
+      "slash_id": "ai-assistant",
+      "plugin": "llm-application-dev"
+    },
+    {
+      "id": "cb-langchain-agent",
+      "slash_id": "langchain-agent",
+      "plugin": "llm-application-dev"
+    },
+    {
+      "id": "cb-prompt-optimize",
+      "slash_id": "prompt-optimize",
+      "plugin": "llm-application-dev"
+    },
+    {
+      "id": "cb-ml-pipeline",
+      "slash_id": "ml-pipeline",
+      "plugin": "machine-learning-ops"
+    },
+    {
+      "id": "cb-multi-platform",
+      "slash_id": "multi-platform",
+      "plugin": "multi-platform-apps"
+    },
+    {
+      "id": "cb-add-auth",
+      "slash_id": "add-auth",
+      "plugin": "nextjs-expert"
+    },
+    {
+      "id": "cb-scaffold",
+      "slash_id": "scaffold",
+      "plugin": "nextjs-expert"
+    },
+    {
+      "id": "cb-monitor-setup",
+      "slash_id": "monitor-setup",
+      "plugin": "observability-monitoring"
+    },
+    {
+      "id": "cb-slo-implement",
+      "slash_id": "slo-implement",
+      "plugin": "observability-monitoring"
+    },
+    {
+      "id": "cb-init-deep",
+      "slash_id": "init-deep",
+      "plugin": "oh-my-codebuddy"
+    },
+    {
+      "id": "cb-init-research",
+      "slash_id": "init-research",
+      "plugin": "oh-my-codebuddy"
+    },
+    {
+      "id": "cb-ralph-loop-research",
+      "slash_id": "ralph-loop-research",
+      "plugin": "oh-my-codebuddy"
+    },
+    {
+      "id": "cb-ralph-loop-wiki",
+      "slash_id": "ralph-loop-wiki",
+      "plugin": "oh-my-codebuddy"
+    },
+    {
+      "id": "cb-ralph-loop",
+      "slash_id": "ralph-loop",
+      "plugin": "oh-my-codebuddy"
+    },
+    {
+      "id": "cb-refactor-2",
+      "slash_id": "refactor",
+      "plugin": "oh-my-codebuddy"
+    },
+    {
+      "id": "cb-create-plugin",
+      "slash_id": "create-plugin",
+      "plugin": "plugin-dev"
+    },
+    {
+      "id": "cb-info",
+      "slash_id": "info",
+      "plugin": "plugin-finder"
+    },
+    {
+      "id": "cb-install-2",
+      "slash_id": "install",
+      "plugin": "plugin-finder"
+    },
+    {
+      "id": "cb-multi-run",
+      "slash_id": "multi-run",
+      "plugin": "plugin-finder"
+    },
+    {
+      "id": "cb-search",
+      "slash_id": "search",
+      "plugin": "plugin-finder"
+    },
+    {
+      "id": "cb-sequence-run",
+      "slash_id": "sequence-run",
+      "plugin": "plugin-finder"
+    },
+    {
+      "id": "cb-smart-search",
+      "slash_id": "smart-search",
+      "plugin": "plugin-finder"
+    },
+    {
+      "id": "cb-wish",
+      "slash_id": "wish",
+      "plugin": "plugin-finder"
+    },
+    {
+      "id": "cb-create-ppt",
+      "slash_id": "create-ppt",
+      "plugin": "ppt-writer"
+    },
+    {
+      "id": "cb-review-pr",
+      "slash_id": "review-pr",
+      "plugin": "pr-review-toolkit"
+    },
+    {
+      "id": "cb-python-scaffold",
+      "slash_id": "python-scaffold",
+      "plugin": "python-development"
+    },
+    {
+      "id": "cb-cancel-ralph-2",
+      "slash_id": "cancel-ralph",
+      "plugin": "ralph-loop"
+    },
+    {
+      "id": "cb-pack-local",
+      "slash_id": "pack-local",
+      "plugin": "repomix-commands"
+    },
+    {
+      "id": "cb-pack-remote",
+      "slash_id": "pack-remote",
+      "plugin": "repomix-commands"
+    },
+    {
+      "id": "cb-explore-local",
+      "slash_id": "explore-local",
+      "plugin": "repomix-explorer"
+    },
+    {
+      "id": "cb-explore-remote",
+      "slash_id": "explore-remote",
+      "plugin": "repomix-explorer"
+    },
+    {
+      "id": "cb-requirements-pilot",
+      "slash_id": "requirements-pilot",
+      "plugin": "requirements-driven-workflow"
+    },
+    {
+      "id": "cb-diff",
+      "slash_id": "diff",
+      "plugin": "security-scan"
+    },
+    {
+      "id": "cb-project",
+      "slash_id": "project",
+      "plugin": "security-scan"
+    },
+    {
+      "id": "cb-compliance-check",
+      "slash_id": "compliance-check",
+      "plugin": "security-compliance"
+    },
+    {
+      "id": "cb-security-dependencies",
+      "slash_id": "security-dependencies",
+      "plugin": "security-scanning"
+    },
+    {
+      "id": "cb-security-sast",
+      "slash_id": "security-sast",
+      "plugin": "security-scanning"
+    },
+    {
+      "id": "cb-business-case",
+      "slash_id": "business-case",
+      "plugin": "startup-business-analyst"
+    },
+    {
+      "id": "cb-financial-projections",
+      "slash_id": "financial-projections",
+      "plugin": "startup-business-analyst"
+    },
+    {
+      "id": "cb-market-opportunity",
+      "slash_id": "market-opportunity",
+      "plugin": "startup-business-analyst"
+    },
+    {
+      "id": "cb-brainstorm",
+      "slash_id": "brainstorm",
+      "plugin": "superpowers"
+    },
+    {
+      "id": "cb-execute-plan",
+      "slash_id": "execute-plan",
+      "plugin": "superpowers"
+    },
+    {
+      "id": "cb-write-plan",
+      "slash_id": "write-plan",
+      "plugin": "superpowers"
+    },
+    {
+      "id": "cb-rust-project",
+      "slash_id": "rust-project",
+      "plugin": "systems-programming"
+    },
+    {
+      "id": "cb-add-dependency",
+      "slash_id": "add-dependency",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-add-subtask",
+      "slash_id": "add-subtask",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-add-task",
+      "slash_id": "add-task",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-analyze-complexity",
+      "slash_id": "analyze-complexity",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-analyze-project",
+      "slash_id": "analyze-project",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-auto-implement-tasks",
+      "slash_id": "auto-implement-tasks",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-command-pipeline",
+      "slash_id": "command-pipeline",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-complexity-report",
+      "slash_id": "complexity-report",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-convert-task-to-subtask",
+      "slash_id": "convert-task-to-subtask",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-expand-all-tasks",
+      "slash_id": "expand-all-tasks",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-expand-task",
+      "slash_id": "expand-task",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-fix-dependencies",
+      "slash_id": "fix-dependencies",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-init-project-quick",
+      "slash_id": "init-project-quick",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-install-taskmaster",
+      "slash_id": "install-taskmaster",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-learn",
+      "slash_id": "learn",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-list-tasks-by-status",
+      "slash_id": "list-tasks-by-status",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-list-tasks-with-subtasks",
+      "slash_id": "list-tasks-with-subtasks",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-list-tasks",
+      "slash_id": "list-tasks",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-next-task",
+      "slash_id": "next-task",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-parse-prd-with-research",
+      "slash_id": "parse-prd-with-research",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-parse-prd",
+      "slash_id": "parse-prd",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-project-status",
+      "slash_id": "project-status",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-quick-install-taskmaster",
+      "slash_id": "quick-install-taskmaster",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-remove-all-subtasks",
+      "slash_id": "remove-all-subtasks",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-remove-dependency",
+      "slash_id": "remove-dependency",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-remove-subtask",
+      "slash_id": "remove-subtask",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-remove-subtasks",
+      "slash_id": "remove-subtasks",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-remove-task",
+      "slash_id": "remove-task",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-setup-models",
+      "slash_id": "setup-models",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-show-task",
+      "slash_id": "show-task",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-sync-readme",
+      "slash_id": "sync-readme",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-to-cancelled",
+      "slash_id": "to-cancelled",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-to-deferred",
+      "slash_id": "to-deferred",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-to-done",
+      "slash_id": "to-done",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-to-in-progress",
+      "slash_id": "to-in-progress",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-to-pending",
+      "slash_id": "to-pending",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-to-review",
+      "slash_id": "to-review",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-validate-dependencies",
+      "slash_id": "validate-dependencies",
+      "plugin": "taskmaster"
+    },
+    {
+      "id": "cb-tdd-cycle",
+      "slash_id": "tdd-cycle",
+      "plugin": "tdd-workflows"
+    },
+    {
+      "id": "cb-tdd-green",
+      "slash_id": "tdd-green",
+      "plugin": "tdd-workflows"
+    },
+    {
+      "id": "cb-tdd-red",
+      "slash_id": "tdd-red",
+      "plugin": "tdd-workflows"
+    },
+    {
+      "id": "cb-tdd-refactor",
+      "slash_id": "tdd-refactor",
+      "plugin": "tdd-workflows"
+    },
+    {
+      "id": "cb-issue",
+      "slash_id": "issue",
+      "plugin": "team-collaboration"
+    },
+    {
+      "id": "cb-standup-notes",
+      "slash_id": "standup-notes",
+      "plugin": "team-collaboration"
+    },
+    {
+      "id": "cb-test-generate",
+      "slash_id": "test-generate",
+      "plugin": "unit-testing"
+    },
+    {
+      "id": "cb-chat_design",
+      "slash_id": "chat_design",
+      "plugin": "testbuddy"
+    },
+    {
+      "id": "cb-open_design",
+      "slash_id": "open_design",
+      "plugin": "testbuddy"
+    },
+    {
+      "id": "cb-alb_codegen_cmd",
+      "slash_id": "alb_codegen_cmd",
+      "plugin": "tsmart"
+    },
+    {
+      "id": "cb-tb_open",
+      "slash_id": "tb_open",
+      "plugin": "tsmart"
+    },
+    {
+      "id": "cb-tcase_codegen_cmd",
+      "slash_id": "tcase_codegen_cmd",
+      "plugin": "tsmart"
+    },
+    {
+      "id": "cb-yottadb_codegen_cmd",
+      "slash_id": "yottadb_codegen_cmd",
+      "plugin": "tsmart"
+    }
+  ],
+  "templates": [
+    {
+      "id": "tpl-atuin-template",
+      "plugin": "atuin"
+    },
+    {
+      "id": "tpl-agent-browser-template",
+      "plugin": "agent-browser"
+    },
+    {
+      "id": "tpl-cloudbase-template",
+      "plugin": "cloudbase"
+    },
+    {
+      "id": "tpl-hookify-template",
+      "plugin": "hookify"
+    },
+    {
+      "id": "tpl-plugin-finder-template",
+      "plugin": "plugin-finder"
+    },
+    {
+      "id": "tpl-ralph-loop-template",
+      "plugin": "ralph-loop"
+    },
+    {
+      "id": "tpl-security-guidance-template",
+      "plugin": "security-guidance"
+    },
+    {
+      "id": "tpl-superpowers-template",
+      "plugin": "superpowers"
+    },
+    {
+      "id": "tpl-tsmart-template",
+      "plugin": "tsmart"
+    }
+  ],
+  "excluded": {
+    "skills": [
+      "apple-notes",
+      "apple-reminders",
+      "blogwatcher"
+    ],
+    "agents": [
+      "cb-ai-engineer-2",
+      "cb-api-documenter-2",
+      "cb-api-documenter-3",
+      "cb-architect-review-2",
+      "cb-architect-review-3",
+      "cb-architect-review-4",
+      "cb-backend-architect-2",
+      "cb-backend-architect-3",
+      "cb-backend-architect-4",
+      "cb-backend-architect-5",
+      "cb-backend-architect-6",
+      "cb-backend-architect-7",
+      "cb-backend-security-coder-2",
+      "cb-blockchain-developer-2",
+      "cb-business-analyst-2",
+      "cb-cloud-architect-2",
+      "cb-cloud-architect-3",
+      "cb-cloud-architect-4",
+      "cb-cloud-architect-5",
+      "cb-code-reviewer-6",
+      "cb-code-reviewer-9",
+      "cb-code-reviewer-7",
+      "cb-code-reviewer-8",
+      "cb-code-reviewer-10",
+      "cb-code-reviewer-2",
+      "cb-code-reviewer-3",
+      "cb-code-reviewer-4",
+      "cb-code-reviewer-5",
+      "cb-code-simplifier-2",
+      "cb-content-marketer-2",
+      "cb-context-manager",
+      "cb-context-manager-3",
+      "cb-customer-support-2",
+      "cb-data-engineer-2",
+      "cb-data-scientist-2",
+      "cb-database-admin-2",
+      "cb-database-architect-2",
+      "cb-database-optimizer-2",
+      "cb-database-optimizer-3",
+      "cb-database-optimizer-4",
+      "cb-debugger-2",
+      "cb-debugger-3",
+      "cb-debugger-4",
+      "cb-debugger-5",
+      "cb-deployment-engineer-2",
+      "cb-deployment-engineer-3",
+      "cb-deployment-engineer-4",
+      "cb-devops-troubleshooter-2",
+      "cb-devops-troubleshooter-3",
+      "cb-devops-troubleshooter-4",
+      "cb-django-pro-2",
+      "cb-docs-architect-2",
+      "cb-dx-optimizer-2",
+      "cb-dx-optimizer-3",
+      "cb-error-detective-2",
+      "cb-error-detective-3",
+      "cb-error-detective-4",
+      "cb-fastapi-pro-2",
+      "cb-frontend-developer-2",
+      "cb-frontend-developer-3",
+      "cb-frontend-developer-4",
+      "cb-frontend-developer-5",
+      "cb-graphql-architect-2",
+      "cb-graphql-architect-3",
+      "cb-incident-responder-2",
+      "cb-ios-developer-2",
+      "cb-kubernetes-architect-2",
+      "cb-kubernetes-architect-3",
+      "cb-legacy-modernizer-2",
+      "cb-legacy-modernizer-3",
+      "cb-legacy-modernizer-4",
+      "cb-legal-advisor-2",
+      "cb-ml-engineer-2",
+      "cb-mlops-engineer-2",
+      "cb-mobile-developer-2",
+      "cb-mobile-developer-3",
+      "cb-network-engineer-2",
+      "cb-network-engineer-3",
+      "cb-observability-engineer-2",
+      "cb-payment-integration-2",
+      "cb-performance-engineer-2",
+      "cb-performance-engineer-3",
+      "cb-performance-engineer-4",
+      "cb-performance-engineer-5",
+      "cb-prompt-engineer-2",
+      "cb-quant-analyst-2",
+      "cb-risk-manager-2",
+      "cb-sales-automator-2",
+      "cb-search-specialist-2",
+      "cb-security-auditor-2",
+      "cb-security-auditor-3",
+      "cb-security-auditor-4",
+      "cb-security-auditor-5",
+      "cb-tdd-orchestrator-2",
+      "cb-terraform-specialist-2",
+      "cb-terraform-specialist-3",
+      "cb-terraform-specialist-4",
+      "cb-test-automator-2",
+      "cb-test-automator-3",
+      "cb-test-automator-4",
+      "cb-test-automator-5",
+      "cb-tutorial-engineer-2",
+      "cb-ui-ux-designer-2"
+    ],
+    "commands": [
+      "cb-route-plan",
+      "cb-search-poi",
+      "cb-set-key",
+      "cb-smart-workflow",
+      "cb-tm-main",
+      "cb-update-single-task",
+      "cb-update-task",
+      "cb-update-tasks-from-id",
+      "cb-view-models",
+      "cb-ai-review-2",
+      "cb-cancel-ralph",
+      "cb-code-review-2",
+      "cb-commit-2",
+      "cb-context-restore-2",
+      "cb-deps-audit-2",
+      "cb-doc-generate-2",
+      "cb-docs-2",
+      "cb-error-analysis-2",
+      "cb-error-trace-2",
+      "cb-help-2",
+      "cb-help-3",
+      "cb-init-project-2",
+      "cb-install",
+      "cb-multi-agent-review-2",
+      "cb-optimize-3",
+      "cb-optimize-2",
+      "cb-pr-enhance",
+      "cb-ralph-loop-2",
+      "cb-refactor",
+      "cb-refactor-clean-2",
+      "cb-review",
+      "cb-security-hardening-2",
+      "cb-setup-2",
+      "cb-smart-debug-2",
+      "cb-status-2",
+      "cb-tech-debt-2"
+    ],
+    "reasons": {
+      "cb-route-plan": "hard_delete_platform_command",
+      "cb-search-poi": "hard_delete_platform_command",
+      "cb-set-key": "hard_delete_platform_command",
+      "cb-smart-workflow": "hard_delete_platform_command",
+      "cb-tm-main": "hard_delete_platform_command",
+      "cb-update-single-task": "hard_delete_platform_command",
+      "cb-update-task": "hard_delete_platform_command",
+      "cb-update-tasks-from-id": "hard_delete_platform_command",
+      "cb-view-models": "hard_delete_platform_command",
+      "cb-ai-review-2": "slash_id_duplicate:ai-review",
+      "cb-cancel-ralph": "slash_id_duplicate:cancel-ralph",
+      "cb-code-review-2": "slash_id_duplicate:code-review",
+      "cb-commit-2": "slash_id_duplicate:commit",
+      "cb-context-restore-2": "slash_id_duplicate:context-restore",
+      "cb-deps-audit-2": "slash_id_duplicate:deps-audit",
+      "cb-doc-generate-2": "slash_id_duplicate:doc-generate",
+      "cb-docs-2": "slash_id_duplicate:docs",
+      "cb-error-analysis-2": "slash_id_duplicate:error-analysis",
+      "cb-error-trace-2": "slash_id_duplicate:error-trace",
+      "cb-help-2": "slash_id_duplicate:help",
+      "cb-help-3": "slash_id_duplicate:help",
+      "cb-init-project-2": "slash_id_duplicate:init-project",
+      "cb-install": "slash_id_duplicate:install",
+      "cb-multi-agent-review-2": "slash_id_duplicate:multi-agent-review",
+      "cb-optimize-3": "slash_id_duplicate:optimize",
+      "cb-optimize-2": "slash_id_duplicate:optimize",
+      "cb-pr-enhance": "slash_id_duplicate:pr-enhance",
+      "cb-ralph-loop-2": "slash_id_duplicate:ralph-loop",
+      "cb-refactor": "slash_id_duplicate:refactor",
+      "cb-refactor-clean-2": "slash_id_duplicate:refactor-clean",
+      "cb-review": "slash_id_duplicate:review",
+      "cb-security-hardening-2": "slash_id_duplicate:security-hardening",
+      "cb-setup-2": "slash_id_duplicate:setup",
+      "cb-smart-debug-2": "slash_id_duplicate:smart-debug",
+      "cb-status-2": "slash_id_duplicate:status",
+      "cb-tech-debt-2": "slash_id_duplicate:tech-debt",
+      "apple-notes": "platform_hard_dependency",
+      "apple-reminders": "platform_hard_dependency",
+      "blogwatcher": "platform_hard_dependency",
+      "cb-ai-engineer-2": "duplicate_persona",
+      "cb-api-documenter-2": "duplicate_persona",
+      "cb-api-documenter-3": "duplicate_persona",
+      "cb-architect-review-2": "duplicate_persona",
+      "cb-architect-review-3": "duplicate_persona",
+      "cb-architect-review-4": "duplicate_persona",
+      "cb-backend-architect-2": "duplicate_persona",
+      "cb-backend-architect-3": "duplicate_persona",
+      "cb-backend-architect-4": "duplicate_persona",
+      "cb-backend-architect-5": "duplicate_persona",
+      "cb-backend-architect-6": "duplicate_persona",
+      "cb-backend-architect-7": "duplicate_persona",
+      "cb-backend-security-coder-2": "duplicate_persona",
+      "cb-blockchain-developer-2": "duplicate_persona",
+      "cb-business-analyst-2": "duplicate_persona",
+      "cb-cloud-architect-2": "duplicate_persona",
+      "cb-cloud-architect-3": "duplicate_persona",
+      "cb-cloud-architect-4": "duplicate_persona",
+      "cb-cloud-architect-5": "duplicate_persona",
+      "cb-code-reviewer-6": "duplicate_persona",
+      "cb-code-reviewer-9": "duplicate_persona",
+      "cb-code-reviewer-7": "duplicate_persona",
+      "cb-code-reviewer-8": "duplicate_persona",
+      "cb-code-reviewer-10": "duplicate_persona",
+      "cb-code-reviewer-2": "duplicate_persona",
+      "cb-code-reviewer-3": "duplicate_persona",
+      "cb-code-reviewer-4": "duplicate_persona",
+      "cb-code-reviewer-5": "duplicate_persona",
+      "cb-code-simplifier-2": "duplicate_persona",
+      "cb-content-marketer-2": "duplicate_persona",
+      "cb-context-manager": "duplicate_persona",
+      "cb-context-manager-3": "duplicate_persona",
+      "cb-customer-support-2": "duplicate_persona",
+      "cb-data-engineer-2": "duplicate_persona",
+      "cb-data-scientist-2": "duplicate_persona",
+      "cb-database-admin-2": "duplicate_persona",
+      "cb-database-architect-2": "duplicate_persona",
+      "cb-database-optimizer-2": "duplicate_persona",
+      "cb-database-optimizer-3": "duplicate_persona",
+      "cb-database-optimizer-4": "duplicate_persona",
+      "cb-debugger-2": "duplicate_persona",
+      "cb-debugger-3": "duplicate_persona",
+      "cb-debugger-4": "duplicate_persona",
+      "cb-debugger-5": "duplicate_persona",
+      "cb-deployment-engineer-2": "duplicate_persona",
+      "cb-deployment-engineer-3": "duplicate_persona",
+      "cb-deployment-engineer-4": "duplicate_persona",
+      "cb-devops-troubleshooter-2": "duplicate_persona",
+      "cb-devops-troubleshooter-3": "duplicate_persona",
+      "cb-devops-troubleshooter-4": "duplicate_persona",
+      "cb-django-pro-2": "duplicate_persona",
+      "cb-docs-architect-2": "duplicate_persona",
+      "cb-dx-optimizer-2": "duplicate_persona",
+      "cb-dx-optimizer-3": "duplicate_persona",
+      "cb-error-detective-2": "duplicate_persona",
+      "cb-error-detective-3": "duplicate_persona",
+      "cb-error-detective-4": "duplicate_persona",
+      "cb-fastapi-pro-2": "duplicate_persona",
+      "cb-frontend-developer-2": "duplicate_persona",
+      "cb-frontend-developer-3": "duplicate_persona",
+      "cb-frontend-developer-4": "duplicate_persona",
+      "cb-frontend-developer-5": "duplicate_persona",
+      "cb-graphql-architect-2": "duplicate_persona",
+      "cb-graphql-architect-3": "duplicate_persona",
+      "cb-incident-responder-2": "duplicate_persona",
+      "cb-ios-developer-2": "duplicate_persona",
+      "cb-kubernetes-architect-2": "duplicate_persona",
+      "cb-kubernetes-architect-3": "duplicate_persona",
+      "cb-legacy-modernizer-2": "duplicate_persona",
+      "cb-legacy-modernizer-3": "duplicate_persona",
+      "cb-legacy-modernizer-4": "duplicate_persona",
+      "cb-legal-advisor-2": "duplicate_persona",
+      "cb-ml-engineer-2": "duplicate_persona",
+      "cb-mlops-engineer-2": "duplicate_persona",
+      "cb-mobile-developer-2": "duplicate_persona",
+      "cb-mobile-developer-3": "duplicate_persona",
+      "cb-network-engineer-2": "duplicate_persona",
+      "cb-network-engineer-3": "duplicate_persona",
+      "cb-observability-engineer-2": "duplicate_persona",
+      "cb-payment-integration-2": "duplicate_persona",
+      "cb-performance-engineer-2": "duplicate_persona",
+      "cb-performance-engineer-3": "duplicate_persona",
+      "cb-performance-engineer-4": "duplicate_persona",
+      "cb-performance-engineer-5": "duplicate_persona",
+      "cb-prompt-engineer-2": "duplicate_persona",
+      "cb-quant-analyst-2": "duplicate_persona",
+      "cb-risk-manager-2": "duplicate_persona",
+      "cb-sales-automator-2": "duplicate_persona",
+      "cb-search-specialist-2": "duplicate_persona",
+      "cb-security-auditor-2": "duplicate_persona",
+      "cb-security-auditor-3": "duplicate_persona",
+      "cb-security-auditor-4": "duplicate_persona",
+      "cb-security-auditor-5": "duplicate_persona",
+      "cb-tdd-orchestrator-2": "duplicate_persona",
+      "cb-terraform-specialist-2": "duplicate_persona",
+      "cb-terraform-specialist-3": "duplicate_persona",
+      "cb-terraform-specialist-4": "duplicate_persona",
+      "cb-test-automator-2": "duplicate_persona",
+      "cb-test-automator-3": "duplicate_persona",
+      "cb-test-automator-4": "duplicate_persona",
+      "cb-test-automator-5": "duplicate_persona",
+      "cb-tutorial-engineer-2": "duplicate_persona",
+      "cb-ui-ux-designer-2": "duplicate_persona"
+    }
+  },
+  "notices": [
+    {
+      "plugin": "algorithmic-art",
+      "license_file": "plugins/algorithmic-art/LICENSE.txt",
+      "description": "使用 p5.js 创建算法艺术，支持种子随机性和交互式参数探索。适用于生成艺术、流场、粒子系统等代码艺术创作。"
+    },
+    {
+      "plugin": "brand-guidelines",
+      "license_file": "external_plugins/brand-guidelines/LICENSE.txt",
+      "description": "将 Anthropic 官方品牌配色和排版应用于工件，确保视觉识别和专业设计标准的一致性。"
+    },
+    {
+      "plugin": "canvas-design",
+      "license_file": "external_plugins/canvas-design/LICENSE.txt",
+      "description": "使用设计哲学和美学原则创建精美的视觉艺术作品，支持生成海报、设计稿和静态艺术品的 PNG 和 PDF 文档。"
+    },
+    {
+      "plugin": "docx",
+      "license_file": "plugins/docx/LICENSE.txt",
+      "description": "全面的 Word 文档创建、编辑和分析工具，支持修订跟踪、评论、格式保留和文本提取。用于处理专业 Word 文档(.docx)"
+    },
+    {
+      "plugin": "frontend-design",
+      "license_file": "plugins/frontend-design/LICENSE.txt",
+      "description": "创建独特的生产级前端界面,具有高设计质量。生成富有创意、精致的代码,避免千篇一律的AI审美。"
+    },
+    {
+      "plugin": "internal-comms",
+      "license_file": "external_plugins/internal-comms/LICENSE.txt",
+      "description": "帮助撰写内部沟通文档，包括三要素更新（进展/计划/问题）、公司通讯、常见问题解答、状态报告和项目更新，遵循公司特定格式规范。"
+    },
+    {
+      "plugin": "mcp-builder",
+      "license_file": "external_plugins/mcp-builder/LICENSE.txt",
+      "description": "指导创建高质量的 MCP（模型上下文协议）服务器,用于将外部 API 和服务与大语言模型集成,支持 Python 和 TypeScript 开发"
+    },
+    {
+      "plugin": "pdf",
+      "license_file": "plugins/pdf/LICENSE.txt",
+      "description": "全面的 PDF 处理工具包，支持提取文本和表格、创建新 PDF、合并/拆分文档、表单填写、加密解密、OCR 扫描等功能"
+    },
+    {
+      "plugin": "playwright-cli",
+      "license_file": "plugins/playwright-cli/LICENSE",
+      "description": "基于 Playwright 的 CLI 浏览器自动化工具，专为编程代理优化。通过命令行控制浏览器进行网页导航、元素交互、表单填写、截图、网络拦截和会话管理，比 MCP 方案更节省 Token。"
+    },
+    {
+      "plugin": "pptx",
+      "license_file": "plugins/pptx/LICENSE.txt",
+      "description": "PowerPoint 演示文稿创建、编辑和分析技能。支持创建新演示文稿、修改内容、处理布局、添加注释或演讲者备注等操作"
+    },
+    {
+      "plugin": "skill-creator",
+      "license_file": "external_plugins/skill-creator/LICENSE.txt",
+      "description": "提供创建高效 Claude 技能的指南,通过专业知识、工作流程和工具集成来扩展 AI 助手的能力"
+    },
+    {
+      "plugin": "slack-gif-creator",
+      "license_file": "external_plugins/slack-gif-creator/LICENSE.txt",
+      "description": "创建针对 Slack 优化的动画 GIF,提供文件大小约束验证和可组合的动画基元。"
+    },
+    {
+      "plugin": "superpowers",
+      "license_file": "external_plugins/superpowers/LICENSE",
+      "description": "Claude Code 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+    },
+    {
+      "plugin": "superpowers-chrome",
+      "license_file": "external_plugins/superpowers-chrome/LICENSE",
+      "description": "超轻量级 Chrome DevTools Protocol MCP 服务器，支持自动捕获。通过 Chrome DevTools Protocol 实现直接浏览器控制，零依赖，API 简单易用。"
+    },
+    {
+      "plugin": "theme-factory",
+      "license_file": "external_plugins/theme-factory/LICENSE.txt",
+      "description": "为演示文稿、文档、报告和 HTML 落地页等制品应用专业的字体和配色主题，提供 10 套预设主题方案。"
+    },
+    {
+      "plugin": "ui-ux-pro-max-skill",
+      "license_file": "external_plugins/ui-ux-pro-max-skill/LICENSE",
+      "description": "AI-powered UI/UX design system generator with 100+ industry-specific reasoning rules, 57 UI styles, and intelligent design recommendations"
+    },
+    {
+      "plugin": "web-artifacts-builder",
+      "license_file": "plugins/web-artifacts-builder/LICENSE.txt",
+      "description": "使用现代前端技术（React、Tailwind CSS、shadcn/ui）创建复杂多组件 HTML 工件的工具套件。适用于需要状态管理、路由或 shadcn/ui 组件的复杂工件。"
+    },
+    {
+      "plugin": "webapp-testing",
+      "license_file": "external_plugins/webapp-testing/LICENSE.txt",
+      "description": "使用 Playwright 测试本地 Web 应用，支持验证前端功能、调试 UI 行为和捕获浏览器截图。"
+    },
+    {
+      "plugin": "xlsx",
+      "license_file": "plugins/xlsx/LICENSE.txt",
+      "description": "全面的电子表格创建、编辑和分析工具，支持公式、格式化、数据分析和可视化。适用于 .xlsx、.xlsm、.csv、.tsv 等表格文件的处理"
+    }
+  ],
+  "compatibility": {
+    "pass": 822,
+    "rewrite": 928,
+    "delete": 142
+  },
+  "counts": {
+    "skills": 253,
+    "agents": 233,
+    "commands": 336
+  }
+}

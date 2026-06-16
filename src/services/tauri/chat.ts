@@ -114,6 +114,8 @@ export function chatSend(args: {
   teamId?: string | null;
   /** WorkZ team mode: pool id for this coordinator run. */
   poolId?: string | null;
+  /** Prefer Chinese prompt/description when available. */
+  preferZh?: boolean | null;
 }): Promise<ChatResult> {
   return invoke<ChatResult>("chat_send", {
     prompt: args.prompt,
@@ -133,6 +135,7 @@ export function chatSend(args: {
     sessionSource: args.sessionSource ?? SESSION_SOURCE_CODEZ,
     teamId: args.teamId ?? null,
     poolId: args.poolId ?? null,
+    preferZh: args.preferZh ?? null,
   });
 }
 

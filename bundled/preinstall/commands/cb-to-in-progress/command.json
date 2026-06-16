@@ -1,0 +1,13 @@
+{
+  "id": "cb-to-in-progress",
+  "slash_id": "to-in-progress",
+  "name": "cb-to-in-progress",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Start working on a task by setting its status to in-progress.\n\nArguments: $ARGUMENTS (task ID)\n\n## Starting Work on Task\n\nThis command does more than just change status - it prepares your environment for productive work.\n\n## Pre-Start Checks\n\n1. Verify dependencies are met\n2. Check if another task is already in-progress\n3. Ensure task details are complete\n4. Validate test strategy exists\n\n## Execution\n\n```bash\ntask-master set-status --id=$ARGUMENTS --status=in-progress\n```\n\n## Environment Setup\n\nAfter setting to in-progress:\n1. Create/checkout appropriate git branch\n2. Open relevant documentation\n3. Set up test watchers if applicable\n4. Display task details and acceptance criteria\n5. Show similar completed tasks for reference\n\n## Smart Suggestions\n\n- Estimated completion time based on complexity\n- Related files from similar tasks\n- Potential blockers to watch for\n- Recommended first steps",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

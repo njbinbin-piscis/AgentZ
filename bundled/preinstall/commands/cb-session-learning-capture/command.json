@@ -1,0 +1,15 @@
+{
+  "id": "cb-session-learning-capture",
+  "slash_id": "session-learning-capture",
+  "name": "cb-session-learning-capture",
+  "description": "Capture and document session learnings",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_list"
+  ],
+  "prompt": "# Session Learning Capture\n\nCapture and document session learnings\n\n## Instructions\n\n1. **Identify Session Learnings**\n   - Review if during your session:\n     - You learned something new about the project\n     - I corrected you on a specific implementation detail\n     - I corrected source code you generated\n     - You struggled to find specific information and had to infer details about the project\n     - You lost track of the project structure and had to look up information in the source code\n\n2. **Determine Appropriate File**\n   - Choose the right file for the information:\n     - `CLAUDE.md` for shared context that should be version controlled\n     - `CLAUDE.local.md` for private notes and developer-specific settings\n     - Subdirectory `CLAUDE.md` for component-specific information\n\n3. **Memory File Types Summary**\n   - **Shared Project Memory (`CLAUDE.md`):**\n     - Located in the repository root or any working directory\n     - Checked into version control for team-wide context sharing\n     - Loaded recursively from the current directory up to the root\n   - **Local, Non-Shared Memory (`CLAUDE.local.md`):**\n     - Placed alongside or above working files, excluded from version control\n     - Stores private, developer-specific notes and settings\n     - Loaded recursively like `CLAUDE.md`\n   - **On-Demand Subdirectory Loading:**\n     - `CLAUDE.md` files in child folders are loaded only when editing files in those subfolders\n     - Prevents unnecessary context bloat\n   - **Global User Memory (`~/.claude/CLAUDE.md`):**\n     - Acts as a personal, cross-project memory\n     - Automatically merged into sessions under your home directory\n\n4. **Update Memory Files**\n   - Add relevant, non-obvious information that should be persisted\n   - Ensure proper placement based on component relevance:\n     - UI-specific information → `apps/[project]-ui/CLAUDE.md`\n     - API-specific information → `apps/[project]-api/CLAUDE.md`\n     - Infrastructure information → `cdk/CLAUDE.md` or `infrastructure/CLAUDE.md`\n   - This ensures important knowledge is retained and available in future sessions\n\n## Credit\n\nThis command is based on the work of Thomas Landgraf: https://thomaslandgraf.substack.com/p/claude-codes-memory-working-with",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-team-collaboration"
+}

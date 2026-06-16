@@ -1,0 +1,13 @@
+{
+  "id": "cb-five",
+  "slash_id": "five",
+  "name": "cb-five",
+  "description": "Apply the Five Whys root cause analysis technique to systematically investigate issues",
+  "description_zh": "",
+  "argument_hint": "<issue_description>",
+  "tools": [],
+  "prompt": "# Five Whys Analysis\n\nApply the Five Whys root cause analysis technique to investigate: $ARGUMENTS\n\n## Description\nThis command implements the Five Whys problem-solving methodology, iteratively asking \"why\" to drill down from symptoms to root causes. It helps identify the fundamental reason behind a problem rather than just addressing surface-level symptoms.\n\n## Usage\n`five [issue_description]`\n\n## Variables\n- ISSUE: The problem or symptom to analyze (default: prompt for input)\n- DEPTH: Number of \"why\" iterations (default: 5, can be adjusted)\n\n## Steps\n1. Start with the problem statement\n2. Ask \"Why did this happen?\" and document the answer\n3. For each answer, ask \"Why?\" again\n4. Continue for at least 5 iterations or until root cause is found\n5. Validate the root cause by working backwards\n6. Propose solutions that address the root cause\n\n## Examples\n### Example 1: Application crash analysis\n```\nProblem: Application crashes on startup\nWhy 1: Database connection fails\nWhy 2: Connection string is invalid\nWhy 3: Environment variable not set\nWhy 4: Deployment script missing env setup\nWhy 5: Documentation didn't specify env requirements\nRoot Cause: Missing deployment documentation\n```\n\n### Example 2: Performance issue investigation\nSystematically trace why a feature is running slowly by examining each contributing factor.\n\n## Notes\n- Don't stop at symptoms; keep digging for systemic issues\n- Multiple root causes may exist - explore different branches\n- Document each \"why\" for future reference\n- Consider both technical and process-related causes\n- The magic isn't in exactly 5 whys - stop when you reach the true root cause",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-miscellaneous"
+}

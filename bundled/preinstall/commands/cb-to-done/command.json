@@ -1,0 +1,13 @@
+{
+  "id": "cb-to-done",
+  "slash_id": "to-done",
+  "name": "cb-to-done",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Mark a task as completed.\n\nArguments: $ARGUMENTS (task ID)\n\n## Completing a Task\n\nThis command validates task completion and updates project state intelligently.\n\n## Pre-Completion Checks\n\n1. Verify test strategy was followed\n2. Check if all subtasks are complete\n3. Validate acceptance criteria met\n4. Ensure code is committed\n\n## Execution\n\n```bash\ntask-master set-status --id=$ARGUMENTS --status=done\n```\n\n## Post-Completion Actions\n\n1. **Update Dependencies**\n   - Identify newly unblocked tasks\n   - Update sprint progress\n   - Recalculate project timeline\n\n2. **Documentation**\n   - Generate completion summary\n   - Update CLAUDE.md with learnings\n   - Log implementation approach\n\n3. **Next Steps**\n   - Show newly available tasks\n   - Suggest logical next task\n   - Update velocity metrics\n\n## Celebration & Learning\n\n- Show impact of completion\n- Display unblocked work\n- Recognize achievement\n- Capture lessons learned",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

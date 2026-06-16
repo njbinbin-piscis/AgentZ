@@ -1,0 +1,134 @@
+.agentz-tpl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.agentz-tpl-dialog {
+  width: min(520px, 92vw);
+  max-height: 80vh;
+  overflow: auto;
+  padding: 1.25rem 1.5rem;
+  border-radius: 12px;
+  background: var(--agentz-panel-bg, #1e1e1e);
+  border: 1px solid var(--agentz-border, #333);
+  color: var(--agentz-text, #eee);
+}
+
+.agentz-tpl-dialog h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+}
+
+.agentz-tpl-sub {
+  margin: 0 0 1rem;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.agentz-tpl-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.agentz-tpl-list label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.agentz-tpl-list label.active {
+  border-color: var(--agentz-accent, #7c6af7);
+  background: rgba(124, 106, 247, 0.12);
+}
+
+.agentz-tpl-name {
+  font-weight: 600;
+}
+
+.agentz-tpl-desc {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.agentz-tpl-note,
+.agentz-tpl-empty {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.agentz-tpl-error {
+  color: #fc5c65;
+  font-size: 0.85rem;
+}
+
+.agentz-tpl-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.agentz-tpl-actions button {
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--agentz-border, #444);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.agentz-tpl-actions button.primary {
+  background: var(--agentz-accent, #7c6af7);
+  border-color: transparent;
+  color: #fff;
+}
+
+.agentz-command-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.agentz-command-item {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--agentz-border, #333);
+}
+
+.agentz-command-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agentz-command-head code {
+  font-size: 0.95rem;
+}
+
+.agentz-command-source {
+  font-size: 0.75rem;
+  opacity: 0.65;
+}
+
+.agentz-command-desc,
+.agentz-command-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}

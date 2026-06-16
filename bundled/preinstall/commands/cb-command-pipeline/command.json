@@ -1,0 +1,13 @@
+{
+  "id": "cb-command-pipeline",
+  "slash_id": "command-pipeline",
+  "name": "cb-command-pipeline",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Execute a pipeline of commands based on a specification.\n\nArguments: $ARGUMENTS\n\n## Command Pipeline Execution\n\nParse pipeline specification from arguments. Supported formats:\n\n### Simple Pipeline\n`init → expand-all → sprint-plan`\n\n### Conditional Pipeline  \n`status → if:pending>10 → sprint-plan → else → next`\n\n### Iterative Pipeline\n`for:pending-tasks → expand → complexity-check`\n\n### Smart Pipeline Patterns\n\n**1. Project Setup Pipeline**\n```\ninit [prd] → \nexpand-all → \ncomplexity-report → \nsprint-plan → \nshow first-sprint\n```\n\n**2. Daily Work Pipeline**\n```\nstandup →\nif:in-progress → continue →\nelse → next → start\n```\n\n**3. Task Completion Pipeline**\n```\ncomplete [id] →\ngit-commit →\nif:blocked-tasks-freed → show-freed →\nnext\n```\n\n**4. Quality Check Pipeline**\n```\nlist in-progress →\nfor:each → check-idle-time →\nif:idle>1day → prompt-update\n```\n\n### Pipeline Features\n\n**Variables**\n- Store results: `status → $count=pending-count`\n- Use in conditions: `if:$count>10`\n- Pass between commands: `expand $high-priority-tasks`\n\n**Error Handling**\n- On failure: `try:complete → catch:show-blockers`\n- Skip on error: `optional:test-run`\n- Retry logic: `retry:3:commit`\n\n**Parallel Execution**\n- Parallel branches: `[analyze | test | lint]`\n- Join results: `parallel → join:report`\n\n### Execution Flow\n\n1. Parse pipeline specification\n2. Validate command sequence\n3. Execute with state passing\n4. Handle conditions and loops\n5. Aggregate results\n6. Show summary\n\nThis enables complex workflows like:\n`parse-prd → expand-all → filter:complex>70 → assign:senior → sprint-plan:weighted`",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

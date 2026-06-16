@@ -1,0 +1,16 @@
+{
+  "id": "cb-create-jtbd",
+  "slash_id": "create-jtbd",
+  "name": "cb-create-jtbd",
+  "description": "Create a Jobs to be Done (JTBD) document for a product feature focusing on user needs",
+  "description_zh": "",
+  "argument_hint": "<feature description> [output-path]",
+  "tools": [
+    "file_write",
+    "plan_todo"
+  ],
+  "prompt": "Create a comprehensive Jobs to be Done (JTBD) document based on the feature description provided.\n\n## Instructions:\n1. Parse the arguments:\n   - First argument: Feature/product description (required)\n   - Second argument: Output path (optional, defaults to `JTBD.md` in current directory)\n\n2. Create a well-structured JTBD document that includes:\n\n   **Core Job Statement**:\n   - When [situation]\n   - I want to [motivation]\n   - So I can [expected outcome]\n\n   **Job Map**:\n   - Define: What users need to understand first\n   - Locate: What inputs/resources users need\n   - Prepare: How users get ready\n   - Confirm: How users verify readiness\n   - Execute: The core action\n   - Monitor: How users track progress\n   - Modify: How users make adjustments\n   - Conclude: How users finish the job\n\n   **Context & Circumstances**:\n   - Functional job aspects\n   - Emotional job aspects\n   - Social job aspects\n\n   **Success Criteria**:\n   - How users measure success\n   - What outcomes they expect\n   - Time/effort constraints\n\n   **Pain Points**:\n   - Current frustrations\n   - Workarounds users employ\n   - Unmet needs\n\n   **Competing Solutions**:\n   - How users currently solve this\n   - Alternative approaches\n   - Why current solutions fall short\n\n3. Focus on:\n   - User motivations (not features)\n   - Jobs that remain stable over time\n   - Outcomes users want to achieve\n   - Context that triggers the job\n\n4. Use the plan_todo tool tool to track JTBD sections as you complete them\n\n## Example usage:\n- `/create-jtbd \"Help developers find and fix bugs faster\"`\n- `/create-jtbd \"Enable teams to collaborate on documents in real-time\" collab-JTBD.md`\n\nFeature description: $ARGUMENTS",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-project-task-management"
+}

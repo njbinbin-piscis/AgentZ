@@ -1,0 +1,17 @@
+{
+  "id": "cb-revise-codebuddy-md",
+  "slash_id": "revise-codebuddy-md",
+  "name": "cb-revise-codebuddy-md",
+  "description": "Update AgentZ.md with learnings from this session",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_edit",
+    "file_list"
+  ],
+  "prompt": "Review this session for learnings about working with AgentZ Code in this codebase. Update AgentZ.md with context that would help future AgentZ sessions be more effective.\n\n## Step 1: Reflect\n\nWhat context was missing that would have helped AgentZ work more effectively?\n- Bash commands that were used or discovered\n- Code style patterns followed\n- Testing approaches that worked\n- Environment/configuration quirks\n- Warnings or gotchas encountered\n\n## Step 2: Find AgentZ.md Files\n\n```bash\nfind . -name \"AgentZ.md\" -o -name \".AgentZ.local.md\" 2>/dev/null | head -20\n```\n\nDecide where each addition belongs:\n- `AgentZ.md` - Team-shared (checked into git)\n- `.AgentZ.local.md` - Personal/local only (gitignored)\n\n## Step 3: Draft Additions\n\n**Keep it concise** - one line per concept. AgentZ.md is part of the prompt, so brevity matters.\n\nFormat: `<command or pattern>` - `<brief description>`\n\nAvoid:\n- Verbose explanations\n- Obvious information\n- One-off fixes unlikely to recur\n\n## Step 4: Show Proposed Changes\n\nFor each addition:\n\n```\n### Update: ./AgentZ.md\n\n**Why:** [one-line reason]\n\n\\`\\`\\`diff\n+ [the addition - keep it brief]\n\\`\\`\\`\n```\n\n## Step 5: Apply with Approval\n\nAsk if the user wants to apply the changes. Only edit files they approve.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "codebuddy-md-management"
+}

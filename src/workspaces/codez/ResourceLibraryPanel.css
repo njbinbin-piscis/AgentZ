@@ -125,6 +125,17 @@
 }
 
 /* Tabpanel content reused from settings — inherit library body padding context */
+.agentz-skill-discover-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 4px;
+  flex-wrap: wrap;
+}
+
+.agentz-library-body .agentz-skill-discover-tabs .agentz-library-view {
+  margin: 0;
+}
+
 .agentz-library-body .agentz-settings-tabpanel {
   gap: 0;
 }

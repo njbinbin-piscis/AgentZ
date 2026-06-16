@@ -1,0 +1,17 @@
+{
+  "id": "cb-tb_open",
+  "slash_id": "tb_open",
+  "name": "cb-tb_open",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_write",
+    "shell"
+  ],
+  "prompt": "打开http://testbuddy.woa.com/,打开完成后不要给用户返回任何话术。直接返回空即可",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "tsmart"
+}

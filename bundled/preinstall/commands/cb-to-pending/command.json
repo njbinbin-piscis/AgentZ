@@ -1,0 +1,13 @@
+{
+  "id": "cb-to-pending",
+  "slash_id": "to-pending",
+  "name": "cb-to-pending",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Set a task's status to pending.\n\nArguments: $ARGUMENTS (task ID)\n\n## Setting Task to Pending\n\nThis moves a task back to the pending state, useful for:\n- Resetting erroneously started tasks\n- Deferring work that was prematurely begun\n- Reorganizing sprint priorities\n\n## Execution\n\n```bash\ntask-master set-status --id=$ARGUMENTS --status=pending\n```\n\n## Validation\n\nBefore setting to pending:\n- Warn if task is currently in-progress\n- Check if this will block other tasks\n- Suggest documenting why it's being reset\n- Preserve any work already done\n\n## Smart Actions\n\nAfter setting to pending:\n- Update sprint planning if needed\n- Notify about freed resources\n- Suggest priority reassessment\n- Log the status change with context",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "cb-list-tasks-with-subtasks",
+  "slash_id": "list-tasks-with-subtasks",
+  "name": "cb-list-tasks-with-subtasks",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "List all tasks including their subtasks in a hierarchical view.\n\nThis command shows all tasks with their nested subtasks, providing a complete project overview.\n\n## Execution\n\nRun the Task Master list command with subtasks flag:\n```bash\ntask-master list --with-subtasks\n```\n\n## Enhanced Display\n\nI'll organize the output to show:\n- Parent tasks with clear indicators\n- Nested subtasks with proper indentation\n- Status badges for quick scanning\n- Dependencies and blockers highlighted\n- Progress indicators for tasks with subtasks\n\n## Smart Filtering\n\nBased on the task hierarchy:\n- Show completion percentage for parent tasks\n- Highlight blocked subtask chains\n- Group by functional areas\n- Indicate critical path items\n\nThis gives you a complete tree view of your project structure.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "cb-fix-pr",
+  "slash_id": "fix-pr",
+  "name": "cb-fix-pr",
+  "description": "Fetch unresolved comments for current branch's PR and fix them",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_edit"
+  ],
+  "prompt": "Fetch unresolved comments for this branch's PR, then fix them",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-version-control-git"
+}

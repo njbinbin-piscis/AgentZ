@@ -1,0 +1,13 @@
+{
+  "id": "cb-brainstorm",
+  "slash_id": "brainstorm",
+  "name": "cb-brainstorm",
+  "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores requirements and design before implementation.",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Invoke the superpowers:brainstorming skill and follow it exactly as presented to you",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "superpowers"
+}

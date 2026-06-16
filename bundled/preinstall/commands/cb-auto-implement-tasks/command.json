@@ -1,0 +1,13 @@
+{
+  "id": "cb-auto-implement-tasks",
+  "slash_id": "auto-implement-tasks",
+  "name": "cb-auto-implement-tasks",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Enhanced auto-implementation with intelligent code generation and testing.\n\nArguments: $ARGUMENTS\n\n## Intelligent Auto-Implementation\n\nAdvanced implementation with context awareness and quality checks.\n\n### 1. **Pre-Implementation Analysis**\n\nBefore starting:\n- Analyze task complexity and requirements\n- Check codebase patterns and conventions\n- Identify similar completed tasks\n- Assess test coverage needs\n- Detect potential risks\n\n### 2. **Smart Implementation Strategy**\n\nBased on task type and context:\n\n**Feature Tasks**\n1. Research existing patterns\n2. Design component architecture\n3. Implement with tests\n4. Integrate with system\n5. Update documentation\n\n**Bug Fix Tasks**\n1. Reproduce issue\n2. Identify root cause\n3. Implement minimal fix\n4. Add regression tests\n5. Verify side effects\n\n**Refactoring Tasks**\n1. Analyze current structure\n2. Plan incremental changes\n3. Maintain test coverage\n4. Refactor step-by-step\n5. Verify behavior unchanged\n\n### 3. **Code Intelligence**\n\n**Pattern Recognition**\n- Learn from existing code\n- Follow team conventions\n- Use preferred libraries\n- Match style guidelines\n\n**Test-Driven Approach**\n- Write tests first when possible\n- Ensure comprehensive coverage\n- Include edge cases\n- Performance considerations\n\n### 4. **Progressive Implementation**\n\nStep-by-step with validation:\n```\nStep 1/5: Setting up component structure ✓\nStep 2/5: Implementing core logic ✓\nStep 3/5: Adding error handling ⚡ (in progress)\nStep 4/5: Writing tests ⏳\nStep 5/5: Integration testing ⏳\n\nCurrent: Adding try-catch blocks and validation...\n```\n\n### 5. **Quality Assurance**\n\nAutomated checks:\n- Linting and formatting\n- Test execution\n- Type checking\n- Dependency validation\n- Performance analysis\n\n### 6. **Smart Recovery**\n\nIf issues arise:\n- Diagnostic analysis\n- Suggestion generation\n- Fallback strategies\n- Manual intervention points\n- Learning from failures\n\n### 7. **Post-Implementation**\n\nAfter completion:\n- Generate PR description\n- Update documentation\n- Log lessons learned\n- Suggest follow-up tasks\n- Update task relationships\n\nResult: High-quality, production-ready implementations.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

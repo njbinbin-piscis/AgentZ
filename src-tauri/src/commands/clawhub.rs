@@ -10,6 +10,41 @@ use tracing::{info, warn};
 use crate::commands::chat::resolve_config_dir;
 
 const CLAWHUB_API: &str = "https://clawhub.ai";
+const SKILLHUB_API: &str = "https://api.skillhub.cn";
+
+fn resolve_registry(registry: Option<String>) -> Result<&'static str, String> {
+    match registry
+        .unwrap_or_else(|| "clawhub".into())
+        .trim()
+        .to_lowercase()
+        .as_str()
+    {
+        "clawhub" => Ok(CLAWHUB_API),
+        "skillhub" => Ok(SKILLHUB_API),
+        other => Err(format!("unknown skill registry: {other}")),
+    }
+}
+
+fn resolve_source(registry: Option<String>) -> Result<&'static str, String> {
+    match registry
+        .unwrap_or_else(|| "clawhub".into())
+        .trim()
+        .to_lowercase()
+        .as_str()
+    {
+        "clawhub" => Ok("clawhub"),
+        "skillhub" => Ok("skillhub"),
+        other => Err(format!("unknown skill registry: {other}")),
+    }
+}
+
+fn registry_label(base: &str) -> &'static str {
+    if base == SKILLHUB_API {
+        "SkillHub"
+    } else {
+        "ClawHub"
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ClawHubSkill {
@@ -67,7 +102,7 @@ async fn clawhub_get_with_retry(
         } else {
             (base_delay_ms * (1u64 << attempt.min(4))).min(16_000)
         };
-        warn!("ClawHub {status} for '{url}', retry in {backoff_ms}ms");
+        warn!("skill registry {status} for '{url}', retry in {backoff_ms}ms");
         tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
         attempt += 1;
     }
@@ -131,13 +166,59 @@ fn extract_zip_to_dir(zip_bytes: &[u8], dest: &Path) -> Result<String, String> {
     Ok(skill_md)
 }
 
-/// Search ClawHub for skills.
+fn parse_search_hit(r: &serde_json::Value) -> Option<ClawHubSkill> {
+    let slug = r["slug"].as_str()?.to_string();
+    let stars = r["stars"]
+        .as_u64()
+        .or_else(|| r["stats"]["stars"].as_u64())
+        .unwrap_or(0);
+    Some(ClawHubSkill {
+        name: r["displayName"]
+            .as_str()
+            .or_else(|| r["name"].as_str())
+            .unwrap_or(&slug)
+            .to_string(),
+        description: r["summary"]
+            .as_str()
+            .or_else(|| r["description"].as_str())
+            .unwrap_or("")
+            .to_string(),
+        version: r["version"].as_str().unwrap_or("").to_string(),
+        stars,
+        tags: vec![],
+        slug,
+    })
+}
+
+fn parse_list_hit(item: &serde_json::Value) -> Option<ClawHubSkill> {
+    let slug = item["slug"].as_str()?.to_string();
+    let tags: Vec<String> = item["tags"]
+        .as_object()
+        .map(|obj| obj.keys().cloned().collect())
+        .unwrap_or_default();
+    Some(ClawHubSkill {
+        name: item["displayName"].as_str().unwrap_or(&slug).to_string(),
+        description: item["summary"].as_str().unwrap_or("").to_string(),
+        version: item["latestVersion"]["version"]
+            .as_str()
+            .unwrap_or("latest")
+            .to_string(),
+        stars: item["stats"]["stars"].as_u64().unwrap_or(0),
+        tags,
+        slug,
+    })
+}
+
+/// Search a skill registry (ClawHub or SkillHub) for skills.
 #[tauri::command]
 pub async fn clawhub_search(
     query: String,
     limit: Option<u32>,
+    registry: Option<String>,
 ) -> Result<ClawHubSearchResult, String> {
     let limit = limit.unwrap_or(20).min(50);
+    let api_base = resolve_registry(registry.clone())?;
+    let label = registry_label(api_base);
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .user_agent("AgentZ-Desktop/1.0")
@@ -145,15 +226,23 @@ pub async fn clawhub_search(
         .map_err(|e| e.to_string())?;
 
     let q = query.trim().to_string();
+    let is_skillhub = api_base == SKILLHUB_API;
     let (url, use_search) = if q.is_empty() {
-        (
-            format!("{CLAWHUB_API}/api/v1/skills?sort=stars&limit={limit}"),
-            false,
-        )
+        if is_skillhub {
+            (
+                format!("{api_base}/api/v1/search?q=&limit={limit}"),
+                true,
+            )
+        } else {
+            (
+                format!("{api_base}/api/v1/skills?sort=stars&limit={limit}"),
+                false,
+            )
+        }
     } else {
         (
             format!(
-                "{CLAWHUB_API}/api/v1/search?q={}&limit={limit}",
+                "{api_base}/api/v1/search?q={}&limit={limit}",
                 urlencoding::encode(&q)
             ),
             true,
@@ -162,9 +251,9 @@ pub async fn clawhub_search(
 
     let resp = clawhub_get_with_retry(&client, &url, 3)
         .await
-        .map_err(|e| format!("cannot reach ClawHub: {e}"))?;
+        .map_err(|e| format!("cannot reach {label}: {e}"))?;
     if !resp.status().is_success() {
-        return Err(format!("ClawHub HTTP {}", resp.status()));
+        return Err(format!("{label} HTTP {}", resp.status()));
     }
     let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
 
@@ -174,17 +263,7 @@ pub async fn clawhub_search(
             .cloned()
             .unwrap_or_default()
             .iter()
-            .filter_map(|r| {
-                let slug = r["slug"].as_str()?.to_string();
-                Some(ClawHubSkill {
-                    name: r["displayName"].as_str().unwrap_or(&slug).to_string(),
-                    description: r["summary"].as_str().unwrap_or("").to_string(),
-                    version: r["version"].as_str().unwrap_or("").to_string(),
-                    stars: 0,
-                    tags: vec![],
-                    slug,
-                })
-            })
+            .filter_map(parse_search_hit)
             .collect()
     } else {
         body["items"]
@@ -192,24 +271,7 @@ pub async fn clawhub_search(
             .cloned()
             .unwrap_or_default()
             .iter()
-            .filter_map(|item| {
-                let slug = item["slug"].as_str()?.to_string();
-                let tags: Vec<String> = item["tags"]
-                    .as_object()
-                    .map(|obj| obj.keys().cloned().collect())
-                    .unwrap_or_default();
-                Some(ClawHubSkill {
-                    name: item["displayName"].as_str().unwrap_or(&slug).to_string(),
-                    description: item["summary"].as_str().unwrap_or("").to_string(),
-                    version: item["latestVersion"]["version"]
-                        .as_str()
-                        .unwrap_or("latest")
-                        .to_string(),
-                    stars: item["stats"]["stars"].as_u64().unwrap_or(0),
-                    tags,
-                    slug,
-                })
-            })
+            .filter_map(parse_list_hit)
             .collect()
     };
 
@@ -221,14 +283,18 @@ pub async fn clawhub_search(
     })
 }
 
-/// Install a skill from ClawHub into `{config_dir}/skills/{slug}/`.
+/// Install a skill from ClawHub or SkillHub into `{config_dir}/skills/installed/{slug}/`.
 #[tauri::command]
 pub async fn clawhub_install(
     app: AppHandle,
     slug: String,
     version: Option<String>,
+    registry: Option<String>,
 ) -> Result<ClawHubInstallResult, String> {
     let slug = sanitize_slug(slug.trim())?;
+    let api_base = resolve_registry(registry.clone())?;
+    let source = resolve_source(registry)?;
+    let label = registry_label(api_base);
     let config_dir = resolve_config_dir(&app)?;
     let skills_root = crate::skills::service::skills_root_from_config_dir(&config_dir);
     crate::skills::provenance::ensure_evolution_dirs(&skills_root).map_err(|e| e.to_string())?;
@@ -245,25 +311,25 @@ pub async fn clawhub_install(
         .map(str::trim)
         .filter(|v| !v.is_empty() && *v != "latest");
     let file_url = if let Some(v) = ver {
-        format!("{CLAWHUB_API}/api/v1/skills/{slug}/file?path=SKILL.md&version={v}")
+        format!("{api_base}/api/v1/skills/{slug}/file?path=SKILL.md&version={v}")
     } else {
-        format!("{CLAWHUB_API}/api/v1/skills/{slug}/file?path=SKILL.md")
+        format!("{api_base}/api/v1/skills/{slug}/file?path=SKILL.md")
     };
-    info!("ClawHub install: {file_url}");
+    info!("{label} install: {file_url}");
 
     let resp = clawhub_get_with_retry(&client, &file_url, 3).await?;
     let content = if resp.status().is_success() {
         resp.text().await.map_err(|e| e.to_string())?
     } else {
         let zip_url = if let Some(v) = ver {
-            format!("{CLAWHUB_API}/api/v1/download?slug={slug}&version={v}")
+            format!("{api_base}/api/v1/download?slug={slug}&version={v}")
         } else {
-            format!("{CLAWHUB_API}/api/v1/download?slug={slug}")
+            format!("{api_base}/api/v1/download?slug={slug}")
         };
         let zip_resp = clawhub_get_with_retry(&client, &zip_url, 3).await?;
         if !zip_resp.status().is_success() {
             return Err(format!(
-                "ClawHub install failed for '{slug}': HTTP {}",
+                "{label} install failed for '{slug}': HTTP {}",
                 zip_resp.status()
             ));
         }
@@ -283,7 +349,7 @@ pub async fn clawhub_install(
         &db,
         &skills_root,
         &content,
-        "clawhub",
+        source,
         source_url,
         None,
     )

@@ -1,0 +1,17 @@
+{
+  "id": "cb-tdd",
+  "slash_id": "tdd",
+  "name": "cb-tdd",
+  "description": "Test-driven development workflow with Red-Green-Refactor process and branch management",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_write",
+    "file_edit"
+  ],
+  "prompt": "This outlines the development practices and principles we require you to follow. Don't start\nworking on features until asked, this document is intended to get you into the right state\nof mind.\n\n1. Make sure you are on the main branch before you start (unless instructed to start on a specific branch)\n2. Understand the code that is there before you begin to change it.\n3. Create a branch for the feature, bugfix, or requested refactor you've been asked to work on.\n4. Employ test-driven development. Red-Green-Refactor process (outlined below)\n5. When committing to git, omit the Claude footer from comments.\n6. Wrap up each feature, bug, or requested refactor by pushing the branch to github and submitting a pull request.\n7. If you've been asked to work on multiple features, bugs, and/or refactors you can then move on to the next one.\n\n# High-level flow\n\n## One vs many\nSometimes you will be given one task. Sometimes you will be given a task list.\nThe list might be provided as a git repo issue list, for example.\n\nIf you are given many at once, start with the first, and complete them one by one, creating a branch for each and a pull-request when finished.\n\n## Keep notes\nCreate a markdown file under the notes/features/ folder for the feature. If you are creating a feature branch, use the same name.\n\nUse this notes file to record answers to clarifying questions, and other important things as you work on the feature. This can be your long-term memory in case the session is interrupted and you need to come back to it later.\n\nThese are your notes, so feel free to add, modify, re-arrange, and delete content in the notes file.\n\nYou may, if you wish, add other notes that might be helpful to you or future developers, but more isn't always better. Be breif and helpful.\n\n## Understand the feature\n1. First read the README.md and any relevant docs it points to.\n1. Ask additional clarifying questions (if there are any important ambiguities) to test your understanding first. For example,\nif you were asked to write a tic-tac-toe app,",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-code-analysis-testing"
+}

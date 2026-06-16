@@ -1,0 +1,13 @@
+{
+  "id": "cb-testing_plan_integration",
+  "slash_id": "testing_plan_integration",
+  "name": "cb-testing_plan_integration",
+  "description": "I need you to create an integration testing plan for $ARGUMENTS",
+  "description_zh": "",
+  "argument_hint": "Specify test plan or integration type",
+  "tools": [],
+  "prompt": "I need you to create an integration testing plan for $ARGUMENTS\n\nThese are integration tests and I want them to be inline in rust fashion.\n\nIf the code is difficult to test, you should suggest refactoring to make it easier to test.\n\nThink really hard about the code, the tests, and the refactoring (if applicable).\n\nWill you come up with test cases and let me review before you write the tests?\n\nFeel free to ask clarifying questions.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-code-analysis-testing"
+}

@@ -46,6 +46,8 @@ import {
   SunIcon,
   WikiIcon,
 } from "./components/TitleBarIcons";
+import ProjectTemplateDialog from "./components/ProjectTemplateDialog";
+import { projectHasAgentz } from "./services/tauri/projectTemplates";
 import ResourceLibraryPanel, {
   type LibraryInitialState,
 } from "./workspaces/codez/ResourceLibraryPanel";
@@ -93,6 +95,7 @@ export default function App() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryInitial, setLibraryInitial] = useState<LibraryInitialState | null>(null);
   const [assistantPanelOpen, setAssistantPanelOpen] = useState(false);
+  const [templateProjectDir, setTemplateProjectDir] = useState<string | null>(null);
   const [hasImAssistant, setHasImAssistant] = useState(false);
   const [wikiBuildNonce, setWikiBuildNonce] = useState(0);
   const [wikiBusy, setWikiBusy] = useState(false);
@@ -342,6 +345,12 @@ export default function App() {
       setChatInsertElement(null);
       await persistWorkspace();
       setProjectDir(dir);
+      try {
+        const hasAgentz = await projectHasAgentz(dir);
+        if (!hasAgentz) setTemplateProjectDir(dir);
+      } catch {
+        // Non-fatal — user can apply templates from settings later.
+      }
     } catch (e) {
       console.error("pickFolder failed:", e);
     }
@@ -713,6 +722,13 @@ export default function App() {
       )}
       {assistantPanelOpen && (
         <AssistantMessagesPanel onClose={() => setAssistantPanelOpen(false)} />
+      )}
+      {templateProjectDir && (
+        <ProjectTemplateDialog
+          projectDir={templateProjectDir}
+          onDone={() => setTemplateProjectDir(null)}
+          onSkip={() => setTemplateProjectDir(null)}
+        />
       )}
 
       {/* Project-scoped extension host — must live outside CodeZ/WorkZ panes so

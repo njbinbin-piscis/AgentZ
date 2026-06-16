@@ -1,0 +1,13 @@
+{
+  "id": "cb-sync-readme",
+  "slash_id": "sync-readme",
+  "name": "cb-sync-readme",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Export tasks to README.md with professional formatting.\n\nArguments: $ARGUMENTS\n\nGenerate a well-formatted README with current task information.\n\n## README Synchronization\n\nCreates or updates README.md with beautifully formatted task information.\n\n## Argument Parsing\n\nOptional filters:\n- \"pending\" → Only pending tasks\n- \"with-subtasks\" → Include subtask details\n- \"by-priority\" → Group by priority\n- \"sprint\" → Current sprint only\n\n## Execution\n\n```bash\ntask-master sync-readme [--with-subtasks] [--status=<status>]\n```\n\n## README Generation\n\n### 1. **Project Header**\n```markdown\n# Project Name\n\n## 📋 Task Progress\n\nLast Updated: 2024-01-15 10:30 AM\n\n### Summary\n- Total Tasks: 45\n- Completed: 15 (33%)\n- In Progress: 5 (11%)\n- Pending: 25 (56%)\n```\n\n### 2. **Task Sections**\nOrganized by status or priority:\n- Progress indicators\n- Task descriptions\n- Dependencies noted\n- Time estimates\n\n### 3. **Visual Elements**\n- Progress bars\n- Status badges\n- Priority indicators\n- Completion checkmarks\n\n## Smart Features\n\n1. **Intelligent Grouping**\n   - By feature area\n   - By sprint/milestone\n   - By assigned developer\n   - By priority\n\n2. **Progress Tracking**\n   - Overall completion\n   - Sprint velocity\n   - Burndown indication\n   - Time tracking\n\n3. **Formatting Options**\n   - GitHub-flavored markdown\n   - Task checkboxes\n   - Collapsible sections\n   - Table format available\n\n## Example Output\n\n```markdown\n## 🚀 Current Sprint\n\n### In Progress\n- [ ] 🔄 #5 **Implement user authentication** (60% complete)\n  - Dependencies: API design (#3 ✅)\n  - Subtasks: 4 (2 completed)\n  - Est: 8h / Spent: 5h\n\n### Pending (High Priority)\n- [ ] ⚡ #8 **Create dashboard UI**\n  - Blocked by: #5\n  - Complexity: High\n  - Est: 12h\n```\n\n## Customization\n\nBased on arguments:\n- Include/exclude sections\n- Detail level control\n- Custom grouping\n- Filter by criteria\n\n## Post-Sync\n\nAfter generation:\n1. Show diff preview\n2. Backup existing README\n3. Write new content\n4. Commit reminder\n5. Update timestamp\n\n## Integration\n\nWorks well with:\n- Git workflows\n- CI/CD pipelines\n- Project documentation\n- Team updates\n- Client reports",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

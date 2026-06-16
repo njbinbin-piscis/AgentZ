@@ -1,0 +1,13 @@
+{
+  "id": "cb-expand-all-tasks",
+  "slash_id": "expand-all-tasks",
+  "name": "cb-expand-all-tasks",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Expand all pending tasks that need subtasks.\n\n## Bulk Task Expansion\n\nIntelligently expands all tasks that would benefit from breakdown.\n\n## Execution\n\n```bash\ntask-master expand --all\n```\n\n## Smart Selection\n\nOnly expands tasks that:\n- Are marked as pending\n- Have high complexity (>5)\n- Lack existing subtasks\n- Would benefit from breakdown\n\n## Expansion Process\n\n1. **Analysis Phase**\n   - Identify expansion candidates\n   - Group related tasks\n   - Plan expansion strategy\n\n2. **Batch Processing**\n   - Expand tasks in logical order\n   - Maintain consistency\n   - Preserve relationships\n   - Optimize for parallelism\n\n3. **Quality Control**\n   - Ensure subtask quality\n   - Avoid over-decomposition\n   - Maintain task coherence\n   - Update dependencies\n\n## Options\n\n- Add `force` to expand all regardless of complexity\n- Add `research` for enhanced AI analysis\n\n## Results\n\nAfter bulk expansion:\n- Summary of tasks expanded\n- New subtask count\n- Updated complexity metrics\n- Suggested task order",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

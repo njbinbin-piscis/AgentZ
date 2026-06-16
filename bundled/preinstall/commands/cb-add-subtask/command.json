@@ -1,0 +1,13 @@
+{
+  "id": "cb-add-subtask",
+  "slash_id": "add-subtask",
+  "name": "cb-add-subtask",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Add a subtask to a parent task.\n\nArguments: $ARGUMENTS\n\nParse arguments to create a new subtask or convert existing task.\n\n## Adding Subtasks\n\nCreates subtasks to break down complex parent tasks into manageable pieces.\n\n## Argument Parsing\n\nFlexible natural language:\n- \"add subtask to 5: implement login form\"\n- \"break down 5 with: setup, implement, test\"\n- \"subtask for 5: handle edge cases\"\n- \"5: validate user input\" → adds subtask to task 5\n\n## Execution Modes\n\n### 1. Create New Subtask\n```bash\ntask-master add-subtask --parent=<id> --title=\"<title>\" --description=\"<desc>\"\n```\n\n### 2. Convert Existing Task\n```bash\ntask-master add-subtask --parent=<id> --task-id=<existing-id>\n```\n\n## Smart Features\n\n1. **Automatic Subtask Generation**\n   - If title contains \"and\" or commas, create multiple\n   - Suggest common subtask patterns\n   - Inherit parent's context\n\n2. **Intelligent Defaults**\n   - Priority based on parent\n   - Appropriate time estimates\n   - Logical dependencies between subtasks\n\n3. **Validation**\n   - Check parent task complexity\n   - Warn if too many subtasks\n   - Ensure subtask makes sense\n\n## Creation Process\n\n1. Parse parent task context\n2. Generate subtask with ID like \"5.1\"\n3. Set appropriate defaults\n4. Link to parent task\n5. Update parent's time estimate\n\n## Example Flows\n\n```\n/taskmaster:add-subtask to 5: implement user authentication\n→ Created subtask #5.1: \"implement user authentication\"\n→ Parent task #5 now has 1 subtask\n→ Suggested next subtasks: tests, documentation\n\n/taskmaster:add-subtask 5: setup, implement, test\n→ Created 3 subtasks:\n  #5.1: setup\n  #5.2: implement  \n  #5.3: test\n```\n\n## Post-Creation\n\n- Show updated task hierarchy\n- Suggest logical next subtasks\n- Update complexity estimates\n- Recommend subtask order",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

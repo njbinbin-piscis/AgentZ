@@ -1,0 +1,17 @@
+{
+  "id": "cb-husky",
+  "slash_id": "husky",
+  "name": "cb-husky",
+  "description": "Verify repository is in working state by running CI checks and fixing issues",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "shell",
+    "file_read",
+    "file_edit"
+  ],
+  "prompt": "## Summary\n\nVerify the repository is in a working state by running appropriate CI checks and fixing any issues found.\n\n## Process\n\n1. **Detect Package Manager**:\n   - Check for package manager files: package-lock.json (npm), pnpm-lock.yaml (pnpm), yarn.lock (yarn), bun.lockb (bun)\n   - Check for other build systems: Makefile, Cargo.toml, go.mod, requirements.txt, etc.\n\n2. **Update Dependencies**:\n   - npm: `npm install`\n   - pnpm: `pnpm install`\n   - yarn: `yarn install`\n   - bun: `bun install`\n   - Other: Run appropriate dependency installation\n\n3. **Run Linting**:\n   - Check package.json scripts for lint command\n   - Common patterns: `lint`, `eslint`, `check`, `format`\n   - Fix any linting issues found\n\n4. **Run Type Checking** (if applicable):\n   - TypeScript: `tsc` or check for `typecheck` script\n   - Other typed languages: run appropriate type checker\n\n5. **Run Build**:\n   - Check for build scripts in package.json or build configuration\n   - Common patterns: `build`, `compile`, `dist`\n   - Fix any build errors\n\n6. **Run Tests**:\n   - Check for test scripts: `test`, `test:unit`, `test:coverage`\n   - Source .env file if it exists before running tests\n   - Fix any failing tests\n\n7. **Additional Checks**:\n   - Check if package.json needs sorting (if sort-package-json is available)\n   - Run any other project-specific checks found in CI configuration\n\n8. **Stage Changes**:\n   - Review changes with `git status`\n   - Add fixed files with `git add`\n   - Exclude any git submodules or vendor directories\n\n## Important Notes:\n\n- Do NOT continue to the next step until the current command succeeds\n- Fix any issues found before proceeding\n- If a command doesn't exist, check for alternatives or skip if not applicable\n- Print a summary with checkmarks (✅) for passed steps at the end\n\n## Protocol when something breaks\n\nTake the following steps if CI breaks\n\n### 1. Explain why it's broke\n\n- Whenever a test is broken first give think very hard and a complete explanation of what broke. Cite source code and logs that support your thesis.\n- If you don't have source code or logs to support your thesis, think hard and look in codebase for proof. \n- Add console logs if it will help you confirm your thesis or find out why it's broke\n- If you don",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-version-control-git"
+}

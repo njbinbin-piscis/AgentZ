@@ -1,0 +1,13 @@
+{
+  "id": "cb-setup-formatting",
+  "slash_id": "setup-formatting",
+  "name": "cb-setup-formatting",
+  "description": "Configure code formatting tools",
+  "description_zh": "",
+  "argument_hint": "1. **Language-Specific Tools**",
+  "tools": [],
+  "prompt": "# Setup Formatting Command\n\nConfigure code formatting tools\n\n## Instructions\n\nSetup code formatting following these steps: **$ARGUMENTS**\n\n1. **Language-Specific Tools**\n\n   **JavaScript/TypeScript:**\n   ```bash\n   npm install -D prettier\n   echo '{\"semi\": true, \"singleQuote\": true, \"tabWidth\": 2}' > .prettierrc\n   ```\n\n   **Python:**\n   ```bash\n   pip install black isort\n   echo '[tool.black]\\nline-length = 88\\ntarget-version = [\"py38\"]' > pyproject.toml\n   ```\n\n   **Java:**\n   ```bash\n   # Google Java Format or Spotless plugin\n   ```\n\n2. **Configuration Files**\n\n   **.prettierrc:**\n   ```json\n   {\n     \"semi\": true,\n     \"singleQuote\": true,\n     \"tabWidth\": 2,\n     \"trailingComma\": \"es5\",\n     \"printWidth\": 80\n   }\n   ```\n\n3. **IDE Setup**\n   - Install formatter extensions\n   - Enable format on save\n   - Configure keyboard shortcuts\n\n4. **Scripts and Automation**\n   ```json\n   {\n     \"scripts\": {\n       \"format\": \"prettier --write .\",\n       \"format:check\": \"prettier --check .\"\n     }\n   }\n   ```\n\n5. **Pre-commit Hooks**\n   ```bash\n   npm install -D husky lint-staged\n   echo '{\"*.{js,ts,tsx}\": [\"prettier --write\", \"eslint --fix\"]}' > .lintstagedrc\n   ```\n\nRemember to run formatting on entire codebase initially and configure team IDE settings consistently.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-project-setup"
+}

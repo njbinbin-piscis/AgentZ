@@ -26,6 +26,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm run verify:preinstall
+      - run: npm run lint:preinstall -- --strict
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test

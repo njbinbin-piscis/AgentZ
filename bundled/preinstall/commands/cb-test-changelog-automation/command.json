@@ -1,0 +1,13 @@
+{
+  "id": "cb-test-changelog-automation",
+  "slash_id": "test-changelog-automation",
+  "name": "cb-test-changelog-automation",
+  "description": "Automate changelog testing workflow",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# Test Command\n\nAutomate changelog testing workflow\n\n## Instructions\n\n1. This command serves as a demonstration\n2. It shows how the changelog automation works\n3. When this file is added, the changelog should update automatically",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-code-analysis-testing"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "cb-explain-issue-fix",
+  "slash_id": "explain-issue-fix",
+  "name": "cb-explain-issue-fix",
+  "description": "Explain how tasks in an issue were implemented with detailed breakdown",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Analyze the recent changes and create a detailed explanation of how the issue was resolved.\n\n## Process:\n\n1. **Review recent changes**:\n   - Check git diff for uncommitted changes\n   - Review recent commits if changes are already committed\n   - Identify all modified files\n\n2. **Analyze the implementation**:\n   - Identify what problem was being solved\n   - Document the approach taken\n   - Explain key code changes\n   - Note any design decisions made\n\n3. **Create detailed breakdown**:\n   - Problem statement\n   - Solution approach\n   - Implementation details\n   - Files modified and why\n   - Any trade-offs or alternatives considered\n\n4. **Generate explanation**:\n   - Write a clear, structured explanation\n   - Include code snippets where relevant\n   - Highlight important changes\n   - Document any follow-up tasks if needed",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-documentation-changelogs"
+}

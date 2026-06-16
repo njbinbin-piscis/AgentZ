@@ -1,0 +1,13 @@
+{
+  "id": "cb-execute-plan",
+  "slash_id": "execute-plan",
+  "name": "cb-execute-plan",
+  "description": "Execute plan in batches with review checkpoints",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Invoke the superpowers:executing-plans skill and follow it exactly as presented to you",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "superpowers"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "cb-setup-models",
+  "slash_id": "setup-models",
+  "name": "cb-setup-models",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Run interactive setup to configure AI models.\n\n## Interactive Model Configuration\n\nGuides you through setting up AI providers for Task Master.\n\n## Execution\n\n```bash\ntask-master models --setup\n```\n\n## Setup Process\n\n1. **Environment Check**\n   - Detect existing API keys\n   - Show current configuration\n   - Identify missing providers\n\n2. **Provider Selection**\n   - Choose main provider (required)\n   - Select research provider (recommended)\n   - Configure fallback (optional)\n\n3. **API Key Configuration**\n   - Prompt for missing keys\n   - Validate key format\n   - Test connectivity\n   - Save configuration\n\n## Smart Recommendations\n\nBased on your needs:\n- **For best results**: Claude + Perplexity\n- **Budget conscious**: GPT-3.5 + Perplexity\n- **Maximum capability**: GPT-4 + Perplexity + Claude fallback\n\n## Configuration Storage\n\nKeys can be stored in:\n1. Environment variables (recommended)\n2. `.env` file in project\n3. Global `.taskmaster/config`\n\n## Post-Setup\n\nAfter configuration:\n- Test each provider\n- Show usage examples\n- Suggest next steps\n- Verify parse-prd works",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

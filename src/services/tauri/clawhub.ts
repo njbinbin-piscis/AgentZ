@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
+export type SkillRegistry = "clawhub" | "skillhub";
+
 export interface ClawHubSkill {
   slug: string;
   name: string;
@@ -22,9 +24,13 @@ export interface ClawHubInstallResult {
 }
 
 export const clawHubApi = {
-  search: (query: string, limit?: number) =>
-    invoke<ClawHubSearchResult>("clawhub_search", { query, limit }),
+  search: (query: string, limit?: number, registry: SkillRegistry = "clawhub") =>
+    invoke<ClawHubSearchResult>("clawhub_search", { query, limit, registry }),
 
-  install: (slug: string, version?: string) =>
-    invoke<ClawHubInstallResult>("clawhub_install", { slug, version: version ?? null }),
+  install: (slug: string, version?: string, registry: SkillRegistry = "clawhub") =>
+    invoke<ClawHubInstallResult>("clawhub_install", {
+      slug,
+      version: version ?? null,
+      registry,
+    }),
 };

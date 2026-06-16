@@ -34,7 +34,11 @@ pub struct AgentManifest {
     #[serde(default)]
     pub description: String,
     #[serde(default)]
+    pub description_zh: String,
+    #[serde(default)]
     pub system_prompt: String,
+    #[serde(default)]
+    pub system_prompt_zh: String,
     /// Skill slugs to enable (full SKILL.md injected, like composer selection).
     #[serde(default)]
     pub skills: Vec<String>,
@@ -78,6 +82,8 @@ pub struct AgentInfo {
     pub icon: String,
     pub color: String,
     pub description: String,
+    #[serde(default)]
+    pub description_zh: String,
     pub skills: Vec<String>,
     pub tools: Vec<String>,
     pub mcp_servers: Vec<String>,
@@ -95,6 +101,7 @@ impl From<AgentManifest> for AgentInfo {
             icon: m.icon,
             color: m.color,
             description: m.description,
+            description_zh: m.description_zh,
             skills: m.skills,
             tools: m.tools,
             mcp_servers: m.mcp_servers,

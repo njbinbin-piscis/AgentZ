@@ -1,0 +1,13 @@
+{
+  "id": "cb-enhance-prompt",
+  "slash_id": "enhance-prompt",
+  "name": "cb-enhance-prompt",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "`/enhance-prompt <task info>`\n\nHere is an instruction that I'd like to give you, but it needs to be improved. Rewrite and enhance this instruction to make it clearer, more specific, less ambiguous, and correct any mistakes. Do not use any tools: reply immediately with your answer, even if you're not sure. Consider the context of our conversation history when enhancing the prompt. If there is code in triple backticks (```) consider whether it is a code sample and should remain unchanged.Reply with the following format:\n\n### BEGIN RESPONSE\n\n<enhanced-prompt>enhanced prompt goes here</enhanced-prompt>\n\n### END RESPONSE",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "development-essentials"
+}

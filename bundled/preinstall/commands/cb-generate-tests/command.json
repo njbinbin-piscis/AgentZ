@@ -1,0 +1,13 @@
+{
+  "id": "cb-generate-tests",
+  "slash_id": "generate-tests",
+  "name": "cb-generate-tests",
+  "description": "Generate comprehensive test suite for $ARGUMENTS following project testing conventions and best practices.",
+  "description_zh": "",
+  "argument_hint": "Specify test generation options",
+  "tools": [],
+  "prompt": "# Test Generator\n\nGenerate comprehensive test suite for $ARGUMENTS following project testing conventions and best practices.\n\n## Task\n\nI'll analyze the target code and create complete test coverage including:\n\n1. Unit tests for individual functions and methods\n2. Integration tests for component interactions  \n3. Edge case and error handling tests\n4. Mock implementations for external dependencies\n5. Test utilities and helpers as needed\n6. Performance and snapshot tests where appropriate\n\n## Process\n\nI'll follow these steps:\n\n1. Analyze the target file/component structure\n2. Identify all testable functions, methods, and behaviors\n3. Examine existing test patterns in the project\n4. Create test files following project naming conventions\n5. Implement comprehensive test cases with proper setup/teardown\n6. Add necessary mocks and test utilities\n7. Verify test coverage and add missing test cases\n\n## Test Types\n\n### Unit Tests\n- Individual function testing with various inputs\n- Component rendering and prop handling\n- State management and lifecycle methods\n- Utility function edge cases and error conditions\n\n### Integration Tests\n- Component interaction testing\n- API integration with mocked responses\n- Service layer integration\n- End-to-end user workflows\n\n### Framework-Specific Tests\n- **React**: Component testing with React Testing Library\n- **Vue**: Component testing with Vue Test Utils\n- **Angular**: Component and service testing with TestBed\n- **Node.js**: API endpoint and middleware testing\n\n## Testing Best Practices\n\n### Test Structure\n- Use descriptive test names that explain the behavior\n- Follow AAA pattern (Arrange, Act, Assert)\n- Group related tests with describe blocks\n- Use proper setup and teardown for test isolation\n\n### Mock Strategy\n- Mock external dependencies and API calls\n- Use factories for test data generation\n- Implement proper cleanup for async operations\n- Mock timers and dates for deterministic tests\n\n### Coverage Goals\n- Aim for 80%+ code coverage\n- Focus on critical business logic paths\n- Test both happy path and error scenarios\n- Include boundary value testing\n\nI'll adapt to your project's testing framework (Jest, Vitest, Cypress, etc.) and follow established patterns.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-code-analysis-testing"
+}

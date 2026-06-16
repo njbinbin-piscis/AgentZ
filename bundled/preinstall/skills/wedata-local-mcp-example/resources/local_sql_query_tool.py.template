@@ -1,0 +1,770 @@
+"""本地工具：在指定工作空间下执行只读 SQL 查询。
+
+封装远端 WeData MCP Server 的多个底层工具
+（ListComputeResources → SubmitJob → QueryJobStatus → DownloadJobResult），
+通过编排调用逻辑，自动发现计算资源、提交 SQL 任务、轮询状态，并在任务成功后返回结果下载链接。
+
+使用方式::
+
+    from agent_server.local_sql_query_tool import execute_sql_query
+
+    agent = Agent(
+        name="my agent",
+        tools=[execute_sql_query],
+        ...
+    )
+
+当用户输入类似 "在 17700183032157854 工作空间下执行 SELECT * FROM divewang_workspace_1110_1.08976gy.t_corp LIMIT 10" 时，
+Agent 会自动调用此工具，传入 workspace_id 和 sql。
+"""
+
+from __future__ import annotations
+
+import asyncio
+import csv
+import io
+import json
+import logging
+import time
+from typing import Any
+
+import httpx
+from agents import function_tool
+from agents.mcp import MCPServerStreamableHttpParams
+
+from wedata.openai.agents import WedataMcpServer
+from wedata.openai.credential_provider import get_request_credential_headers
+
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────
+# 远端 WeData MCP Server 配置
+# ─────────────────────────────────────────────
+# 使用写死的默认官方 MCP 地址。
+# 如果此地址连接失败，请到 WeData 平台找到官方 MCP 服务地址，
+# 然后直接替换下面的 REMOTE_MCP_URL。
+# 注意：不要从 agent.py 的 WEDATA_MCP_ENDPOINT 或 MCP_TOOL_PATHS 推断这个值，
+# 它们是不同概念，不应混用。
+REMOTE_MCP_URL = "https://mcp-ap-chongqing.wedataapp.cloud.tencent.com/api/1.0/mcp/http/sql"
+
+# SQL 安全：只允许只读查询类型的 SQL 关键字
+_ALLOWED_SQL_PREFIXES = (
+    "SELECT", "WITH", "SHOW", "DESC", "DESCRIBE", "EXPLAIN",
+)
+
+# 轮询配置
+_POLL_INTERVAL_SECONDS = 2.0
+_POLL_MAX_ATTEMPTS = 45  # 最多轮询 45 次 × 2 秒 = 90 秒
+
+# 终态集合
+# COMPLETED=执行完成, FAILED=执行失败, KILLING=任务终止中, KILLED=已终止, TIMEOUT=超时终止
+_TERMINAL_STATUSES = {"COMPLETED", "FAILED", "KILLING", "KILLED", "TIMEOUT"}
+
+# 成功状态
+_SUCCESS_STATUS = "COMPLETED"
+# 失败状态
+_FAILED_STATUS = "FAILED"
+
+# 结果下载与解析配置
+_DOWNLOAD_TIMEOUT_SECONDS = 30.0
+_MAX_PREVIEW_ROWS = 50      # 返回给 LLM 的最大行数（避免 token 爆炸）
+_MAX_CELL_LENGTH = 200       # 单个单元格最大字符数（超长截断）
+
+
+# ═════════════════════════════════════════════
+# 辅助函数
+# ═════════════════════════════════════════════
+
+def _parse_tool_result(result: Any) -> dict:
+    """解析 CallToolResult，从 content[0].text 中提取 JSON 数据。
+
+    远端 MCP Server 返回的 CallToolResult.content 是一个列表，
+    通常第一个元素是 TextContent，其 text 字段包含序列化的 JSON 字符串。
+
+    Args:
+        result: CallToolResult 对象
+
+    Returns:
+        解析后的 dict 数据
+    """
+    if result and result.content:
+        for item in result.content:
+            if hasattr(item, "text") and item.text:
+                try:
+                    return json.loads(item.text)
+                except json.JSONDecodeError:
+                    logger.warning("[local_sql_tool] 无法解析工具返回的 JSON: %s", item.text[:200])
+                    return {"raw_text": item.text}
+    return {}
+
+
+def _unwrap_response_data(parsed: dict[str, Any]) -> dict[str, Any]:
+    """提取远端工具当前真实返回中的 `Response.Data`。
+
+    当前远端 MCP 返回统一使用如下结构：
+    `{"Response": {"Data": {...}}}`
+
+    Args:
+        parsed: `_parse_tool_result()` 返回的原始 dict
+
+    Returns:
+        `Response.Data` 对应的 dict；缺失时返回空 dict
+    """
+    if not isinstance(parsed, dict):
+        return {}
+    response = parsed.get("Response")
+    if not isinstance(response, dict):
+        return {}
+    data = response.get("Data")
+    if isinstance(data, dict):
+        return data
+    return {}
+
+
+def _validate_sql_readonly(sql: str) -> str | None:
+    """校验 SQL 是否为只读查询。
+
+    检查 SQL 语句的第一个关键字是否在允许的只读前缀列表中。
+    仅允许 SELECT、WITH、SHOW、DESC、DESCRIBE、EXPLAIN。
+
+    Args:
+        sql: 待校验的 SQL 语句
+
+    Returns:
+        校验通过返回 None；不通过返回错误信息字符串
+    """
+    stripped = sql.strip()
+    if not stripped:
+        return "SQL 语句不能为空"
+    first_token = stripped.split()[0].upper()
+    if first_token not in _ALLOWED_SQL_PREFIXES:
+        return (
+            f"安全限制：不允许执行 '{first_token}' 类型的 SQL。"
+            f"当前仅支持只读查询：{', '.join(_ALLOWED_SQL_PREFIXES)}。"
+            f"如需执行写入操作，请使用 WeData 平台的 SQL 控制台。"
+        )
+    return None
+
+
+async def _create_remote_mcp() -> WedataMcpServer:
+    """创建并连接远端 MCP Server 实例。
+
+    从 ContextVar 中获取当前请求的凭证 headers，
+    创建 WedataMcpServer 实例用于调用远端工具。
+
+    Returns:
+        已配置凭证的 WedataMcpServer 实例（未连接，需在 async with 中使用）
+    """
+    credential_headers = get_request_credential_headers()
+    if not credential_headers:
+        raise ValueError(
+            "未找到凭证 headers，请确保请求入口已调用 set_request_credential_headers() 设置凭证。"
+        )
+    params = MCPServerStreamableHttpParams(
+        url=REMOTE_MCP_URL,
+        timeout=300.0,
+        headers=credential_headers,
+    )
+    return WedataMcpServer(
+        params=params,
+        credential_headers=credential_headers,
+        cache_tools_list=True,
+        name="remote-wedata-mcp-for-sql-tool",
+    )
+
+
+def _build_resource_candidates(resources: list[dict]) -> list[dict]:
+    """将计算资源列表转换为标准化的候选列表格式，用于返回给用户选择。
+
+    Args:
+        resources: 从 ListComputeResources 获取的原始资源列表
+
+    Returns:
+        标准化后的候选资源列表，包含人类可读的类型和状态标签
+    """
+    _TYPE_LABELS = {1: "标准型", 2: "数据集成型", 3: "分析型"}
+    _STATUS_LABELS = {2: "已停止", 3: "运行中", 4: "运行中", 13: "已删除"}
+
+    candidates = []
+    for r in resources:
+        rtype = r.get("ResourceType") or r.get("Type", "")
+        rstatus = r.get("ResourceStatus") or r.get("Status", "")
+        exec_available = r.get("ExecAvailableStatus")
+
+        candidates.append({
+            "resource_id": r.get("ResourceId") or r.get("Id", ""),
+            "resource_name": r.get("ResourceName") or r.get("Name", ""),
+            "status": rstatus,
+            "status_label": _STATUS_LABELS.get(int(rstatus), str(rstatus)) if rstatus else "",
+            "type": rtype,
+            "type_label": _TYPE_LABELS.get(int(rtype), str(rtype)) if rtype else "",
+            "exec_available": exec_available == 1 if exec_available is not None else None,
+        })
+    return candidates
+
+
+async def _list_compute_resources(
+    remote: WedataMcpServer,
+    workspace_id: str,
+    keyword: str | None = None,
+) -> list[dict]:
+    """获取指定工作空间下的计算资源列表。
+
+    调用远端 `ListComputeResources` 工具，返回可用的计算资源。
+    可通过 keyword 按资源名称或 ID 过滤。
+
+    Args:
+        remote: 已连接的 WedataMcpServer 实例
+        workspace_id: 工作空间 ID
+        keyword: 关键字过滤（可选），按资源名称或 ID 匹配
+
+    Returns:
+        计算资源列表
+    """
+    args: dict[str, Any] = {"WorkspaceId": workspace_id}
+    if keyword:
+        args["Keywords"] = keyword
+
+    logger.info("[local_sql_tool] 调用 ListComputeResources, 参数: %s", args)
+    result = await remote.call_tool("ListComputeResources", args)
+    parsed = _parse_tool_result(result)
+    data = _unwrap_response_data(parsed)
+
+    items = data.get("Items") or data.get("Resources") or []
+    if isinstance(items, list):
+        # 兼容嵌套结构：将 BasicInfo 中的字段提升到顶层，方便后续统一访问
+        normalized = []
+        for item in items:
+            basic_info = item.get("BasicInfo")
+            if isinstance(basic_info, dict):
+                # 将 BasicInfo 字段合并到顶层（顶层同名字段优先）
+                merged = {**basic_info, **item}
+                normalized.append(merged)
+            else:
+                normalized.append(item)
+        logger.info("[local_sql_tool] ListComputeResources 返回 %d 个资源", len(normalized))
+        return normalized
+    return []
+
+
+async def _submit_job(
+    remote: WedataMcpServer,
+    workspace_id: str,
+    compute_resource_id: str,
+    sql: str,
+    catalog_name: str | None = None,
+    schema_name: str | None = None,
+) -> str | None:
+    """提交 SQL 查询任务（异步执行），返回 JobId。
+
+    调用远端 `SubmitJob` 工具，将 SQL 提交到指定的计算资源执行。
+    任务为异步执行，需通过 `_poll_job_status` 轮询状态。
+
+    Args:
+        remote: 已连接的 WedataMcpServer 实例
+        workspace_id: 工作空间 ID
+        compute_resource_id: 计算资源 ID
+        sql: 要执行的 SQL 查询语句
+        catalog_name: Catalog 名称（可选）
+        schema_name: Schema 名称（可选）
+
+    Returns:
+        任务 ID（JobId）；提交失败时返回 None
+    """
+    args: dict[str, Any] = {
+        "WorkspaceId": workspace_id,
+        "ComputeResource": compute_resource_id,
+        "Sql": sql,
+        "Name": "agent_sql_query",
+        "Desc": f"Agent 提交的 SQL 查询: {sql[:80]}" if len(sql) > 80 else f"Agent 提交的 SQL 查询: {sql}",
+    }
+    if catalog_name:
+        args["CatalogName"] = catalog_name
+    if schema_name:
+        args["SchemaName"] = schema_name
+
+    logger.info("[local_sql_tool] 调用 SubmitJob, 参数: %s", {**args, "Sql": sql[:100] + "..." if len(sql) > 100 else sql})
+    result = await remote.call_tool("SubmitJob", args)
+    parsed = _parse_tool_result(result)
+    data = _unwrap_response_data(parsed)
+
+    job_id = data.get("JobId")
+
+    if job_id:
+        logger.info("[local_sql_tool] SubmitJob 成功, JobId=%s", job_id)
+    else:
+        logger.error("[local_sql_tool] SubmitJob 未返回 JobId, 响应: %s", json.dumps(parsed, ensure_ascii=False)[:500])
+    return job_id
+
+
+async def _poll_job_status(
+    remote: WedataMcpServer,
+    job_id: str,
+    workspace_id: str,
+) -> dict:
+    """轮询任务状态直到终态。
+
+    以 2 秒间隔调用远端 `QueryJobStatus`，最多轮询 45 次（90 秒）。
+    当任务进入终态（COMPLETED / FAILED / KILLING / KILLED / TIMEOUT）时立即返回。
+
+    Args:
+        remote: 已连接的 WedataMcpServer 实例
+        job_id: 任务 ID
+        workspace_id: 工作空间 ID
+
+    Returns:
+        包含 JobStatus、poll_count、raw_response 的 dict；
+        超时时额外包含 timeout=True
+    """
+    last_status = "UNKNOWN"
+    for attempt in range(1, _POLL_MAX_ATTEMPTS + 1):
+        await asyncio.sleep(_POLL_INTERVAL_SECONDS)
+
+        logger.info("[local_sql_tool] 轮询 #%d: QueryJobStatus(JobId=%s)", attempt, job_id)
+        result = await remote.call_tool("QueryJobStatus", {
+            "JobId": job_id,
+            "WorkspaceId": workspace_id,
+        })
+        parsed = _parse_tool_result(result)
+        data = _unwrap_response_data(parsed)
+
+        last_status = data.get("JobStatus") or "UNKNOWN"
+
+        logger.info("[local_sql_tool] 轮询 #%d: Status=%s", attempt, last_status)
+
+        if last_status in _TERMINAL_STATUSES:
+            return {
+                "JobStatus": last_status,
+                "poll_count": attempt,
+                "raw_response": data,
+            }
+
+    return {
+        "JobStatus": last_status,
+        "poll_count": _POLL_MAX_ATTEMPTS,
+        "timeout": True,
+        "raw_response": {},
+    }
+
+
+async def _fetch_and_parse_csv(
+    url: str,
+    max_rows: int = _MAX_PREVIEW_ROWS,
+) -> dict[str, Any]:
+    """下载 CSV 结果文件并解析为结构化数据，供 LLM 直接阅读和分析。
+
+    只取前 max_rows 行，避免超大结果集撑爆 LLM 的 token 上限。
+    超长单元格会被截断并加上 "..." 标记。
+
+    Args:
+        url: 已授权的 CSV 下载链接（DownloadJobResult 返回的 URL）
+        max_rows: 最多返回的数据行数（不含表头）
+
+    Returns:
+        dict 包含 columns、rows、total_rows、truncated 等字段。
+        解析失败时返回 error 字段。
+    """
+    try:
+        async with httpx.AsyncClient(timeout=_DOWNLOAD_TIMEOUT_SECONDS, follow_redirects=True) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+
+        # 尝试自动检测编码，回退到 utf-8
+        content_type = resp.headers.get("content-type", "")
+        encoding = "utf-8"
+        if "charset=" in content_type:
+            encoding = content_type.split("charset=")[-1].strip().split(";")[0]
+
+        text = resp.content.decode(encoding, errors="replace")
+
+        reader = csv.reader(io.StringIO(text))
+        headers = next(reader, [])
+        if not headers:
+            return {"error": "CSV 文件为空或格式异常", "raw_size_bytes": len(resp.content)}
+
+        rows: list[list[str]] = []
+        total_rows = 0
+        for row in reader:
+            total_rows += 1
+            if len(rows) < max_rows:
+                # 截断超长单元格
+                truncated_row = [
+                    (cell[:_MAX_CELL_LENGTH] + "...") if len(cell) > _MAX_CELL_LENGTH else cell
+                    for cell in row
+                ]
+                rows.append(truncated_row)
+
+        result: dict[str, Any] = {
+            "columns": headers,
+            "rows": rows,
+            "preview_row_count": len(rows),
+            "total_row_count": total_rows,
+            "raw_size_bytes": len(resp.content),
+        }
+        if total_rows > max_rows:
+            result["truncated"] = True
+            result["truncation_note"] = f"结果共 {total_rows} 行，仅展示前 {max_rows} 行。"
+
+        logger.info(
+            "[local_sql_tool] CSV 下载解析完成: %d 列, %d/%d 行, %.1fKB",
+            len(headers), len(rows), total_rows, len(resp.content) / 1024,
+        )
+        return result
+
+    except httpx.HTTPStatusError as e:
+        logger.error("[local_sql_tool] CSV 下载失败: HTTP %d, url=%s", e.response.status_code, url[:100])
+        return {"error": f"CSV 下载失败: HTTP {e.response.status_code}", "url": url}
+    except Exception as e:
+        logger.error("[local_sql_tool] CSV 解析异常: %s, url=%s", e, url[:100])
+        return {"error": f"CSV 下载/解析异常: {e}", "url": url}
+
+
+async def _download_job_result(
+    remote: WedataMcpServer,
+    job_id: str,
+    workspace_id: str,
+) -> dict:
+    """获取任务结果的下载链接。
+
+    仅在任务状态为 SUCCEEDED 时调用。调用远端 `DownloadJobResult` 工具，
+    返回已授权的下载链接列表和结果元数据。
+
+    Args:
+        remote: 已连接的 WedataMcpServer 实例
+        job_id: 任务 ID
+        workspace_id: 工作空间 ID
+
+    Returns:
+        包含 DownloadUrls、ResultMeta、raw_response 的 dict
+    """
+    logger.info("[local_sql_tool] 调用 DownloadJobResult(JobId=%s)", job_id)
+    result = await remote.call_tool("DownloadJobResult", {
+        "WorkspaceId": workspace_id,
+        "JobId": job_id,
+    })
+    parsed = _parse_tool_result(result)
+    data = _unwrap_response_data(parsed)
+
+    download_urls = data.get("DownloadUrls") or []
+    result_meta = data.get("ResultMeta") or {}
+
+    return {
+        "DownloadUrls": download_urls,
+        "ResultMeta": result_meta,
+        "raw_response": data,
+    }
+
+
+# ═════════════════════════════════════════════
+# 对外暴露的工具函数
+# ═════════════════════════════════════════════
+
+@function_tool(
+    name_override="execute_sql_query",
+    description_override=(
+        "在指定工作空间下执行只读 SQL 查询。"
+        "支持 SELECT、WITH、SHOW、DESC、EXPLAIN 等只读语句。"
+        "如果未提供 compute_resource_id，会自动发现可用的计算资源。"
+        "如果发现多个计算资源且无法自动选择，会返回候选列表供用户指定。"
+        "执行流程：自动发现计算资源 → 提交 SQL 任务 → 轮询状态 → 返回下载链接。"
+    ),
+)
+async def execute_sql_query(
+    workspace_id: str,
+    sql: str,
+    compute_resource_id: str | None = None,
+    compute_resource_keyword: str | None = None,
+    catalog_name: str | None = None,
+    schema_name: str | None = None,
+) -> str:
+    """在指定工作空间下执行只读 SQL 查询。
+
+    Args:
+        workspace_id: WeData 工作空间唯一 ID，例如 "17700183032157854"
+        sql: 要执行的 SQL 查询语句，仅支持只读查询（SELECT、WITH、SHOW、DESC、EXPLAIN）
+        compute_resource_id: 计算资源 ID（可选）。如果不提供，会自动发现可用资源。
+        compute_resource_keyword: 计算资源关键字（可选）。用于在自动发现时按名称或 ID 过滤。
+        catalog_name: Catalog 名称（可选）。指定查询的数据目录。
+        schema_name: Schema 名称（可选）。SQL 未指定库名时使用。
+
+    Returns:
+        JSON 格式的执行结果字符串，包含任务状态、下载链接、执行耗时等。
+        如果需要用户选择计算资源，返回候选资源列表。
+        如果执行失败或超时，返回错误信息和 job_id 供后续查询。
+    """
+    started_at = time.perf_counter()
+
+    # ── 参数归一化：LLM 可能传入字符串 "None" 而非 Python None ──
+    if compute_resource_id and compute_resource_id.strip().lower() in ("none", ""):
+        compute_resource_id = None
+    if compute_resource_keyword and compute_resource_keyword.strip().lower() in ("none", ""):
+        compute_resource_keyword = None
+    if catalog_name and catalog_name.strip().lower() in ("none", ""):
+        catalog_name = None
+    if schema_name and schema_name.strip().lower() in ("none", ""):
+        schema_name = None
+
+    logger.info(
+        "[local_sql_tool] 开始执行 SQL: workspace_id=%s, sql=%s",
+        workspace_id, sql[:100] + "..." if len(sql) > 100 else sql,
+    )
+
+    # ── Step 0: SQL 安全校验 ──
+    validation_error = _validate_sql_readonly(sql)
+    if validation_error:
+        return json.dumps({"error": validation_error}, ensure_ascii=False, indent=2)
+
+    remote = await _create_remote_mcp()
+
+    async with remote:
+        # ── Step 1: 确定计算资源（始终调用 ListComputeResources） ──
+        resource_info: dict = {}
+
+        # 无论用户是否指定了 compute_resource_id，都先调用 ListComputeResources
+        # 获取可用资源列表，确保资源确实存在且可用
+        resources = await _list_compute_resources(
+            remote, workspace_id, keyword=compute_resource_keyword
+        )
+
+        if compute_resource_id:
+            # 用户指定了计算资源 ID，在列表中验证是否存在
+            matched = None
+            for r in resources:
+                rid = r.get("ResourceId") or r.get("Id", "")
+                if rid == compute_resource_id:
+                    matched = r
+                    break
+            if matched:
+                resource_info = {
+                    "id": compute_resource_id,
+                    "name": matched.get("ResourceName") or matched.get("Name", ""),
+                    "status": matched.get("ResourceStatus") or matched.get("Status", ""),
+                    "source": "user_specified_verified",
+                }
+                logger.info(
+                    "[local_sql_tool] 用户指定的计算资源已验证: %s (%s)",
+                    compute_resource_id, resource_info["name"],
+                )
+            else:
+                # 用户指定的资源不在列表中，仍然尝试使用（可能是权限问题导致列表不全）
+                resource_info = {
+                    "id": compute_resource_id,
+                    "name": "(用户指定，未在资源列表中找到)",
+                    "source": "user_specified_unverified",
+                }
+                logger.warning(
+                    "[local_sql_tool] 用户指定的计算资源 %s 未在列表中找到，仍尝试使用",
+                    compute_resource_id,
+                )
+        else:
+            # 用户未指定，从列表中自动选择（优先选择分析型计算资源）
+            if not resources:
+                return json.dumps(
+                    {
+                        "error": f"工作空间 {workspace_id} 下未找到可用的计算资源",
+                        "hint": "请确认工作空间 ID 是否正确，或手动指定 compute_resource_id。",
+                    },
+                    ensure_ascii=False, indent=2,
+                )
+
+            # 优先选择分析型计算资源（ResourceType=3，适合 SQL 查询场景）
+            _ANALYTICAL_RESOURCE_TYPE = 3
+
+            def _is_analytical(r: dict) -> bool:
+                """判断是否为分析型计算资源（ResourceType == 3）"""
+                rtype = r.get("ResourceType") or r.get("Type")
+                # 兼容字符串和整数类型
+                try:
+                    return int(rtype) == _ANALYTICAL_RESOURCE_TYPE
+                except (TypeError, ValueError):
+                    return False
+
+            def _is_active(r: dict) -> bool:
+                """判断资源是否处于可用状态。
+
+                API 返回的 ResourceStatus 是整数（如 2=已停止, 3=运行中, 4=运行中, 13=已删除），
+                同时可能有 ExecAvailableStatus=1 表示可执行。
+                优先检查 ExecAvailableStatus，其次检查 ResourceStatus 数值。
+                """
+                # 优先使用 ExecAvailableStatus（1 = 可执行）
+                exec_available = r.get("ExecAvailableStatus")
+                if exec_available is not None:
+                    try:
+                        return int(exec_available) == 1
+                    except (TypeError, ValueError):
+                        pass
+
+                # 回退到 ResourceStatus 数值判断（3, 4 通常表示运行中/可用）
+                status = r.get("ResourceStatus") or r.get("Status")
+                if status is not None:
+                    try:
+                        return int(status) in (3, 4)
+                    except (TypeError, ValueError):
+                        # 如果是字符串类型（兼容性处理）
+                        if isinstance(status, str):
+                            return status.upper() in ("RUNNING", "ACTIVE", "READY", "AVAILABLE")
+                return False
+
+            # Step 1: 筛选分析型资源
+            analytical = [r for r in resources if _is_analytical(r)]
+            # Step 2: 在分析型资源中优先选择活跃的
+            active_analytical = [r for r in analytical if _is_active(r)]
+
+            # 选择优先级：活跃的分析型 > 所有分析型 > 活跃的任意资源 > 第一个资源
+            if active_analytical:
+                selected = active_analytical[0]
+                selection_reason = "auto_analytical_active"
+            elif analytical:
+                selected = analytical[0]
+                selection_reason = "auto_analytical"
+            else:
+                active_any = [r for r in resources if _is_active(r)]
+                selected = active_any[0] if active_any else resources[0]
+                selection_reason = "auto_fallback"
+
+            compute_resource_id = selected.get("ResourceId") or selected.get("Id") or selected.get("ResourceName", "")
+            resource_info = {
+                "id": compute_resource_id,
+                "name": selected.get("ResourceName") or selected.get("Name", ""),
+                "status": selected.get("ResourceStatus") or selected.get("Status", ""),
+                "type": selected.get("ResourceType") or selected.get("Type", ""),
+                "source": selection_reason,
+            }
+            logger.info(
+                "[local_sql_tool] 自动选中计算资源: %s (%s), 策略=%s, 总资源数=%d",
+                compute_resource_id, resource_info["name"], selection_reason, len(resources),
+            )
+
+        # ── Step 2: 提交 SQL 任务 ──
+        job_id = await _submit_job(
+            remote, workspace_id, compute_resource_id, sql,
+            catalog_name=catalog_name, schema_name=schema_name,
+        )
+
+        if not job_id:
+            # 提交失败，返回候选资源列表供用户重试
+            candidates = _build_resource_candidates(resources)
+            return json.dumps(
+                {
+                    "error": "SQL 任务提交失败，SubmitJob 未返回 JobId",
+                    "compute_resource": resource_info,
+                    "available_resources": candidates,
+                    "hint": "当前计算资源可能不可用，请从上述候选资源中选择一个，然后重新调用并传入 compute_resource_id 重试。",
+                },
+                ensure_ascii=False, indent=2,
+            )
+
+        # ── Step 3: 轮询任务状态 ──
+        status_result = await _poll_job_status(remote, job_id, workspace_id)
+        job_status = status_result.get("JobStatus", "UNKNOWN")
+        poll_count = status_result.get("poll_count", 0)
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+
+        if job_status == _SUCCESS_STATUS:
+            # ── Step 4: 获取下载链接 ──
+            download_result = await _download_job_result(remote, job_id, workspace_id)
+            download_urls = download_result.get("DownloadUrls", [])
+
+            # ── Step 5: 下载 CSV 并解析为结构化数据，直接返回给 LLM 分析 ──
+            data_preview: dict[str, Any] | None = None
+            if download_urls:
+                # 取第一个 URL（通常只有一个结果文件）
+                first_url = download_urls[0] if isinstance(download_urls[0], str) else download_urls[0].get("Url", "")
+                if first_url:
+                    data_preview = await _fetch_and_parse_csv(first_url)
+
+            result_payload: dict[str, Any] = {
+                "status": "SUCCEEDED",
+                "job_id": job_id,
+                "workspace_id": workspace_id,
+                "sql": sql,
+                "compute_resource": resource_info,
+                "result_meta": download_result.get("ResultMeta", {}),
+            }
+
+            if data_preview and "error" not in data_preview:
+                # CSV 解析成功，返回结构化数据供 LLM 直接分析
+                result_payload["data"] = data_preview
+                result_payload["message"] = (
+                    f"SQL 执行成功。结果共 {data_preview.get('total_row_count', '?')} 行 "
+                    f"× {len(data_preview.get('columns', []))} 列"
+                    + (f"，已截取前 {data_preview['preview_row_count']} 行展示。" if data_preview.get("truncated") else "。")
+                )
+            else:
+                # CSV 下载/解析失败，回退到返回下载链接
+                result_payload["download_urls"] = download_urls
+                result_payload["message"] = "SQL 执行成功。CSV 结果解析失败，请使用下载链接自行获取结果文件。"
+                if data_preview:
+                    result_payload["parse_error"] = data_preview.get("error", "")
+
+            result_payload["_execution"] = {
+                "poll_count": poll_count,
+                "elapsed_ms": round(elapsed_ms, 2),
+            }
+            if catalog_name:
+                result_payload["catalog_name"] = catalog_name
+            if schema_name:
+                result_payload["schema_name"] = schema_name
+
+            logger.info(
+                "[local_sql_tool] ✅ SQL 执行成功: JobId=%s, 耗时=%.2fms, 轮询=%d次",
+                job_id, elapsed_ms, poll_count,
+            )
+            return json.dumps(result_payload, ensure_ascii=False, indent=2)
+
+        elif job_status == _FAILED_STATUS:
+            raw_response = status_result.get("raw_response", {})
+            # 错误信息字段：优先取 JobErrMsg，兼容 ErrorMessage
+            error_msg = raw_response.get("JobErrMsg") or raw_response.get("ErrorMessage") or "未知错误"
+            error_code = raw_response.get("JobErrCode", "")
+
+            logger.error("[local_sql_tool] ❌ SQL 执行失败: JobId=%s, ErrCode=%s, Error=%s", job_id, error_code, error_msg)
+            # 执行失败，返回候选资源列表供用户选择重试
+            candidates = _build_resource_candidates(resources)
+            return json.dumps(
+                {
+                    "status": "FAILED",
+                    "job_id": job_id,
+                    "workspace_id": workspace_id,
+                    "sql": sql,
+                    "compute_resource": resource_info,
+                    "error": error_msg,
+                    "error_code": error_code,
+                    "available_resources": candidates,
+                    "hint": "执行失败，可能是计算资源问题。请从上述候选资源中选择一个重试。",
+                    "_execution": {"poll_count": poll_count, "elapsed_ms": round(elapsed_ms, 2)},
+                },
+                ensure_ascii=False, indent=2,
+            )
+
+        elif status_result.get("timeout"):
+            logger.warning("[local_sql_tool] ⏰ SQL 执行超时: JobId=%s, 最后状态=%s", job_id, job_status)
+            return json.dumps(
+                {
+                    "status": "TIMEOUT",
+                    "job_id": job_id,
+                    "workspace_id": workspace_id,
+                    "sql": sql,
+                    "compute_resource": resource_info,
+                    "last_status": job_status,
+                    "message": f"SQL 执行超时（已轮询 {poll_count} 次，约 {poll_count * _POLL_INTERVAL_SECONDS:.0f} 秒），最后状态: {job_status}",
+                    "hint": "任务可能仍在执行中，可稍后通过 job_id 查询状态。",
+                    "_execution": {"poll_count": poll_count, "elapsed_ms": round(elapsed_ms, 2)},
+                },
+                ensure_ascii=False, indent=2,
+            )
+
+        else:
+            logger.warning("[local_sql_tool] SQL 执行终止: JobId=%s, Status=%s", job_id, job_status)
+            return json.dumps(
+                {
+                    "status": job_status,
+                    "job_id": job_id,
+                    "workspace_id": workspace_id,
+                    "sql": sql,
+                    "compute_resource": resource_info,
+                    "message": f"SQL 任务状态: {job_status}",
+                    "_execution": {"poll_count": poll_count, "elapsed_ms": round(elapsed_ms, 2)},
+                },
+                ensure_ascii=False, indent=2,
+            )

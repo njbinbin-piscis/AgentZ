@@ -1,0 +1,13 @@
+{
+  "id": "cb-cancel-ralph-2",
+  "slash_id": "cancel-ralph",
+  "name": "cb-cancel-ralph-2",
+  "description": "Cancel active Ralph Loop",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# Cancel Ralph\n\nTo cancel the Ralph loop:\n\n1. Check if `.AgentZ/ralph-loop.local.md` exists using Bash: `test -f .AgentZ/ralph-loop.local.md && echo \"EXISTS\" || echo \"NOT_FOUND\"`\n\n2. **If NOT_FOUND**: Say \"No active Ralph loop found.\"\n\n3. **If EXISTS**:\n   - Read `.AgentZ/ralph-loop.local.md` to get the current iteration number from the `iteration:` field\n   - Remove the file using Bash: `rm .AgentZ/ralph-loop.local.md`\n   - Report: \"Cancelled Ralph loop (was at iteration N)\" where N is the iteration value",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "ralph-loop"
+}

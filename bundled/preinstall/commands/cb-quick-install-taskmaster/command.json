@@ -1,0 +1,13 @@
+{
+  "id": "cb-quick-install-taskmaster",
+  "slash_id": "quick-install-taskmaster",
+  "name": "cb-quick-install-taskmaster",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Quick install Task Master globally if not already installed.\n\nExecute this streamlined installation:\n\n```bash\n# Check and install in one command\ntask-master --version 2>/dev/null || npm install -g task-master-ai\n\n# Verify installation\ntask-master --version\n\n# Quick setup check\ntask-master models --status || echo \"Note: You'll need to set up an AI provider API key\"\n```\n\nIf you see \"command not found\" after installation, you may need to:\n1. Restart your terminal\n2. Or add npm global bin to PATH: `export PATH=$(npm bin -g):$PATH`\n\nOnce installed, you can use all the Task Master commands!\n\nQuick test: Run `/project:help` to see all available commands.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

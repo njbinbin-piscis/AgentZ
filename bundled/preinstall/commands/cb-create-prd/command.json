@@ -1,0 +1,16 @@
+{
+  "id": "cb-create-prd",
+  "slash_id": "create-prd",
+  "name": "cb-create-prd",
+  "description": "Create a Product Requirements Document (PRD) for a product feature",
+  "description_zh": "",
+  "argument_hint": "<feature description> [output-path]",
+  "tools": [
+    "file_write",
+    "plan_todo"
+  ],
+  "prompt": "Create a comprehensive Product Requirements Document (PRD) based on the feature description provided.\n\n## Instructions:\n1. Parse the arguments:\n   - First argument: Feature description (required)\n   - Second argument: Output path (optional, defaults to `PRD.md` in current directory)\n\n2. Create a well-structured PRD that includes:\n   - **Executive Summary**: Brief overview of the feature\n   - **Problem Statement**: What problem does this solve?\n   - **Objectives**: Clear, measurable goals\n   - **User Stories**: Who are the users and what are their needs?\n   - **Functional Requirements**: What the feature must do\n   - **Non-Functional Requirements**: Performance, security, usability standards\n   - **Success Metrics**: How will we measure success?\n   - **Assumptions & Constraints**: Any limitations or dependencies\n   - **Out of Scope**: What this PRD does NOT cover\n\n3. Focus on:\n   - User needs and business value (not technical implementation)\n   - Clear, measurable objectives\n   - Specific acceptance criteria\n   - User personas and their journey\n\n4. Use the plan_todo tool tool to track PRD sections as you complete them\n\n## Example usage:\n- `/create-prd \"Add dark mode toggle to settings\"`\n- `/create-prd \"Implement user authentication with SSO\" auth-PRD.md`\n\nFeature description: $ARGUMENTS",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-project-task-management"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "cb-remove-all-subtasks",
+  "slash_id": "remove-all-subtasks",
+  "name": "cb-remove-all-subtasks",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Clear all subtasks from all tasks globally.\n\n## Global Subtask Clearing\n\nRemove all subtasks across the entire project. Use with extreme caution.\n\n## Execution\n\n```bash\ntask-master clear-subtasks --all\n```\n\n## Pre-Clear Analysis\n\n1. **Project-Wide Summary**\n   ```\n   Global Subtask Summary\n   ━━━━━━━━━━━━━━━━━━━━\n   Total parent tasks: 12\n   Total subtasks: 47\n   - Completed: 15\n   - In-progress: 8\n   - Pending: 24\n   \n   Work at risk: ~120 hours\n   ```\n\n2. **Critical Warnings**\n   - In-progress subtasks that will lose work\n   - Completed subtasks with valuable history\n   - Complex dependency chains\n   - Integration test results\n\n## Double Confirmation\n\n```\n⚠️  DESTRUCTIVE OPERATION WARNING ⚠️\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nThis will remove ALL 47 subtasks from your project\nIncluding 8 in-progress and 15 completed subtasks\n\nThis action CANNOT be undone\n\nType 'CLEAR ALL SUBTASKS' to confirm:\n```\n\n## Smart Safeguards\n\n- Require explicit confirmation phrase\n- Create automatic backup\n- Log all removed data\n- Option to export first\n\n## Use Cases\n\nValid reasons for global clear:\n- Project restructuring\n- Major pivot in approach\n- Starting fresh breakdown\n- Switching to different task organization\n\n## Process\n\n1. Full project analysis\n2. Create backup file\n3. Show detailed impact\n4. Require confirmation\n5. Execute removal\n6. Generate summary report\n\n## Alternative Suggestions\n\nBefore clearing all:\n- Export subtasks to file\n- Clear only pending subtasks\n- Clear by task category\n- Archive instead of delete\n\n## Post-Clear Report\n\n```\nGlobal Subtask Clear Complete\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\nRemoved: 47 subtasks from 12 tasks\nBackup saved: .taskmaster/backup/subtasks-20240115.json\nParent tasks updated: 12\nTime estimates adjusted: Yes\n\nNext steps:\n- Review updated task list\n- Re-expand complex tasks as needed\n- Check project timeline\n```",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

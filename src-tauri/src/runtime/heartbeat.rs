@@ -279,6 +279,7 @@ async fn dispatch_pool_attention(
         None,
         None,
         Some(attention.pool_id.clone()),
+        false,
     )
     .await
     .map_err(|e| e.to_string())?;

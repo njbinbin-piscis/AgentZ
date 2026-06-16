@@ -1,0 +1,18 @@
+{
+  "id": "cb-create-command",
+  "slash_id": "create-command",
+  "name": "cb-create-command",
+  "description": "Create a new command following existing patterns and organizational structure",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_write",
+    "file_edit",
+    "file_list"
+  ],
+  "prompt": "Create a new command that follows the existing patterns and organizational structure in this project.\n\n## ANALYZE EXISTING COMMANDS\n\n1. First, study the existing commands in the `.claude/commands/` directory to understand:\n   - Common patterns and structures\n   - Naming conventions\n   - Documentation styles\n   - Command organization\n\n2. Use MCP tools to explore the codebase and understand:\n   - Project structure\n   - Existing functionality\n   - Code patterns\n   - Dependencies\n\n## UNDERSTAND THE REQUEST\n\n3. Analyze the user's request to determine:\n   - The command's purpose and functionality\n   - Which category it belongs to\n   - Similar existing commands to reference\n   - Required inputs and outputs\n\n## SELECT APPROPRIATE PATTERNS\n\n4. Based on your analysis, choose the most appropriate pattern:\n   - Simple execution commands\n   - File generation commands\n   - Analysis and reporting commands\n   - Multi-step workflow commands\n\n## DETERMINE COMMAND LOCATION\n\n5. Place the command in the appropriate category directory:\n   - `code-analysis-testing/` - For code analysis, testing, and quality assurance\n   - `ci-deployment/` - For CI/CD and deployment related commands\n   - `context-loading-priming/` - For loading context and priming commands\n   - `documentation-changelogs/` - For documentation and changelog commands\n   - `project-task-management/` - For project and task management commands\n   - `version-control-git/` - For version control and Git operations\n   - `miscellaneous/` - For commands that don't fit other categories\n\n## PLAN SUPPORTING RESOURCES\n\n6. Consider what supporting resources might be needed:\n   - Templates or example files\n   - Configuration files\n   - Documentation updates\n   - Related commands that might work together\n\n## CREATE THE COMMAND\n\n7. Write the command following these guidelines:\n   - Use clear, descriptive names\n   - Include comprehensive instructions\n   - Follow existing formatting patterns\n   - Add appropriate examples\n   - Include error handling considerations\n\n## HUMAN REVIEW\n\n8. Present your analysis and proposed command to the human for review before implementation, including:\n   - Command purpose and location\n   - Key patterns you're following\n   - Any assumptions you're making\n   - Questions about specific requirements",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-project-task-management"
+}

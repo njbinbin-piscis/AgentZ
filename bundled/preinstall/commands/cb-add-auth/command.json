@@ -1,0 +1,20 @@
+{
+  "id": "cb-add-auth",
+  "slash_id": "add-auth",
+  "name": "cb-add-auth",
+  "description": "Add authentication to a Next.js application",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_write",
+    "file_list",
+    "codebase_search",
+    "shell",
+    "chat_ui"
+  ],
+  "prompt": "# Add Authentication to Next.js App\n\nYou are adding authentication to a Next.js application using Auth.js (NextAuth.js v5).\n\n## Workflow\n\n### Step 1: Assess Current State\n\n1. Check if authentication already exists:\n   - Look for `auth.ts` or `auth.config.ts`\n   - Check for `next-auth` in `package.json`\n   - Look for existing middleware\n\n2. Identify database setup:\n   - Check for Prisma schema\n   - Identify existing User model\n\n### Step 2: Ask About Requirements\n\nUse chat_ui tool to clarify:\n- **Providers**: Which OAuth providers? (GitHub, Google, Email/Password)\n- **Session strategy**: JWT or database sessions?\n- **Protected routes**: Which routes need protection?\n- **Role-based access**: Is RBAC needed?\n\n### Step 3: Install Dependencies\n\n```bash\nnpm install next-auth@beta @auth/prisma-adapter\n```\n\nIf using credentials:\n```bash\nnpm install bcryptjs\nnpm install -D @types/bcryptjs\n```\n\n### Step 4: Create Auth Configuration\n\nApply the `auth-patterns` skill and create:\n\n1. **`auth.ts`** - Main auth configuration with:\n   - Provider setup\n   - Adapter configuration\n   - Session callbacks\n   - JWT callbacks\n\n2. **`app/api/auth/[...nextauth]/route.ts`** - Route handler\n\n### Step 5: Add Middleware\n\nCreate `middleware.ts` with:\n- Route protection logic\n- Redirect rules for auth pages\n- Public route exceptions\n\n### Step 6: Update Database Schema\n\nIf using Prisma, add/update models:\n- User\n- Account\n- Session\n- VerificationToken\n\n### Step 7: Create Auth Components\n\n1. **Login form** - Credentials + OAuth buttons\n2. **Register form** - If using credentials\n3. **User menu** - Session-aware navigation\n4. **Session provider** - Client-side wrapper\n\n### Step 8: Environment Variables\n\nCreate/update `.env.local`:\n```\nAUTH_SECRET=generated-secret\nAUTH_URL=http://localhost:3000\nGITHUB_CLIENT_ID=...\nGITHUB_CLIENT_SECRET=...\n```\n\n## Implementation Checklist\n\n- [ ] Install next-auth@beta\n- [ ] Create auth.ts configuration\n- [ ] Create API route handler\n- [ ] Add middleware for route protection\n- [ ] Update Prisma schema (if using database)\n- [ ] Create login/register pages\n- [ ] Add SessionProvider to layout\n- [ ] Create auth-related components\n- [ ] Set up environment variables\n- [ ] Test authentication flow\n\n## Files to Create\n\n| File | Purpose |\n|------|---------|\n| `auth.ts` | Auth configuration |\n| `app/api/auth/[...nextauth]/route.ts` | NextAuth route handler |\n| `middleware.ts` | Route protection |\n| `app/login/page.tsx` | Login page |\n| `app/register/page.tsx` | Registration page (if credentials) |\n| `components/login-form.tsx` | Login form component |\n| `components/oauth-buttons.tsx` | OAuth sign-in buttons |\n| `components/user-menu.tsx` | User dropdown menu |\n| `app/providers.tsx` | SessionProvider wrapper |\n| `types/next-auth.d.ts` | Extended types |\n| `lib/auth-helpers.ts` | Auth utility functions |\n\n## Security Considerations\n\n- Use `AUTH_SECRET` from environment\n- Set `httpOnly` cookies\n- Implement CSRF protection\n- Hash passwords with bcrypt (min 12 rounds)\n- Validate all inputs\n- Rate limit authentication endpoints",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "nextjs-expert"
+}

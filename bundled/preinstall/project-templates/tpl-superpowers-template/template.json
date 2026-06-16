@@ -1,0 +1,8 @@
+{
+  "id": "tpl-superpowers-template",
+  "name": "superpowers",
+  "name_zh": "superpowers",
+  "description": "Claude Code 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法",
+  "description_zh": "Claude Code 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法",
+  "source_plugin": "superpowers"
+}

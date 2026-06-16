@@ -1,0 +1,17 @@
+{
+  "id": "cb-check",
+  "slash_id": "check",
+  "name": "cb-check",
+  "description": "Run project checks and fix any errors without committing",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "shell",
+    "file_edit",
+    "file_read"
+  ],
+  "prompt": "Run project validation checks and resolve any errors found.\n\n## Process:\n\n1. **Detect Package Manager** (for JavaScript/TypeScript projects):\n   - npm: Look for package-lock.json\n   - pnpm: Look for pnpm-lock.yaml\n   - yarn: Look for yarn.lock\n   - bun: Look for bun.lockb\n\n2. **Check Available Scripts**:\n   - Read package.json to find check/validation scripts\n   - Common script names: `check`, `validate`, `verify`, `test`, `lint`\n\n3. **Run Appropriate Check Command**:\n   - JavaScript/TypeScript:\n     - npm: `npm run check` or `npm test`\n     - pnpm: `pnpm check` or `pnpm test`\n     - yarn: `yarn check` or `yarn test`\n     - bun: `bun check` or `bun test`\n   \n   - Other languages:\n     - Python: `pytest`, `flake8`, `mypy`, or `make check`\n     - Go: `go test ./...` or `golangci-lint run`\n     - Rust: `cargo check` or `cargo test`\n     - Ruby: `rubocop` or `rake test`\n\n4. **Fix Any Errors**:\n   - Analyze error output\n   - Fix code issues, syntax errors, or test failures\n   - Re-run checks after fixing\n\n5. **Important Constraints**:\n   - DO NOT commit any code\n   - DO NOT change version numbers\n   - Only fix errors to make checks pass\n\nIf no check script exists, run the most appropriate validation for the project type.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-code-analysis-testing"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "cb-load-llms-txt",
+  "slash_id": "load-llms-txt",
+  "name": "cb-load-llms-txt",
+  "description": "READ the llms.txt file from https://raw.githubusercontent.com/ethpandaops/xatu-data/refs/heads/master/llms.txt via `curl`. Do nothing else and await further instructions.",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# Load Xatu Data Context\nREAD the llms.txt file from https://raw.githubusercontent.com/ethpandaops/xatu-data/refs/heads/master/llms.txt via `curl`. Do nothing else and await further instructions.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-documentation-changelogs"
+}

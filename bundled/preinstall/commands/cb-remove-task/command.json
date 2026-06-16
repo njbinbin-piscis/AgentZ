@@ -1,0 +1,13 @@
+{
+  "id": "cb-remove-task",
+  "slash_id": "remove-task",
+  "name": "cb-remove-task",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Remove a task permanently from the project.\n\nArguments: $ARGUMENTS (task ID)\n\nDelete a task and handle all its relationships properly.\n\n## Task Removal\n\nPermanently removes a task while maintaining project integrity.\n\n## Argument Parsing\n\n- \"remove task 5\"\n- \"delete 5\"\n- \"5\" → remove task 5\n- Can include \"-y\" for auto-confirm\n\n## Execution\n\n```bash\ntask-master remove-task --id=<id> [-y]\n```\n\n## Pre-Removal Analysis\n\n1. **Task Details**\n   - Current status\n   - Work completed\n   - Time invested\n   - Associated data\n\n2. **Relationship Check**\n   - Tasks that depend on this\n   - Dependencies this task has\n   - Subtasks that will be removed\n   - Blocking implications\n\n3. **Impact Assessment**\n   ```\n   Task Removal Impact\n   ━━━━━━━━━━━━━━━━━━\n   Task: #5 \"Implement authentication\" (in-progress)\n   Status: 60% complete (~8 hours work)\n   \n   Will affect:\n   - 3 tasks depend on this (will be blocked)\n   - Has 4 subtasks (will be deleted)\n   - Part of critical path\n   \n   ⚠️  This action cannot be undone\n   ```\n\n## Smart Warnings\n\n- Warn if task is in-progress\n- Show dependent tasks that will be blocked\n- Highlight if part of critical path\n- Note any completed work being lost\n\n## Removal Process\n\n1. Show comprehensive impact\n2. Require confirmation (unless -y)\n3. Update dependent task references\n4. Remove task and subtasks\n5. Clean up orphaned dependencies\n6. Log removal with timestamp\n\n## Alternative Actions\n\nSuggest before deletion:\n- Mark as cancelled instead\n- Convert to documentation\n- Archive task data\n- Transfer work to another task\n\n## Post-Removal\n\n- List affected tasks\n- Show broken dependencies\n- Update project statistics\n- Suggest dependency fixes\n- Recalculate timeline\n\n## Example Flows\n\n```\n/taskmaster:remove-task 5\n→ Task #5 is in-progress with 8 hours logged\n→ 3 other tasks depend on this\n→ Suggestion: Mark as cancelled instead?\nRemove anyway? (y/n)\n\n/taskmaster:remove-task 5 -y\n→ Removed: Task #5 and 4 subtasks\n→ Updated: 3 task dependencies\n→ Warning: Tasks #7, #8, #9 now have missing dependency\n→ Run /taskmaster:fix-dependencies to resolve\n```\n\n## Safety Features\n\n- Confirmation required\n- Impact preview\n- Removal logging\n- Suggest alternatives\n- No cascade delete of dependents",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

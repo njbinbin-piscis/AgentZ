@@ -1,0 +1,13 @@
+{
+  "id": "cb-project-status",
+  "slash_id": "project-status",
+  "name": "cb-project-status",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Enhanced status command with comprehensive project insights.\n\nArguments: $ARGUMENTS\n\n## Intelligent Status Overview\n\n### 1. **Executive Summary**\nQuick dashboard view:\n- 🏃 Active work (in-progress tasks)\n- 📊 Progress metrics (% complete, velocity)\n- 🚧 Blockers and risks\n- ⏱️ Time analysis (estimated vs actual)\n- 🎯 Sprint/milestone progress\n\n### 2. **Contextual Analysis**\n\nBased on $ARGUMENTS, focus on:\n- \"sprint\" → Current sprint progress and burndown\n- \"blocked\" → Dependency chains and resolution paths\n- \"team\" → Task distribution and workload\n- \"timeline\" → Schedule adherence and projections\n- \"risk\" → High complexity or overdue items\n\n### 3. **Smart Insights**\n\n**Workflow Health:**\n- Idle tasks (in-progress > 24h without updates)\n- Bottlenecks (multiple tasks waiting on same dependency)\n- Quick wins (low complexity, high impact)\n\n**Predictive Analytics:**\n- Completion projections based on velocity\n- Risk of missing deadlines\n- Recommended task order for optimal flow\n\n### 4. **Visual Intelligence**\n\nDynamic visualization based on data:\n```\nSprint Progress: ████████░░ 80% (16/20 tasks)\nVelocity Trend: ↗️ +15% this week\nBlocked Tasks:  🔴 3 critical path items\n\nPriority Distribution:\nHigh:   ████████ 8 tasks (2 blocked)\nMedium: ████░░░░ 4 tasks\nLow:    ██░░░░░░ 2 tasks\n```\n\n### 5. **Actionable Recommendations**\n\nBased on analysis:\n1. **Immediate actions** (unblock critical path)\n2. **Today's focus** (optimal task sequence)\n3. **Process improvements** (recurring patterns)\n4. **Resource needs** (skills, time, dependencies)\n\n### 6. **Historical Context**\n\nCompare to previous periods:\n- Velocity changes\n- Pattern recognition\n- Improvement areas\n- Success patterns to repeat",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

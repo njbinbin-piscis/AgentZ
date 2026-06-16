@@ -1,0 +1,13 @@
+{
+  "id": "cb-fix-dependencies",
+  "slash_id": "fix-dependencies",
+  "name": "cb-fix-dependencies",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Automatically fix dependency issues found during validation.\n\n## Automatic Dependency Repair\n\nIntelligently fixes common dependency problems while preserving project logic.\n\n## Execution\n\n```bash\ntask-master fix-dependencies\n```\n\n## What Gets Fixed\n\n### 1. **Auto-Fixable Issues**\n- Remove references to deleted tasks\n- Break simple circular dependencies\n- Remove self-dependencies\n- Clean up duplicate dependencies\n\n### 2. **Smart Resolutions**\n- Reorder dependencies to maintain logic\n- Suggest task merging for over-dependent tasks\n- Flatten unnecessary dependency chains\n- Remove redundant transitive dependencies\n\n### 3. **Manual Review Required**\n- Complex circular dependencies\n- Critical path modifications\n- Business logic dependencies\n- High-impact changes\n\n## Fix Process\n\n1. **Analysis Phase**\n   - Run validation check\n   - Categorize issues by type\n   - Determine fix strategy\n\n2. **Execution Phase**\n   - Apply automatic fixes\n   - Log all changes made\n   - Preserve task relationships\n\n3. **Verification Phase**\n   - Re-validate after fixes\n   - Show before/after comparison\n   - Highlight manual fixes needed\n\n## Smart Features\n\n- Preserves intended task flow\n- Minimal disruption approach\n- Creates fix history/log\n- Suggests manual interventions\n\n## Output Example\n\n```\nDependency Auto-Fix Report\n━━━━━━━━━━━━━━━━━━━━━━━━\nFixed Automatically:\n✅ Removed 2 references to deleted tasks\n✅ Resolved 1 self-dependency\n✅ Cleaned 3 redundant dependencies\n\nManual Review Needed:\n⚠️ Complex circular dependency: #12 → #15 → #18 → #12\n  Suggestion: Make #15 not depend on #12\n⚠️ Task #45 has 8 dependencies\n  Suggestion: Break into subtasks\n\nRun '/taskmaster:validate-dependencies' to verify fixes\n```\n\n## Safety\n\n- Preview mode available\n- Rollback capability\n- Change logging\n- No data loss",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

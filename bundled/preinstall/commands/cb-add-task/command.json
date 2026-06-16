@@ -1,0 +1,13 @@
+{
+  "id": "cb-add-task",
+  "slash_id": "add-task",
+  "name": "cb-add-task",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Add new tasks with intelligent parsing and context awareness.\n\nArguments: $ARGUMENTS\n\n## Smart Task Addition\n\nParse natural language to create well-structured tasks.\n\n### 1. **Input Understanding**\n\nI'll intelligently parse your request:\n- Natural language → Structured task\n- Detect priority from keywords (urgent, ASAP, important)\n- Infer dependencies from context\n- Suggest complexity based on description\n- Determine task type (feature, bug, refactor, test, docs)\n\n### 2. **Smart Parsing Examples**\n\n**\"Add urgent task to fix login bug\"**\n→ Title: Fix login bug\n→ Priority: high\n→ Type: bug\n→ Suggested complexity: medium\n\n**\"Create task for API documentation after task 23 is done\"**\n→ Title: API documentation\n→ Dependencies: [23]\n→ Type: documentation\n→ Priority: medium\n\n**\"Need to refactor auth module - depends on 12 and 15, high complexity\"**\n→ Title: Refactor auth module\n→ Dependencies: [12, 15]\n→ Complexity: high\n→ Type: refactor\n\n### 3. **Context Enhancement**\n\nBased on current project state:\n- Suggest related existing tasks\n- Warn about potential conflicts\n- Recommend dependencies\n- Propose subtasks if complex\n\n### 4. **Interactive Refinement**\n\n```yaml\nTask Preview:\n─────────────\nTitle: [Extracted title]\nPriority: [Inferred priority]\nDependencies: [Detected dependencies]\nComplexity: [Estimated complexity]\n\nSuggestions:\n- Similar task #34 exists, consider as dependency?\n- This seems complex, break into subtasks?\n- Tasks #45-47 work on same module\n```\n\n### 5. **Validation & Creation**\n\nBefore creating:\n- Validate dependencies exist\n- Check for duplicates\n- Ensure logical ordering\n- Verify task completeness\n\n### 6. **Smart Defaults**\n\nIntelligent defaults based on:\n- Task type patterns\n- Team conventions\n- Historical data\n- Current sprint/phase\n\nResult: High-quality tasks from minimal input.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

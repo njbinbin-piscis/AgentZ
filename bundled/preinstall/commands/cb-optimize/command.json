@@ -1,0 +1,16 @@
+{
+  "id": "cb-optimize",
+  "slash_id": "optimize",
+  "name": "cb-optimize",
+  "description": "Analyze code performance and propose three specific optimization improvements",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_edit"
+  ],
+  "prompt": "Analyze the performance of this code and propose three specific optimizations.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-code-analysis-testing"
+}

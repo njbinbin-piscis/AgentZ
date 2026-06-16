@@ -9,6 +9,8 @@ pub struct SkillDefinition {
     pub name: String,
     pub description: String,
     #[serde(default)]
+    pub description_zh: String,
+    #[serde(default)]
     pub version: String,
     #[serde(default)]
     pub tools: Vec<String>,
@@ -127,6 +129,11 @@ impl SkillLoader {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
+            description_zh: frontmatter
+                .get("description_zh")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
             version: frontmatter
                 .get("version")
                 .and_then(|v| v.as_str())
@@ -169,6 +176,11 @@ impl SkillLoader {
             name: name.clone(),
             description: frontmatter
                 .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            description_zh: frontmatter
+                .get("description_zh")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),

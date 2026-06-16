@@ -1,0 +1,13 @@
+{
+  "id": "cb-init-project-quick",
+  "slash_id": "init-project-quick",
+  "name": "cb-init-project-quick",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Quick initialization with auto-confirmation.\n\nArguments: $ARGUMENTS\n\nInitialize a Task Master project without prompts, accepting all defaults.\n\n## Quick Setup\n\n```bash\ntask-master init -y\n```\n\n## What It Does\n\n1. Creates `.taskmaster/` directory structure\n2. Initializes empty `tasks.json`\n3. Sets up default configuration\n4. Uses directory name as project name\n5. Skips all confirmation prompts\n\n## Smart Defaults\n\n- Project name: Current directory name\n- Description: \"Task Master Project\"\n- Model config: Existing environment vars\n- Task structure: Standard format\n\n## Next Steps\n\nAfter quick init:\n1. Configure AI models if needed:\n   ```\n   /taskmaster:models/setup\n   ```\n\n2. Parse PRD if available:\n   ```\n   /taskmaster:parse-prd <file>\n   ```\n\n3. Or create first task:\n   ```\n   /taskmaster:add-task create initial setup\n   ```\n\nPerfect for rapid project setup!",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

@@ -873,6 +873,7 @@ fn build_tool_registry(
     enable_skill_manage: bool,
     loop_halt: Arc<std::sync::atomic::AtomicBool>,
     api_connector_allowlist: Option<Vec<String>>,
+    slash_tool_allowlist: Option<Vec<String>>,
 ) -> ToolRegistry {
     let mut builtin_tool_enabled = None;
     if chat_mode == "plan" {
@@ -881,6 +882,11 @@ fn build_tool_registry(
             map.insert((*name).to_string(), false);
         }
         builtin_tool_enabled = Some(map);
+    }
+    if let Some(allow) = slash_tool_allowlist.filter(|a| !a.is_empty()) {
+        if let Some(map) = crate::commands::slash_commands::tool_allowlist_map(&allow) {
+            builtin_tool_enabled = Some(map);
+        }
     }
     // User-selected skills can re-enable tools they need (e.g. a tool that plan
     // mode disabled). The map is an override (missing = enabled), so this only
@@ -1066,6 +1072,7 @@ fn build_subagent_registry(
         false,
         false,
         Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        None,
         None,
     )
 }
@@ -1466,6 +1473,7 @@ pub async fn run_agentz_turn(
     agent_id: Option<String>,
     workz_team_id: Option<String>,
     workz_pool_id: Option<String>,
+    prefer_zh: bool,
 ) -> Result<HeadlessCliResponse> {
     if !matches!(request.mode, HeadlessCliMode::Piscis) {
         return Err(anyhow!("AgentZ chat only supports mode=piscis"));
@@ -1546,8 +1554,25 @@ pub async fn run_agentz_turn(
         s.vision_enabled || model_supports_vision(&runtime.provider, &runtime.model)
     };
 
-    let (effective_prompt, image_attachment) =
+    let (mut effective_prompt, image_attachment) =
         resolve_attachment(&request.prompt, attachment, vision_capable)?;
+
+    // Slash commands: `/review args` expands to a preset prompt and optional tool allowlist.
+    let mut slash_tool_allowlist: Option<Vec<String>> = None;
+    let mut slash_display: Option<String> = None;
+    if effective_prompt.trim_start().starts_with('/') {
+        if let Ok(Some(resolved)) = crate::commands::slash_commands::resolve_command(
+            &config_dir,
+            &effective_prompt,
+            prefer_zh,
+        ) {
+            effective_prompt = resolved.prompt;
+            slash_display = Some(resolved.display);
+            if !resolved.tools.is_empty() {
+                slash_tool_allowlist = Some(resolved.tools);
+            }
+        }
+    }
     request.prompt = effective_prompt.clone();
 
     // Phase 1: skills the user selected for this conversation bind their
@@ -1593,6 +1618,7 @@ pub async fn run_agentz_turn(
         chat_mode == "agent",
         loop_halt.clone(),
         api_connector_allowlist,
+        slash_tool_allowlist.clone(),
     );
     // Register MCP server tools (M6) from settings.mcp_servers — async because
     // it connects to stdio/SSE servers. Plan mode keeps them (read-context).
@@ -1674,6 +1700,7 @@ pub async fn run_agentz_turn(
 
     let display_for_db = display_prompt
         .filter(|s| !s.trim().is_empty())
+        .or(slash_display)
         .unwrap_or_else(|| request.prompt.clone());
     let with_browser = expand_browser_element_refs(&effective_prompt, &browser).await;
     let snippets = {
@@ -1893,12 +1920,16 @@ pub async fn run_agentz_turn(
         }
     }
     if let Some(agent) = agent.as_ref() {
-        if !agent.system_prompt.trim().is_empty() {
+        let prompt_body = if prefer_zh && !agent.system_prompt_zh.trim().is_empty() {
+            agent.system_prompt_zh.trim()
+        } else {
+            agent.system_prompt.trim()
+        };
+        if !prompt_body.is_empty() {
             extra_sections.push(format!(
                 "## Active agent: {}\nYou are acting as this agent. Follow its role and \
                  instructions:\n{}",
-                agent.name,
-                agent.system_prompt.trim()
+                agent.name, prompt_body
             ));
         }
     }

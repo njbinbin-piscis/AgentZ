@@ -1,0 +1,13 @@
+{
+  "id": "cb-to-cancelled",
+  "slash_id": "to-cancelled",
+  "name": "cb-to-cancelled",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Cancel a task permanently.\n\nArguments: $ARGUMENTS (task ID)\n\n## Cancelling a Task\n\nThis status indicates a task is no longer needed and won't be completed.\n\n## Valid Reasons for Cancellation\n\n- Requirements changed\n- Feature deprecated\n- Duplicate of another task\n- Strategic pivot\n- Technical approach invalidated\n\n## Pre-Cancellation Checks\n\n1. Confirm no critical dependencies\n2. Check for partial implementation\n3. Verify cancellation rationale\n4. Document lessons learned\n\n## Execution\n\n```bash\ntask-master set-status --id=$ARGUMENTS --status=cancelled\n```\n\n## Cancellation Impact\n\nWhen cancelling:\n1. **Dependency Updates**\n   - Notify dependent tasks\n   - Update project scope\n   - Recalculate timelines\n\n2. **Clean-up Actions**\n   - Remove related branches\n   - Archive any work done\n   - Update documentation\n   - Close related issues\n\n3. **Learning Capture**\n   - Document why cancelled\n   - Note what was learned\n   - Update estimation models\n   - Prevent future duplicates\n\n## Historical Preservation\n\n- Keep for reference\n- Tag with cancellation reason\n- Link to replacement if any\n- Maintain audit trail",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

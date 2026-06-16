@@ -1,0 +1,17 @@
+{
+  "id": "cb-commit",
+  "slash_id": "commit",
+  "name": "cb-commit",
+  "description": "Create well-formatted git commits with conventional commit messages and emoji",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "shell",
+    "file_read",
+    "file_list"
+  ],
+  "prompt": "# AgentZ slash command: Commit\n\nThis command helps you create well-formatted commits with conventional commit messages and emoji.\n\n## Usage\n\nTo create a commit, just type:\n```\n/commit\n```\n\nOr with options:\n```\n/commit --no-verify\n```\n\n## What This Command Does\n\n1. Unless specified with `--no-verify`, automatically runs pre-commit checks:\n   - Detect package manager (npm, pnpm, yarn, bun) and run appropriate commands\n   - Run lint/format checks if available\n   - Run build verification if build script exists\n   - Update documentation if generation script exists\n2. Checks which files are staged with `git status`\n3. If 0 files are staged, automatically adds all modified and new files with `git add`\n4. Performs a `git diff` to understand what changes are being committed\n5. Analyzes the diff to determine if multiple distinct logical changes are present\n6. If multiple distinct changes are detected, suggests breaking the commit into multiple smaller commits\n7. For each commit (or the single commit if not split), creates a commit message using emoji conventional commit format\n\n## Best Practices for Commits\n\n- **Verify before committing**: Ensure code is linted, builds correctly, and documentation is updated\n- **Atomic commits**: Each commit should contain related changes that serve a single purpose\n- **Split large changes**: If changes touch multiple concerns, split them into separate commits\n- **Conventional commit format**: Use the format `<type>: <description>` where type is one of:\n  - `feat`: A new feature\n  - `fix`: A bug fix\n  - `docs`: Documentation changes\n  - `style`: Code style changes (formatting, etc)\n  - `refactor`: Code changes that neither fix bugs nor add features\n  - `perf`: Performance improvements\n  - `test`: Adding or fixing tests\n  - `chore`: Changes to the build process, tools, etc.\n- **Present tense, imperative mood**: Write commit messages as commands (e.g., \"add feature\" not \"added feature\")\n- **Concise first line**: Keep the first line under 72 characters\n- **Emoji**: Each commit type is paired with an appropriate emoji:\n  - ✨ `feat`: New feature",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-version-control-git"
+}

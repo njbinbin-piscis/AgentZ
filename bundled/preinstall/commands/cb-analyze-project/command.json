@@ -1,0 +1,13 @@
+{
+  "id": "cb-analyze-project",
+  "slash_id": "analyze-project",
+  "name": "cb-analyze-project",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Advanced project analysis with actionable insights and recommendations.\n\nArguments: $ARGUMENTS\n\n## Comprehensive Project Analysis\n\nMulti-dimensional analysis based on requested focus area.\n\n### 1. **Analysis Modes**\n\nBased on $ARGUMENTS:\n- \"velocity\" → Sprint velocity and trends\n- \"quality\" → Code quality metrics\n- \"risk\" → Risk assessment and mitigation\n- \"dependencies\" → Dependency graph analysis\n- \"team\" → Workload and skill distribution\n- \"architecture\" → System design coherence\n- Default → Full spectrum analysis\n\n### 2. **Velocity Analytics**\n\n```\n📊 Velocity Analysis\n━━━━━━━━━━━━━━━━━━━\nCurrent Sprint: 24 points/week ↗️ +20%\nRolling Average: 20 points/week\nEfficiency: 85% (17/20 tasks on time)\n\nBottlenecks Detected:\n- Code review delays (avg 4h wait)\n- Test environment availability\n- Dependency on external team\n\nRecommendations:\n1. Implement parallel review process\n2. Add staging environment\n3. Mock external dependencies\n```\n\n### 3. **Risk Assessment**\n\n**Technical Risks**\n- High complexity tasks without backup assignee\n- Single points of failure in architecture\n- Insufficient test coverage in critical paths\n- Technical debt accumulation rate\n\n**Project Risks**\n- Critical path dependencies\n- Resource availability gaps\n- Deadline feasibility analysis\n- Scope creep indicators\n\n### 4. **Dependency Intelligence**\n\nVisual dependency analysis:\n```\nCritical Path: \n#12 → #15 → #23 → #45 → #50 (20 days)\n         ↘ #24 → #46 ↗\n\nOptimization: Parallelize #15 and #24\nTime Saved: 3 days\n```\n\n### 5. **Quality Metrics**\n\n**Code Quality**\n- Test coverage trends\n- Complexity scores\n- Technical debt ratio\n- Review feedback patterns\n\n**Process Quality**\n- Rework frequency\n- Bug introduction rate\n- Time to resolution\n- Knowledge distribution\n\n### 6. **Predictive Insights**\n\nBased on patterns:\n- Completion probability by deadline\n- Resource needs projection\n- Risk materialization likelihood\n- Suggested interventions\n\n### 7. **Executive Dashboard**\n\nHigh-level summary with:\n- Health score (0-100)\n- Top 3 risks\n- Top 3 opportunities\n- Recommended actions\n- Success probability\n\nResult: Data-driven decisions with clear action paths.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

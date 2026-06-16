@@ -317,6 +317,38 @@ agent 池 / 看板 / `@mention` 编排。需要"多个能改代码的 agent 并�
 
 **Wave**：不由独立调度器实现 — 协调者按 `workflow_hint`（waves / sequential / review）在 system prompt 中约束，实际顺序靠 `depends_on` 与 patrol 激活 pending todo。
 
+---
+
+## 13. CodeBuddy 预装与斜杠命令（v0.6.0）
+
+首次启动时，`seed_preinstall_packs` 将 `bundled/preinstall/`（由 `npm run import:codebuddy` 生成）
+**非破坏性**复制到全局配置目录：
+
+| 类型 | 目标路径 | Sentinel |
+|---|---|---|
+| 技能 | `{config}/skills/installed/<slug>/` | `.preinstall-codebuddy-v1` |
+| 智能体 | `{config}/agents/<id>/agent.json` | 同上 |
+| 斜杠命令 | `{config}/commands/<id>/command.json` | 同上 |
+
+Composer 输入 `/slash_id args` 时，`slash_commands_resolve` 展开 prompt（`$ARGUMENTS` 替换）并
+可选限制 builtin 工具集。manifest 支持 `description_zh` / `prompt_zh`；`prefer_zh` 由前端
+按 i18n locale 传入 chat turn。
+
+打开尚无 `.agentz` 的项目文件夹时，UI 提供 **项目模板** 选择（规则 + 钩子，write-if-absent；
+CodeBuddy hooks 转换为 AgentZ `hooks.json`，默认 `enabled: false`）。
+
+CI：`npm run verify:preinstall -- --strict` 与 `npm run lint:preinstall -- --strict` 校验 bundled 兼容性与 manifest。详见 `THIRD_PARTY_NOTICES.md`。
+
+### 兼容性分级（PASS / REWRITE / DELETE）
+
+| 级别 | 含义 | 处理方式 |
+|------|------|----------|
+| **PASS** | schema 合法、工具 id 均在 builtin catalog、`slash_id` 唯一 | 保留在 `bundled/preinstall/` |
+| **REWRITE** | 含 CodeBuddy/Claude 术语或工具名可映射 | `remediate-preinstall` / import 时自动改写为 AgentZ 用语 |
+| **DELETE** | 空 prompt、重复 slash_id/persona（低分）、强依赖专有 MCP/平台 | 写入 `bundled/codebuddy/exclude.json` 并从预装树移除 |
+
+审计产物：`bundled/codebuddy/compatibility-report.json`（`npm run lint:preinstall`）。
+
 **Pool 隔离**：`pool_sessions.team_id` 按团队隔离；workflow run 另设 `workflow_run_id`，每次 run 创建独立 pool。
 
 **ToolContext**：协调者 turn 将 `workz_pool_id` 绑定到 `pool_session_id`，`pool_org` 在未显式传 `pool_id` 时仍可解析。

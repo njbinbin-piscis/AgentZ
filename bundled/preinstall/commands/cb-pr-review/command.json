@@ -1,0 +1,15 @@
+{
+  "id": "cb-pr-review",
+  "slash_id": "pr-review",
+  "name": "cb-pr-review",
+  "description": "Conduct comprehensive PR review from multiple perspectives (PM, Developer, QA, Security)",
+  "description_zh": "",
+  "argument_hint": "<pr_link_or_number>",
+  "tools": [
+    "file_read"
+  ],
+  "prompt": "# PR Review\n\n**PR Link/Number**: $ARGUMENTS\n\n> **Instructions**: Execute each task in the order given to conduct a thorough code review.  Update GitHub with this review.\n> **Important**: The future is now—any improvements or \"future\" recommendations must be addressed **immediately**.\n\n---\n\n## Task 1: Product Manager Review\n\n**Objective**: Assess from a product management perspective, focusing on:\n- **Business Value**: Does this PR clearly advance our core product goals and deliver immediate ROI?\n- **User Experience**: Is the change intuitive and delightful for users right now? If not, make fixes immediately.\n- **Strategic Alignment**: Does the PR align with current (and long-term, i.e., now) strategic objectives?\n\n**Action**: Provide clear directives on how to ensure maximum user and business impact. All \"future\" suggestions must be implemented now.\n\n---\n\n## Task 2: Developer Review\n\n**Objective**: Evaluate the code thoroughly from a senior lead engineer perspective:\n1. **Code Quality & Maintainability**: Is the code structured for readability and easy maintenance? If not, refactor now.\n2. **Performance & Scalability**: Will these changes operate efficiently at scale? If not, optimize immediately.\n3. **Best Practices & Standards**: Note any deviation from coding standards and correct it now.\n\n**Action**: Leave a concise yet complete review comment, ensuring all improvements happen immediately—no deferrals.\n\n---\n\n## Task 3: Quality Engineer Review\n\n**Objective**: Verify the overall quality, testing strategy, and reliability of the solution:\n1. **Test Coverage**: Are there sufficient tests (unit, integration, E2E)? If not, add them now.\n2. **Potential Bugs & Edge Cases**: Have all edge cases been considered? If not, address them immediately.\n3. **Regression Risk**: Confirm changes don't undermine existing functionality. If risk is identified, mitigate now with additional checks or tests.\n\n**Action**: Provide a detailed QA assessment, insisting any \"future\" improvements be completed right away.\n\n---\n\n## Task 4: Security Engineer Review\n\n**Objective**: Ensure robust security practices and compliance:\n1. **Vulnerabilities**:",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-version-control-git"
+}

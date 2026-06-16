@@ -1,0 +1,13 @@
+{
+  "id": "cb-to-review",
+  "slash_id": "to-review",
+  "name": "cb-to-review",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Set a task's status to review.\n\nArguments: $ARGUMENTS (task ID)\n\n## Marking Task for Review\n\nThis status indicates work is complete but needs verification before final approval.\n\n## When to Use Review Status\n\n- Code complete but needs peer review\n- Implementation done but needs testing\n- Documentation written but needs proofreading\n- Design complete but needs stakeholder approval\n\n## Execution\n\n```bash\ntask-master set-status --id=$ARGUMENTS --status=review\n```\n\n## Review Preparation\n\nWhen setting to review:\n1. **Generate Review Checklist**\n   - Link to PR/MR if applicable\n   - Highlight key changes\n   - Note areas needing attention\n   - Include test results\n\n2. **Documentation**\n   - Update task with review notes\n   - Link relevant artifacts\n   - Specify reviewers if known\n\n3. **Smart Actions**\n   - Create review reminders\n   - Track review duration\n   - Suggest reviewers based on expertise\n   - Prepare rollback plan if needed",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

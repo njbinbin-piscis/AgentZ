@@ -1,0 +1,428 @@
+"""本地工具：当用户只知道表名时，在指定工作空间下自动搜索并定位该表的详细信息。
+
+与远端 MCP 的 GetTable 工具互补：
+- 远端 GetTable：需要完整的三段式路径（CatalogName + SchemaName + TableName），直接查询，效率高
+- 本工具 search_table_by_name：只需 workspace_id + table_name，自动遍历所有 Catalog/Schema 来定位表
+
+封装远端 WeData MCP Server 的多个底层工具（ListCatalogs → ListSchemas → ListTables → GetTable），
+通过编排调用逻辑，先获取 TABLE 类型 Catalog，再按表名命中目标表，最后获取完整表详情。
+
+使用方式::
+
+    from agent_server.local_table_tool import search_table_by_name
+
+    agent = Agent(
+        name="my agent",
+        tools=[search_table_by_name],
+        ...
+    )
+
+当用户输入类似 "查询一下 17700183032157854 工作空间下 t_corp 表的结构" 时，
+Agent 会自动调用此工具，传入 workspace_id 和 table_name。
+如果用户给出了完整的三段式路径（如 catalog1.db1.t_corp），Agent 应优先使用远端 GetTable。
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any
+
+from agents import function_tool
+from agents.mcp import MCPServerStreamableHttpParams
+
+from wedata.openai.agents import WedataMcpServer
+from wedata.openai.credential_provider import get_request_credential_headers
+
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────
+# 远端 WeData MCP Server 配置
+# ─────────────────────────────────────────────
+# 使用写死的默认官方 MCP 地址。
+# 如果此地址连接失败，请到 WeData 平台找到官方 MCP 服务地址，
+# 然后直接替换下面的 REMOTE_MCP_URL。
+# 注意：不要从 agent.py 的 WEDATA_MCP_ENDPOINT 或 MCP_TOOL_PATHS 推断这个值，
+# 它们是不同概念，不应混用。
+REMOTE_MCP_URL = "https://mcp-ap-chongqing.wedataapp.cloud.tencent.com/api/1.0/mcp/http/sql"
+
+# 分页获取时每页最大条数
+DEFAULT_PAGE_SIZE = 100
+
+
+# ═════════════════════════════════════════════
+# 辅助函数
+# ═════════════════════════════════════════════
+
+def _parse_tool_result(result: Any) -> dict:
+    """解析 CallToolResult，从 content[0].text 中提取 JSON 数据。
+
+    远端 MCP Server 返回的 CallToolResult.content 是一个列表，
+    通常第一个元素是 TextContent，其 text 字段包含序列化的 JSON 字符串。
+
+    Args:
+        result: CallToolResult 对象
+
+    Returns:
+        解析后的 dict 数据
+    """
+    if result and result.content:
+        for item in result.content:
+            if hasattr(item, "text") and item.text:
+                try:
+                    return json.loads(item.text)
+                except json.JSONDecodeError:
+                    logger.warning("[local_table_tool] 无法解析工具返回的 JSON: %s", item.text[:200])
+                    return {"raw_text": item.text}
+    return {}
+
+
+def _unwrap_response_data(parsed: dict[str, Any]) -> dict[str, Any]:
+    """提取远端工具当前真实返回中的 `Response.Data`。
+
+    当前远端 MCP 返回统一使用如下结构：
+    `{"Response": {"Data": {...}}}`
+
+    - 列表型接口在 `Data.Items` 返回数据
+    - `GetTable` 在 `Data.Table` 返回详情
+
+    Args:
+        parsed: `_parse_tool_result()` 返回的原始 dict
+
+    Returns:
+        `Response.Data` 对应的 dict；缺失时返回空 dict
+    """
+    if not isinstance(parsed, dict):
+        return {}
+
+    response = parsed.get("Response")
+    if not isinstance(response, dict):
+        return {}
+
+    data = response.get("Data")
+    if isinstance(data, dict):
+        return data
+
+    return {}
+
+
+async def _create_remote_mcp() -> WedataMcpServer:
+    """创建并连接远端 MCP Server 实例。
+
+    从 ContextVar 中获取当前请求的凭证 headers，
+    创建 WedataMcpServer 实例用于调用远端工具。
+
+    Returns:
+        已配置凭证的 WedataMcpServer 实例（未连接，需在 async with 中使用）
+    """
+    credential_headers = get_request_credential_headers()
+    if not credential_headers:
+        raise ValueError(
+            "未找到凭证 headers，请确保请求入口已调用 set_request_credential_headers() 设置凭证。"
+        )
+
+    params = MCPServerStreamableHttpParams(
+        url=REMOTE_MCP_URL,
+        timeout=300.0,
+        headers=credential_headers,
+    )
+    return WedataMcpServer(
+        params=params,
+        credential_headers=credential_headers,
+        cache_tools_list=True,
+        name="remote-wedata-mcp-for-tool",
+    )
+
+
+async def _list_all_with_pagination(
+    remote: WedataMcpServer,
+    tool_name: str,
+    base_args: dict[str, Any],
+) -> list[dict]:
+    """通用的分页游标获取函数。
+
+    循环调用指定的远端工具，通过 `Response.Data.Items` 和 `NextPageToken`
+    获取所有分页数据，直到没有更多数据为止。
+
+    Args:
+        remote: 已连接的 WedataMcpServer 实例
+        tool_name: 远端工具名称（如 "ListCatalogs"、"ListSchemas"、"ListTables"）
+        base_args: 基础调用参数（不含分页参数）
+
+    Returns:
+        合并后的所有数据列表
+    """
+
+    all_items: list[dict] = []
+    page_token: str | None = None
+
+    while True:
+        args = {**base_args, "MaxResults": DEFAULT_PAGE_SIZE}
+        if page_token:
+            args["PageToken"] = page_token
+
+        logger.info("[local_table_tool] 调用 %s, 参数: %s", tool_name, args)
+        result = await remote.call_tool(tool_name, args)
+        parsed = _parse_tool_result(result)
+        data = _unwrap_response_data(parsed)
+
+        items = data.get("Items")
+        if isinstance(items, list):
+            all_items.extend(items)
+        logger.info(
+            "[local_table_tool] %s 返回 %d 条（累计 %d 条）",
+            tool_name, len(items) if isinstance(items, list) else 0, len(all_items),
+        )
+
+        page_token = data.get("NextPageToken")
+        if not page_token:
+            break
+
+    return all_items
+
+
+async def _list_all_catalogs(remote: WedataMcpServer, workspace_id: str) -> list[dict]:
+    """分页获取指定工作空间下的 TABLE 类型 Catalog。
+
+    Args:
+        remote: 已连接的 WedataMcpServer 实例
+        workspace_id: 工作空间 ID
+
+    Returns:
+        TABLE 类型 Catalog 列表
+    """
+    return await _list_all_with_pagination(
+        remote=remote,
+        tool_name="ListCatalogs",
+        base_args={"WorkspaceId": workspace_id, "Types": "TABLE"},
+    )
+
+
+async def _list_all_schemas(
+    remote: WedataMcpServer, catalog_name: str, workspace_id: str
+) -> list[dict]:
+    """分页获取指定 Catalog 下的所有 Schema。
+
+    Args:
+        remote: 已连接的 WedataMcpServer 实例
+        catalog_name: Catalog 名称
+        workspace_id: 工作空间 ID
+
+    Returns:
+        Schema 列表
+    """
+    return await _list_all_with_pagination(
+        remote=remote,
+        tool_name="ListSchemas",
+        base_args={"CatalogName": catalog_name, "WorkspaceId": workspace_id},
+    )
+
+
+async def _list_all_tables(
+    remote: WedataMcpServer,
+    catalog_name: str,
+    schema_name: str,
+    workspace_id: str,
+) -> list[dict]:
+    """分页获取指定 Schema 下的所有表对象。
+
+    Args:
+        remote: 已连接的 WedataMcpServer 实例
+        catalog_name: Catalog 名称
+        schema_name: Schema 名称
+        workspace_id: 工作空间 ID
+
+    Returns:
+        表对象列表
+    """
+    return await _list_all_with_pagination(
+        remote=remote,
+        tool_name="ListTables",
+        base_args={
+            "CatalogName": catalog_name,
+            "SchemaName": schema_name,
+            "WorkspaceId": workspace_id,
+        },
+    )
+
+
+async def _get_table(
+    remote: WedataMcpServer,
+    catalog_name: str,
+    schema_name: str,
+    table_name: str,
+    workspace_id: str,
+) -> dict | None:
+    """尝试获取指定表的详细信息。
+
+    该函数应在已经通过 `ListTables` 命中候选表后调用，
+    用于补充最终详情；如果调用失败，调用方可回退到 `ListTables` 命中结果。
+
+    Args:
+        remote: 已连接的 WedataMcpServer 实例
+        catalog_name: Catalog 名称
+        schema_name: Schema（数据库）名称
+        table_name: 表名称
+        workspace_id: 工作空间 ID
+
+    Returns:
+        归一化后的表详细信息 dict，找不到时返回 None
+    """
+    try:
+        result = await remote.call_tool("GetTable", {
+            "CatalogName": catalog_name,
+            "SchemaName": schema_name,
+            "TableName": table_name,
+            "WorkspaceId": workspace_id,
+        })
+        parsed = _parse_tool_result(result)
+        if not parsed or parsed.get("Error"):
+            return None
+
+        data = _unwrap_response_data(parsed)
+        if data.get("Error"):
+            return None
+
+        table = data.get("Table")
+        if isinstance(table, dict):
+            return table
+        return None
+
+    except Exception as e:
+
+        logger.debug(
+            "[local_table_tool] GetTable(%s.%s.%s) 调用失败: %s",
+            catalog_name, schema_name, table_name, e,
+        )
+        return None
+
+
+# ═════════════════════════════════════════════
+# 对外暴露的工具函数
+# ═════════════════════════════════════════════
+
+@function_tool(
+    name_override="search_table_by_name",
+    description_override=(
+        "当用户只提供了表名（如 't_corp'）而没有给出完整的 CatalogName.SchemaName.TableName 三段式路径时，"
+        "使用此工具在指定工作空间下自动搜索并定位该表。"
+        "它会遍历所有 TABLE 类型 Catalog 和 Schema，按表名匹配后返回完整的表元数据。"
+        "如果用户已经知道完整的三段式路径（CatalogName、SchemaName、TableName 都有），"
+        "应优先使用远端 MCP 的 GetTable 工具直接查询，效率更高。"
+    ),
+)
+async def search_table_by_name(workspace_id: str, table_name: str) -> str:
+    """当用户只知道表名时，在指定工作空间下自动搜索并定位该表的详细元数据。
+
+    与远端 MCP 的 GetTable 工具不同：GetTable 需要完整的三段式路径
+    （CatalogName + SchemaName + TableName），而本工具只需 workspace_id 和 table_name，
+    会自动遍历所有 TABLE 类型 Catalog → Schema → 按表名匹配，最后获取完整详情。
+
+    适用场景：用户说"查一下 t_corp 表的结构"但没有给出 Catalog 和 Schema 信息。
+    不适用场景：用户已给出完整路径如 "catalog1.db1.t_corp"，此时应使用远端 GetTable。
+
+    Args:
+        workspace_id: WeData 工作空间唯一 ID，例如 "17700183032157854"
+        table_name: 要查询的表名称，例如 "t_corp"
+
+    Returns:
+        JSON 格式的表详细信息字符串，包含字段列表、字段类型、分区键、存储格式等。
+        如果未找到表，返回未找到的提示信息。
+    """
+    logger.info(
+        "[local_table_tool] 开始查找表: workspace_id=%s, table_name=%s",
+        workspace_id, table_name,
+    )
+
+    remote = await _create_remote_mcp()
+
+    async with remote:
+        catalogs = await _list_all_catalogs(remote, workspace_id)
+        if not catalogs:
+            return json.dumps(
+                {"error": f"工作空间 {workspace_id} 下未找到任何 TABLE 类型 Catalog"},
+                ensure_ascii=False,
+            )
+
+        logger.info("[local_table_tool] 共发现 %d 个 TABLE 类型 Catalog", len(catalogs))
+
+        for catalog in catalogs:
+            catalog_name = catalog.get("Name") or catalog.get("CatalogName", "")
+            if not catalog_name:
+                continue
+
+            logger.info("[local_table_tool] 正在搜索 TABLE Catalog: %s", catalog_name)
+            schemas = await _list_all_schemas(remote, catalog_name, workspace_id)
+
+            if not schemas:
+                logger.info("[local_table_tool] Catalog %s 下无 Schema，跳过", catalog_name)
+                continue
+
+            for schema in schemas:
+                schema_name = schema.get("Name") or schema.get("SchemaName", "")
+                if not schema_name:
+                    continue
+
+                logger.info(
+                    "[local_table_tool] 正在枚举表: %s.%s",
+                    catalog_name, schema_name,
+                )
+
+                try:
+                    tables = await _list_all_tables(remote, catalog_name, schema_name, workspace_id)
+                except Exception as e:
+                    logger.debug(
+                        "[local_table_tool] ListTables(%s.%s) 调用失败: %s",
+                        catalog_name, schema_name, e,
+                    )
+                    continue
+
+                matched_table: dict | None = None
+                for table in tables:
+                    current_table_name = table.get("Name") or table.get("TableName", "")
+                    if current_table_name == table_name:
+                        matched_table = table
+                        break
+
+                if matched_table is None:
+                    continue
+
+                logger.info(
+                    "[local_table_tool] 命中目标表，准备获取详情: %s.%s.%s",
+                    catalog_name, schema_name, table_name,
+                )
+
+                table_detail = await _get_table(
+                    remote, catalog_name, schema_name, table_name, workspace_id
+                )
+                normalized_table = table_detail or matched_table
+
+                if table_detail is None:
+                    logger.warning(
+                        "[local_table_tool] GetTable 未返回有效结果，回退使用 ListTables 命中结果: %s.%s.%s",
+                        catalog_name, schema_name, table_name,
+                    )
+
+                normalized_table["_location"] = {
+                    "WorkspaceId": workspace_id,
+                    "CatalogName": catalog_name,
+                    "SchemaName": schema_name,
+                    "TableName": table_name,
+                }
+                logger.info(
+                    "[local_table_tool] ✅ 找到表: %s.%s.%s",
+                    catalog_name, schema_name, table_name,
+                )
+                return json.dumps(normalized_table, ensure_ascii=False, indent=2)
+
+        searched_catalogs = [c.get("Name") or c.get("CatalogName", "?") for c in catalogs]
+
+        return json.dumps(
+            {
+                "error": f"未在工作空间 {workspace_id} 中找到表 '{table_name}'",
+                "searched_catalogs": searched_catalogs,
+                "hint": "请确认表名是否正确，或者该表是否存在于此工作空间中。",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )

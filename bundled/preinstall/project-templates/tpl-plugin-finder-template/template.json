@@ -1,0 +1,8 @@
+{
+  "id": "tpl-plugin-finder-template",
+  "name": "plugin-finder",
+  "name_zh": "plugin-finder",
+  "description": "智能插件发现和管理助手 - 支持智能搜索、多插件并行对比、多插件协同工作流（sequence-run）、插件信息详解、许愿新插件等功能",
+  "description_zh": "智能插件发现和管理助手 - 支持智能搜索、多插件并行对比、多插件协同工作流（sequence-run）、插件信息详解、许愿新插件等功能",
+  "source_plugin": "plugin-finder"
+}

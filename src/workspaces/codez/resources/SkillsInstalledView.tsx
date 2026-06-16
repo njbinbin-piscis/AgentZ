@@ -13,7 +13,7 @@ import {
 import { listFish, type FishDef } from "../../../services/tauri/fish";
 
 export default function SkillsInstalledView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [installed, setInstalled] = useState<InstalledSkill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +47,11 @@ export default function SkillsInstalledView() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const pickDesc = (s: InstalledSkill) => {
+    if (i18n.language.startsWith("zh") && s.description_zh?.trim()) return s.description_zh;
+    return s.description;
+  };
 
   const stableSkills = useMemo(
     () => installed.filter((s) => (s.quadrant ?? "installed") === "installed"),
@@ -159,7 +164,7 @@ export default function SkillsInstalledView() {
                 <div className="agentz-wb-info">
                   <strong>{s.name}</strong>
                   <span className="agentz-wb-meta">{s.slug}</span>
-                  {s.description && <span className="agentz-wb-desc">{s.description}</span>}
+                  {pickDesc(s) && <span className="agentz-wb-desc">{pickDesc(s)}</span>}
                   {agent && (
                     <span className="agentz-wb-desc">{t("skills.linkedAnonymousAgent", { agent })}</span>
                   )}
@@ -207,7 +212,7 @@ export default function SkillsInstalledView() {
                     {s.slug} · {s.quadrant ?? s.lifecycle}
                     {s.locked ? " · locked" : ""}
                   </span>
-                  {s.description && <span className="agentz-wb-desc">{s.description}</span>}
+                  {pickDesc(s) && <span className="agentz-wb-desc">{pickDesc(s)}</span>}
                 </div>
                 <div className="agentz-wb-actions">
                   {s.quadrant === "draft" && (

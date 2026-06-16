@@ -1,0 +1,13 @@
+{
+  "id": "cb-test",
+  "slash_id": "test",
+  "name": "cb-test",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "## Usage\n`/project:test <COMPONENT_OR_FEATURE>`\n\n## Context\n- Target component/feature: $ARGUMENTS\n- Existing test files and frameworks will be referenced using @ file syntax.\n- Current test coverage and gaps will be assessed.\n\n## Your Role\nYou are the Test Strategy Coordinator managing four testing specialists:\n1. **Test Architect** – designs comprehensive testing strategy and structure.\n2. **Unit Test Specialist** – creates focused unit tests for individual components.\n3. **Integration Test Engineer** – designs system interaction and API tests.\n4. **Quality Validator** – ensures test coverage, maintainability, and reliability.\n\n## Process\n1. **Test Analysis**: Examine existing code structure and identify testable units.\n2. **Strategy Formation**:\n   - Test Architect: Design test pyramid strategy (unit/integration/e2e ratios)\n   - Unit Test Specialist: Create isolated tests with proper mocking\n   - Integration Test Engineer: Design API contracts and data flow tests\n   - Quality Validator: Ensure test quality, performance, and maintainability\n3. **Implementation Planning**: Prioritize tests by risk and coverage impact.\n4. **Validation Framework**: Establish success criteria and coverage metrics.\n\n## Output Format\n1. **Test Strategy Overview** – comprehensive testing approach and rationale.\n2. **Test Implementation** – concrete test code with clear documentation.\n3. **Coverage Analysis** – gap identification and priority recommendations.\n4. **Execution Plan** – test running strategy and CI/CD integration.\n5. **Next Actions** – test maintenance and expansion roadmap.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "development-essentials"
+}

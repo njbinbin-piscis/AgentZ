@@ -1,0 +1,13 @@
+{
+  "id": "cb-remove-subtask",
+  "slash_id": "remove-subtask",
+  "name": "cb-remove-subtask",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Remove a subtask from its parent task.\n\nArguments: $ARGUMENTS\n\nParse subtask ID to remove, with option to convert to standalone task.\n\n## Removing Subtasks\n\nRemove a subtask and optionally convert it back to a standalone task.\n\n## Argument Parsing\n\n- \"remove subtask 5.1\"\n- \"delete 5.1\"\n- \"convert 5.1 to task\" → remove and convert\n- \"5.1 standalone\" → convert to standalone\n\n## Execution Options\n\n### 1. Delete Subtask\n```bash\ntask-master remove-subtask --id=<parentId.subtaskId>\n```\n\n### 2. Convert to Standalone\n```bash\ntask-master remove-subtask --id=<parentId.subtaskId> --convert\n```\n\n## Pre-Removal Checks\n\n1. **Validate Subtask**\n   - Verify subtask exists\n   - Check completion status\n   - Review dependencies\n\n2. **Impact Analysis**\n   - Other subtasks that depend on it\n   - Parent task implications\n   - Data that will be lost\n\n## Removal Process\n\n### For Deletion:\n1. Confirm if subtask has work done\n2. Update parent task estimates\n3. Remove subtask and its data\n4. Clean up dependencies\n\n### For Conversion:\n1. Assign new standalone task ID\n2. Preserve all task data\n3. Update dependency references\n4. Maintain task history\n\n## Smart Features\n\n- Warn if subtask is in-progress\n- Show impact on parent task\n- Preserve important data\n- Update related estimates\n\n## Example Flows\n\n```\n/taskmaster:remove-subtask 5.1\n→ Warning: Subtask #5.1 is in-progress\n→ This will delete all subtask data\n→ Parent task #5 will be updated\nConfirm deletion? (y/n)\n\n/taskmaster:remove-subtask 5.1 convert\n→ Converting subtask #5.1 to standalone task #89\n→ Preserved: All task data and history\n→ Updated: 2 dependency references\n→ New task #89 is now independent\n```\n\n## Post-Removal\n\n- Update parent task status\n- Recalculate estimates\n- Show updated hierarchy\n- Suggest next actions",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

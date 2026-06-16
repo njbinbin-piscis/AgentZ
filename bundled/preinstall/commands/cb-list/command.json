@@ -1,0 +1,13 @@
+{
+  "id": "cb-list",
+  "slash_id": "list",
+  "name": "cb-list",
+  "description": "List all configured hookify rules",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# List Hookify Rules\n\n**Load hookify:writing-rules skill first** to understand rule format.\n\nShow all configured hookify rules in the project.\n\n## Steps\n\n1. Use Glob tool to find all hookify rule files:\n   ```\n   pattern: \".AgentZ/hookify.*.local.md\"\n   ```\n\n2. For each file found:\n   - Use Read tool to read the file\n   - Extract frontmatter fields: name, enabled, event, pattern\n   - Extract message preview (first 100 chars)\n\n3. Present results in a table:\n\n```\n## Configured Hookify Rules\n\n| Name | Enabled | Event | Pattern | File |\n|------|---------|-------|---------|------|\n| warn-dangerous-rm | ✅ Yes | bash | rm\\s+-rf | hookify.dangerous-rm.local.md |\n| warn-console-log | ✅ Yes | file | console\\.log\\( | hookify.console-log.local.md |\n| check-tests | ❌ No | stop | .* | hookify.require-tests.local.md |\n\n**Total**: 3 rules (2 enabled, 1 disabled)\n```\n\n4. For each rule, show a brief preview:\n```\n### warn-dangerous-rm\n**Event**: bash\n**Pattern**: `rm\\s+-rf`\n**Message**: \"⚠️ **Dangerous rm command detected!** This command could delete...\"\n\n**Status**: ✅ Active\n**File**: .AgentZ/hookify.dangerous-rm.local.md\n```\n\n5. Add helpful footer:\n```\n---\n\nTo modify a rule: Edit the .local.md file directly\nTo disable a rule: Set `enabled: false` in frontmatter\nTo enable a rule: Set `enabled: true` in frontmatter\nTo delete a rule: Remove the .local.md file\nTo create a rule: Use `/hookify` command\n\n**Remember**: Changes take effect immediately - no restart needed\n```\n\n## If No Rules Found\n\nIf no hookify rules exist:\n\n```\n## No Hookify Rules Configured\n\nYou haven't created any hookify rules yet.\n\nTo get started:\n1. Use `/hookify` to analyze conversation and create rules\n2. Or manually create `.AgentZ/hookify.my-rule.local.md` files\n3. See `/hookify:help` for documentation\n\nExample:\n```\n/hookify Warn me when I use console.log\n```\n\nCheck `${AgentZ_PLUGIN_ROOT}/examples/` for example rule files.\n```",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "hookify"
+}

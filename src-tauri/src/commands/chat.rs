@@ -83,6 +83,7 @@ pub async fn chat_send(
     session_source: Option<String>,
     team_id: Option<String>,
     pool_id: Option<String>,
+    prefer_zh: Option<bool>,
 ) -> Result<ChatResult, String> {
     let project = require_project_dir(project_dir.as_deref().or(workspace.as_deref()))?;
     // When an isolated worktree is provided, the agent works inside it (and the
@@ -177,6 +178,7 @@ pub async fn chat_send(
         agent_id.filter(|a| !a.trim().is_empty()),
         team_id.filter(|s| !s.trim().is_empty()),
         pool_id.filter(|s| !s.trim().is_empty()),
+        prefer_zh.unwrap_or(false),
     )
     .await;
 

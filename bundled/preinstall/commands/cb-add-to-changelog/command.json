@@ -1,0 +1,16 @@
+{
+  "id": "cb-add-to-changelog",
+  "slash_id": "add-to-changelog",
+  "name": "cb-add-to-changelog",
+  "description": "Add a new entry to the project's CHANGELOG.md file following Keep a Changelog format",
+  "description_zh": "",
+  "argument_hint": "<version> <change_type> <message>",
+  "tools": [
+    "file_read",
+    "file_edit"
+  ],
+  "prompt": "# Update Changelog\n\nAdd a new entry to the project's CHANGELOG.md file based on the provided arguments.\n\n## Parse Arguments\n\nParse $ARGUMENTS to extract:\n- Version number (e.g., \"1.1.0\")\n- Change type: \"added\", \"changed\", \"deprecated\", \"removed\", \"fixed\", or \"security\"\n- `<message>` is the description of the change\n\n## Examples\n\n```\n/add-to-changelog 1.1.0 added \"New markdown to BlockDoc conversion feature\"\n```\n\n```\n/add-to-changelog 1.0.2 fixed \"Bug in HTML renderer causing incorrect output\"\n```\n\n## Description\n\nThis command will:\n\n1. Check if a CHANGELOG.md file exists and create one if needed\n2. Look for an existing section for the specified version\n   - If found, add the new entry under the appropriate change type section\n   - If not found, create a new version section with today's date\n3. Format the entry according to Keep a Changelog conventions\n4. Commit the changes if requested\n\nThe CHANGELOG follows the [Keep a Changelog](https://keepachangelog.com/) format and [Semantic Versioning](https://semver.org/).\n\n## Implementation\n\nThe command should:\n\n1. Parse the arguments to extract version, change type, and message\n2. Read the existing CHANGELOG.md file if it exists\n3. If the file doesn't exist, create a new one with standard header\n4. Check if the version section already exists\n5. Add the new entry in the appropriate section\n6. Write the updated content back to the file\n7. Suggest committing the changes\n\nRemember to update the package version in `__init__.py` and `setup.py` if this is a new version.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-documentation-changelogs"
+}

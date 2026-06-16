@@ -1,0 +1,18 @@
+{
+  "id": "cb-run-ci",
+  "slash_id": "run-ci",
+  "name": "cb-run-ci",
+  "description": "Run CI checks and fix any errors until all tests pass",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "shell",
+    "file_edit",
+    "file_read",
+    "file_list"
+  ],
+  "prompt": "Run CI checks for the project and fix any errors until all tests pass.\n\n## Process:\n\n1. **Detect CI System**:\n   - Check for CI configuration files:\n     - `.github/workflows/*.yml` (GitHub Actions)\n     - `.gitlab-ci.yml` (GitLab CI)\n     - `.circleci/config.yml` (CircleCI)\n     - `Jenkinsfile` (Jenkins)\n     - `.travis.yml` (Travis CI)\n     - `bitbucket-pipelines.yml` (Bitbucket)\n\n2. **Detect Build System**:\n   - JavaScript/TypeScript: package.json scripts\n   - Python: Makefile, tox.ini, setup.py, pyproject.toml\n   - Go: Makefile, go.mod\n   - Rust: Cargo.toml\n   - Java: pom.xml, build.gradle\n   - Other: Look for common CI scripts\n\n3. **Run CI Commands**:\n   - Check for CI scripts: `ci`, `test`, `check`, `validate`, `verify`\n   - Common script locations:\n     - `./scripts/ci.sh`, `./ci.sh`, `./run-tests.sh`\n     - Package manager scripts (npm/yarn/pnpm run test)\n     - Make targets (make test, make ci)\n   - Activate virtual environments if needed (Python, Ruby, etc.)\n\n4. **Fix Errors**:\n   - Analyze error output\n   - Fix code issues, test failures, or configuration problems\n   - Re-run CI checks after each fix\n\n5. **Common CI Tasks**:\n   - Linting/formatting\n   - Type checking\n   - Unit tests\n   - Integration tests\n   - Build verification\n   - Documentation generation\n\n## Examples:\n- JavaScript: `npm test` or `npm run ci`\n- Python: `make test` or `pytest` or `tox`\n- Go: `go test ./...` or `make test`\n- Rust: `cargo test`\n- Generic: `./ci.sh` or `make ci`\n\nContinue fixing issues and re-running until all CI checks pass.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-ci-deployment"
+}

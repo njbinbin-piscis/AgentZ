@@ -1,0 +1,13 @@
+{
+  "id": "cb-changelog-demo-command",
+  "slash_id": "changelog-demo-command",
+  "name": "cb-changelog-demo-command",
+  "description": "Demo changelog automation features",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# Demo Command for Changelog\n\nDemo changelog automation features\n\n## Instructions\n\n1. This is a demonstration command\n2. Shows changelog automation working independently\n3. Bypasses Claude review bot for faster testing",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-ci-deployment"
+}

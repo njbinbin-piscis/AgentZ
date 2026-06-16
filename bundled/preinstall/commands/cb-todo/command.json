@@ -1,0 +1,17 @@
+{
+  "id": "cb-todo",
+  "slash_id": "todo",
+  "name": "cb-todo",
+  "description": "Manage project todos in a todos.md file with add, complete, remove, and list operations",
+  "description_zh": "",
+  "argument_hint": "<action> [args...]",
+  "tools": [
+    "file_read",
+    "file_write",
+    "file_edit"
+  ],
+  "prompt": "# Project Todo Manager\n\nManage todos in a `todos.md` file at the root of your current project directory.\n\n## Usage Examples:\n- `/user:todo add \"Fix navigation bug\"`\n- `/user:todo add \"Fix navigation bug\" [date/time/\"tomorrow\"/\"next week\"]` an optional 2nd parameter to set a due date\n- `/user:todo complete 1`\n- `/user:todo remove 2`\n- `/user:todo list`\n- `/user:todo undo 1`\n\n## Instructions:\nParse the command arguments: $ARGUMENTS\n\nManage todos in a `todos.md` file at the root of the current project directory. When this command is invoked:\n\n1. **Determine the project root** by looking for common indicators (.git, package.json, etc.)\n2. **Locate or create** `todos.md` in the project root\n3. **Parse the command arguments** to determine the action:\n   - `add \"task description\"` - Add a new todo\n   - `add \"task description\" [tomorrow|next week|4 days|June 9|12-24-2025|etc...]` - Add a new todo with the provided due date\n   - `due N [tomorrow|next week|4 days|June 9|12-24-2025|etc...]` - Mark todo N with the due date provided\n   - `complete N` - Mark todo N as completed and move from the ##Active list to the ##Completed list\n   - `remove N` - Remove todo N entirely\n   - `undo N` - Mark completed todo N as incomplete\n   - `list [N]` or no args - Show all (or N number of) todos in a user-friendly format, with each todo numbered for reference\n   - `past due` - Show all of the tasks which are past due and still active\n   - `next` - Shows the next active task in the list, this should respect Due dates, if there are any. If not, just show the first todo in the Active list\n\n## Todo Format:\nUse this markdown format in todos.md:\n```\n# Project Todos\n\n## Active\n- [ ] Task description here | Due: MM-DD-YYYY (conditionally include HH:MM AM/PM, if specified)\n- [ ] Another task\n\n## Completed\n- [x] Completed task description | Due: MM-DD-YYYY | Completed: MM-DD-YYYY\n```\n\n## Implementation Notes:\n- Always show friendly numbered lists when displaying todos\n- Handle date parsing for common formats (natural language, ISO dates, etc.)\n- Maintain the markdown checkbox format for compatibility\n- Keep completed tasks in the file for reference but in a separate section\n- Support undo operations by moving tasks back to Active section",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-project-task-management"
+}

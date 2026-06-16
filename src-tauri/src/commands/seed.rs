@@ -10,9 +10,10 @@
 //! the seed version so the set can be extended in future releases without
 //! re-creating things the user removed.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use tauri::AppHandle;
+use serde::Deserialize;
+use tauri::{AppHandle, Manager};
 use tracing::{info, warn};
 
 use crate::commands::agents::{safe_id, AgentManifest};
@@ -21,7 +22,9 @@ use crate::commands::teams::TeamManifest;
 use crate::commands::workflow::WorkflowGraph;
 
 /// Bump when the built-in pack contents change to re-run the (non-destructive) seed.
-const SEED_SENTINEL: &str = ".layered-seed-v2";
+const SEED_SENTINEL: &str = ".layered-seed-v3";
+const PREINSTALL_SENTINEL: &str = ".preinstall-codebuddy-v1";
+const PREINSTALL_COMPAT_SENTINEL: &str = ".preinstall-codebuddy-v2-compat";
 
 /// A demonstrable workflow team: coder ⇄ reviewer review loop that exits once
 /// the reviewer's output contains "approved" (capped at 3 iterations).
@@ -89,7 +92,9 @@ fn agent(
         icon: icon.to_string(),
         color: color.to_string(),
         description: description.to_string(),
+        description_zh: String::new(),
         system_prompt: system_prompt.to_string(),
+        system_prompt_zh: String::new(),
         skills: Vec::new(),
         tools: Vec::new(),
         mcp_servers: Vec::new(),
@@ -235,6 +240,234 @@ fn write_if_absent(path: &Path, contents: &str) {
     }
     if let Err(e) = std::fs::write(path, contents) {
         warn!("seed: cannot write {}: {}", path.display(), e);
+    }
+}
+
+fn bundled_preinstall_root(app: &AppHandle) -> Option<PathBuf> {
+    if let Ok(res) = app.path().resource_dir() {
+        let p = res.join("preinstall");
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../bundled/preinstall");
+    if dev.is_dir() {
+        return Some(dev);
+    }
+    None
+}
+
+fn copy_file_if_absent(src: &Path, dest: &Path) {
+    if dest.exists() {
+        return;
+    }
+    if let Some(parent) = dest.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            warn!("seed: cannot create {}: {}", parent.display(), e);
+            return;
+        }
+    }
+    if let Err(e) = std::fs::copy(src, dest) {
+        warn!("seed: copy {} → {}: {}", src.display(), dest.display(), e);
+    }
+}
+
+fn copy_tree_if_absent(src: &Path, dest: &Path) {
+    if !src.is_dir() {
+        return;
+    }
+    if let Err(e) = std::fs::create_dir_all(dest) {
+        warn!("seed: cannot create {}: {}", dest.display(), e);
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(src) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let s = entry.path();
+        let d = dest.join(entry.file_name());
+        if s.is_dir() {
+            copy_tree_if_absent(&s, &d);
+        } else if !d.exists() {
+            copy_file_if_absent(&s, &d);
+        }
+    }
+}
+
+fn seed_preinstall_resources(app: &AppHandle, config_dir: &Path) {
+    let Some(bundle) = bundled_preinstall_root(app) else {
+        warn!("seed: bundled preinstall directory not found");
+        return;
+    };
+
+    let skills_root = crate::skills::service::skills_root_from_config_dir(config_dir);
+    let _ = crate::skills::provenance::ensure_evolution_dirs(&skills_root);
+    let skills_dest = crate::skills::provenance::installed_dir(&skills_root);
+    let skills_src = bundle.join("skills");
+    if skills_src.is_dir() {
+        for entry in std::fs::read_dir(&skills_src).into_iter().flatten().flatten() {
+            if entry.path().is_dir() {
+                let slug = entry.file_name().to_string_lossy().to_string();
+                copy_tree_if_absent(&entry.path(), &skills_dest.join(&slug));
+            }
+        }
+    }
+
+    let agents_src = bundle.join("agents");
+    if agents_src.is_dir() {
+        let agents_dest = config_dir.join("agents");
+        for entry in std::fs::read_dir(&agents_src).into_iter().flatten().flatten() {
+            if !entry.path().is_dir() {
+                continue;
+            }
+            let agent_json = entry.path().join("agent.json");
+            if agent_json.is_file() {
+                let id = entry.file_name().to_string_lossy().to_string();
+                copy_file_if_absent(&agent_json, &agents_dest.join(safe_id(&id)).join("agent.json"));
+            }
+        }
+    }
+
+    let commands_src = bundle.join("commands");
+    if commands_src.is_dir() {
+        let commands_dest = config_dir.join("commands");
+        for entry in std::fs::read_dir(&commands_src).into_iter().flatten().flatten() {
+            if !entry.path().is_dir() {
+                continue;
+            }
+            let cmd_json = entry.path().join("command.json");
+            if cmd_json.is_file() {
+                let id = entry.file_name().to_string_lossy().to_string();
+                copy_file_if_absent(&cmd_json, &commands_dest.join(safe_id(&id)).join("command.json"));
+            }
+        }
+    }
+
+    info!("seed: copied CodeBuddy preinstall from {}", bundle.display());
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ExcludeManifest {
+    #[serde(default)]
+    skills: Vec<String>,
+    #[serde(default)]
+    agents: Vec<String>,
+    #[serde(default)]
+    commands: Vec<String>,
+}
+
+fn bundled_codebuddy_root(app: &AppHandle) -> Option<PathBuf> {
+    if let Ok(res) = app.path().resource_dir() {
+        let p = res.join("codebuddy");
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../bundled/codebuddy");
+    if dev.is_dir() {
+        return Some(dev);
+    }
+    None
+}
+
+fn load_exclude_manifest(app: &AppHandle) -> Option<ExcludeManifest> {
+    let root = bundled_codebuddy_root(app)?;
+    let path = root.join("exclude.json");
+    if !path.is_file() {
+        return None;
+    }
+    let text = std::fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+fn is_codebuddy_agent(path: &Path) -> bool {
+    #[derive(Deserialize)]
+    struct Partial {
+        #[serde(default)]
+        source: String,
+    }
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    serde_json::from_str::<Partial>(&text)
+        .ok()
+        .map(|p| p.source == "codebuddy")
+        .unwrap_or(false)
+}
+
+fn is_codebuddy_command(path: &Path) -> bool {
+    is_codebuddy_agent(path)
+}
+
+/// Remove deprecated CodeBuddy preinstall entries listed in bundled exclude.json.
+pub fn seed_preinstall_compat_cleanup(app: &AppHandle) {
+    let config_dir = match resolve_global_config_dir(app) {
+        Ok(d) => d,
+        Err(e) => {
+            warn!("seed: compat cleanup cannot resolve config dir: {}", e);
+            return;
+        }
+    };
+    let sentinel = config_dir.join(PREINSTALL_COMPAT_SENTINEL);
+    if sentinel.exists() {
+        return;
+    }
+    let Some(exclude) = load_exclude_manifest(app) else {
+        return;
+    };
+
+    let skills_root = crate::skills::service::skills_root_from_config_dir(&config_dir);
+    let skills_installed = crate::skills::provenance::installed_dir(&skills_root);
+    for slug in &exclude.skills {
+        let dir = skills_installed.join(slug);
+        if dir.is_dir() {
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
+    for id in &exclude.agents {
+        let dir = config_dir.join("agents").join(safe_id(id));
+        let manifest = dir.join("agent.json");
+        if manifest.is_file() && is_codebuddy_agent(&manifest) {
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
+    for id in &exclude.commands {
+        let dir = config_dir.join("commands").join(safe_id(id));
+        let manifest = dir.join("command.json");
+        if manifest.is_file() && is_codebuddy_command(&manifest) {
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
+    if let Err(e) = std::fs::write(&sentinel, b"1") {
+        warn!("seed: cannot write compat sentinel: {}", e);
+    } else {
+        info!("seed: applied CodeBuddy preinstall compat cleanup");
+    }
+}
+
+/// Copy bundled CodeBuddy resources once (skills / agents / commands).
+pub fn seed_preinstall_packs(app: &AppHandle) {
+    let config_dir = match resolve_global_config_dir(app) {
+        Ok(d) => d,
+        Err(e) => {
+            warn!("seed: cannot resolve config dir: {}", e);
+            return;
+        }
+    };
+    let sentinel = config_dir.join(PREINSTALL_SENTINEL);
+    if sentinel.exists() {
+        return;
+    }
+    if let Err(e) = std::fs::create_dir_all(&config_dir) {
+        warn!("seed: cannot create config dir: {}", e);
+        return;
+    }
+    seed_preinstall_resources(app, &config_dir);
+    if let Err(e) = std::fs::write(&sentinel, b"1") {
+        warn!("seed: cannot write preinstall sentinel: {}", e);
     }
 }
 

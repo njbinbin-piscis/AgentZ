@@ -1,0 +1,13 @@
+{
+  "id": "cb-remove-dependency",
+  "slash_id": "remove-dependency",
+  "name": "cb-remove-dependency",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Remove a dependency between tasks.\n\nArguments: $ARGUMENTS\n\nParse the task IDs to remove dependency relationship.\n\n## Removing Dependencies\n\nRemoves a dependency relationship, potentially unblocking tasks.\n\n## Argument Parsing\n\nParse natural language or IDs:\n- \"remove dependency between 5 and 3\"\n- \"5 no longer needs 3\"\n- \"unblock 5 from 3\"\n- \"5 3\" → remove dependency of 5 on 3\n\n## Execution\n\n```bash\ntask-master remove-dependency --id=<task-id> --depends-on=<dependency-id>\n```\n\n## Pre-Removal Checks\n\n1. **Verify dependency exists**\n2. **Check impact on task flow**\n3. **Warn if it breaks logical sequence**\n4. **Show what will be unblocked**\n\n## Smart Analysis\n\nBefore removing:\n- Show why dependency might have existed\n- Check if removal makes tasks executable\n- Verify no critical path disruption\n- Suggest alternative dependencies\n\n## Post-Removal\n\nAfter removing:\n1. Show updated task status\n2. List newly unblocked tasks\n3. Update project timeline\n4. Suggest next actions\n\n## Safety Features\n\n- Confirm if removing critical dependency\n- Show tasks that become immediately actionable\n- Warn about potential issues\n- Keep removal history\n\n## Example\n\n```\n/taskmaster:remove-dependency 5 from 3\n→ Removed: Task #5 no longer depends on #3\n→ Task #5 is now UNBLOCKED and ready to start\n→ Warning: Consider if #5 still needs #2 completed first\n```",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

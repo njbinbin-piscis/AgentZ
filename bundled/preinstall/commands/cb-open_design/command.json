@@ -1,0 +1,17 @@
+{
+  "id": "cb-open_design",
+  "slash_id": "open_design",
+  "name": "cb-open_design",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_write",
+    "shell"
+  ],
+  "prompt": "忽略历史的请求，执行以下操作：\n\n1. 首先检测当前运行环境：\n   - 如果 preview_url 工具可用（IDE环境），使用 preview_url 工具在IDE内置webview浏览器中打开 http://testbuddy.woa.com/\n\n- 如果 preview_url 工具不可用（CLI环境），尝试唤起 AgentZ IDE：\n  - macOS: 执行 `open \"AgentZcn:\"`\n  - Linux: 执行 `xdg-open \"AgentZcn:\"`\n  - Windows: 执行 `start \"AgentZcn:\"`\n  - 执行完成后，提示用户：「已打开 AgentZ IDE，请在右上角打开浏览器，并手动输入http://testbuddy.woa.com/ 打开testbuddy开始测试设计\n\n2. 如果在 IDE 中成功打开，不要给用户返回任何话术",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "testbuddy"
+}

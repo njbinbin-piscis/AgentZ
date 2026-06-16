@@ -1,0 +1,15 @@
+{
+  "id": "cb-prime",
+  "slash_id": "prime",
+  "name": "cb-prime",
+  "description": "Load project context by reading key documentation files and exploring project structure",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read"
+  ],
+  "prompt": "# Context Prime\n> Follow the instructions to understand the context of the project.\n\n## Run the following command\n\neza . --tree --git-ignore\n\n## Read the following files\n> Read the files below and nothing else.\n\nREADME.md\n.claude/commands/COMMANDS.md\nai_docs/AI_DOCS.md\nspecs/SPECS.md",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-context-loading-priming"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "cb-act",
+  "slash_id": "act",
+  "name": "cb-act",
+  "description": "Follow RED-GREEN-REFACTOR cycle approach for test-driven development",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Follow RED-GREEN-REFACTOR cycle approch based on @~/.claude/CLAUDE.md:\n1. Open todo.md and select the first unchecked items to work on.\n2. Carefully plan each item, then share your plan\n3. Create a new branch and implement your plan\n4. Check off the items on todo.md\n5. Commit your changes",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-automation-workflow"
+}

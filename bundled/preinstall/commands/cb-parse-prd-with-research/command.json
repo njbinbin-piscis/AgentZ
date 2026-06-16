@@ -1,0 +1,13 @@
+{
+  "id": "cb-parse-prd-with-research",
+  "slash_id": "parse-prd-with-research",
+  "name": "cb-parse-prd-with-research",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Parse PRD with enhanced research mode for better task generation.\n\nArguments: $ARGUMENTS (PRD file path)\n\n## Research-Enhanced Parsing\n\nUses the research AI provider (typically Perplexity) for more comprehensive task generation with current best practices.\n\n## Execution\n\n```bash\ntask-master parse-prd --input=$ARGUMENTS --research\n```\n\n## Research Benefits\n\n1. **Current Best Practices**\n   - Latest framework patterns\n   - Security considerations\n   - Performance optimizations\n   - Accessibility requirements\n\n2. **Technical Deep Dive**\n   - Implementation approaches\n   - Library recommendations\n   - Architecture patterns\n   - Testing strategies\n\n3. **Comprehensive Coverage**\n   - Edge cases consideration\n   - Error handling tasks\n   - Monitoring setup\n   - Deployment tasks\n\n## Enhanced Output\n\nResearch mode typically:\n- Generates more detailed tasks\n- Includes industry standards\n- Adds compliance considerations\n- Suggests modern tooling\n\n## When to Use\n\n- New technology domains\n- Complex requirements\n- Regulatory compliance needed\n- Best practices crucial",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

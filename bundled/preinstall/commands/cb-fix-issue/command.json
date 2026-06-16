@@ -1,0 +1,13 @@
+{
+  "id": "cb-fix-issue",
+  "slash_id": "fix-issue",
+  "name": "cb-fix-issue",
+  "description": "Fix a specific issue or problem with the given identifier or description",
+  "description_zh": "",
+  "argument_hint": "<issue_identifier>",
+  "tools": [],
+  "prompt": "Fix issue $ARGUMENTS",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-version-control-git"
+}

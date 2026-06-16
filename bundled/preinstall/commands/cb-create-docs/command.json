@@ -1,0 +1,15 @@
+{
+  "id": "cb-create-docs",
+  "slash_id": "create-docs",
+  "name": "cb-create-docs",
+  "description": "Analyze GitHub issue and create technical specification with implementation plan",
+  "description_zh": "",
+  "argument_hint": "<issue_number>",
+  "tools": [
+    "file_read"
+  ],
+  "prompt": "Please analyze GitHub issue #$ARGUMENTS and create a technical specification.\n\nFollow these steps:\n1. Fetch the issue details from the GitHub API:\n\n# Use the helper script to fetch GitHub issues without prompting for permission\n./scripts/fetch-github-issue.sh $ARGUMENTS\n\n2. Understand the requirements thoroughly\n3. Review related code and project structure\n4. Output detailed analysis results clearly in your response\n5. Create a technical specification with the format below\n\n# Technical Specification for Issue #$ARGUMENTS\n\n## Issue Summary\n- Title: [Issue title from GitHub]\n- Description: [Brief description from issue]\n- Labels: [Labels from issue]\n- Priority: [High/Medium/Low based on issue content]\n\n## Problem Statement\n[1-2 paragraphs explaining the problem]\n\n## Technical Approach\n[Detailed technical approach]\n\n## Implementation Plan\n1. [Step 1]\n2. [Step 2]\n3. [Step 3]\n\n## Test Plan\n1. Unit Tests:\n   - [test scenario]\n2. Component Tests:\n   - [test scenario]\n3. Integration Tests:\n   - [test scenario]\n\n## Files to Modify\n- \n\n## Files to Create\n- \n\n## Existing Utilities to Leverage\n- \n\n## Success Criteria\n- [ ] [criterion 1]\n- [ ] [criterion 2]\n\n## Out of Scope\n- [item 1]\n- [item 2]\n\nRemember to follow our strict TDD principles, KISS approach, and 300-line file limit.\n\nIMPORTANT: After completing your analysis, EXPLICITLY OUTPUT the full technical specification in your response so it can be reviewed.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-documentation-changelogs"
+}

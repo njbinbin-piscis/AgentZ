@@ -1,0 +1,18 @@
+{
+  "id": "cb-mermaid",
+  "slash_id": "mermaid",
+  "name": "cb-mermaid",
+  "description": "Create entity relationship diagrams using Mermaid from SQL/database files",
+  "description_zh": "",
+  "argument_hint": "<source-path> [output-path]",
+  "tools": [
+    "file_read",
+    "file_write",
+    "shell",
+    "file_list"
+  ],
+  "prompt": "Create Mermaid entity relationship diagrams (ERD) from SQL migration files or database schemas.\n\n## Process:\n\n1. **Parse Arguments**:\n   - First argument: Source path (SQL files or directory)\n   - Second argument: Output path (optional, defaults to `docs/erd.md`)\n\n2. **Find SQL/Schema Files**:\n   - Look for SQL files: `*.sql`, `*.ddl`\n   - Check common locations if no path provided:\n     - `migrations/`, `db/migrations/`, `schema/`\n     - `database/`, `sql/`\n   - Support multiple database formats:\n     - PostgreSQL, MySQL, SQLite\n     - Migration files (Rails, Django, Flyway, etc.)\n\n3. **Extract Schema Information**:\n   - Parse CREATE TABLE statements\n   - Extract table names, columns, and data types\n   - Identify primary keys, foreign keys, and relationships\n   - Handle indexes and constraints\n\n4. **Generate Mermaid ERD**:\n   ```mermaid\n   erDiagram\n     CUSTOMER ||--o{ ORDER : places\n     ORDER ||--|{ LINE-ITEM : contains\n     CUSTOMER {\n       string name\n       string email\n       int id PK\n     }\n   ```\n\n5. **Validate Diagram**:\n   - If mermaid-cli is available: `npx -p @mermaid-js/mermaid-cli mmdc -i output.md -o temp.svg`\n   - Alternative validation: Check syntax manually\n   - Clean up temporary files\n\n6. **Output Options**:\n   - Single file with all entities\n   - Separate files per schema/database\n   - Include relationship descriptions\n\n## Example Usage:\n- `/mermaid migrations/` - Create ERD from all SQL files in migrations\n- `/mermaid schema.sql docs/database-erd.md` - Create ERD from specific file\n- `/mermaid \"db/**/*.sql\" erd/` - Create ERDs for all SQL files\n\nSource: $ARGUMENTS",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-miscellaneous"
+}

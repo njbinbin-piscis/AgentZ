@@ -1,0 +1,13 @@
+{
+  "id": "cb-bug-fix",
+  "slash_id": "bug-fix",
+  "name": "cb-bug-fix",
+  "description": "Systematic workflow for fixing bugs including issue creation, branch management, and PR submission",
+  "description_zh": "",
+  "argument_hint": "<bug_description>",
+  "tools": [],
+  "prompt": "Understand the bug: $ARGUMENTS\n\nBefore Starting:\n- GITHUB: create an issue with a short descriptive title.\n- GIT: checkout a branch and switch to it.\n\nFix the Bug\n\nOn Completion:\n- GIT: commit with a descriptive message.\n- GIT: push the branch to the remote repository.\n- GITHUB: create a PR and link the issue.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-version-control-git"
+}

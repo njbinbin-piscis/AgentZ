@@ -1,0 +1,18 @@
+{
+  "id": "cb-clean",
+  "slash_id": "clean",
+  "name": "cb-clean",
+  "description": "Fix all linting and formatting issues across the codebase",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "shell",
+    "file_edit",
+    "file_read",
+    "file_list"
+  ],
+  "prompt": "Fix all linting, formatting, and static analysis issues in the entire codebase.\n\n## Process:\n\n1. **Detect Project Language(s)**:\n   - Check file extensions and configuration files\n   - Common indicators:\n     - Python: .py files, requirements.txt, pyproject.toml\n     - JavaScript/TypeScript: .js/.ts files, package.json\n     - Go: .go files, go.mod\n     - Rust: .rs files, Cargo.toml\n     - Java: .java files, pom.xml\n     - Ruby: .rb files, Gemfile\n\n2. **Run Language-Specific Linters**:\n\n   **Python:**\n   - Formatting: `black .` or `autopep8`\n   - Import sorting: `isort .`\n   - Linting: `flake8` or `pylint`\n   - Type checking: `mypy`\n   \n   **JavaScript/TypeScript:**\n   - Linting: `eslint . --fix`\n   - Formatting: `prettier --write .`\n   - Type checking: `tsc --noEmit`\n   \n   **Go:**\n   - Formatting: `go fmt ./...`\n   - Linting: `golangci-lint run --fix`\n   \n   **Rust:**\n   - Formatting: `cargo fmt`\n   - Linting: `cargo clippy --fix`\n   \n   **Java:**\n   - Formatting: `google-java-format` or `spotless`\n   - Linting: `checkstyle` or `spotbugs`\n   \n   **Ruby:**\n   - Linting/Formatting: `rubocop -a`\n\n3. **Check for Project Scripts**:\n   - Look for lint/format scripts in package.json, Makefile, etc.\n   - Common script names: `lint`, `format`, `fix`, `clean`\n\n4. **Fix Issues**:\n   - Apply auto-fixes where available\n   - Manually fix issues that can't be auto-fixed\n   - Re-run linters to verify all issues are resolved\n\n5. **Verify Clean State**:\n   - Run all linters again without fix flags\n   - Ensure no errors or warnings remain\n\nFix all issues found until the codebase passes all linting and formatting checks.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-code-analysis-testing"
+}

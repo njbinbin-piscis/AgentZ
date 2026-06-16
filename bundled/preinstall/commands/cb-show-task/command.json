@@ -1,0 +1,13 @@
+{
+  "id": "cb-show-task",
+  "slash_id": "show-task",
+  "name": "cb-show-task",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Show detailed task information with rich context and insights.\n\nArguments: $ARGUMENTS\n\n## Enhanced Task Display\n\nParse arguments to determine what to show and how.\n\n### 1. **Smart Task Selection**\n\nBased on $ARGUMENTS:\n- Number → Show specific task with full context\n- \"current\" → Show active in-progress task(s)\n- \"next\" → Show recommended next task\n- \"blocked\" → Show all blocked tasks with reasons\n- \"critical\" → Show critical path tasks\n- Multiple IDs → Comparative view\n\n### 2. **Contextual Information**\n\nFor each task, intelligently include:\n\n**Core Details**\n- Full task information (id, title, description, details)\n- Current status with history\n- Test strategy and acceptance criteria\n- Priority and complexity analysis\n\n**Relationships**\n- Dependencies (what it needs)\n- Dependents (what needs it)\n- Parent/subtask hierarchy\n- Related tasks (similar work)\n\n**Time Intelligence**\n- Created/updated timestamps\n- Time in current status\n- Estimated vs actual time\n- Historical completion patterns\n\n### 3. **Visual Enhancements**\n\n```\n📋 Task #45: Implement User Authentication\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nStatus: 🟡 in-progress (2 hours)\nPriority: 🔴 High | Complexity: 73/100\n\nDependencies: ✅ #41, ✅ #42, ⏳ #43 (blocked)\nBlocks: #46, #47, #52\n\nProgress: ████████░░ 80% complete\n\nRecent Activity:\n- 2h ago: Status changed to in-progress\n- 4h ago: Dependency #42 completed\n- Yesterday: Task expanded with 3 subtasks\n```\n\n### 4. **Intelligent Insights**\n\nBased on task analysis:\n- **Risk Assessment**: Complexity vs time remaining\n- **Bottleneck Analysis**: Is this blocking critical work?\n- **Recommendation**: Suggested approach or concerns\n- **Similar Tasks**: How others completed similar work\n\n### 5. **Action Suggestions**\n\nContext-aware next steps:\n- If blocked → Show how to unblock\n- If complex → Suggest expansion\n- If in-progress → Show completion checklist\n- If done → Show dependent tasks ready to start\n\n### 6. **Multi-Task View**\n\nWhen showing multiple tasks:\n- Common dependencies\n- Optimal completion order\n- Parallel work opportunities\n- Combined complexity analysis",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "cb-convert-task-to-subtask",
+  "slash_id": "convert-task-to-subtask",
+  "name": "cb-convert-task-to-subtask",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Convert an existing task into a subtask.\n\nArguments: $ARGUMENTS\n\nParse parent ID and task ID to convert.\n\n## Task Conversion\n\nConverts an existing standalone task into a subtask of another task.\n\n## Argument Parsing\n\n- \"move task 8 under 5\"\n- \"make 8 a subtask of 5\"\n- \"nest 8 in 5\"\n- \"5 8\" → make task 8 a subtask of task 5\n\n## Execution\n\n```bash\ntask-master add-subtask --parent=<parent-id> --task-id=<task-to-convert>\n```\n\n## Pre-Conversion Checks\n\n1. **Validation**\n   - Both tasks exist and are valid\n   - No circular parent relationships\n   - Task isn't already a subtask\n   - Logical hierarchy makes sense\n\n2. **Impact Analysis**\n   - Dependencies that will be affected\n   - Tasks that depend on converting task\n   - Priority alignment needed\n   - Status compatibility\n\n## Conversion Process\n\n1. Change task ID from \"8\" to \"5.1\" (next available)\n2. Update all dependency references\n3. Inherit parent's context where appropriate\n4. Adjust priorities if needed\n5. Update time estimates\n\n## Smart Features\n\n- Preserve task history\n- Maintain dependencies\n- Update all references\n- Create conversion log\n\n## Example\n\n```\n/taskmaster:add-subtask/from-task 5 8\n→ Converting: Task #8 becomes subtask #5.1\n→ Updated: 3 dependency references\n→ Parent task #5 now has 1 subtask\n→ Note: Subtask inherits parent's priority\n\nBefore: #8 \"Implement validation\" (standalone)\nAfter:  #5.1 \"Implement validation\" (subtask of #5)\n```\n\n## Post-Conversion\n\n- Show new task hierarchy\n- List updated dependencies\n- Verify project integrity\n- Suggest related conversions",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

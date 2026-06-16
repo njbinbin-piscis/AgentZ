@@ -1,0 +1,34 @@
+---
+name: "testbuddy-ext-skill"
+description: "|"
+description_zh: "测试用例生成插件"
+version: "1.0.0"
+source: codebuddy
+source_plugin: "testbuddy"
+---
+
+> **AgentZ note:** Configure external services under Settings → MCP Servers / Connectors. Use `api_connector`, `shell`, `file_read`, and `codebase_search` instead of vendor-specific MCP tool names.
+
+# TestBuddy 插件技能包
+
+## 核心定位
+
+本 skill 旨在为TestBuddy插件对接生成用例自动化代码生成Agent，通过一系列插件功能，让用户在TestBuddy插件的测试设计脑图上能过一键调用生成用例自动化代码Agent，并记录用例代码和用例节点的映射关系，实现用例节点和用例代码的双向导航。
+
+**本SKILL不涉及任何MCP工具，执行本SKILL时不需要考虑MCP工具，只考虑下文中定义的核心工具**
+
+## 核心工具
+
+本 skill 提供1个核心工具，若符合执行条件，则执行对应的工具
+
+1. 记录用例代码和用例节点的映射关系工具：根据已经生成的用例代码、工作空间路径、测试设计UID(design_uid)和节点Uid(node_uid)，分析并记录用例代码和用例节点的映射关系
+
+### 1.记录用例代码和用例节点的映射关系工具
+
+#### 执行条件
+
+生成用例代码结束后，检查是否有用例代码和用例节点的映射关系，如果没有，则执行记录用例代码和用例节点的映射关系工具
+
+#### 执行逻辑
+
+加载`tools/record_code_case_relation.md`，根据里面的流程，记录用例代码和用例节点的映射关系：根据已经生成的用例代码、工作空间路径、测试设计UID(design_uid)和节点UID(node_uid)，分析并记录用例代码和用例节点的映射关系，用例代码和用例节点的映射关系会存储在会话中，后续用户在测试设计脑图上点击用例节点，会从会话中获取用例代码和用例节点的映射关系，实现用例节点和用例代码的双向导航。

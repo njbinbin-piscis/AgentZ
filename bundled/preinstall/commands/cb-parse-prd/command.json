@@ -1,0 +1,13 @@
+{
+  "id": "cb-parse-prd",
+  "slash_id": "parse-prd",
+  "name": "cb-parse-prd",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Parse a PRD document to generate tasks.\n\nArguments: $ARGUMENTS (PRD file path)\n\n## Intelligent PRD Parsing\n\nAnalyzes your requirements document and generates a complete task breakdown.\n\n## Execution\n\n```bash\ntask-master parse-prd --input=$ARGUMENTS\n```\n\n## Parsing Process\n\n1. **Document Analysis**\n   - Extract key requirements\n   - Identify technical components\n   - Detect dependencies\n   - Estimate complexity\n\n2. **Task Generation**\n   - Create 10-15 tasks by default\n   - Include implementation tasks\n   - Add testing tasks\n   - Include documentation tasks\n   - Set logical dependencies\n\n3. **Smart Enhancements**\n   - Group related functionality\n   - Set appropriate priorities\n   - Add acceptance criteria\n   - Include test strategies\n\n## Options\n\nParse arguments for modifiers:\n- Number after filename → `--num-tasks`\n- `research` → Use research mode\n- `comprehensive` → Generate more tasks\n\n## Post-Generation\n\nAfter parsing:\n1. Display task summary\n2. Show dependency graph\n3. Suggest task expansion for complex items\n4. Recommend sprint planning",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

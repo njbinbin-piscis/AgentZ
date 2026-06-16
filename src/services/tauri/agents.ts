@@ -11,6 +11,7 @@ export interface AgentInfo {
   icon: string;
   color: string;
   description: string;
+  description_zh?: string;
   skills: string[];
   tools: string[];
   mcp_servers: string[];

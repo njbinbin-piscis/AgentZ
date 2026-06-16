@@ -72,6 +72,8 @@ pub fn run() {
             app.manage(close_gate);
             // Phase 5: install built-in agent/team packs on first run.
             commands::seed::seed_builtin_packs(app.handle());
+            commands::seed::seed_preinstall_packs(app.handle());
+            commands::seed::seed_preinstall_compat_cleanup(app.handle());
             // Skill evolution: migrate flat skills + periodic curator idle check.
             let app_migrate = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -292,6 +294,13 @@ pub fn run() {
             commands::workbench::hooks_get,
             commands::workbench::hooks_save,
             commands::workbench::hooks_run,
+            // Slash commands (CodeBuddy presets)
+            commands::slash_commands::slash_commands_list,
+            commands::slash_commands::slash_commands_resolve,
+            // Project templates (.agentz rules + hooks)
+            commands::project_templates::project_templates_list,
+            commands::project_templates::project_apply_template,
+            commands::project_templates::project_has_agentz,
             // Interactive UI (chat_ui tool)
             commands::interactive::respond_interactive_ui,
             // File journal — Review / Undo of a turn's edits

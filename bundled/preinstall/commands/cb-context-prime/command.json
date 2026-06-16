@@ -1,0 +1,15 @@
+{
+  "id": "cb-context-prime",
+  "slash_id": "context-prime",
+  "name": "cb-context-prime",
+  "description": "Load project context by reading README.md and exploring relevant project files",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read"
+  ],
+  "prompt": "Read README.md, THEN run `git ls-files | grep -v -f (sed 's|^|^|; s|$|/|' .cursorignore | psub)` to understand the context of the project",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-context-loading-priming"
+}

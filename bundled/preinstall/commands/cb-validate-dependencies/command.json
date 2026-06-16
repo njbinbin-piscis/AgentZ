@@ -1,0 +1,13 @@
+{
+  "id": "cb-validate-dependencies",
+  "slash_id": "validate-dependencies",
+  "name": "cb-validate-dependencies",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Validate all task dependencies for issues.\n\n## Dependency Validation\n\nComprehensive check for dependency problems across the entire project.\n\n## Execution\n\n```bash\ntask-master validate-dependencies\n```\n\n## Validation Checks\n\n1. **Circular Dependencies**\n   - A depends on B, B depends on A\n   - Complex circular chains\n   - Self-dependencies\n\n2. **Missing Dependencies**\n   - References to non-existent tasks\n   - Deleted task references\n   - Invalid task IDs\n\n3. **Logical Issues**\n   - Completed tasks depending on pending\n   - Cancelled tasks in dependency chains\n   - Impossible sequences\n\n4. **Complexity Warnings**\n   - Over-complex dependency chains\n   - Too many dependencies per task\n   - Bottleneck tasks\n\n## Smart Analysis\n\nThe validation provides:\n- Visual dependency graph\n- Critical path analysis\n- Bottleneck identification\n- Suggested optimizations\n\n## Report Format\n\n```\nDependency Validation Report\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ No circular dependencies found\n⚠️  2 warnings found:\n   - Task #23 has 7 dependencies (consider breaking down)\n   - Task #45 blocks 5 other tasks (potential bottleneck)\n❌ 1 error found:\n   - Task #67 depends on deleted task #66\n\nCritical Path: #1 → #5 → #23 → #45 → #50 (15 days)\n```\n\n## Actionable Output\n\nFor each issue found:\n- Clear description\n- Impact assessment\n- Suggested fix\n- Command to resolve\n\n## Next Steps\n\nAfter validation:\n- Run `/taskmaster:fix-dependencies` to auto-fix\n- Manually adjust problematic dependencies\n- Rerun to verify fixes",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

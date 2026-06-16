@@ -1,0 +1,8 @@
+{
+  "id": "tpl-atuin-template",
+  "name": "atuin",
+  "name_zh": "atuin",
+  "description": "腾讯玄武实验室安全插件",
+  "description_zh": "腾讯玄武实验室安全插件",
+  "source_plugin": "atuin"
+}

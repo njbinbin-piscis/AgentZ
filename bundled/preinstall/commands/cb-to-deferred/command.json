@@ -1,0 +1,13 @@
+{
+  "id": "cb-to-deferred",
+  "slash_id": "to-deferred",
+  "name": "cb-to-deferred",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Defer a task for later consideration.\n\nArguments: $ARGUMENTS (task ID)\n\n## Deferring a Task\n\nThis status indicates a task is valid but not currently actionable or prioritized.\n\n## Valid Reasons for Deferral\n\n- Waiting for external dependencies\n- Reprioritized for future sprint\n- Blocked by technical limitations\n- Resource constraints\n- Strategic timing considerations\n\n## Execution\n\n```bash\ntask-master set-status --id=$ARGUMENTS --status=deferred\n```\n\n## Deferral Management\n\nWhen deferring:\n1. **Document Reason**\n   - Capture why it's being deferred\n   - Set reactivation criteria\n   - Note any partial work completed\n\n2. **Impact Analysis**\n   - Check dependent tasks\n   - Update project timeline\n   - Notify affected stakeholders\n\n3. **Future Planning**\n   - Set review reminders\n   - Tag for specific milestone\n   - Preserve context for reactivation\n   - Link to blocking issues\n\n## Smart Tracking\n\n- Monitor deferral duration\n- Alert when criteria met\n- Prevent scope creep\n- Regular review cycles",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

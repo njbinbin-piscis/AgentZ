@@ -9,6 +9,7 @@ import {
   type LibraryInitialState,
   type LibraryView,
 } from "./resources/types";
+import CommandsInstalledView from "./resources/CommandsInstalledView";
 import SkillsInstalledView from "./resources/SkillsInstalledView";
 import SkillsDiscoverView from "./resources/SkillsDiscoverView";
 import MarketGridView from "./resources/MarketGridView";
@@ -88,6 +89,9 @@ export default function ResourceLibraryPanel({ onClose, initial }: ResourceLibra
     if (category === "skill") {
       if (view === "discover") return <SkillsDiscoverView />;
       return <SkillsInstalledView />;
+    }
+    if (category === "command") {
+      return <CommandsInstalledView />;
     }
     if (category === "tool") {
       return <MarketGridView category="tool" mode={view === "discover" ? "discover" : "installed"} />;

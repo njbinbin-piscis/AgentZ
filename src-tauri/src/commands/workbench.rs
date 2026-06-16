@@ -21,6 +21,8 @@ pub struct InstalledSkill {
     pub slug: String,
     pub name: String,
     pub description: String,
+    #[serde(default)]
+    pub description_zh: String,
     pub path: String,
     #[serde(default)]
     pub lifecycle: String,
@@ -76,6 +78,7 @@ pub async fn skills_list_installed(app: AppHandle) -> Result<Vec<InstalledSkill>
             slug: skill.skill_id.clone(),
             name: skill.name.clone(),
             description: skill.description.clone(),
+            description_zh: skill.description_zh.clone(),
             path: skill.source_path.join("SKILL.md").display().to_string(),
             lifecycle: meta.lifecycle,
             locked: meta.locked,

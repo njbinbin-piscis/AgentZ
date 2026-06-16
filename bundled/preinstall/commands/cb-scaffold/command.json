@@ -1,0 +1,19 @@
+{
+  "id": "cb-scaffold",
+  "slash_id": "scaffold",
+  "name": "cb-scaffold",
+  "description": "Scaffold Next.js components following best practices",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_write",
+    "file_list",
+    "codebase_search",
+    "chat_ui"
+  ],
+  "prompt": "# Scaffold Next.js Component\n\nYou are scaffolding a Next.js component or page following App Router best practices.\n\n## Workflow\n\n### Step 1: Gather Requirements\n\nAsk the user what they want to scaffold:\n- **Page**: A new route with page.tsx\n- **Layout**: A shared layout for routes\n- **Server Component**: A data-fetching component\n- **Client Component**: An interactive component\n- **API Route**: A route handler\n- **Server Action**: A mutation function\n- **Loading/Error**: Loading and error states\n\n### Step 2: Analyze Existing Patterns\n\nBefore scaffolding, examine the codebase:\n\n1. Check existing component structure:\n   - Look at `app/` directory structure\n   - Check `components/` organization\n   - Note existing patterns for server vs client\n\n2. Identify conventions:\n   - TypeScript patterns used\n   - Styling approach (Tailwind, CSS Modules, etc.)\n   - Data fetching patterns\n   - Error handling patterns\n\n### Step 3: Apply Skills\n\nBased on what the user wants, apply the appropriate skill:\n\n- For pages and routing: Use `app-router` skill\n- For component decisions: Use `server-components` skill\n- For API routes: Use `route-handlers` skill\n- For mutations: Use `server-actions` skill\n- For protected routes: Use `auth-patterns` skill\n\n### Step 4: Generate Code\n\nCreate the component following:\n- Next.js 15 conventions\n- Async params/searchParams (Promise-based)\n- Proper TypeScript types\n- Existing project patterns\n\n### Step 5: Verify\n\nAfter scaffolding:\n1. Ensure imports are correct\n2. Check TypeScript types\n3. Confirm file placement matches App Router conventions\n\n## Examples\n\n### Scaffold a Page\n\nWhen user asks: \"Create a blog post page\"\n\n1. Create `app/blog/[slug]/page.tsx`:\n```tsx\ninterface PageProps {\n  params: Promise<{ slug: string }>\n}\n\nexport default async function BlogPostPage({ params }: PageProps) {\n  const { slug } = await params\n  // ... fetch and render\n}\n```\n\n2. Add `loading.tsx` and `error.tsx` if needed\n\n### Scaffold a Client Component\n\nWhen user asks: \"Create a search filter component\"\n\n1. Create in `components/` with 'use client'\n2. Keep it minimal - only client code that needs state\n3. Follow existing naming conventions\n\n### Scaffold an API Route\n\nWhen user asks: \"Create a users API endpoint\"\n\n1. Create `app/api/users/route.ts`\n2. Include GET, POST as needed\n3. Add proper error handling and validation",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "nextjs-expert"
+}

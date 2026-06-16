@@ -44,6 +44,7 @@ import TaskPanel, {
 import Markdown from "../codez/Markdown";
 import InteractiveCard from "../../components/chat/InteractiveCard";
 import { useInteractiveCards } from "../../hooks/useInteractiveCards";
+import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import AgentFilePreview from "./AgentFilePreview";
 import { useProjectEdge } from "../../contexts/ProjectEdgeContext";
 import CollabBoard from "./CollabBoard";
@@ -92,7 +93,7 @@ export default function WorkZWorkspace({
   onWikiBusyChange,
   onOpenLibrary,
 }: WorkZWorkspaceProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     setArtifacts,
     setPreviewPath,
@@ -172,6 +173,14 @@ export default function WorkZWorkspace({
   worktreeRef.current = worktree;
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const {
+    slash,
+    slashMatches,
+    pickSlash,
+    slashLabel,
+    detectSlash,
+    handleSlashKeyDown,
+  } = useSlashCompletion(setGoal, taRef);
   const panelRef = useRef<HTMLDivElement>(null);
   const runRef = useRef<(text: string, att: ChatAttachment | null) => Promise<void>>(async () => {});
 
@@ -642,6 +651,7 @@ export default function WorkZWorkspace({
         sessionSource: activeTeam ? SESSION_SOURCE_WORKZ_TEAM : SESSION_SOURCE_WORKZ,
         teamId: activeTeam || null,
         poolId: activePoolRef.current,
+        preferZh: i18n.language.startsWith("zh"),
       });
       // The backend echoes the (pre-generated) session id; keep the maps in
       // sync in case it ever differs, then fold in the final assistant text.
@@ -847,6 +857,7 @@ export default function WorkZWorkspace({
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
+    if (handleSlashKeyDown(e)) return;
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
       const atEnd = ta.selectionStart === goal.length && ta.selectionEnd === goal.length;
@@ -1326,7 +1337,10 @@ export default function WorkZWorkspace({
 
         <ChatComposer
           value={goal}
-          onChange={setGoal}
+          onChange={(value, caret) => {
+            setGoal(value);
+            detectSlash(value, caret);
+          }}
           onSubmit={run}
           onStop={stopActive}
           busy={busy}
@@ -1361,10 +1375,31 @@ export default function WorkZWorkspace({
                   options: installedSkills.map((s) => ({
                     id: s.slug,
                     label: s.name,
-                    hint: s.description,
+                    hint:
+                      i18n.language.startsWith("zh") && s.description_zh?.trim()
+                        ? s.description_zh
+                        : s.description,
                   })),
                 }
               : undefined
+          }
+          mentionPopup={
+            slash && slashMatches.length > 0 ? (
+              <div className="agentz-mention-popup">
+                {slashMatches.map((cmd, i) => (
+                  <div
+                    key={cmd.id}
+                    className={`agentz-mention-item ${i === slash.active ? "active" : ""}`}
+                    onMouseDown={(ev) => {
+                      ev.preventDefault();
+                      pickSlash(cmd);
+                    }}
+                  >
+                    {slashLabel(cmd)}
+                  </div>
+                ))}
+              </div>
+            ) : undefined
           }
           connectorSelector={
             showGenericComposerTools

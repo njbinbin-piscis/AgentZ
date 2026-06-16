@@ -1,0 +1,13 @@
+{
+  "id": "cb-use-stepper",
+  "slash_id": "use-stepper",
+  "name": "cb-use-stepper",
+  "description": "Use structured stepper approach for problem-solving and project development",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "<Stepper>\n\n1. **Identify the Problem**\n1. **Plan Your Project**\n1. **Build Your Solution**\n1. **Test and Deploy**\n\n</Stepper>",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-miscellaneous"
+}

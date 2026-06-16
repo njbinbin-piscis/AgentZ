@@ -91,7 +91,7 @@ pub fn install_to_installed(
     std::fs::create_dir_all(&skill_dir)?;
     std::fs::write(skill_dir.join("SKILL.md"), content)?;
 
-    if source == "clawhub" {
+    if source == "clawhub" || source == "skillhub" || source == "codebuddy" {
         let _ = provenance::add_hub_lock(root, &skill_id);
     }
     Ok((skill_id, skill.name))

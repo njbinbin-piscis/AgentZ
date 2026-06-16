@@ -1,0 +1,13 @@
+{
+  "id": "cb-memory-spring-cleaning",
+  "slash_id": "memory-spring-cleaning",
+  "name": "cb-memory-spring-cleaning",
+  "description": "Clean and organize project memory",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# Memory Spring Cleaning\n\nClean and organize project memory\n\n## Instructions\n\n1. **Get Overview**\n   - List all CLAUDE.md and CLAUDE.local.md files in the project hierarchy\n\n2. **Iterative Review**\n   - Process each file systematically, starting with the root `CLAUDE.md` file\n   - Load the current content\n   - Compare documented patterns against actual implementation\n   - Identify outdated, incorrect, or missing information\n\n3. **Update and Refactor**\n   - For each memory file:\n     - Verify all technical claims against the current codebase\n     - Remove obsolete information\n     - Consolidate duplicate entries\n     - Ensure information is in the most appropriate file\n   - When information belongs to a specific subcomponent, ensure it's placed correctly:\n     - UI-specific patterns → `apps/myproject-ui/CLAUDE.md`\n     - API conventions → `apps/myproject-api/CLAUDE.md`\n     - Infrastructure details → `cdk/CLAUDE.md` or `infrastructure/CLAUDE.md`\n\n4. **Focus on Quality**\n   - Prioritize clarity, accuracy, and relevance\n   - Remove any information that no longer serves the project\n   - Ensure each piece of information is in its most logical location\n\n## Credit\n\nThis command is based on the work of Thomas Landgraf: https://thomaslandgraf.substack.com/p/claude-codes-memory-working-with",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-team-collaboration"
+}

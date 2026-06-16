@@ -1,0 +1,13 @@
+{
+  "id": "cb-list-tasks",
+  "slash_id": "list-tasks",
+  "name": "cb-list-tasks",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "List tasks with intelligent argument parsing.\n\nParse arguments to determine filters and display options:\n- Status: pending, in-progress, done, review, deferred, cancelled\n- Priority: high, medium, low (or priority:high)\n- Special: subtasks, tree, dependencies, blocked\n- IDs: Direct numbers (e.g., \"1,3,5\" or \"1-5\")\n- Complex: \"pending high\" = pending AND high priority\n\nArguments: $ARGUMENTS\n\nLet me parse your request intelligently:\n\n1. **Detect Filter Intent**\n   - If arguments contain status keywords → filter by status\n   - If arguments contain priority → filter by priority\n   - If arguments contain \"subtasks\" → include subtasks\n   - If arguments contain \"tree\" → hierarchical view\n   - If arguments contain numbers → show specific tasks\n   - If arguments contain \"blocked\" → show blocked tasks only\n\n2. **Smart Combinations**\n   Examples of what I understand:\n   - \"pending high\" → pending tasks with high priority\n   - \"done today\" → tasks completed today\n   - \"blocked\" → tasks with unmet dependencies\n   - \"1-5\" → tasks 1 through 5\n   - \"subtasks tree\" → hierarchical view with subtasks\n\n3. **Execute Appropriate Query**\n   Based on parsed intent, run the most specific task-master command\n\n4. **Enhanced Display**\n   - Group by relevant criteria\n   - Show most important information first\n   - Use visual indicators for quick scanning\n   - Include relevant metrics\n\n5. **Intelligent Suggestions**\n   Based on what you're viewing, suggest next actions:\n   - Many pending? → Suggest priority order\n   - Many blocked? → Show dependency resolution\n   - Looking at specific tasks? → Show related tasks",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

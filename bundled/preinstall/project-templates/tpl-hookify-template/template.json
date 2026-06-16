@@ -1,0 +1,8 @@
+{
+  "id": "tpl-hookify-template",
+  "name": "hookify",
+  "name_zh": "hookify",
+  "description": "创建和管理自定义钩子,自动化你的工作流程。",
+  "description_zh": "创建和管理自定义钩子,自动化你的工作流程。",
+  "source_plugin": "hookify"
+}

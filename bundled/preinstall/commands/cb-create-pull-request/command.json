@@ -1,0 +1,13 @@
+{
+  "id": "cb-create-pull-request",
+  "slash_id": "create-pull-request",
+  "name": "cb-create-pull-request",
+  "description": "Guide for creating pull requests using GitHub CLI with proper templates and conventions",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# How to Create a Pull Request Using GitHub CLI\n\nThis guide explains how to create pull requests using GitHub CLI in our project.\n\n## Prerequisites\n\n1. Install GitHub CLI if you haven't already:\n\n   ```bash\n   # macOS\n   brew install gh\n\n   # Windows\n   winget install --id GitHub.cli\n\n   # Linux\n   # Follow instructions at https://github.com/cli/cli/blob/trunk/docs/install_linux.md\n   ```\n\n2. Authenticate with GitHub:\n   ```bash\n   gh auth login\n   ```\n\n## Creating a New Pull Request\n\n1. First, prepare your PR description following the template in @.github/pull_request_template.md\n\n2. Use the `gh pr create --draft` command to create a new pull request:\n\n   ```bash\n   # Basic command structure\n   gh pr create --draft --title \"✨(scope): Your descriptive title\" --body \"Your PR description\" --base main \n   ```\n\n   For more complex PR descriptions with proper formatting, use the `--body-file` option with the exact PR template structure:\n\n   ```bash\n   # Create PR with proper template structure\n   gh pr create --draft --title \"✨(scope): Your descriptive title\" --body-file .github/pull_request_template.md --base main\n   ```\n\n## Best Practices\n\n1. **PR Title Format**: Use conventional commit format with emojis\n\n   - Always include an appropriate emoji at the beginning of the title\n   - Use the actual emoji character (not the code representation like `:sparkles:`)\n   - Examples:\n     - `✨(supabase): Add staging remote configuration`\n     - `🐛(auth): Fix login redirect issue`\n     - `📝(readme): Update installation instructions`\n\n2. **Description Template**: Always use our PR template structure from @.github/pull_request_template.md:\n\n3. **Template Accuracy**: Ensure your PR description precisely follows the template structure:\n\n   - Don't modify or rename the PR-Agent sections (`pr_agent:summary` and `pr_agent:walkthrough`)\n   - Keep all section headers exactly as they appear in the template",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-version-control-git"
+}

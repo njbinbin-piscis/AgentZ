@@ -86,7 +86,7 @@ pub async fn marketplace_install(
     version: Option<String>,
 ) -> Result<(), String> {
     match (category.as_str(), source.as_str()) {
-        ("skill", "clawhub") => clawhub::clawhub_install(app, identifier, version)
+        ("skill", "clawhub") => clawhub::clawhub_install(app, identifier, version, None)
             .await
             .map(|_| ()),
         ("tool", _) => user_tools::user_tools_install(app, identifier)
@@ -133,7 +133,7 @@ async fn search_skills(app: AppHandle, query: String) -> Result<Vec<MarketItem>,
     let installed_slugs: std::collections::HashSet<String> =
         installed.iter().map(|s| s.slug.clone()).collect();
 
-    let res = clawhub::clawhub_search(query, Some(30)).await?;
+    let res = clawhub::clawhub_search(query, Some(30), None).await?;
     let mut items: Vec<MarketItem> = res
         .items
         .into_iter()

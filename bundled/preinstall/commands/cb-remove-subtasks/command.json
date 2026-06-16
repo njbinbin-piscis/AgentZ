@@ -1,0 +1,13 @@
+{
+  "id": "cb-remove-subtasks",
+  "slash_id": "remove-subtasks",
+  "name": "cb-remove-subtasks",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Clear all subtasks from a specific task.\n\nArguments: $ARGUMENTS (task ID)\n\nRemove all subtasks from a parent task at once.\n\n## Clearing Subtasks\n\nBulk removal of all subtasks from a parent task.\n\n## Execution\n\n```bash\ntask-master clear-subtasks --id=<task-id>\n```\n\n## Pre-Clear Analysis\n\n1. **Subtask Summary**\n   - Number of subtasks\n   - Completion status of each\n   - Work already done\n   - Dependencies affected\n\n2. **Impact Assessment**\n   - Data that will be lost\n   - Dependencies to be removed\n   - Effect on project timeline\n   - Parent task implications\n\n## Confirmation Required\n\n```\nClear Subtasks Confirmation\n━━━━━━━━━━━━━━━━━━━━━━━━━\nParent Task: #5 \"Implement user authentication\"\nSubtasks to remove: 4\n- #5.1 \"Setup auth framework\" (done)\n- #5.2 \"Create login form\" (in-progress)\n- #5.3 \"Add validation\" (pending)\n- #5.4 \"Write tests\" (pending)\n\n⚠️  This will permanently delete all subtask data\nContinue? (y/n)\n```\n\n## Smart Features\n\n- Option to convert to standalone tasks\n- Backup task data before clearing\n- Preserve completed work history\n- Update parent task appropriately\n\n## Process\n\n1. List all subtasks for confirmation\n2. Check for in-progress work\n3. Remove all subtasks\n4. Update parent task\n5. Clean up dependencies\n\n## Alternative Options\n\nSuggest alternatives:\n- Convert important subtasks to tasks\n- Keep completed subtasks\n- Archive instead of delete\n- Export subtask data first\n\n## Post-Clear\n\n- Show updated parent task\n- Recalculate time estimates\n- Update task complexity\n- Suggest next steps\n\n## Example\n\n```\n/taskmaster:clear-subtasks 5\n→ Found 4 subtasks to remove\n→ Warning: Subtask #5.2 is in-progress\n→ Cleared all subtasks from task #5\n→ Updated parent task estimates\n→ Suggestion: Consider re-expanding with better breakdown\n```",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

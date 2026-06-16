@@ -1,0 +1,17 @@
+{
+  "id": "cb-initref",
+  "slash_id": "initref",
+  "name": "cb-initref",
+  "description": "Build reference documentation by creating markdown files and updating CLAUDE.md",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_write",
+    "file_list"
+  ],
+  "prompt": "Build the reference docs. Run /summarize on files to get summaries, don't read too many file contents to avoid burning usage. Read important files directly.\n\nCreate reference markdown files in `/ref` directory.\n\nUpdate `CLAUDE.md` file with pointers to important documentation files.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-context-loading-priming"
+}

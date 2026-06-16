@@ -5,6 +5,23 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-13
+
+### Added
+
+- **CodeBuddy 预装资源**：首次启动将 bundled/preinstall 中的技能、智能体、斜杠命令复制到全局配置目录（write-if-absent）。
+- **斜杠命令**：Composer `/` 补全；后端展开 prompt 并可选限制工具集。
+- **项目模板**：打开尚无 `.agentz` 的文件夹时可选应用 CodeBuddy 规则/钩子模板。
+- **兼容性审计流水线**：`lint:preinstall`、`remediate:preinstall`、`verify:preinstall --strict`；产物见 `bundled/codebuddy/compatibility-report.json` 与 `exclude.json`。
+
+### Changed
+
+- **Kernel `piscis-engine v0.8.62`**、**RobotZ `v0.1.6`**：对齐合并后的 engine 发布（含 v0.8.61 功能 + plan path 修复）。
+- 预装资源经 AgentZ 规范化：工具名映射、CodeBuddy 术语改写、slash_id 去重（保留质量最高条目）。
+- 排除 142 条不兼容/重复资源（3 技能 + 103 智能体 + 36 命令），详见 `bundled/codebuddy/exclude.json`。
+- 已安装用户：`.preinstall-codebuddy-v2-compat` sentinel 自动清理 exclude 列表中的 CodeBuddy 资源。
+- Seed sentinel 升级为 `.layered-seed-v3`；CodeBuddy 预装使用 `.preinstall-codebuddy-v1`。
+
 ## [0.5.10] - 2026-06-13
 
 ### Fixed

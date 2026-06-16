@@ -1,0 +1,13 @@
+{
+  "id": "cb-expand-task",
+  "slash_id": "expand-task",
+  "name": "cb-expand-task",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Break down a complex task into subtasks.\n\nArguments: $ARGUMENTS (task ID)\n\n## Intelligent Task Expansion\n\nAnalyzes a task and creates detailed subtasks for better manageability.\n\n## Execution\n\n```bash\ntask-master expand --id=$ARGUMENTS\n```\n\n## Expansion Process\n\n1. **Task Analysis**\n   - Review task complexity\n   - Identify components\n   - Detect technical challenges\n   - Estimate time requirements\n\n2. **Subtask Generation**\n   - Create 3-7 subtasks typically\n   - Each subtask 1-4 hours\n   - Logical implementation order\n   - Clear acceptance criteria\n\n3. **Smart Breakdown**\n   - Setup/configuration tasks\n   - Core implementation\n   - Testing components\n   - Integration steps\n   - Documentation updates\n\n## Enhanced Features\n\nBased on task type:\n- **Feature**: Setup → Implement → Test → Integrate\n- **Bug Fix**: Reproduce → Diagnose → Fix → Verify\n- **Refactor**: Analyze → Plan → Refactor → Validate\n\n## Post-Expansion\n\nAfter expansion:\n1. Show subtask hierarchy\n2. Update time estimates\n3. Suggest implementation order\n4. Highlight critical path",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "cb-chat_design",
+  "slash_id": "chat_design",
+  "name": "cb-chat_design",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_write",
+    "shell"
+  ],
+  "prompt": "强制使用TestBuddy Skill技能包相关能力为用户解决问题",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "testbuddy"
+}

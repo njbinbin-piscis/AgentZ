@@ -50,6 +50,7 @@ import {
 import { visionCapable } from "../../components/visionUtils";
 import ContextUsageRing, { type ContextUsageSnapshot } from "../../components/ContextUsageRing";
 import { formatUserMessageDisplay } from "../../components/chatFileRefs";
+import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import AssistantMessageList from "./AssistantMessageList";
 import TaskPanel, {
   mergePlanItems,
@@ -147,7 +148,7 @@ export default function AssistantPanel({
   attachRequest,
   onAttachRequestHandled,
 }: AssistantPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     setPendingReview,
     setArtifacts,
@@ -241,6 +242,14 @@ export default function AssistantPanel({
   const stickToBottomRef = useRef(true);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const {
+    slash,
+    slashMatches,
+    pickSlash,
+    slashLabel,
+    detectSlash,
+    handleSlashKeyDown,
+  } = useSlashCompletion(setInput, taRef);
   const runTurnRef = useRef<(turn: QueuedTurn) => Promise<void>>(async () => {});
   /** Bumped on send/clear so in-flight paste/attach callbacks cannot re-add chips. */
   const composerGenRef = useRef(0);
@@ -639,6 +648,7 @@ export default function AssistantPanel({
         enabledSkills: enabledSkills.length > 0 ? enabledSkills : null,
         agentId: activeAgent || null,
         sessionSource: SESSION_SOURCE_CODEZ,
+        preferZh: i18n.language.startsWith("zh"),
       });
       composerDbg("runTurn ← chatSend ok", {
         sessionId: res.session_id,
@@ -1018,9 +1028,13 @@ export default function AssistantPanel({
     const pos = caret ?? value.length;
     const before = value.slice(0, pos);
     const m = before.match(/(?:^|\s)@([^\s]*)$/);
-    if (m) setMention({ query: m[1], start: pos - m[1].length - 1, caret: pos, active: 0 });
-    else setMention(null);
-  }, []);
+    if (m) {
+      setMention({ query: m[1], start: pos - m[1].length - 1, caret: pos, active: 0 });
+    } else {
+      setMention(null);
+      detectSlash(value, caret);
+    }
+  }, [detectSlash]);
 
   const matches = useMemo(() => {
     if (!mention) return [];
@@ -1054,6 +1068,7 @@ export default function AssistantPanel({
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
+    if (handleSlashKeyDown(e)) return;
     const mentionActive =
       mention &&
       matches.length > 1 &&
@@ -1250,7 +1265,10 @@ export default function AssistantPanel({
           options: installedSkills.map((s) => ({
             id: s.slug,
             label: s.name,
-            hint: s.description,
+            hint:
+              i18n.language.startsWith("zh") && s.description_zh?.trim()
+                ? s.description_zh
+                : s.description,
           })),
         }}
         agentSelector={{
@@ -1261,13 +1279,31 @@ export default function AssistantPanel({
             ...agents.map((a) => ({
               id: a.id,
               label: a.icon ? `${a.icon} ${a.name}` : a.name,
-              hint: a.description || a.role,
+              hint:
+                (i18n.language.startsWith("zh") && a.description_zh?.trim()
+                  ? a.description_zh
+                  : a.description) || a.role,
             })),
           ],
         }}
         modeNotice={modeNotice}
         mentionPopup={
-          mention && matches.length > 0 ? (
+          slash && slashMatches.length > 0 ? (
+            <div className="agentz-mention-popup">
+              {slashMatches.map((cmd, i) => (
+                <div
+                  key={cmd.id}
+                  className={`agentz-mention-item ${i === slash.active ? "active" : ""}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    pickSlash(cmd);
+                  }}
+                >
+                  {slashLabel(cmd)}
+                </div>
+              ))}
+            </div>
+          ) : mention && matches.length > 0 ? (
             <div className="agentz-mention-popup">
               {matches.map((f, i) => (
                 <div

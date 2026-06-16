@@ -1,0 +1,13 @@
+{
+  "id": "cb-setup",
+  "slash_id": "setup",
+  "name": "cb-setup",
+  "description": "Configure claude-hud as your AgentZ statusline",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# Claude HUD Setup\n\nConfigure claude-hud as your AgentZ statusline by adding the following configuration to your settings.\n\n## Configuration\n\nAdd this to your `~/.claude/settings.json`:\n\n```json\n{\n  \"statusLine\": {\n    \"type\": \"command\",\n    \"command\": \"node ${CLAUDE_PLUGIN_ROOT}/dist/index.js\"\n  }\n}\n```\n\n## What This Does\n\nThe HUD displays real-time session information:\n\n- **Session Info**: Model name, context usage bar (color-coded), config counts, session duration\n- **Tool Activity**: Running tools with spinner, completed tools with counts\n- **Agent Tracking**: Active subagents with descriptions and runtime\n- **Todo Progress**: Current task and completion metrics\n\n## Manual Setup\n\nIf automatic configuration doesn't work, you can manually:\n\n1. Open `~/.claude/settings.json`\n2. Add or update the `statusLine` section\n3. Restart AgentZ\n\n## Troubleshooting\n\nIf the HUD doesn't appear:\n\n1. Ensure Node.js 18+ is installed\n2. Check that the plugin is properly installed\n3. Verify the statusLine configuration in settings.json\n4. Try running `node ${CLAUDE_PLUGIN_ROOT}/dist/index.js` manually to check for errors\n\n## First-Time Build\n\nIf this is a fresh installation, build the TypeScript:\n\n```bash\ncd ${CLAUDE_PLUGIN_ROOT}\nnpm install\nnpm run build\n```",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "claude-hud"
+}

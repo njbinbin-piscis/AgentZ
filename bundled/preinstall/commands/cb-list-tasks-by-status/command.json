@@ -1,0 +1,13 @@
+{
+  "id": "cb-list-tasks-by-status",
+  "slash_id": "list-tasks-by-status",
+  "name": "cb-list-tasks-by-status",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "List tasks filtered by a specific status.\n\nArguments: $ARGUMENTS\n\nParse the status from arguments and list only tasks matching that status.\n\n## Status Options\n- `pending` - Not yet started\n- `in-progress` - Currently being worked on\n- `done` - Completed\n- `review` - Awaiting review\n- `deferred` - Postponed\n- `cancelled` - Cancelled\n\n## Execution\n\nBased on $ARGUMENTS, run:\n```bash\ntask-master list --status=$ARGUMENTS\n```\n\n## Enhanced Display\n\nFor the filtered results:\n- Group by priority within the status\n- Show time in current status\n- Highlight tasks approaching deadlines\n- Display blockers and dependencies\n- Suggest next actions for each status group\n\n## Intelligent Insights\n\nBased on the status filter:\n- **Pending**: Show recommended start order\n- **In-Progress**: Display idle time warnings\n- **Done**: Show newly unblocked tasks\n- **Review**: Indicate review duration\n- **Deferred**: Show reactivation criteria\n- **Cancelled**: Display impact analysis",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

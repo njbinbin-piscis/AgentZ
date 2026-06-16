@@ -8,6 +8,7 @@ export interface InstalledSkill {
   slug: string;
   name: string;
   description: string;
+  description_zh?: string;
   path: string;
   lifecycle?: string;
   locked?: boolean;

@@ -1,0 +1,17 @@
+{
+  "id": "cb-repro-issue",
+  "slash_id": "repro-issue",
+  "name": "cb-repro-issue",
+  "description": "Reproduce a specific issue by creating a failing test case",
+  "description_zh": "",
+  "argument_hint": "<issue_description>",
+  "tools": [
+    "file_read",
+    "file_write",
+    "file_edit"
+  ],
+  "prompt": "Repro issue $ARGUMENTS in a failing test",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-code-analysis-testing"
+}

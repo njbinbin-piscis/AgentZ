@@ -1,0 +1,13 @@
+{
+  "id": "cb-clean_gone",
+  "slash_id": "clean_gone",
+  "name": "cb-clean_gone",
+  "description": "Cleans up all git branches marked as [gone] (branches that have been deleted on the remote but still exist locally), including removing associated worktrees.",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "## Your Task\n\nYou need to execute the following bash commands to clean up stale local branches that have been deleted from the remote repository.\n\n## Commands to Execute\n\n1. **First, list branches to identify any with [gone] status**\n   Execute this command:\n   ```bash\n   git branch -v\n   ```\n   \n   Note: Branches with a '+' prefix have associated worktrees and must have their worktrees removed before deletion.\n\n2. **Next, identify worktrees that need to be removed for [gone] branches**\n   Execute this command:\n   ```bash\n   git worktree list\n   ```\n\n3. **Finally, remove worktrees and delete [gone] branches (handles both regular and worktree branches)**\n   Execute this command:\n   ```bash\n   # Process all [gone] branches, removing '+' prefix if present\n   git branch -v | grep '\\[gone\\]' | sed 's/^[+* ]//' | awk '{print $1}' | while read branch; do\n     echo \"Processing branch: $branch\"\n     # Find and remove worktree if it exists\n     worktree=$(git worktree list | grep \"\\\\[$branch\\\\]\" | awk '{print $1}')\n     if [ ! -z \"$worktree\" ] && [ \"$worktree\" != \"$(git rev-parse --show-toplevel)\" ]; then\n       echo \"  Removing worktree: $worktree\"\n       git worktree remove --force \"$worktree\"\n     fi\n     # Delete the branch\n     echo \"  Deleting branch: $branch\"\n     git branch -D \"$branch\"\n   done\n   ```\n\n## Expected Behavior\n\nAfter executing these commands, you will:\n\n- See a list of all local branches with their status\n- Identify and remove any worktrees associated with [gone] branches\n- Delete all branches marked as [gone]\n- Provide feedback on which worktrees and branches were removed\n\nIf no branches are marked as [gone], report that no cleanup was needed.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commit-commands"
+}

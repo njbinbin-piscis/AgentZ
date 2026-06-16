@@ -1,0 +1,8 @@
+{
+  "id": "tpl-agent-browser-template",
+  "name": "agent-browser",
+  "name_zh": "agent-browser",
+  "description": "基于 Vercel agent-browser CLI 的浏览器自动化插件。首次使用时自动安装，让 CodeBuddy 能够进行网页交互、截图、表单填写等浏览器操作。",
+  "description_zh": "基于 Vercel agent-browser CLI 的浏览器自动化插件。首次使用时自动安装，让 CodeBuddy 能够进行网页交互、截图、表单填写等浏览器操作。",
+  "source_plugin": "agent-browser"
+}

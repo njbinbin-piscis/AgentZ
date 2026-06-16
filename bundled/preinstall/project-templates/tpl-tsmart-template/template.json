@@ -1,0 +1,8 @@
+{
+  "id": "tpl-tsmart-template",
+  "name": "tsmart",
+  "name_zh": "tsmart",
+  "description": "AI 驱动测试用例生成与管理工作流，集成 TestBuddy 脑图可视化和 TCase 自动化测试代码生成能力",
+  "description_zh": "AI 驱动测试用例生成与管理工作流，集成 TestBuddy 脑图可视化和 TCase 自动化测试代码生成能力",
+  "source_plugin": "tsmart"
+}

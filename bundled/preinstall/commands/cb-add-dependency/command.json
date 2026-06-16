@@ -1,0 +1,13 @@
+{
+  "id": "cb-add-dependency",
+  "slash_id": "add-dependency",
+  "name": "cb-add-dependency",
+  "description": "",
+  "description_zh": "",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Add a dependency between tasks.\n\nArguments: $ARGUMENTS\n\nParse the task IDs to establish dependency relationship.\n\n## Adding Dependencies\n\nCreates a dependency where one task must be completed before another can start.\n\n## Argument Parsing\n\nParse natural language or IDs:\n- \"make 5 depend on 3\" → task 5 depends on task 3\n- \"5 needs 3\" → task 5 depends on task 3\n- \"5 3\" → task 5 depends on task 3\n- \"5 after 3\" → task 5 depends on task 3\n\n## Execution\n\n```bash\ntask-master add-dependency --id=<task-id> --depends-on=<dependency-id>\n```\n\n## Validation\n\nBefore adding:\n1. **Verify both tasks exist**\n2. **Check for circular dependencies**\n3. **Ensure dependency makes logical sense**\n4. **Warn if creating complex chains**\n\n## Smart Features\n\n- Detect if dependency already exists\n- Suggest related dependencies\n- Show impact on task flow\n- Update task priorities if needed\n\n## Post-Addition\n\nAfter adding dependency:\n1. Show updated dependency graph\n2. Identify any newly blocked tasks\n3. Suggest task order changes\n4. Update project timeline\n\n## Example Flows\n\n```\n/taskmaster:add-dependency 5 needs 3\n→ Task #5 now depends on Task #3\n→ Task #5 is now blocked until #3 completes\n→ Suggested: Also consider if #5 needs #4\n```",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "taskmaster"
+}

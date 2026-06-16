@@ -208,6 +208,7 @@ const en = {
     title: "Resource library",
     subtitle: "Discover, manage, and compose skills, agents, teams, and connectors",
     cat_skill: "Skills",
+    cat_command: "Commands",
     cat_tool: "Tools",
     cat_agent: "Agents",
     cat_team: "Teams",
@@ -232,10 +233,22 @@ const en = {
     installedGeneric: "Installed successfully",
     authorized: "Authorized",
     unauthorized: "Unauthorized",
-    discoverSkillsTitle: "Discover skills (ClawHub)",
+    discoverSkillsTitle: "Discover skills",
     discoverConnectorsTitle: "Discover connectors",
     goDiscoverConnectors: "Discover connectors in library",
     goDiscoverSkills: "Discover skills in library",
+    commandsSearch: "Search slash commands…",
+    commandsEmpty: "No slash commands installed yet. CodeBuddy presets are seeded on first launch.",
+    commandsArgs: "Arguments",
+  },
+
+  projectTemplate: {
+    title: "Project template",
+    subtitle: "This folder has no .agentz setup yet. Optionally apply a CodeBuddy rules/hooks template.",
+    none: "No templates available.",
+    hint: "Templates write .agentz/rules and hooks.json only when absent (hooks default to disabled).",
+    skip: "Skip",
+    apply: "Apply template",
   },
 
   connectors: {
@@ -517,13 +530,22 @@ const en = {
     installedTitle: "Installed skills",
     installedHint:
       "Skills (SKILL.md) are installed in the global config dir and injected into the agent when a task matches.",
-    empty: "No skills installed yet. Go to Resource library → Skills · Discover to search ClawHub.",
+    empty: "No skills installed yet. Go to Resource library → Skills · Discover to search SkillHub or ClawHub.",
     uninstall: "Uninstall",
     uninstallBlockedByAnonymousAgent:
       "Delete anonymous agent \"{{agent}}\" before uninstalling this skill",
     linkedAnonymousAgent: "Referenced by anonymous agent \"{{agent}}\"",
-    marketTitle: "Skill marketplace (ClawHub)",
+    marketTitle: "Skill marketplace",
     marketHint: "Search and install community skills. Leave empty to browse popular skills.",
+    registryTabs: "Skill source",
+    registry: {
+      skillhub: "SkillHub",
+      clawhub: "ClawHub",
+    },
+    skillhubHint:
+      "Skills community optimized for China (api.skillhub.cn). Leave empty to browse popular skills.",
+    clawhubHint:
+      "OpenClaw public skill registry (clawhub.ai). Leave empty to browse popular skills.",
     searchPlaceholder: "Search skills, e.g. figma, finance…",
     search: "Search",
     searching: "Searching…",

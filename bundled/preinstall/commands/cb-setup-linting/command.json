@@ -1,0 +1,13 @@
+{
+  "id": "cb-setup-linting",
+  "slash_id": "setup-linting",
+  "name": "cb-setup-linting",
+  "description": "Setup code linting and quality tools",
+  "description_zh": "",
+  "argument_hint": "1. **Project Analysis**",
+  "tools": [],
+  "prompt": "# Setup Linting Command\n\nSetup code linting and quality tools\n\n## Instructions\n\nFollow this systematic approach to setup linting: **$ARGUMENTS**\n\n1. **Project Analysis**\n   - Identify programming languages and frameworks\n   - Check existing linting configuration\n   - Review current code style and patterns\n   - Assess team preferences and requirements\n\n2. **Tool Selection by Language**\n\n   **JavaScript/TypeScript:**\n   ```bash\n   npm install -D eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin\n   npm install -D prettier eslint-config-prettier eslint-plugin-prettier\n   ```\n\n   **Python:**\n   ```bash\n   pip install flake8 black isort mypy pylint\n   ```\n\n   **Java:**\n   ```bash\n   # Add to pom.xml or build.gradle\n   # Checkstyle, SpotBugs, PMD\n   ```\n\n3. **Configuration Setup**\n\n   **ESLint (.eslintrc.json):**\n   ```json\n   {\n     \"extends\": [\n       \"eslint:recommended\",\n       \"@typescript-eslint/recommended\",\n       \"prettier\"\n     ],\n     \"parser\": \"@typescript-eslint/parser\",\n     \"plugins\": [\"@typescript-eslint\"],\n     \"rules\": {\n       \"no-console\": \"warn\",\n       \"no-unused-vars\": \"error\",\n       \"@typescript-eslint/no-explicit-any\": \"warn\"\n     }\n   }\n   ```\n\n4. **IDE Integration**\n   - Configure VS Code settings\n   - Setup auto-fix on save\n   - Install relevant extensions\n\n5. **CI/CD Integration**\n   ```yaml\n   - name: Lint code\n     run: npm run lint\n   ```\n\n6. **Package.json Scripts**\n   ```json\n   {\n     \"scripts\": {\n       \"lint\": \"eslint src --ext .ts,.tsx\",\n       \"lint:fix\": \"eslint src --ext .ts,.tsx --fix\",\n       \"format\": \"prettier --write src\"\n     }\n   }\n   ```\n\nRemember to customize rules based on team preferences and gradually enforce stricter standards.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-project-setup"
+}

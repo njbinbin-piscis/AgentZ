@@ -1,0 +1,15 @@
+{
+  "id": "cb-modernize-deps",
+  "slash_id": "modernize-deps",
+  "name": "cb-modernize-deps",
+  "description": "Update and modernize project dependencies",
+  "description_zh": "",
+  "argument_hint": "1. **Dependency Audit**",
+  "tools": [
+    "file_read"
+  ],
+  "prompt": "# Modernize Dependencies Command\n\nUpdate and modernize project dependencies\n\n## Instructions\n\nFollow this approach to modernize dependencies: **$ARGUMENTS**\n\n1. **Dependency Audit**\n   ```bash\n   # Check outdated packages\n   npm outdated\n   pip list --outdated\n   composer outdated\n   \n   # Security audit\n   npm audit\n   pip-audit\n   ```\n\n2. **Update Strategy**\n   - Start with patch updates (1.2.3 → 1.2.4)\n   - Then minor updates (1.2.3 → 1.3.0)\n   - Finally major updates (1.2.3 → 2.0.0)\n   - Test thoroughly between each step\n\n3. **Automated Updates**\n   ```bash\n   # Safe updates\n   npm update\n   pip install -U package-name\n   \n   # Interactive updates\n   npx npm-check-updates -i\n   ```\n\n4. **Breaking Changes Review**\n   - Read changelogs and migration guides\n   - Identify deprecated APIs\n   - Plan code changes needed\n   - Update tests and documentation\n\n5. **Testing and Validation**\n   ```bash\n   npm test\n   npm run build\n   npm run lint\n   ```\n\n6. **Documentation Updates**\n   - Update README.md\n   - Revise installation instructions\n   - Update API documentation\n   - Note breaking changes\n\nRemember to update dependencies incrementally, test thoroughly, and maintain backward compatibility where possible.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "commands-project-setup"
+}

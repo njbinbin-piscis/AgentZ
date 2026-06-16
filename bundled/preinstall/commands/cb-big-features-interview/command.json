@@ -1,0 +1,20 @@
+{
+  "id": "cb-big-features-interview",
+  "slash_id": "big-features-interview",
+  "name": "cb-big-features-interview",
+  "description": "Interview to flesh out a plan/spec",
+  "description_zh": "",
+  "argument_hint": "<plan-file>",
+  "tools": [
+    "chat_ui",
+    "file_read",
+    "file_list",
+    "codebase_search",
+    "file_write",
+    "file_edit"
+  ],
+  "prompt": "Here's the current plan:\n\n@$ARGUMENTS\n\nInterview me in detail using the chat_ui tool tool about literally anything: technical implementation, UI & UX, concerns, tradeoffs, etc. but make sure the questions are not obvious.\n\nBe very in-depth and continue interviewing me continually until it's complete, then write the spec back to `$ARGUMENTS`.",
+  "prompt_zh": "",
+  "source": "codebuddy",
+  "source_plugin": "interview"
+}
