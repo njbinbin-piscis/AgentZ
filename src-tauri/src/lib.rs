@@ -296,6 +296,7 @@ pub fn run() {
             commands::workbench::hooks_run,
             // Slash commands (CodeBuddy presets)
             commands::slash_commands::slash_commands_list,
+            commands::slash_commands::slash_commands_install,
             commands::slash_commands::slash_commands_resolve,
             // Project templates (.agentz rules + hooks)
             commands::project_templates::project_templates_list,

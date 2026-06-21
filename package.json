@@ -15,6 +15,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "import:codebuddy": "node scripts/import-codebuddy-marketplace.mjs",
+    "export:official-catalog": "node scripts/export-preinstall-to-marketplace.mjs",
     "lint:preinstall": "node scripts/lint-preinstall.mjs",
     "remediate:preinstall": "node scripts/remediate-preinstall.mjs",
     "verify:preinstall": "node scripts/verify-preinstall.mjs"

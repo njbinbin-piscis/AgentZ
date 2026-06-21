@@ -63,6 +63,7 @@ fn client_profile_query() -> String {
 fn cloud_kind_for_category(category: &str) -> Option<&'static str> {
     match category {
         "agent" => Some("expert"),
+        "skill" => Some("skill"),
         "connector" => Some("connector"),
         "team" => Some("team"),
         "tool" => Some("tool"),
@@ -70,11 +71,26 @@ fn cloud_kind_for_category(category: &str) -> Option<&'static str> {
     }
 }
 
+async fn fetch_cloud_asset_payload(asset_id: &str) -> Result<serde_json::Value, String> {
+    let url = cloud_asset_url(asset_id)?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .user_agent("AgentZ-Desktop/1.0")
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("asset fetch HTTP {}", resp.status()));
+    }
+    let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    Ok(body.get("payload").cloned().unwrap_or(body))
+}
+
 async fn fetch_cloud_assets(category: &str, query: &str) -> Result<Vec<CloudAssetSummary>, String> {
     let base = cloud_base_url().ok_or_else(|| "cloud marketplace URL not configured".to_string())?;
     let kind = cloud_kind_for_category(category).ok_or_else(|| format!("no cloud kind for {category}"))?;
     let profile = client_profile_query();
-    let mut url = format!(
+    let url = format!(
         "{}/api/marketplace/assets?kind={kind}&{profile}",
         base.trim_end_matches('/')
     );
@@ -102,17 +118,7 @@ fn cloud_asset_url(asset_id: &str) -> Result<String, String> {
 }
 
 async fn remote_install_connector(app: &AppHandle, asset_id: &str) -> Result<(), String> {
-    let url = cloud_asset_url(asset_id)?;
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .user_agent("AgentZ-Desktop/1.0")
-        .build()
-        .map_err(|e| e.to_string())?;
-    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
-    if !resp.status().is_success() {
-        return Err(format!("asset fetch HTTP {}", resp.status()));
-    }
-    let payload: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let payload = fetch_cloud_asset_payload(asset_id).await?;
     let connector = payload
         .get("connector")
         .cloned()
@@ -131,31 +137,33 @@ async fn remote_install_connector(app: &AppHandle, asset_id: &str) -> Result<(),
 }
 
 async fn remote_install_agent(app: &AppHandle, asset_id: &str) -> Result<(), String> {
-    let url = cloud_asset_url(asset_id)?;
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .user_agent("AgentZ-Desktop/1.0")
-        .build()
-        .map_err(|e| e.to_string())?;
-    let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
-    if !resp.status().is_success() {
-        return Err(format!("asset fetch HTTP {}", resp.status()));
-    }
-    let payload: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    let slug = asset_id
-        .split('/')
-        .nth(2)
-        .and_then(|s| s.split('@').next())
-        .unwrap_or("agent");
-    let manifest = serde_json::json!({
-        "id": slug,
-        "name": payload.get("name").and_then(|v| v.as_str()).unwrap_or(slug),
-        "description": payload.get("description").and_then(|v| v.as_str()).unwrap_or(""),
-        "system_prompt": payload.get("system_prompt").and_then(|v| v.as_str()).unwrap_or(""),
-        "icon": payload.get("icon").and_then(|v| v.as_str()).unwrap_or("🤖"),
-        "color": payload.get("color").and_then(|v| v.as_str()).unwrap_or("#7c5cff"),
-    });
+    let payload = fetch_cloud_asset_payload(asset_id).await?;
+    let manifest = if let Some(m) = payload.get("agent_manifest") {
+        m.clone()
+    } else {
+        let slug = asset_id
+            .split('/')
+            .nth(2)
+            .and_then(|s| s.split('@').next())
+            .unwrap_or("agent");
+        serde_json::json!({
+            "id": slug,
+            "name": payload.get("name").and_then(|v| v.as_str()).unwrap_or(slug),
+            "description": payload.get("description").and_then(|v| v.as_str()).unwrap_or(""),
+            "description_zh": payload.get("description_zh").and_then(|v| v.as_str()).unwrap_or(""),
+            "system_prompt": payload.get("system_prompt").and_then(|v| v.as_str()).unwrap_or(""),
+            "system_prompt_zh": payload.get("system_prompt_zh").and_then(|v| v.as_str()).unwrap_or(""),
+            "icon": payload.get("icon").and_then(|v| v.as_str()).unwrap_or("🤖"),
+            "color": payload.get("color").and_then(|v| v.as_str()).unwrap_or("#7c5cff"),
+            "tools": payload.get("allowed_tools").cloned().unwrap_or(serde_json::json!([])),
+            "skills": payload.get("allowed_skills").cloned().unwrap_or(serde_json::json!([])),
+        })
+    };
     let pretty = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?;
+    let slug = manifest
+        .get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("agent");
     let tmp = std::env::temp_dir().join(format!("agentz-agent-{}.json", slug));
     tokio::fs::write(&tmp, pretty)
         .await
@@ -163,6 +171,36 @@ async fn remote_install_agent(app: &AppHandle, asset_id: &str) -> Result<(), Str
     agents::agents_install(app.clone(), tmp.to_string_lossy().into())
         .await
         .map(|_| ())
+}
+
+async fn remote_install_skill(app: &AppHandle, asset_id: &str) -> Result<(), String> {
+    let payload = fetch_cloud_asset_payload(asset_id).await?;
+    let skill_md = payload
+        .get("skill_md")
+        .and_then(|v| v.as_str())
+        .or_else(|| payload.get("content").and_then(|v| v.as_str()))
+        .or_else(|| payload.get("instructions").and_then(|v| v.as_str()))
+        .unwrap_or("");
+    if skill_md.trim().is_empty() {
+        return Err("cloud skill payload missing skill_md".into());
+    }
+    let config_dir = crate::commands::data_scope::resolve_global_config_dir(app)?;
+    let skills_root =
+        crate::skills::service::skills_root_from_config_dir(&config_dir);
+    crate::skills::provenance::ensure_evolution_dirs(&skills_root).map_err(|e| e.to_string())?;
+    let (global_db, _) =
+        crate::commands::data_scope::open_global_kernel_state(app).map_err(|e| e.to_string())?;
+    let db = global_db.lock().await;
+    crate::skills::service::install_to_installed(
+        &db,
+        &skills_root,
+        skill_md,
+        "official",
+        Some(asset_id.to_string()),
+        None,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 async fn remote_install_team(app: &AppHandle, asset_id: &str) -> Result<(), String> {
@@ -242,6 +280,7 @@ pub async fn marketplace_install(
         ("skill", "clawhub") => clawhub::clawhub_install(app, identifier, version, None)
             .await
             .map(|_| ()),
+        ("skill", "remote") => remote_install_skill(&app, &identifier).await,
         ("tool", "remote") => remote_install_tool(app, &identifier).await,
         ("agent", "remote") => remote_install_agent(&app, &identifier).await,
         ("team", "remote") => remote_install_team(&app, &identifier).await,
@@ -290,7 +329,7 @@ async fn search_skills(app: AppHandle, query: String) -> Result<Vec<MarketItem>,
     let installed_slugs: std::collections::HashSet<String> =
         installed.iter().map(|s| s.slug.clone()).collect();
 
-    let res = clawhub::clawhub_search(query, Some(30), None).await?;
+    let res = clawhub::clawhub_search(query.clone(), Some(30), None).await?;
     let mut items: Vec<MarketItem> = res
         .items
         .into_iter()
@@ -307,6 +346,33 @@ async fn search_skills(app: AppHandle, query: String) -> Result<Vec<MarketItem>,
             it
         })
         .collect();
+
+    if let Ok(remote) = fetch_cloud_assets("skill", &query).await {
+        let listed: std::collections::HashSet<String> = items.iter().map(|i| i.id.clone()).collect();
+        for a in remote {
+            if !query.is_empty()
+                && !a.name.to_lowercase().contains(&query.to_lowercase())
+                && !a.description.to_lowercase().contains(&query.to_lowercase())
+            {
+                continue;
+            }
+            if listed.contains(&a.id) {
+                continue;
+            }
+            let mut it = MarketItem::base("skill", "remote");
+            it.id = a.id.clone();
+            it.name = a.name;
+            it.description = a.description;
+            it.version = a.version;
+            it.icon = "🧩".into();
+            it.tag = if a.category == "official" {
+                "official".into()
+            } else {
+                a.category
+            };
+            items.push(it);
+        }
+    }
 
     // Surface locally-installed skills that aren't in the search results so the
     // user can always manage them from the same tab.
@@ -367,6 +433,22 @@ where
 }
 
 async fn remote_install_tool(app: AppHandle, asset_id: &str) -> Result<(), String> {
+    let payload = fetch_cloud_asset_payload(asset_id).await?;
+    let is_slash = payload
+        .get("agentz_kind")
+        .and_then(|v| v.as_str())
+        == Some("slash_command")
+        || payload.get("slash_command").is_some();
+    if is_slash {
+        let cmd = payload
+            .get("slash_command")
+            .cloned()
+            .unwrap_or(payload);
+        let pretty = serde_json::to_string_pretty(&cmd).map_err(|e| e.to_string())?;
+        return crate::commands::slash_commands::slash_commands_install(app.clone(), pretty)
+            .await
+            .map(|_| ());
+    }
     user_tools::user_tools_install(app, cloud_asset_url(asset_id)?)
         .await
         .map(|_| ())

@@ -72,6 +72,18 @@ pub fn load_manifest(path: &Path) -> Result<SlashCommandManifest, String> {
     serde_json::from_str(&text).map_err(|e| format!("invalid command.json: {e}"))
 }
 
+fn write_manifest(config_dir: &Path, manifest: &SlashCommandManifest) -> Result<(), String> {
+    let id = safe_id(&manifest.id);
+    if id.is_empty() {
+        return Err("command.json must declare a non-empty 'id'".into());
+    }
+    let dir = command_dir(config_dir, &id);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string_pretty(manifest).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join("command.json"), json).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 pub fn list_commands_from_dir(config_dir: &Path) -> Vec<SlashCommandInfo> {
     let root = commands_root(config_dir);
     let Ok(entries) = std::fs::read_dir(&root) else {
@@ -165,6 +177,61 @@ pub fn resolve_command(
 pub fn slash_commands_list(app: AppHandle) -> Result<Vec<SlashCommandInfo>, String> {
     let config_dir = resolve_global_config_dir(&app)?;
     Ok(list_commands_from_dir(&config_dir))
+}
+
+/// Install a slash command from a local `command.json` path or JSON string / HTTPS URL.
+#[tauri::command]
+pub async fn slash_commands_install(app: AppHandle, source: String) -> Result<SlashCommandInfo, String> {
+    let config_dir = resolve_global_config_dir(&app)?;
+    let manifest_text = if source.starts_with("http://") || source.starts_with("https://") {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .map_err(|e| e.to_string())?;
+        client
+            .get(&source)
+            .header("User-Agent", "AgentZ-Desktop/1.0")
+            .send()
+            .await
+            .map_err(|e| format!("Download error: {e}"))?
+            .text()
+            .await
+            .map_err(|e| format!("Read error: {e}"))?
+    } else if source.trim_start().starts_with('{') {
+        source
+    } else {
+        let p = PathBuf::from(&source);
+        let file = if p.is_dir() {
+            p.join("command.json")
+        } else {
+            p
+        };
+        std::fs::read_to_string(&file).map_err(|e| e.to_string())?
+    };
+
+    let mut manifest: SlashCommandManifest =
+        serde_json::from_str(&manifest_text).map_err(|e| format!("invalid command.json: {e}"))?;
+    manifest.id = safe_id(&manifest.id);
+    if manifest.id.is_empty() {
+        return Err("command.json must declare a non-empty 'id'".into());
+    }
+    if manifest.slash_id.is_empty() {
+        manifest.slash_id = manifest.id.clone();
+    }
+    write_manifest(&config_dir, &manifest)?;
+    Ok(list_commands_from_dir(&config_dir)
+        .into_iter()
+        .find(|c| c.id == manifest.id)
+        .unwrap_or_else(|| SlashCommandInfo {
+            id: manifest.id.clone(),
+            slash_id: manifest.slash_id.clone(),
+            name: manifest.name.clone(),
+            description: manifest.description.clone(),
+            description_zh: manifest.description_zh.clone(),
+            argument_hint: manifest.argument_hint.clone(),
+            tools: manifest.tools.clone(),
+            source: manifest.source.clone(),
+        }))
 }
 
 #[tauri::command]
