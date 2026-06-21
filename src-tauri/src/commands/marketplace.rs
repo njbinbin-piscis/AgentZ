@@ -27,6 +27,12 @@ struct CloudAssetSummary {
     version: String,
     #[serde(default, rename = "kind")]
     category: String,
+    #[serde(default)]
+    download_url: Option<String>,
+    #[serde(default)]
+    channel: Option<String>,
+    #[serde(default)]
+    signature: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -51,13 +57,16 @@ fn desktop_os_name() -> &'static str {
     }
 }
 
-fn client_profile_query() -> String {
+fn client_profile_query(channel: &str) -> String {
     let os = desktop_os_name();
     let mut caps = vec!["mcp_stdio"];
     if os == "windows" {
         caps.push("com");
     }
-    format!("surface=desktop&os={os}&capabilities={}", caps.join(","))
+    format!(
+        "surface=desktop&os={os}&capabilities={}&channel={channel}",
+        caps.join(",")
+    )
 }
 
 fn cloud_kind_for_category(category: &str) -> Option<&'static str> {
@@ -71,7 +80,7 @@ fn cloud_kind_for_category(category: &str) -> Option<&'static str> {
     }
 }
 
-async fn fetch_cloud_asset_payload(asset_id: &str) -> Result<serde_json::Value, String> {
+async fn fetch_cloud_asset_payload(asset_id: &str, channel: &str) -> Result<serde_json::Value, String> {
     let url = cloud_asset_url(asset_id)?;
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
@@ -83,13 +92,70 @@ async fn fetch_cloud_asset_payload(asset_id: &str) -> Result<serde_json::Value, 
         return Err(format!("asset fetch HTTP {}", resp.status()));
     }
     let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    Ok(body.get("payload").cloned().unwrap_or(body))
+    let payload = body.get("payload").cloned().unwrap_or(body.clone());
+    if let Some(sig) = body.get("signature").and_then(|v| v.as_str()) {
+        verify_cloud_signature(&payload, sig)?;
+    } else if let Some(sig) = payload.get("signature").and_then(|v| v.as_str()) {
+        verify_cloud_signature(&payload, sig)?;
+    }
+    let _ = channel; // channel is selected at listing time via client_profile
+    Ok(payload)
 }
 
-async fn fetch_cloud_assets(category: &str, query: &str) -> Result<Vec<CloudAssetSummary>, String> {
+fn canonical_json(value: &serde_json::Value) -> Result<String, String> {
+    match value {
+        serde_json::Value::Object(map) => {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            let mut out = String::from("{");
+            for (i, k) in keys.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                out.push_str(&serde_json::to_string(k).map_err(|e| e.to_string())?);
+                out.push(':');
+                out.push_str(&canonical_json(&map[*k])?);
+            }
+            out.push('}');
+            Ok(out)
+        }
+        serde_json::Value::Array(arr) => {
+            let parts: Result<Vec<String>, String> =
+                arr.iter().map(canonical_json).collect();
+            Ok(format!("[{}]", parts?.join(",")))
+        }
+        other => serde_json::to_string(other).map_err(|e| e.to_string()),
+    }
+}
+
+fn verify_cloud_signature(payload: &serde_json::Value, signature: &str) -> Result<(), String> {
+    let secret = std::env::var("MARKETPLACE_SIGNING_SECRET")
+        .ok()
+        .filter(|s| !s.trim().is_empty());
+    let Some(secret) = secret else {
+        return Ok(());
+    };
+    let mut to_sign = payload.clone();
+    if let Some(obj) = to_sign.as_object_mut() {
+        obj.remove("signature");
+    }
+    let canonical = canonical_json(&to_sign)?;
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).map_err(|e| e.to_string())?;
+    mac.update(canonical.as_bytes());
+    let expected = hex::encode(mac.finalize().into_bytes());
+    if expected != signature {
+        return Err("cloud asset signature mismatch".into());
+    }
+    Ok(())
+}
+
+async fn fetch_cloud_assets(category: &str, query: &str, channel: &str) -> Result<Vec<CloudAssetSummary>, String> {
     let base = cloud_base_url().ok_or_else(|| "cloud marketplace URL not configured".to_string())?;
     let kind = cloud_kind_for_category(category).ok_or_else(|| format!("no cloud kind for {category}"))?;
-    let profile = client_profile_query();
+    let profile = client_profile_query(channel);
     let url = format!(
         "{}/api/marketplace/assets?kind={kind}&{profile}",
         base.trim_end_matches('/')
@@ -118,7 +184,7 @@ fn cloud_asset_url(asset_id: &str) -> Result<String, String> {
 }
 
 async fn remote_install_connector(app: &AppHandle, asset_id: &str) -> Result<(), String> {
-    let payload = fetch_cloud_asset_payload(asset_id).await?;
+    let payload = fetch_cloud_asset_payload(asset_id, "stable").await?;
     let connector = payload
         .get("connector")
         .cloned()
@@ -137,7 +203,7 @@ async fn remote_install_connector(app: &AppHandle, asset_id: &str) -> Result<(),
 }
 
 async fn remote_install_agent(app: &AppHandle, asset_id: &str) -> Result<(), String> {
-    let payload = fetch_cloud_asset_payload(asset_id).await?;
+    let payload = fetch_cloud_asset_payload(asset_id, "stable").await?;
     let manifest = if let Some(m) = payload.get("agent_manifest") {
         m.clone()
     } else {
@@ -174,7 +240,7 @@ async fn remote_install_agent(app: &AppHandle, asset_id: &str) -> Result<(), Str
 }
 
 async fn remote_install_skill(app: &AppHandle, asset_id: &str) -> Result<(), String> {
-    let payload = fetch_cloud_asset_payload(asset_id).await?;
+    let payload = fetch_cloud_asset_payload(asset_id, "stable").await?;
     let skill_md = payload
         .get("skill_md")
         .and_then(|v| v.as_str())
@@ -347,7 +413,7 @@ async fn search_skills(app: AppHandle, query: String) -> Result<Vec<MarketItem>,
         })
         .collect();
 
-    if let Ok(remote) = fetch_cloud_assets("skill", &query).await {
+    if let Ok(remote) = fetch_cloud_assets("skill", &query, "stable").await {
         let listed: std::collections::HashSet<String> = items.iter().map(|i| i.id.clone()).collect();
         for a in remote {
             if !query.is_empty()
@@ -402,7 +468,7 @@ where
     Fut: std::future::Future<Output = Result<Vec<MarketItem>, String>>,
 {
     let mut items = local_fn(app.clone()).await.unwrap_or_default();
-    if let Ok(remote) = fetch_cloud_assets(category, &query).await {
+    if let Ok(remote) = fetch_cloud_assets(category, &query, "stable").await {
         let local_ids: std::collections::HashSet<String> =
             items.iter().map(|i| i.id.clone()).collect();
         for a in remote {
@@ -433,7 +499,7 @@ where
 }
 
 async fn remote_install_tool(app: AppHandle, asset_id: &str) -> Result<(), String> {
-    let payload = fetch_cloud_asset_payload(asset_id).await?;
+    let payload = fetch_cloud_asset_payload(asset_id, "stable").await?;
     let is_slash = payload
         .get("agentz_kind")
         .and_then(|v| v.as_str())
@@ -456,7 +522,7 @@ async fn remote_install_tool(app: AppHandle, asset_id: &str) -> Result<(), Strin
 
 async fn search_connectors(app: AppHandle, query: String) -> Result<Vec<MarketItem>, String> {
     let mut items = list_connectors(app.clone()).await?;
-    if let Ok(remote) = fetch_cloud_assets("connector", &query).await {
+    if let Ok(remote) = fetch_cloud_assets("connector", &query, "stable").await {
         let local_ids: std::collections::HashSet<String> =
             items.iter().map(|i| i.id.clone()).collect();
         for a in remote {
