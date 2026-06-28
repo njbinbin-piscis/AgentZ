@@ -18,6 +18,7 @@ use crate::commands::{agents, clawhub, connectors, teams, user_tools, workbench}
 const DEFAULT_CLOUD_BASE: &str = "https://www.dimnuo.com";
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // download_url / channel / signature reserved for direct-download installs
 struct CloudAssetSummary {
     id: String,
     name: String,
