@@ -19,9 +19,16 @@ import {
 import { useAppSettings, pruneModelId } from "../../hooks/useAppSettings";
 import { loadScopedModelId, saveScopedModelId } from "../../utils/modelPrefs";
 import { useInputHistory } from "../../components/useInputHistory";
+import { useAtMention, CODEBASE_MENTION, GRAPH_MENTION } from "../../hooks/useAtMention";
+import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { agentTaskApi, type AgentTaskInfo } from "../../services/tauri/agentTask";
 import { generateRepoWiki } from "../../services/tauri/repoWiki";
+import {
+  getGraphIndexStatus,
+  requestGraphIndex,
+  waitGraphIndexIdle,
+} from "../../services/tauri/graphIndex";
 import AgentTaskReview from "./AgentTaskReview";
 import SessionSkillRevisions from "./SessionSkillRevisions";
 import ChatComposer, { type ComposerMenuOption } from "../../components/ChatComposer";
@@ -44,7 +51,6 @@ import TaskPanel, {
 import Markdown from "../codez/Markdown";
 import InteractiveCard from "../../components/chat/InteractiveCard";
 import { useInteractiveCards } from "../../hooks/useInteractiveCards";
-import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import AgentFilePreview from "./AgentFilePreview";
 import { useProjectEdge } from "../../contexts/ProjectEdgeContext";
 import CollabBoard from "./CollabBoard";
@@ -70,11 +76,14 @@ import "./Agent.css";
 
 import type { LibraryInitialState } from "../codez/resources/types";
 
+export type WikiBuildAction = "overview" | "graph";
+
 interface WorkZWorkspaceProps {
   projectDir: string | null;
   onOpenFolder: () => void;
   /** Increment from title bar to trigger repo wiki generation. */
   wikiBuildNonce?: number;
+  wikiBuildAction?: WikiBuildAction;
   onWikiBusyChange?: (busy: boolean) => void;
   onOpenLibrary?: (initial?: LibraryInitialState) => void;
 }
@@ -90,6 +99,7 @@ export default function WorkZWorkspace({
   projectDir,
   onOpenFolder,
   wikiBuildNonce = 0,
+  wikiBuildAction = "overview",
   onWikiBusyChange,
   onOpenLibrary,
 }: WorkZWorkspaceProps) {
@@ -181,6 +191,13 @@ export default function WorkZWorkspace({
     detectSlash,
     handleSlashKeyDown,
   } = useSlashCompletion(setGoal, taRef);
+  const {
+    mention,
+    mentionMatches,
+    pickMention,
+    detectAtMention,
+    handleMentionKeyDown,
+  } = useAtMention(setGoal, taRef);
   const panelRef = useRef<HTMLDivElement>(null);
   const runRef = useRef<(text: string, att: ChatAttachment | null) => Promise<void>>(async () => {});
 
@@ -832,31 +849,40 @@ export default function WorkZWorkspace({
     [projectDir, newTask, refreshTasks, markRunning],
   );
 
-  const buildWiki = useCallback(async () => {
-    if (!projectDir || wikiBusy) return;
-    setWikiBusy(true);
-    onWikiBusyChange?.(true);
-    setError(null);
-    try {
-      const res = await generateRepoWiki(projectDir);
-      setPreviewPath(res.path);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setWikiBusy(false);
-      onWikiBusyChange?.(false);
-    }
-  }, [projectDir, wikiBusy, onWikiBusyChange]);
+  const buildWiki = useCallback(
+    async (action: WikiBuildAction) => {
+      if (!projectDir || wikiBusy) return;
+      setWikiBusy(true);
+      onWikiBusyChange?.(true);
+      setError(null);
+      try {
+        if (action === "graph") {
+          await requestGraphIndex(projectDir);
+          await waitGraphIndexIdle(projectDir).catch(() => getGraphIndexStatus(projectDir));
+        } else {
+          const res = await generateRepoWiki(projectDir);
+          setPreviewPath(res.path);
+        }
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setWikiBusy(false);
+        onWikiBusyChange?.(false);
+      }
+    },
+    [projectDir, wikiBusy, onWikiBusyChange, setPreviewPath],
+  );
 
   const wikiTriggerRef = useRef(0);
   useEffect(() => {
     if (wikiBuildNonce <= 0 || wikiBuildNonce === wikiTriggerRef.current) return;
     wikiTriggerRef.current = wikiBuildNonce;
-    void buildWiki();
-  }, [wikiBuildNonce, buildWiki]);
+    void buildWiki(wikiBuildAction);
+  }, [wikiBuildNonce, wikiBuildAction, buildWiki]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
+    if (handleMentionKeyDown(e)) return;
     if (handleSlashKeyDown(e)) return;
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
@@ -1322,15 +1348,15 @@ export default function WorkZWorkspace({
               </button>
             )}
             {worktree && (
-              <button
-                type="button"
-                className="agentz-workz-review-btn"
-                onClick={() => setReviewTask(worktree)}
-                disabled={busy}
-                title={worktree.branch}
-              >
-                {t("agent.review")}
-              </button>
+                <button
+                  type="button"
+                  className="agentz-workz-review-btn"
+                  onClick={() => setReviewTask(worktree)}
+                  disabled={busy}
+                  title={worktree.branch}
+                >
+                  {t("agent.review")}
+                </button>
             )}
           </div>
         </div>
@@ -1339,7 +1365,9 @@ export default function WorkZWorkspace({
           value={goal}
           onChange={(value, caret) => {
             setGoal(value);
-            detectSlash(value, caret);
+            if (!detectAtMention(value, caret)) {
+              detectSlash(value, caret);
+            }
           }}
           onSubmit={run}
           onStop={stopActive}
@@ -1384,7 +1412,26 @@ export default function WorkZWorkspace({
               : undefined
           }
           mentionPopup={
-            slash && slashMatches.length > 0 ? (
+            mention && mentionMatches.length > 0 ? (
+              <div className="agentz-mention-popup">
+                {mentionMatches.map((path, i) => (
+                  <div
+                    key={path}
+                    className={`agentz-mention-item ${i === mention.active ? "active" : ""}`}
+                    onMouseDown={(ev) => {
+                      ev.preventDefault();
+                      pickMention(path);
+                    }}
+                  >
+                    {path === CODEBASE_MENTION
+                      ? `codebase · ${t("chat.mentionCodebase")}`
+                      : path === GRAPH_MENTION
+                        ? `graph · ${t("chat.mentionGraph")}`
+                        : path}
+                  </div>
+                ))}
+              </div>
+            ) : slash && slashMatches.length > 0 ? (
               <div className="agentz-mention-popup">
                 {slashMatches.map((cmd, i) => (
                   <div

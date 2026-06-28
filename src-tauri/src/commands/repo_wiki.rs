@@ -7,13 +7,14 @@
 //! offline without an LLM. The result is written to `{project}/.agentz/REPO_WIKI.md`
 //! and returned to the caller for preview.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 
-use crate::commands::codebase::{build_index, CodeSearchHit};
+use crate::commands::codebase::{build_index, search_index, CodeSearchHit};
 use crate::commands::data_scope::require_project_dir;
+use crate::commands::graph::{self, GraphDoc};
 
 fn index_db_path(root: &Path) -> PathBuf {
     root.join(".agentz").join("index.db")
@@ -33,6 +34,72 @@ fn top_module(path: &str) -> String {
         Some((head, _)) => head.to_string(),
         None => "(root)".to_string(),
     }
+}
+
+fn mermaid_module_deps(doc: &GraphDoc) -> Option<String> {
+    let mut edges: BTreeSet<(String, String)> = BTreeSet::new();
+    for e in &doc.edges {
+        if e.kind != "depends" {
+            continue;
+        }
+        let Some(from) = e.from.strip_prefix("module:") else {
+            continue;
+        };
+        let Some(to) = e.to.strip_prefix("module:") else {
+            continue;
+        };
+        if from == to {
+            continue;
+        }
+        let from_id = mermaid_id(from);
+        let to_id = mermaid_id(to);
+        edges.insert((from_id, to_id));
+    }
+    if edges.is_empty() {
+        return None;
+    }
+    let mut md = String::from("```mermaid\nflowchart LR\n");
+    for (from, to) in edges.iter().take(40) {
+        md.push_str(&format!("  {from} --> {to}\n"));
+    }
+    md.push_str("```\n");
+    Some(md)
+}
+
+fn mermaid_id(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+fn file_in_degrees(doc: &GraphDoc) -> Vec<(String, usize)> {
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for e in &doc.edges {
+        if e.kind != "imports" {
+            continue;
+        }
+        let Some(to) = e.to.strip_prefix("file:") else {
+            continue;
+        };
+        *counts.entry(to.to_string()).or_default() += 1;
+    }
+    let mut sorted: Vec<(String, usize)> = counts.into_iter().collect();
+    sorted.sort_by_key(|x| std::cmp::Reverse(x.1));
+    sorted
+}
+
+fn ensure_graph(root: &Path) -> Option<GraphDoc> {
+    if let Some(doc) = graph::load_graph(root) {
+        return Some(doc);
+    }
+    let _ = crate::commands::graph_index::request_rebuild(root.to_path_buf());
+    graph::load_graph(root)
 }
 
 fn ext_of(path: &str) -> String {
@@ -147,6 +214,45 @@ pub fn generate(root: &Path) -> Result<String, String> {
         ));
     }
 
+    md.push('\n');
+
+    if let Some(doc) = ensure_graph(root) {
+        md.push_str("## Module dependencies\n\n");
+        md.push_str("Cross-module import relationships (from `.agentz/graph.json`):\n\n");
+        if let Some(mermaid) = mermaid_module_deps(&doc) {
+            md.push_str(&mermaid);
+            md.push('\n');
+        } else {
+            md.push_str("_No cross-module dependencies detected._\n\n");
+        }
+
+        md.push_str("## Hub files\n\n");
+        md.push_str("Most imported files (likely shared utilities or core types):\n\n");
+        for (path, deg) in file_in_degrees(&doc).iter().take(15) {
+            md.push_str(&format!("- `{path}` — imported by {deg} file(s)\n"));
+        }
+        md.push('\n');
+    }
+
+    md.push_str("## Representative snippets\n\n");
+    for (name, stat) in module_sorted.iter().take(5) {
+        let hits = search_index(root, name, 1).unwrap_or_default();
+        if let Some(hit) = hits.first() {
+            md.push_str(&format!("### `{name}/`\n\n"));
+            md.push_str(&format!(
+                "`{}` L{}–{}\n\n```\n{}\n```\n\n",
+                hit.path,
+                hit.start_line,
+                hit.end_line,
+                hit.snippet.lines().take(8).collect::<Vec<_>>().join("\n")
+            ));
+        } else if !stat.files.is_empty() {
+            let sample = stat.files.iter().next().unwrap();
+            md.push_str(&format!("- `{name}/` — see `{sample}`\n"));
+        }
+    }
+    md.push('\n');
+
     md.push_str("## Largest files\n\n");
     md.push_str("Likely entry points / hotspots (by indexed size):\n\n");
     for (path, chunks) in file_chunks.iter().take(25) {
@@ -156,18 +262,19 @@ pub fn generate(root: &Path) -> Result<String, String> {
 
     md.push_str("---\n\n");
     md.push_str(
-        "> Tip: ask the Agent to expand any module here, or use `@codebase` in chat \
+        "> **Agent coding brief:** `.agentz/AGENT_CODING_BRIEF.md` (auto-generated with graph) \
+         is injected into agent turns. Use **`graph_search`** + **`@graph`** for structure, \
+         **`codebase_search`** + **`@codebase`** for code snippets.\n>\n\
+         > Tip: ask the Agent to expand any module here, or use `@codebase` in chat \
          to pull relevant code into a conversation.\n",
     );
 
     Ok(md)
 }
 
-/// Optionally surface a few representative search hits (unused helper kept for
-/// callers that want richer wiki sections later).
-#[allow(dead_code)]
+/// Surface representative search hits for richer wiki sections.
 pub fn sample_hits(root: &Path, query: &str) -> Vec<CodeSearchHit> {
-    crate::commands::codebase::search_index(root, query, 5).unwrap_or_default()
+    search_index(root, query, 5).unwrap_or_default()
 }
 
 // ─── Tauri command ────────────────────────────────────────────────────────

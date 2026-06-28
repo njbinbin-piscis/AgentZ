@@ -132,6 +132,7 @@ function flattenFiles(nodes: FileNode[], acc: string[] = []): string[] {
 
 /** Special whole-repo mention surfaced at the top of the @ menu. */
 const CODEBASE_MENTION = "codebase";
+const GRAPH_MENTION = "graph";
 
 interface MentionState {
   query: string;
@@ -1042,6 +1043,7 @@ export default function AssistantPanel({
     const out: string[] = [];
     // Surface the whole-repo `@codebase` recall mention first.
     if (CODEBASE_MENTION.startsWith(q)) out.push(CODEBASE_MENTION);
+    if (GRAPH_MENTION.startsWith(q)) out.push(GRAPH_MENTION);
     for (const f of files) {
       if (out.length >= 9) break;
       if (f.toLowerCase().includes(q)) out.push(f);
@@ -1314,7 +1316,11 @@ export default function AssistantPanel({
                     pickMention(f);
                   }}
                 >
-                  {f === CODEBASE_MENTION ? `codebase · ${t("chat.mentionCodebase")}` : f}
+                  {f === CODEBASE_MENTION
+                    ? `codebase · ${t("chat.mentionCodebase")}`
+                    : f === GRAPH_MENTION
+                      ? `graph · ${t("chat.mentionGraph")}`
+                      : f}
                 </div>
               ))}
             </div>

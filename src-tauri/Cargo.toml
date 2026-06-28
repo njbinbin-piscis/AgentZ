@@ -17,6 +17,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "agentz-desktop"
 path = "src/main.rs"
 
+[[example]]
+name = "graph_verify"
+path = "examples/graph_verify.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

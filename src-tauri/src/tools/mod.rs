@@ -8,6 +8,8 @@ pub mod chat_ui_listen;
 pub mod chat_ui_patch;
 pub mod chat_ui_schema;
 pub mod codebase_search;
+pub mod graph_search;
+pub mod graph_explore;
 pub mod delegate;
 pub mod plan_mode_ui;
 pub mod skill_manage;

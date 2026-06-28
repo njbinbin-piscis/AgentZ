@@ -11,6 +11,12 @@ import {
   type WorkspaceSnapshot,
 } from "./services/tauri/workspace";
 import { generateRepoWiki } from "./services/tauri/repoWiki";
+import {
+  getGraphIndexStatus,
+  requestGraphIndex,
+  waitGraphIndexIdle,
+} from "./services/tauri/graphIndex";
+import IdeSidePanel from "./components/IdeSidePanel";
 import { confirmTerminalCloseOnProjectChange, destroyAllTerminals } from "./workspaces/codez/Terminal";
 import { getSettings } from "./services/tauri/settings";
 import { setLanguage } from "./i18n";
@@ -27,8 +33,7 @@ import {
 } from "./theme";
 import { syncEditorThemeWithAppearance } from "./workspaces/codez/themeStore";
 import CodeZWorkspace from "./workspaces/codez";
-import WorkZWorkspace from "./workspaces/workz";
-import AssistantPanel from "./workspaces/codez/AssistantPanel";
+import WorkZWorkspace, { type WikiBuildAction } from "./workspaces/workz";
 import SettingsPanel from "./workspaces/codez/SettingsPanel";
 import ZLogo from "./components/ZLogo";
 import { browserClose, browserCloseGuard, type PickedElement } from "./services/tauri/browser";
@@ -98,7 +103,10 @@ export default function App() {
   const [templateProjectDir, setTemplateProjectDir] = useState<string | null>(null);
   const [hasImAssistant, setHasImAssistant] = useState(false);
   const [wikiBuildNonce, setWikiBuildNonce] = useState(0);
+  const [wikiBuildAction, setWikiBuildAction] = useState<WikiBuildAction>("overview");
   const [wikiBusy, setWikiBusy] = useState(false);
+  const [wikiMenuOpen, setWikiMenuOpen] = useState(false);
+  const wikiMenuRef = useRef<HTMLDivElement>(null);
   const [settingsToast, setSettingsToast] = useState<string | null>(null);
   const [ideWikiOpenPath, setIdeWikiOpenPath] = useState<{ path: string; nonce: number } | null>(
     null,
@@ -331,6 +339,17 @@ export default function App() {
     return () => document.removeEventListener("mousedown", close);
   }, [fontScaleOpen]);
 
+  useEffect(() => {
+    if (!wikiMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (wikiMenuRef.current && !wikiMenuRef.current.contains(e.target as Node)) {
+        setWikiMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [wikiMenuOpen]);
+
   const pickFolder = useCallback(async () => {
     try {
       const dir = await openFolderDialog(projectDir);
@@ -433,22 +452,58 @@ export default function App() {
     [projectDir],
   );
 
-  const handleWikiClick = useCallback(async () => {
-    if (!projectDir || wikiBusy) return;
-    if (mode === "workz") {
+  const runWikiInIde = useCallback(
+    async (action: WikiBuildAction) => {
+      if (!projectDir || wikiBusy) return;
+      setWikiMenuOpen(false);
+      setWikiBusy(true);
+      try {
+        if (action === "graph") {
+          const ack = await requestGraphIndex(projectDir);
+          setSettingsToast(ack.message);
+          const st = await waitGraphIndexIdle(projectDir).catch(() =>
+            getGraphIndexStatus(projectDir),
+          );
+          if (st.last_error) {
+            setSettingsToast(st.last_error);
+          } else if (st.nodes > 0) {
+            setSettingsToast(
+              t("agent.repoWikiGraphDone", { nodes: st.nodes, edges: st.edges }),
+            );
+          }
+        } else {
+          const res = await generateRepoWiki(projectDir);
+          setIdeWikiOpenPath({ path: res.path, nonce: Date.now() });
+        }
+      } catch (e) {
+        console.error("Wiki generation failed:", e);
+      } finally {
+        setWikiBusy(false);
+      }
+    },
+    [projectDir, wikiBusy, t],
+  );
+
+  const triggerWikiInWorkz = useCallback(
+    (action: WikiBuildAction) => {
+      if (!projectDir || wikiBusy) return;
+      setWikiMenuOpen(false);
+      setWikiBuildAction(action);
       setWikiBuildNonce((n) => n + 1);
-      return;
-    }
-    setWikiBusy(true);
-    try {
-      const res = await generateRepoWiki(projectDir);
-      setIdeWikiOpenPath({ path: res.path, nonce: Date.now() });
-    } catch (e) {
-      console.error("Repo wiki generation failed:", e);
-    } finally {
-      setWikiBusy(false);
-    }
-  }, [projectDir, wikiBusy, mode]);
+    },
+    [projectDir, wikiBusy],
+  );
+
+  const handleWikiAction = useCallback(
+    (action: WikiBuildAction) => {
+      if (mode === "workz") {
+        triggerWikiInWorkz(action);
+      } else {
+        void runWikiInIde(action);
+      }
+    },
+    [mode, runWikiInIde, triggerWikiInWorkz],
+  );
 
   const handleThemeToggle = useCallback(() => {
     const next = toggleAppearanceTheme();
@@ -557,16 +612,40 @@ export default function App() {
               <AssistantBubbleIcon />
             </button>
           )}
-          <button
-            type="button"
-            className={`agentz-titlebar-icon${wikiBusy ? " loading" : ""}`}
-            onClick={() => void handleWikiClick()}
-            disabled={!projectDir || wikiBusy}
-            title={t("agent.repoWikiHint")}
-            aria-label={t("agent.repoWiki")}
-          >
-            <WikiIcon />
-          </button>
+          <div className="agentz-wiki-menu" ref={wikiMenuRef}>
+            <button
+              type="button"
+              className={`agentz-titlebar-icon${wikiBusy ? " loading" : ""}${wikiMenuOpen ? " active" : ""}`}
+              onClick={() => setWikiMenuOpen((v) => !v)}
+              disabled={!projectDir || wikiBusy}
+              title={t("agent.repoWikiHint")}
+              aria-label={t("agent.repoWiki")}
+              aria-expanded={wikiMenuOpen}
+              aria-haspopup="menu"
+            >
+              <WikiIcon />
+            </button>
+            {wikiMenuOpen && (
+              <div className="agentz-wiki-popover" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleWikiAction("overview")}
+                >
+                  {t("agent.repoWikiOverview")}
+                  <span>{t("agent.repoWikiOverviewHint")}</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleWikiAction("graph")}
+                >
+                  {t("agent.repoWikiGraph")}
+                  <span>{t("agent.repoWikiGraphHint")}</span>
+                </button>
+              </div>
+            )}
+          </div>
           <div className="agentz-font-scale-menu" ref={fontScaleRef}>
             <button
               type="button"
@@ -683,7 +762,7 @@ export default function App() {
             {/* Kept mounted while in IDE mode so toggling chat visibility never
                 discards the active session — only show/hide. */}
             <div className="agentz-ide-chat" style={{ width: chatWidth }} hidden={!chatOpen}>
-              <AssistantPanel
+              <IdeSidePanel
                 projectDir={projectDir}
                 insertRequest={chatInsert}
                 insertElementRequest={chatInsertElement}
@@ -699,6 +778,7 @@ export default function App() {
             projectDir={projectDir}
             onOpenFolder={pickFolder}
             wikiBuildNonce={wikiBuildNonce}
+            wikiBuildAction={wikiBuildAction}
             onWikiBusyChange={setWikiBusy}
             onOpenLibrary={(initial) => {
               setLibraryInitial(initial ?? null);

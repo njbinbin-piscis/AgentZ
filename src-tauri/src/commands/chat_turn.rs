@@ -658,6 +658,29 @@ fn codebase_context_block(raw: &str, workspace_root: &str) -> Option<String> {
     Some(block)
 }
 
+/// Inline knowledge-graph context for `@graph` mentions (structure + dependencies).
+fn graph_context_block(raw: &str, workspace_root: &str) -> Option<String> {
+    let root = workspace_root.trim();
+    if root.is_empty() {
+        return None;
+    }
+    let query: String = raw
+        .split_whitespace()
+        .filter(|w| !w.starts_with('@'))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let text = crate::commands::graph_db::explore_graph(
+        std::path::Path::new(root),
+        &query,
+        12,
+    )
+    .ok()?;
+    if text.contains("No matches") {
+        return None;
+    }
+    Some(format!("Knowledge graph (@graph):\n\n{text}"))
+}
+
 fn collect_browser_element_refs(raw: &str) -> Vec<String> {
     let needle = "@browser-element(";
     let mut refs = Vec::new();
@@ -805,10 +828,11 @@ fn expand_file_refs(raw: &str, workspace_root: &str) -> String {
         refs
     );
     let wants_codebase = refs.iter().any(|r| r == "codebase");
+    let wants_graph = refs.iter().any(|r| r == "graph");
     let mut blocks = Vec::new();
     let mut total = 0usize;
     for ref_path in &refs {
-        if ref_path == "codebase" {
+        if ref_path == "codebase" || ref_path == "graph" {
             continue; // handled separately below
         }
         if total >= MAX_TOTAL_REF_CHARS {
@@ -836,6 +860,12 @@ fn expand_file_refs(raw: &str, workspace_root: &str) -> String {
     if wants_codebase {
         if let Some(block) = codebase_context_block(raw, workspace_root) {
             tracing::info!("expand_file_refs: @codebase block → {} chars", block.len());
+            blocks.push(block);
+        }
+    }
+    if wants_graph {
+        if let Some(block) = graph_context_block(raw, workspace_root) {
+            tracing::info!("expand_file_refs: @graph block → {} chars", block.len());
             blocks.push(block);
         }
     }
@@ -951,6 +981,8 @@ fn build_tool_registry(
             lsp_manager: lsp_manager.clone(),
         }));
         registry.register(Box::new(crate::tools::codebase_search::CodebaseSearchTool));
+        registry.register(Box::new(crate::tools::graph_search::GraphSearchTool));
+        registry.register(Box::new(crate::tools::graph_explore::GraphExploreTool));
         if let Ok(config_dir) = crate::commands::data_scope::resolve_global_config_dir(&app) {
             registry.register(Box::new(crate::tools::api_connector::ApiConnectorTool {
                 config_dir,
@@ -1416,23 +1448,44 @@ fn project_rules_context(workspace_root: &str) -> Option<String> {
     Some(format!("## Project rules\n{}", blocks.join("\n\n")))
 }
 
-/// When `.agentz/REPO_WIKI.md` exists, tell the agent where to read architecture context.
-fn repo_wiki_context(workspace_root: &str) -> Option<String> {
+/// Inject compact coding brief so the agent has structural repo context without
+/// an extra file_read round-trip. Falls back to path hints if only REPO_WIKI exists.
+fn wiki_agent_coding_context(workspace_root: &str, chat_mode: &str) -> Option<String> {
     let root = std::path::Path::new(workspace_root.trim());
     if workspace_root.trim().is_empty() {
         return None;
     }
-    let wiki = root.join(".agentz").join("REPO_WIKI.md");
-    if !wiki.is_file() {
-        return None;
+
+    // Agent / plan modes get a richer inline brief; ask mode gets a shorter excerpt.
+    let max_chars = if chat_mode == "agent" { 4500 } else { 2200 };
+
+    if let Some(excerpt) = crate::commands::graph_agent::coding_brief_excerpt(root, max_chars) {
+        let mut block = format!(
+            "## Repository coding brief (auto-injected)\n\
+             Structural map for navigation — use `graph_search` + `codebase_search` before editing.\n\
+             Mention `@graph <topic>` for inline dependency context.\n\n{excerpt}"
+        );
+        if let Some(domains) = crate::commands::graph_agent::domain_context_excerpt(root, 6) {
+            block.push_str("\n\n");
+            block.push_str(&domains);
+        }
+        if let Some(deep) = crate::commands::graph_agent::deep_wiki_excerpt(root, 1200) {
+            block.push_str("\n\n## Deep wiki excerpt\n\n");
+            block.push_str(&deep);
+        }
+        return Some(block);
     }
-    Some(
-        "## Repository wiki\n\
-         A generated module/architecture overview is available at `.agentz/REPO_WIKI.md`. \
-         Read it with `file_read` when you need repo structure, module layout, or onboarding context \
-         (especially after the user generates or refreshes the Repo Wiki)."
-            .to_string(),
-    )
+
+    let wiki = root.join(".agentz").join("REPO_WIKI.md");
+    if wiki.is_file() {
+        return Some(
+            "## Repository wiki\n\
+             Module overview at `.agentz/REPO_WIKI.md`. \
+             Run Wiki → Rebuild graph to generate `.agentz/AGENT_CODING_BRIEF.md` for richer agent context."
+                .to_string(),
+        );
+    }
+    None
 }
 
 /// Load a short excerpt from the session plan file for Agent-mode context.
@@ -1946,7 +1999,7 @@ pub async fn run_agentz_turn(
     if let Some(rules) = project_rules_context(&workspace_root) {
         extra_sections.push(rules);
     }
-    if let Some(wiki) = repo_wiki_context(&workspace_root) {
+    if let Some(wiki) = wiki_agent_coding_context(&workspace_root, chat_mode) {
         extra_sections.push(wiki);
     }
     if chat_mode == "plan" {

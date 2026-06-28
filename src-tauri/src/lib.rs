@@ -169,6 +169,11 @@ pub fn run() {
             commands::debug_scenarios::debug_scenarios_list,
             // Repo Wiki — module/architecture overview from the index (M8)
             commands::repo_wiki::repo_wiki_generate,
+            // Knowledge graph — background index (CodeGraph-style)
+            commands::graph::graph_index_rebuild,
+            commands::graph::graph_index_status,
+            commands::graph_agent::graph_domain_read,
+            commands::graph_agent::graph_validate,
             // VS Code .vsix contribution-point ingestion
             commands::vsix::import_vsix,
             // VS Code extension ecosystem: install/manage + extension host sidecar

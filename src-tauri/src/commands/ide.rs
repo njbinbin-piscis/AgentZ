@@ -340,8 +340,10 @@ fn decode_content(raw: &[u8]) -> (String, String) {
 fn detect_language(path: &Path) -> Option<String> {
     let ext = path.extension()?.to_str()?;
     let lang = match ext {
-        "ts" | "tsx" => "typescript",
-        "js" | "jsx" | "mjs" | "cjs" => "javascript",
+        "ts" => "typescript",
+        "tsx" => "typescriptreact",
+        "js" | "mjs" | "cjs" => "javascript",
+        "jsx" => "javascriptreact",
         "rs" => "rust",
         "py" | "pyi" => "python",
         "go" => "go",
@@ -1473,6 +1475,10 @@ pub async fn ide_start_watcher(
                                         &root_clone,
                                         &rel_for_index,
                                     );
+                                    crate::commands::graph::schedule_patch(
+                                        root_clone,
+                                        rel_for_index,
+                                    );
                                 });
                             }
                         }
@@ -1488,6 +1494,8 @@ pub async fn ide_start_watcher(
     watcher
         .watch(&root, RecursiveMode::Recursive)
         .map_err(|e| format!("Failed to watch: {}", e))?;
+
+    crate::commands::graph_index::ensure_started(&root);
 
     // Store the watcher to keep it alive
     {
