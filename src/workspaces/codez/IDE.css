@@ -455,9 +455,10 @@
 
 .ide-tabs {
   display: flex;
+  flex-wrap: nowrap;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
+  overflow: hidden;
   min-height: 34px;
 }
 
@@ -470,9 +471,11 @@
 .ide-tab {
   display: flex;
   align-items: center;
+  flex: 1 1 0;
+  width: 0;
   padding: 0 12px;
-  min-width: 100px;
-  max-width: 220px;
+  min-width: 72px;
+  max-width: 200px;
   font-size: 13px;
   cursor: pointer;
   border-right: 1px solid var(--border);

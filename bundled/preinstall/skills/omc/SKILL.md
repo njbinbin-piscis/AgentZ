@@ -1,6 +1,6 @@
 ---
 name: "omo"
-description: "Use this skill when you see `/omo`. Multi-agent orchestration for \\\\\\\"code analysis / bug investigation / fix planning / implementation\\\\\\\". Choose the minimal agent set and order based on task type + risk; recipes below show common patterns."
+description: "Use this skill when you see `/omo`. Multi-agent orchestration for \\\\\\\\\\\\\\\"code analysis / bug investigation / fix planning / implementation\\\\\\\\\\\\\\\". Choose the minimal agent set and order based on task type + risk; recipes below show common patterns."
 description_zh: "完整的 OMC (Oh My CodeBuddy) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
 version: "1.0.0"
 source: codebuddy

@@ -13,3 +13,7 @@ dist
 .agentz/
 .codez/
 .piscis/
+
+# Local dev caches (not shipped)
+.cache/
+.codegraph/

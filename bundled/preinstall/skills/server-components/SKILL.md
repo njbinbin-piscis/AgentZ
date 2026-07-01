@@ -1,6 +1,6 @@
 ---
 name: "server-components"
-description: "This skill should be used when the user asks about \\\\\\\"Server Components\\\\\\\", \\\\\\\"Client Components\\\\\\\", \\\\\\\"'use client' directive\\\\\\\", \\\\\\\"when to use server vs client\\\\\\\", \\\\\\\"RSC patterns\\\\\\\", \\\\\\\"component composition\\\\\\\", \\\\\\\"data fetching in components\\\\\\\", or needs guidance on React Server Components architecture in Next.js."
+description: "This skill should be used when the user asks about \\\\\\\\\\\\\\\"Server Components\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"Client Components\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"'use client' directive\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"when to use server vs client\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"RSC patterns\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"component composition\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"data fetching in components\\\\\\\\\\\\\\\", or needs guidance on React Server Components architecture in Next.js."
 version: "1.0.0"
 source: codebuddy
 source_plugin: "nextjs-expert"

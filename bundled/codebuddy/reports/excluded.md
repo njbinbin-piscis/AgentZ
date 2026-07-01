@@ -108,6 +108,7 @@
 | agent | cb-test-automator-5 | duplicate_persona |
 | agent | cb-tutorial-engineer-2 | duplicate_persona |
 | agent | cb-ui-ux-designer-2 | duplicate_persona |
+| agent | cb-deployment-engineer-5 | duplicate_persona |
 | command | cb-route-plan | hard_delete_platform_command |
 | command | cb-search-poi | hard_delete_platform_command |
 | command | cb-set-key | hard_delete_platform_command |

@@ -1,6 +1,6 @@
 ---
 name: "competitive-landscape"
-description: "This skill should be used when the user asks to \\\\\\\"analyze competitors\\\\\\\", \\\\\\\"assess competitive landscape\\\\\\\", \\\\\\\"identify differentiation\\\\\\\", \\\\\\\"evaluate market positioning\\\\\\\", \\\\\\\"apply Porter's Five Forces\\\\\\\", or requests competitive strategy analysis."
+description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"analyze competitors\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"assess competitive landscape\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"identify differentiation\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"evaluate market positioning\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"apply Porter's Five Forces\\\\\\\\\\\\\\\", or requests competitive strategy analysis."
 description_zh: "面向初创企业的综合业务分析工具，提供市场规模分析（TAM/SAM/SOM）、财务建模、团队规划和战略研究功能"
 version: "1.0.0"
 source: codebuddy

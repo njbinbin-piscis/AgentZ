@@ -32,7 +32,15 @@ export default defineConfig({
     port: 5273,
     strictPort: true,
     host: host || false,
-    watch: { ignored: ["**/src-tauri/**", "**/target/**"] },
+    watch: {
+      ignored: [
+        "**/src-tauri/**",
+        "**/target/**",
+        "**/.cache/**",
+        "**/bundled/preinstall/**",
+        "**/node_modules/**",
+      ],
+    },
   },
   optimizeDeps: { entries: ["src/main.tsx"] },
 });

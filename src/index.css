@@ -77,6 +77,9 @@ body {
    px/rem rules all respond; editor/terminal/browser viewports are counter-zoomed below. */
 .agentz-app {
   zoom: var(--ui-font-scale, 1);
+  /* Shrink layout box so zoomed shell still fits the window (avoids bottom/right clipping). */
+  width: calc(100% / var(--ui-font-scale, 1));
+  height: calc(100% / var(--ui-font-scale, 1));
 }
 
 /* Keep code/terminal/browser viewport metrics stable (avoids ResizeObserver storms). */

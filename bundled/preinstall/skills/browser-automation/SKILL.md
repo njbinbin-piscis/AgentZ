@@ -1,6 +1,6 @@
 ---
 name: "Browser Automation"
-description: "This skill should be used when the user needs to interact with web pages, browse websites, take screenshots, fill forms, click elements, extract web content, or perform any browser automation tasks. Trigger phrases include \\\\\\\"open webpage\\\\\\\", \\\\\\\"visit website\\\\\\\", \\\\\\\"browse\\\\\\\", \\\\\\\"screenshot page\\\\\\\", \\\\\\\"fill form\\\\\\\", \\\\\\\"click button\\\\\\\", \\\\\\\"extract from website\\\\\\\", \\\\\\\"web scraping\\\\\\\", \\\\\\\"automate browser\\\\\\\"."
+description: "This skill should be used when the user needs to interact with web pages, browse websites, take screenshots, fill forms, click elements, extract web content, or perform any browser automation tasks. Trigger phrases include \\\\\\\\\\\\\\\"open webpage\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"visit website\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"browse\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"screenshot page\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"fill form\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"click button\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"extract from website\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"web scraping\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"automate browser\\\\\\\\\\\\\\\"."
 description_zh: "基于 Vercel agent-browser CLI 的浏览器自动化插件。首次使用时自动安装，让 CodeBuddy 能够进行网页交互、截图、表单填写等浏览器操作。"
 version: "1.0.0"
 source: codebuddy

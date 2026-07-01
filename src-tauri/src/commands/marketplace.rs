@@ -11,11 +11,29 @@
 //! - `remote`  — theAgentOS cloud marketplace (`/api/marketplace/*`).
 
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::sync::RwLock;
 use tauri::AppHandle;
 
 use crate::commands::{agents, clawhub, connectors, teams, user_tools, workbench};
 
-const DEFAULT_CLOUD_BASE: &str = "https://www.dimnuo.com";
+/// Production default cloud marketplace base.
+const PROD_CLOUD_BASE: &str = "https://www.dimnuo.com";
+/// Development default: the theAgentOS local backend (see web-ui/start.sh).
+const DEV_CLOUD_BASE: &str = "http://localhost:8137";
+
+/// Process-wide cloud base override, hydrated from the persisted settings file
+/// at startup and updated by `set_cloud_base_url`.
+static CLOUD_BASE_OVERRIDE: RwLock<Option<String>> = RwLock::new(None);
+
+/// Build-aware default: dev builds talk to the local theAgentOS backend.
+fn default_cloud_base() -> String {
+    if cfg!(debug_assertions) {
+        DEV_CLOUD_BASE.into()
+    } else {
+        PROD_CLOUD_BASE.into()
+    }
+}
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)] // download_url / channel / signature reserved for direct-download installs
@@ -42,11 +60,68 @@ struct CloudAssetsResponse {
     assets: Vec<CloudAssetSummary>,
 }
 
+/// Resolve the active cloud base URL.
+///
+/// Precedence: user override (settings) → `AGENTZ_CLOUD_BASE_URL` env →
+/// build-aware default (dev → localhost:8137, release → dimnuo.com).
 fn cloud_base_url() -> Option<String> {
+    if let Ok(guard) = CLOUD_BASE_OVERRIDE.read() {
+        if let Some(v) = guard.as_ref() {
+            if !v.trim().is_empty() {
+                return Some(v.clone());
+            }
+        }
+    }
     std::env::var("AGENTZ_CLOUD_BASE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
-        .or_else(|| Some(DEFAULT_CLOUD_BASE.into()))
+        .or_else(|| Some(default_cloud_base()))
+}
+
+fn cloud_base_file(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(crate::commands::data_scope::resolve_global_config_dir(app)?.join("cloud_base_url.txt"))
+}
+
+/// Hydrate the in-process cloud base override from the persisted settings file.
+/// Call once at startup (best-effort; missing/empty file leaves the default).
+pub fn hydrate_cloud_base_override(app: &AppHandle) {
+    if let Ok(path) = cloud_base_file(app) {
+        if let Ok(s) = std::fs::read_to_string(&path) {
+            let s = s.trim().to_string();
+            if !s.is_empty() {
+                if let Ok(mut guard) = CLOUD_BASE_OVERRIDE.write() {
+                    *guard = Some(s);
+                }
+            }
+        }
+    }
+}
+
+/// Current cloud base URL (resolved with full precedence). Used by the settings UI.
+#[tauri::command]
+pub async fn get_cloud_base_url(app: AppHandle) -> Result<String, String> {
+    hydrate_cloud_base_override(&app);
+    Ok(cloud_base_url().unwrap_or_else(default_cloud_base))
+}
+
+/// Persist a user cloud base URL override (empty string clears it).
+#[tauri::command]
+pub async fn set_cloud_base_url(app: AppHandle, url: String) -> Result<(), String> {
+    let trimmed = url.trim().to_string();
+    let path = cloud_base_file(&app)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, &trimmed).map_err(|e| e.to_string())?;
+    let mut guard = CLOUD_BASE_OVERRIDE
+        .write()
+        .map_err(|e| format!("cloud base lock poisoned: {e}"))?;
+    *guard = if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    };
+    Ok(())
 }
 
 fn desktop_os_name() -> &'static str {
@@ -65,7 +140,7 @@ fn client_profile_query(channel: &str) -> String {
         caps.push("com");
     }
     format!(
-        "surface=desktop&os={os}&capabilities={}&channel={channel}",
+        "client_app=agentz&surface=desktop&os={os}&capabilities={}&channel={channel}",
         caps.join(",")
     )
 }

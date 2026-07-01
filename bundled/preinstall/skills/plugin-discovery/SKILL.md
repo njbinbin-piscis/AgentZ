@@ -1,6 +1,6 @@
 ---
 name: "plugin-discovery"
-description: "This skill should be used when the user asks to \\\\\\\"推荐插件\\\\\\\", \\\\\\\"查找插件\\\\\\\", \\\\\\\"搜索插件\\\\\\\", \\\\\\\"有什么插件\\\\\\\", \\\\\\\"安装插件\\\\\\\", \\\\\\\"plugin recommendation\\\\\\\", \\\\\\\"find plugins\\\\\\\", \\\\\\\"search plugins\\\\\\\", or needs help discovering and managing CodeBuddy Code plugins from marketplaces."
+description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"推荐插件\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"查找插件\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"搜索插件\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"有什么插件\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"安装插件\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"plugin recommendation\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"find plugins\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"search plugins\\\\\\\\\\\\\\\", or needs help discovering and managing CodeBuddy Code plugins from marketplaces."
 description_zh: "智能插件发现和管理助手 - 支持智能搜索、多插件并行对比、多插件协同工作流（sequence-run）、插件信息详解、许愿新插件等功能"
 version: "0.1.0"
 source: codebuddy

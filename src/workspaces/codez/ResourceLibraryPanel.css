@@ -54,6 +54,56 @@
   cursor: pointer;
 }
 
+.agentz-library-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agentz-cloudbase-chip {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface-2, #20202c);
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 6px;
+  color: var(--text-dim, #9a9ab0);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.agentz-cloudbase-chip:hover {
+  color: var(--text, #e8e8f0);
+}
+
+.agentz-cloudbase-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agentz-cloudbase-input {
+  width: 260px;
+  background: var(--surface-2, #20202c);
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 6px;
+  color: var(--text, #e8e8f0);
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.agentz-cloudbase-btn {
+  background: var(--surface-2, #20202c);
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 6px;
+  color: var(--text, #e8e8f0);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
 .agentz-library-cats {
   display: flex;
   gap: 2px;

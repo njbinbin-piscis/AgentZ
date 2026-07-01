@@ -1,6 +1,6 @@
 ---
 name: "auth-patterns"
-description: "This skill should be used when the user asks about \\\\\\\"authentication in Next.js\\\\\\\", \\\\\\\"NextAuth\\\\\\\", \\\\\\\"Auth.js\\\\\\\", \\\\\\\"middleware auth\\\\\\\", \\\\\\\"protected routes\\\\\\\", \\\\\\\"session management\\\\\\\", \\\\\\\"JWT\\\\\\\", \\\\\\\"login flow\\\\\\\", or needs guidance on implementing authentication and authorization in Next.js applications."
+description: "This skill should be used when the user asks about \\\\\\\\\\\\\\\"authentication in Next.js\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"NextAuth\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"Auth.js\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"middleware auth\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"protected routes\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"session management\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"JWT\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"login flow\\\\\\\\\\\\\\\", or needs guidance on implementing authentication and authorization in Next.js applications."
 version: "1.0.0"
 source: codebuddy
 source_plugin: "nextjs-expert"

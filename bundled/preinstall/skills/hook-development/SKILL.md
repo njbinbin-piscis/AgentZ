@@ -1,6 +1,6 @@
 ---
 name: "Hook Development"
-description: "This skill should be used when the user asks to \\\\\\\"create a hook\\\\\\\", \\\\\\\"add a PreToolUse/PostToolUse/Stop hook\\\\\\\", \\\\\\\"validate tool use\\\\\\\", \\\\\\\"implement prompt-based hooks\\\\\\\", \\\\\\\"use ${CODEBUDDY_PLUGIN_ROOT}\\\\\\\", \\\\\\\"set up event-driven automation\\\\\\\", \\\\\\\"block dangerous commands\\\\\\\", or mentions hook events (PreToolUse, PostToolUse, Stop, SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact, Notification). Provides comprehensive guidance for creating and implementing CodeBuddy Code plugin hooks with focus on advanced prompt-based hooks API."
+description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"create a hook\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"add a PreToolUse/PostToolUse/Stop hook\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"validate tool use\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"implement prompt-based hooks\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"use ${CODEBUDDY_PLUGIN_ROOT}\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"set up event-driven automation\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"block dangerous commands\\\\\\\\\\\\\\\", or mentions hook events (PreToolUse, PostToolUse, Stop, SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact, Notification). Provides comprehensive guidance for creating and implementing CodeBuddy Code plugin hooks with focus on advanced prompt-based hooks API."
 description_zh: "用于开发 CodeBuddy Code 插件的综合工具包。包含 7 个专家技能，涵盖钩子、MCP 集成、命令、代理和最佳实践。支持 AI 辅助的插件创建和验证。"
 version: "0.1.0"
 source: codebuddy

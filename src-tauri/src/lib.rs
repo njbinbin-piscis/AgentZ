@@ -88,6 +88,8 @@ pub fn run() {
             });
             // Phase 0A: drive headless agent turns for inbound IM messages.
             commands::gateway::spawn_inbound_consumer(app.handle().clone());
+            // Hydrate the persisted cloud marketplace base URL override.
+            commands::marketplace::hydrate_cloud_base_override(app.handle());
             Ok(())
         })
         .manage(AppState::new())
@@ -266,6 +268,8 @@ pub fn run() {
             commands::marketplace::marketplace_search,
             commands::marketplace::marketplace_install,
             commands::marketplace::marketplace_uninstall,
+            commands::marketplace::get_cloud_base_url,
+            commands::marketplace::set_cloud_base_url,
             // User tools (executable plugin manifests in {config}/user-tools)
             commands::user_tools::user_tools_list,
             commands::user_tools::user_tools_install,

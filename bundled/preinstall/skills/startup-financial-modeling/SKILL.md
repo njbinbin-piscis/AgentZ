@@ -1,6 +1,6 @@
 ---
 name: "startup-financial-modeling"
-description: "This skill should be used when the user asks to \\\\\\\"create financial projections\\\\\\\", \\\\\\\"build a financial model\\\\\\\", \\\\\\\"forecast revenue\\\\\\\", \\\\\\\"calculate burn rate\\\\\\\", \\\\\\\"estimate runway\\\\\\\", \\\\\\\"model cash flow\\\\\\\", or requests 3-5 year financial planning for a startup."
+description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"create financial projections\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"build a financial model\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"forecast revenue\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"calculate burn rate\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"estimate runway\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"model cash flow\\\\\\\\\\\\\\\", or requests 3-5 year financial planning for a startup."
 description_zh: "面向初创企业的综合业务分析工具，提供市场规模分析（TAM/SAM/SOM）、财务建模、团队规划和战略研究功能"
 version: "1.0.0"
 source: codebuddy

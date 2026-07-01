@@ -22,9 +22,9 @@ function languageForPath(path: string, lang: string | null | undefined): string 
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   const map: Record<string, string> = {
     ts: "typescript",
-    tsx: "typescript",
+    tsx: "typescriptreact",
     js: "javascript",
-    jsx: "javascript",
+    jsx: "javascriptreact",
     rs: "rust",
     py: "python",
     go: "go",

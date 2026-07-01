@@ -10,6 +10,8 @@ source_plugin: "ui-ux-pro-max-skill"
 
 > **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 
+> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
+
 # UI/UX Pro Max - Design Intelligence
 
 Comprehensive design guide for web and mobile applications. Contains 57 styles, 95+ color palettes, 56 font pairings, 99 UX guidelines, and 25 chart types across 12 technology stacks. Searchable database with BM25-based priority recommendations.

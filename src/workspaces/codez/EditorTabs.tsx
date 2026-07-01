@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { isBrowserTab } from "./browserTab";
 import type { OpenTab } from "./types";
@@ -38,6 +39,27 @@ export default function EditorTabs({
   onDismissContextMenu,
 }: EditorTabsProps) {
   const { t } = useTranslation();
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      el.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
+      e.preventDefault();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [tabs.length]);
+
+  useEffect(() => {
+    if (!activeTabPath || !tabsRef.current) return;
+    tabsRef.current.querySelector<HTMLElement>(".ide-tab.active")?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [activeTabPath, tabs.length]);
 
   if (tabs.length === 0) return null;
 
@@ -54,7 +76,7 @@ export default function EditorTabs({
 
   return (
     <>
-      <div className="ide-tabs">
+      <div className="ide-tabs" ref={tabsRef}>
         {tabs.map((tab) => (
           <div
             key={tab.path}

@@ -4796,7 +4796,8 @@
       "cb-test-automator-4",
       "cb-test-automator-5",
       "cb-tutorial-engineer-2",
-      "cb-ui-ux-designer-2"
+      "cb-ui-ux-designer-2",
+      "cb-deployment-engineer-5"
     ],
     "commands": [
       "cb-route-plan",
@@ -4978,7 +4979,8 @@
       "cb-test-automator-4": "duplicate_persona",
       "cb-test-automator-5": "duplicate_persona",
       "cb-tutorial-engineer-2": "duplicate_persona",
-      "cb-ui-ux-designer-2": "duplicate_persona"
+      "cb-ui-ux-designer-2": "duplicate_persona",
+      "cb-deployment-engineer-5": "duplicate_persona"
     }
   },
   "notices": [
@@ -5081,7 +5083,7 @@
   "compatibility": {
     "pass": 822,
     "rewrite": 928,
-    "delete": 142
+    "delete": 143
   },
   "counts": {
     "skills": 253,

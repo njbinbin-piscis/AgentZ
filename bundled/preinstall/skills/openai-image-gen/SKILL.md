@@ -11,6 +11,8 @@ source_plugin: "hot-skills"
 
 > **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 
+> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
+
 # OpenAI Image Gen
 
 Generate a handful of "random but structured" prompts and render them via OpenAI Images API.

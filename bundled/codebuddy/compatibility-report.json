@@ -1,7 +1,7 @@
 {
   "audit_version": 1,
-  "generated_at": "2026-06-16T09:41:22.639Z",
-  "root": "/home/agent/Projects/pisci/AgentZ/bundled/preinstall",
+  "generated_at": "2026-07-01T15:59:10.254Z",
+  "root": "/home/nfs/zyh/Projects/dimnuo/all_solutions/AgentZ/bundled/preinstall",
   "summary": {
     "errors": 0,
     "warnings": 36,
@@ -42,7 +42,7 @@
     "skill:cloudbase": 25,
     "skill:cloudgame-codegen": 55,
     "skill:code-review-excellence": 45,
-    "skill:codebuddy-md-improver": 65,
+    "skill:codebuddy-md-improver": 55,
     "skill:codex": 45,
     "skill:color-curator": 55,
     "skill:command-development": 55,
@@ -96,7 +96,7 @@
     "skill:helm-chart-scaffolding": 45,
     "skill:himalaya": 55,
     "skill:hook-development": 35,
-    "skill:humanizer": 55,
+    "skill:humanizer": 45,
     "skill:hybrid-cloud-networking": 55,
     "skill:hybrid-search-implementation": 45,
     "skill:image-enhancer": 55,

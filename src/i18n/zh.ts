@@ -205,6 +205,8 @@ const zh = {
   library: {
     title: "资源库",
     subtitle: "获取、管理与编排技能、智能体、团队与连接器",
+    cloudBase: "官方市场源",
+    cloudBaseHint: "官方市场后端地址（theAgentOS）。开发环境默认 http://localhost:8137。",
     cat_skill: "技能",
     cat_command: "命令",
     cat_tool: "工具",

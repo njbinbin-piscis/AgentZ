@@ -42,3 +42,16 @@ export function marketplaceInstall(
 export function marketplaceUninstall(category: MarketCategory, id: string): Promise<void> {
   return invoke<void>("marketplace_uninstall", { category, id });
 }
+
+/**
+ * Current official cloud marketplace base URL (resolved with full precedence:
+ * user override → env → build default; dev → localhost:8137).
+ */
+export function getCloudBaseUrl(): Promise<string> {
+  return invoke<string>("get_cloud_base_url");
+}
+
+/** Persist a user override for the cloud marketplace base URL (empty clears it). */
+export function setCloudBaseUrl(url: string): Promise<void> {
+  return invoke<void>("set_cloud_base_url", { url });
+}

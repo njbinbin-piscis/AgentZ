@@ -1,6 +1,6 @@
 ---
 name: "app-router"
-description: "This skill should be used when the user asks to \\\\\\\"create a Next.js route\\\\\\\", \\\\\\\"add a page\\\\\\\", \\\\\\\"set up layouts\\\\\\\", \\\\\\\"implement loading states\\\\\\\", \\\\\\\"add error boundaries\\\\\\\", \\\\\\\"organize routes\\\\\\\", \\\\\\\"create dynamic routes\\\\\\\", or needs guidance on Next.js App Router file conventions and routing patterns."
+description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"create a Next.js route\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"add a page\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"set up layouts\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"implement loading states\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"add error boundaries\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"organize routes\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"create dynamic routes\\\\\\\\\\\\\\\", or needs guidance on Next.js App Router file conventions and routing patterns."
 version: "1.0.0"
 source: codebuddy
 source_plugin: "nextjs-expert"

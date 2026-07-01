@@ -1,6 +1,6 @@
 ---
 name: "Command Development"
-description: "This skill should be used when the user asks to \\\\\\\"create a slash command\\\\\\\", \\\\\\\"add a command\\\\\\\", \\\\\\\"write a custom command\\\\\\\", \\\\\\\"define command arguments\\\\\\\", \\\\\\\"use command frontmatter\\\\\\\", \\\\\\\"organize commands\\\\\\\", \\\\\\\"create command with file references\\\\\\\", \\\\\\\"interactive command\\\\\\\", \\\\\\\"use AskUserQuestion in command\\\\\\\", or needs guidance on slash command structure, YAML frontmatter fields, dynamic arguments, bash execution in commands, user interaction patterns, or command development best practices for CodeBuddy Code."
+description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"create a slash command\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"add a command\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"write a custom command\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"define command arguments\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"use command frontmatter\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"organize commands\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"create command with file references\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"interactive command\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"use AskUserQuestion in command\\\\\\\\\\\\\\\", or needs guidance on slash command structure, YAML frontmatter fields, dynamic arguments, bash execution in commands, user interaction patterns, or command development best practices for CodeBuddy Code."
 description_zh: "用于开发 CodeBuddy Code 插件的综合工具包。包含 7 个专家技能，涵盖钩子、MCP 集成、命令、代理和最佳实践。支持 AI 辅助的插件创建和验证。"
 version: "0.2.0"
 source: codebuddy

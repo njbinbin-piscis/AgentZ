@@ -11,6 +11,8 @@ source_plugin: "oh-my-codebuddy"
 
 > **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 
+> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
+
 # Gemini CLI Integration
 
 ## Overview

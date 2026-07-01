@@ -3,7 +3,6 @@ name: "humanizer"
 description: "|"
 description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
 version: "2.1.1"
-tools: [file_edit, codebase_search]
 source: codebuddy
 source_plugin: "hot-skills"
 ---

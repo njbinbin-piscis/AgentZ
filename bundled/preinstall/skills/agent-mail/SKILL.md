@@ -11,6 +11,8 @@ source_plugin: "hot-skills"
 
 > **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 
+> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
+
 # AgentMail - Email for AI Agents 📧
 
 Give your AI agent its own email inbox. Send, receive, and manage emails programmatically.

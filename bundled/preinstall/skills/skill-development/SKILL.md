@@ -1,6 +1,6 @@
 ---
 name: "Skill Development"
-description: "This skill should be used when the user wants to \\\\\\\"create a skill\\\\\\\", \\\\\\\"add a skill to plugin\\\\\\\", \\\\\\\"write a new skill\\\\\\\", \\\\\\\"improve skill description\\\\\\\", \\\\\\\"organize skill content\\\\\\\", or needs guidance on skill structure, progressive disclosure, or skill development best practices for CodeBuddy Code plugins."
+description: "This skill should be used when the user wants to \\\\\\\\\\\\\\\"create a skill\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"add a skill to plugin\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"write a new skill\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"improve skill description\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"organize skill content\\\\\\\\\\\\\\\", or needs guidance on skill structure, progressive disclosure, or skill development best practices for CodeBuddy Code plugins."
 description_zh: "用于开发 CodeBuddy Code 插件的综合工具包。包含 7 个专家技能，涵盖钩子、MCP 集成、命令、代理和最佳实践。支持 AI 辅助的插件创建和验证。"
 version: "0.1.0"
 source: codebuddy

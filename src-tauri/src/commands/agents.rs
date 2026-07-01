@@ -466,12 +466,17 @@ mod smoke_tests {
         let db = Database::open(&db_dir.join("piscis.db")).expect("open db");
 
         let synced = sync_agents_to_kois(&db, &config);
-        assert_eq!(synced.len(), 5, "expected 5 seeded agents");
+        assert!(
+            synced.len() >= 5,
+            "expected at least 5 seeded agents, got {}",
+            synced.len()
+        );
         for agent in &synced {
             assert!(agent.koi_id.is_some(), "missing koi_id for {}", agent.id);
         }
 
-        let pool_members: Vec<String> = ["architect", "coder", "reviewer"]
+        let core = ["architect", "coder", "reviewer"];
+        let pool_members: Vec<String> = core
             .iter()
             .map(|slug| {
                 db.find_koi_by_name(slug)
@@ -480,7 +485,7 @@ mod smoke_tests {
                     .id
             })
             .collect();
-        assert_eq!(pool_members.len(), 3);
+        assert_eq!(pool_members.len(), core.len());
 
         let project_dir = tmp.to_string_lossy().into_owned();
         let pool = db

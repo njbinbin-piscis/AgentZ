@@ -77,9 +77,10 @@ source_plugin: "oh-my-codebuddy"
 - 生成优化建议和总结
 
 **输出**: 
-- `wiki.md` - 完整的技术分析文档
-- `wiki-optimization-suggestions.md` - 优化建议
-- `wiki-summary.md` - 总结报告
+- `.agentz/WIKI_DEEP.md` - 完整的技术分析文档
+- `.agentz/wiki-optimization.md` - 优化建议
+- `.agentz/wiki-summary.md` - 总结报告
+- `.agentz/AGENT_CODING_BRIEF.md` - Agent 编码简报（重建图谱时自动生成，agent turn 自动注入）
 
 ## 智能体
 
@@ -158,9 +159,14 @@ GitHub 仓库研究智能体，用于克隆和分析 GitHub 仓库。
 │           └── features.md
 ├── .gh-repo/                         # 克隆的仓库
 │   └── repo-name/
-├── wiki.md                           # 最终生成的 wiki
-├── wiki-optimization-suggestions.md # 优化建议
-└── wiki-summary.md                   # 总结报告
+├── wiki.md                           # 旧路径（已弃用，请用 .agentz/WIKI_DEEP.md）
+├── .agentz/
+│   ├── graph.json                    # 知识图谱（结构）
+│   ├── AGENT_CODING_BRIEF.md         # Agent 编码简报（自动注入 agent turn）
+│   ├── REPO_WIKI.md                  # 快速模块概览
+│   ├── WIKI_DEEP.md                  # 深度 wiki（ralph-loop-wiki 输出）
+│   ├── wiki-optimization.md
+│   └── wiki-summary.md
 ```
 
 ## 安装

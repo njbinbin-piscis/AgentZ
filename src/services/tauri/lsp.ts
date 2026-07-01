@@ -30,6 +30,41 @@ export const lspApi = {
     invoke<void>("ide_lsp_stop", { projectDir, language }),
 };
 
+/** Monaco editor language id (syntax + built-in TS/JS diagnostics). */
+const EXT_TO_MONACO_LANG: Record<string, string> = {
+  ".ts": "typescript",
+  ".tsx": "typescriptreact",
+  ".js": "javascript",
+  ".jsx": "javascriptreact",
+  ".mjs": "javascript",
+  ".cjs": "javascript",
+  ".rs": "rust",
+  ".py": "python",
+  ".pyi": "python",
+  ".json": "json",
+  ".html": "html",
+  ".htm": "html",
+  ".css": "css",
+  ".scss": "scss",
+  ".less": "less",
+  ".md": "markdown",
+  ".sql": "sql",
+  ".yaml": "yaml",
+  ".yml": "yaml",
+  ".xml": "xml",
+  ".sh": "shell",
+  ".bash": "shell",
+};
+
+/** Detect Monaco language from a file path. */
+export function monacoLanguageForFile(filePath: string): string | null {
+  const lower = filePath.toLowerCase();
+  for (const [ext, lang] of Object.entries(EXT_TO_MONACO_LANG)) {
+    if (lower.endsWith(ext)) return lang;
+  }
+  return null;
+}
+
 // ─── File extension → LSP language mapping ─────────────────────────────
 
 const EXT_TO_LSP_LANG: Record<string, string> = {

@@ -5,6 +5,7 @@ import type { OpenTab } from "./types";
 import {
   lspApi,
   languageForFile,
+  monacoLanguageForFile,
   LspClient,
   registerLspProviders,
   type LspProvidersRegistration,
@@ -550,13 +551,16 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
     };
   }, [tab.path]);
 
+  const editorLanguage =
+    monacoLanguageForFile(tab.path) || tab.language || "plaintext";
+
   if (tab.isDiff && tab.originalContent !== undefined) {
     return (
       <div className="agentz-editor-wrap">
         <DiffEditor
           height="100%"
           theme={editorTheme}
-          language={tab.language || "plaintext"}
+          language={editorLanguage}
           original={tab.originalContent}
           modified={tab.content}
           options={{
@@ -577,7 +581,7 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
       <Editor
         height="100%"
         theme={editorTheme}
-        language={tab.language || "plaintext"}
+        language={editorLanguage}
         value={tab.content}
         loading={<div className="ide-file-loading"><div className="ide-file-loading-spinner" /></div>}
         onChange={(v) => {

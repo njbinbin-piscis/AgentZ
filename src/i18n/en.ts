@@ -207,6 +207,8 @@ const en = {
   library: {
     title: "Resource library",
     subtitle: "Discover, manage, and compose skills, agents, teams, and connectors",
+    cloudBase: "Official market source",
+    cloudBaseHint: "Official marketplace backend (theAgentOS). Dev builds default to http://localhost:8137.",
     cat_skill: "Skills",
     cat_command: "Commands",
     cat_tool: "Tools",

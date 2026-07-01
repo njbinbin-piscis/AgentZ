@@ -5,22 +5,28 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.0] - 2026-06-13
+## [0.6.0] - 2026-06-28
 
 ### Added
 
-- **CodeBuddy 预装资源**：首次启动将 bundled/preinstall 中的技能、智能体、斜杠命令复制到全局配置目录（write-if-absent）。
+- **CodeGraph 式后台图谱索引**：移除 React Flow 图谱 UI；`graph_index` 单 worker + debounce 自动重建 `.agentz/graph.db`；Agent 工具 `graph_explore`（源码 + blast radius）与 `@graph` 改调 `explore_graph`。
+- **云市场源配置**：资源库可设置官方市场后端 URL；开发构建默认 `http://localhost:8137`，发布构建默认 `https://www.dimnuo.com`。
+- **Monaco 语言检测**：按文件扩展名自动切换语法高亮（TS/RS/Py 等）。
+- **CodeBuddy 预装资源**：首次启动将 bundled/preinstall 复制到全局配置（write-if-absent）；新增 100+ 智能体变体、40+ 斜杠命令与若干技能；兼容性审计流水线（`lint:preinstall` / `verify:preinstall`）。
 - **斜杠命令**：Composer `/` 补全；后端展开 prompt 并可选限制工具集。
 - **项目模板**：打开尚无 `.agentz` 的文件夹时可选应用 CodeBuddy 规则/钩子模板。
-- **兼容性审计流水线**：`lint:preinstall`、`remediate:preinstall`、`verify:preinstall --strict`；产物见 `bundled/codebuddy/compatibility-report.json` 与 `exclude.json`。
 
 ### Changed
 
-- **Kernel `piscis-engine v0.8.62`**、**RobotZ `v0.1.6`**：对齐合并后的 engine 发布（含 v0.8.61 功能 + plan path 修复）。
-- 预装资源经 AgentZ 规范化：工具名映射、CodeBuddy 术语改写、slash_id 去重（保留质量最高条目）。
-- 排除 142 条不兼容/重复资源（3 技能 + 103 智能体 + 36 命令），详见 `bundled/codebuddy/exclude.json`。
-- 已安装用户：`.preinstall-codebuddy-v2-compat` sentinel 自动清理 exclude 列表中的 CodeBuddy 资源。
-- Seed sentinel 升级为 `.layered-seed-v3`；CodeBuddy 预装使用 `.preinstall-codebuddy-v1`。
+- **IDE 侧栏**：仅保留 Chat，移除图谱 Tab 与 Wiki「打开图谱」入口。
+- **Wiki「重建图谱」**：改为排队后台索引（`graph_index_rebuild`），不再打开 `graph.json`。
+- **资源库**：发现页增加云市场源设置；样式与布局优化。
+- **Kernel `piscis-engine v0.8.62`**、**RobotZ `v0.1.6`**：对齐合并后的 engine 发布。
+- 预装资源经 AgentZ 规范化；排除 142 条不兼容/重复资源（见 `bundled/codebuddy/exclude.json`）。
+
+### Fixed
+
+- **CI**：eslint 忽略 `bundled/`、`scripts/`、`.cache/`；marketplace `dead_code` clippy。
 
 ## [0.5.10] - 2026-06-13
 

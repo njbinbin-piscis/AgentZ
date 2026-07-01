@@ -33,7 +33,9 @@ window.MonacoEnvironment = {
       case "razor":
         return new htmlWorker();
       case "typescript":
+      case "typescriptreact":
       case "javascript":
+      case "javascriptreact":
         return new tsWorker();
       default:
         return new editorWorker();

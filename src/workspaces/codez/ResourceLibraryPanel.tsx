@@ -9,6 +9,7 @@ import {
   type LibraryInitialState,
   type LibraryView,
 } from "./resources/types";
+import { getCloudBaseUrl, setCloudBaseUrl } from "../../services/tauri/marketplace";
 import CommandsInstalledView from "./resources/CommandsInstalledView";
 import SkillsInstalledView from "./resources/SkillsInstalledView";
 import SkillsDiscoverView from "./resources/SkillsDiscoverView";
@@ -35,6 +36,28 @@ export default function ResourceLibraryPanel({ onClose, initial }: ResourceLibra
     initial?.expandConnectorId ?? null,
   );
   const [wide, setWide] = useState(false);
+  const [cloudBase, setCloudBase] = useState<string>("");
+  const [editingBase, setEditingBase] = useState(false);
+  const [baseDraft, setBaseDraft] = useState("");
+
+  useEffect(() => {
+    getCloudBaseUrl()
+      .then((url) => setCloudBase(url))
+      .catch(() => setCloudBase(""));
+  }, []);
+
+  const saveCloudBase = useCallback(async () => {
+    const next = baseDraft.trim();
+    try {
+      await setCloudBaseUrl(next);
+      const resolved = await getCloudBaseUrl();
+      setCloudBase(resolved);
+    } catch {
+      /* ignore persistence errors; keep prior value */
+    } finally {
+      setEditingBase(false);
+    }
+  }, [baseDraft]);
 
   const availableViews = useMemo(() => viewsForCategory(category), [category]);
 
@@ -155,9 +178,45 @@ export default function ResourceLibraryPanel({ onClose, initial }: ResourceLibra
             <h2>{t("library.title")}</h2>
             <p className="agentz-library-subtitle">{t("library.subtitle")}</p>
           </div>
-          <button type="button" className="agentz-library-close" onClick={onClose} title={t("common.close")}>
-            ✕
-          </button>
+          <div className="agentz-library-head-actions">
+            {editingBase ? (
+              <span className="agentz-cloudbase-edit">
+                <input
+                  type="text"
+                  className="agentz-cloudbase-input"
+                  value={baseDraft}
+                  placeholder="https://www.dimnuo.com"
+                  autoFocus
+                  onChange={(e) => setBaseDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void saveCloudBase();
+                    if (e.key === "Escape") setEditingBase(false);
+                  }}
+                />
+                <button type="button" className="agentz-cloudbase-btn" onClick={() => void saveCloudBase()}>
+                  {t("common.save")}
+                </button>
+                <button type="button" className="agentz-cloudbase-btn" onClick={() => setEditingBase(false)}>
+                  {t("common.cancel")}
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="agentz-cloudbase-chip"
+                title={t("library.cloudBaseHint")}
+                onClick={() => {
+                  setBaseDraft(cloudBase);
+                  setEditingBase(true);
+                }}
+              >
+                {t("library.cloudBase")}: {cloudBase || "—"}
+              </button>
+            )}
+            <button type="button" className="agentz-library-close" onClick={onClose} title={t("common.close")}>
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="agentz-library-cats" role="tablist">
