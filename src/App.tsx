@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { openFolderDialog } from "./services/tauri";
@@ -12,9 +12,9 @@ import {
 } from "./services/tauri/workspace";
 import { generateRepoWiki } from "./services/tauri/repoWiki";
 import {
-  getGraphIndexStatus,
+  graphIndexVisualState,
   requestGraphIndex,
-  waitGraphIndexIdle,
+  useGraphIndexStatus,
 } from "./services/tauri/graphIndex";
 import IdeSidePanel from "./components/IdeSidePanel";
 import { confirmTerminalCloseOnProjectChange, destroyAllTerminals } from "./workspaces/codez/Terminal";
@@ -106,7 +106,12 @@ export default function App() {
   const [wikiBuildAction, setWikiBuildAction] = useState<WikiBuildAction>("overview");
   const [wikiBusy, setWikiBusy] = useState(false);
   const [wikiMenuOpen, setWikiMenuOpen] = useState(false);
+  const [graphIndexRefreshNonce, setGraphIndexRefreshNonce] = useState(0);
   const wikiMenuRef = useRef<HTMLDivElement>(null);
+  const graphIndexStatus = useGraphIndexStatus(projectDir, graphIndexRefreshNonce);
+  const graphIndexVisual = graphIndexStatus
+    ? graphIndexVisualState(graphIndexStatus)
+    : null;
   const [settingsToast, setSettingsToast] = useState<string | null>(null);
   const [ideWikiOpenPath, setIdeWikiOpenPath] = useState<{ path: string; nonce: number } | null>(
     null,
@@ -459,18 +464,9 @@ export default function App() {
       setWikiBusy(true);
       try {
         if (action === "graph") {
-          const ack = await requestGraphIndex(projectDir);
-          setSettingsToast(ack.message);
-          const st = await waitGraphIndexIdle(projectDir).catch(() =>
-            getGraphIndexStatus(projectDir),
-          );
-          if (st.last_error) {
-            setSettingsToast(st.last_error);
-          } else if (st.nodes > 0) {
-            setSettingsToast(
-              t("agent.repoWikiGraphDone", { nodes: st.nodes, edges: st.edges }),
-            );
-          }
+          await requestGraphIndex(projectDir);
+          setGraphIndexRefreshNonce((n) => n + 1);
+          setSettingsToast(t("agent.repoWikiGraphQueued"));
         } else {
           const res = await generateRepoWiki(projectDir);
           setIdeWikiOpenPath({ path: res.path, nonce: Date.now() });
@@ -504,6 +500,34 @@ export default function App() {
     },
     [mode, runWikiInIde, triggerWikiInWorkz],
   );
+
+  const wikiTitle = useMemo(() => {
+    if (!graphIndexStatus || wikiBusy) return t("agent.repoWikiHint");
+    switch (graphIndexVisual) {
+      case "indexing":
+        return t("agent.repoWikiGraphStatusIndexing");
+      case "ready":
+        return t("agent.repoWikiGraphStatusReady", { nodes: graphIndexStatus.nodes });
+      case "error":
+        return graphIndexStatus.last_error ?? t("agent.repoWikiGraphError");
+      default:
+        return t("agent.repoWikiHint");
+    }
+  }, [graphIndexStatus, graphIndexVisual, wikiBusy, t]);
+
+  const graphMenuStatusLabel = useMemo(() => {
+    if (!graphIndexStatus) return null;
+    switch (graphIndexVisual) {
+      case "indexing":
+        return t("agent.repoWikiGraphIndexing");
+      case "ready":
+        return t("agent.repoWikiGraphReadyShort", { nodes: graphIndexStatus.nodes });
+      case "error":
+        return t("agent.repoWikiGraphError");
+      default:
+        return t("agent.repoWikiGraphEmpty");
+    }
+  }, [graphIndexStatus, graphIndexVisual, t]);
 
   const handleThemeToggle = useCallback(() => {
     const next = toggleAppearanceTheme();
@@ -615,10 +639,19 @@ export default function App() {
           <div className="agentz-wiki-menu" ref={wikiMenuRef}>
             <button
               type="button"
-              className={`agentz-titlebar-icon${wikiBusy ? " loading" : ""}${wikiMenuOpen ? " active" : ""}`}
+              className={[
+                "agentz-titlebar-icon",
+                wikiMenuOpen ? "active" : "",
+                wikiBusy ? "loading" : "",
+                !wikiBusy && graphIndexVisual === "indexing" ? "graph-indexing" : "",
+                !wikiBusy && graphIndexVisual === "ready" ? "graph-ready" : "",
+                !wikiBusy && graphIndexVisual === "error" ? "graph-error" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               onClick={() => setWikiMenuOpen((v) => !v)}
               disabled={!projectDir || wikiBusy}
-              title={t("agent.repoWikiHint")}
+              title={wikiTitle}
               aria-label={t("agent.repoWiki")}
               aria-expanded={wikiMenuOpen}
               aria-haspopup="menu"
@@ -638,9 +671,21 @@ export default function App() {
                 <button
                   type="button"
                   role="menuitem"
+                  className={[
+                    graphIndexVisual === "indexing" ? "graph-indexing" : "",
+                    graphIndexVisual === "ready" ? "graph-ready" : "",
+                    graphIndexVisual === "error" ? "graph-error" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   onClick={() => handleWikiAction("graph")}
                 >
-                  {t("agent.repoWikiGraph")}
+                  <span className="agentz-wiki-menu-row">
+                    {t("agent.repoWikiGraph")}
+                    {graphMenuStatusLabel && (
+                      <span className="agentz-wiki-graph-status">{graphMenuStatusLabel}</span>
+                    )}
+                  </span>
                   <span>{t("agent.repoWikiGraphHint")}</span>
                 </button>
               </div>

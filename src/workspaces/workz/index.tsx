@@ -25,9 +25,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { agentTaskApi, type AgentTaskInfo } from "../../services/tauri/agentTask";
 import { generateRepoWiki } from "../../services/tauri/repoWiki";
 import {
-  getGraphIndexStatus,
   requestGraphIndex,
-  waitGraphIndexIdle,
 } from "../../services/tauri/graphIndex";
 import AgentTaskReview from "./AgentTaskReview";
 import SessionSkillRevisions from "./SessionSkillRevisions";
@@ -858,7 +856,6 @@ export default function WorkZWorkspace({
       try {
         if (action === "graph") {
           await requestGraphIndex(projectDir);
-          await waitGraphIndexIdle(projectDir).catch(() => getGraphIndexStatus(projectDir));
         } else {
           const res = await generateRepoWiki(projectDir);
           setPreviewPath(res.path);

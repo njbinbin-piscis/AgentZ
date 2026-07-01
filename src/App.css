@@ -154,8 +154,50 @@
   cursor: not-allowed;
 }
 
-.agentz-titlebar-icon.loading {
+.agentz-titlebar-icon.loading,
+.agentz-titlebar-icon.graph-indexing:not(.active) {
   animation: agentz-icon-pulse 1s ease-in-out infinite;
+}
+
+.agentz-titlebar-icon.graph-indexing:not(.active) {
+  color: #f59e0b;
+}
+
+.agentz-titlebar-icon.graph-ready:not(.active) {
+  color: #22c55e;
+}
+
+.agentz-titlebar-icon.graph-error:not(.active) {
+  color: #ef4444;
+}
+
+.agentz-titlebar-icon.graph-indexing.active::after,
+.agentz-titlebar-icon.graph-ready.active::after,
+.agentz-titlebar-icon.graph-error.active::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--bg-elev);
+}
+
+.agentz-titlebar-icon.graph-indexing.active::after {
+  background: #f59e0b;
+}
+
+.agentz-titlebar-icon.graph-ready.active::after {
+  background: #22c55e;
+}
+
+.agentz-titlebar-icon.graph-error.active::after {
+  background: #ef4444;
+}
+
+.agentz-wiki-menu .agentz-titlebar-icon {
+  position: relative;
 }
 
 @keyframes agentz-icon-pulse {
@@ -251,6 +293,33 @@
 
 .agentz-wiki-popover button:hover {
   background: var(--bg-elev-2);
+}
+
+.agentz-wiki-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.agentz-wiki-graph-status {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.agentz-wiki-popover button.graph-indexing .agentz-wiki-graph-status {
+  color: #f59e0b;
+}
+
+.agentz-wiki-popover button.graph-ready .agentz-wiki-graph-status {
+  color: #22c55e;
+}
+
+.agentz-wiki-popover button.graph-error .agentz-wiki-graph-status {
+  color: #ef4444;
 }
 
 .agentz-ide-split {

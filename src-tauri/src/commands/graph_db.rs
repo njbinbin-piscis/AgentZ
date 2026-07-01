@@ -5,6 +5,8 @@
 
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 use rusqlite::{params, Connection};
 use serde::Serialize;
@@ -19,10 +21,23 @@ fn graph_db_path(root: &Path) -> PathBuf {
     root.join(".agentz").join("graph.db")
 }
 
+fn graph_db_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+}
+
 pub fn open_graph_db(root: &Path) -> Result<Connection, String> {
+    open_graph_db_inner(root)
+}
+
+fn open_graph_db_inner(root: &Path) -> Result<Connection, String> {
     let dir = root.join(".agentz");
     std::fs::create_dir_all(&dir).map_err(|e| format!("create .agentz: {e}"))?;
     let conn = Connection::open(graph_db_path(root)).map_err(|e| format!("open graph.db: {e}"))?;
+    conn.busy_timeout(Duration::from_secs(10))
+        .map_err(|e| format!("graph.db busy_timeout: {e}"))?;
     conn.pragma_update(None, "journal_mode", "WAL")
         .map_err(|e| format!("wal: {e}"))?;
     conn.execute_batch(
@@ -62,9 +77,7 @@ pub fn open_graph_db(root: &Path) -> Result<Connection, String> {
     Ok(conn)
 }
 
-/// Replace graph.db contents from a GraphDoc (Phase 0 bridge from graph.json).
-pub fn sync_from_graph_doc(root: &Path, doc: &GraphDoc) -> Result<(), String> {
-    let conn = open_graph_db(root)?;
+fn sync_from_graph_doc_conn(conn: &Connection, doc: &GraphDoc) -> Result<(), String> {
     let tx = conn
         .unchecked_transaction()
         .map_err(|e| format!("tx: {e}"))?;
@@ -103,8 +116,15 @@ pub fn sync_from_graph_doc(root: &Path, doc: &GraphDoc) -> Result<(), String> {
     Ok(())
 }
 
+/// Replace graph.db contents from a GraphDoc (Phase 0 bridge from graph.json).
+pub fn sync_from_graph_doc(root: &Path, doc: &GraphDoc) -> Result<(), String> {
+    let _guard = graph_db_lock();
+    let conn = open_graph_db_inner(root)?;
+    sync_from_graph_doc_conn(&conn, doc)
+}
+
 fn ensure_synced(root: &Path) -> Result<Connection, String> {
-    let conn = open_graph_db(root)?;
+    let conn = open_graph_db_inner(root)?;
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
         .unwrap_or(0);
@@ -114,9 +134,8 @@ fn ensure_synced(root: &Path) -> Result<Connection, String> {
     let doc = crate::commands::graph::load_graph(root).ok_or(
         "graph index empty — run Wiki → Rebuild graph first".to_string(),
     )?;
-    drop(conn);
-    sync_from_graph_doc(root, &doc)?;
-    open_graph_db(root)
+    sync_from_graph_doc_conn(&conn, &doc)?;
+    Ok(conn)
 }
 
 #[derive(Debug, Clone)]
@@ -464,6 +483,7 @@ fn pending_banner(conn: &Connection) -> Option<String> {
 
 /// Explore the codebase graph (CodeGraph-style markdown for agents).
 pub fn explore_graph(root: &Path, query: &str, limit: usize) -> Result<String, String> {
+    let _guard = graph_db_lock();
     let limit = limit.clamp(1, 25);
     let conn = ensure_synced(root)?;
     let nodes = search_nodes(&conn, root, query, limit)?;
@@ -598,7 +618,8 @@ pub fn graph_db_status(root: &Path) -> Result<Option<GraphDbStatus>, String> {
     if !graph_db_path(root).is_file() {
         return Ok(None);
     }
-    let conn = open_graph_db(root)?;
+    let _guard = graph_db_lock();
+    let conn = open_graph_db_inner(root)?;
     let nodes: usize = conn
         .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
         .unwrap_or(0);

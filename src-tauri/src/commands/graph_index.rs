@@ -191,7 +191,10 @@ fn worker_loop(key: String) {
                     st.phases.insert(key.clone(), IndexPhase::Building);
                 }
 
-                let result = generate(&root);
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    generate(&root)
+                }))
+                .unwrap_or_else(|_| Err("graph index worker panicked".into()));
                 let rerun = {
                     let mut st = state().lock().unwrap_or_else(|e| e.into_inner());
                     match result {

@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-06-25
+
+### Added
+
+- **Wiki 图谱索引状态指示**：标题栏 Wiki 图标按索引状态变色（琥珀=构建中、绿=已完成、红=失败）；菜单项显示节点数与状态标签。
+
+### Fixed
+
+- **重建图谱索引闪退**：Wiki 改为后台排队，不再阻塞 UI 轮询；`graph.db` 写入加锁与 `busy_timeout`；跳过 `bundled/` 扫描；worker `catch_unwind` 防 panic。
+
 ## [0.6.0] - 2026-06-28
 
 ### Added

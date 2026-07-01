@@ -72,7 +72,7 @@ fn tours_path(root: &Path) -> PathBuf {
 }
 
 fn is_ignored_dir(name: &str) -> bool {
-    crate::path_filter::is_ignored_dir_name(name)
+    crate::path_filter::is_ignored_dir_name(name) || name == "bundled"
 }
 
 fn is_code_file(path: &Path) -> bool {
@@ -680,7 +680,7 @@ fn write_graph(root: &Path, doc: &GraphDoc) -> Result<(), String> {
     std::fs::create_dir_all(&dir).map_err(|e| format!("create .agentz: {e}"))?;
     let json = serde_json::to_string_pretty(doc).map_err(|e| format!("serialize graph: {e}"))?;
     std::fs::write(graph_path(root), json).map_err(|e| format!("write graph: {e}"))?;
-    let _ = crate::commands::graph_db::sync_from_graph_doc(root, doc);
+    crate::commands::graph_db::sync_from_graph_doc(root, doc)?;
     Ok(())
 }
 
