@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-06-25
+
+### Fixed
+
+- **Windows Release 构建**：新增 `tauri.windows.conf.json`，Windows 仅打 NSIS `.exe`，跳过 WiX MSI（preinstall 资源过多导致 `light.exe` 失败）。
+
 ## [0.6.1] - 2026-06-25
 
 ### Added

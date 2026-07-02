@@ -159,7 +159,7 @@ jobs:
 
   # ── Windows (x86_64) ─────────────────────────────────────────────
   bundle-windows-x86_64:
-    name: Bundle Windows x86_64 (.msi + .exe)
+    name: Bundle Windows x86_64 (NSIS .exe)
     runs-on: windows-latest
     timeout-minutes: 120
     permissions:
@@ -205,15 +205,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: agentz-windows-x86_64-bundles
-          path: |
-            target/release/bundle/msi/*.msi
-            target/release/bundle/nsis/*.exe
-          if-no-files-found: warn
+          path: target/release/bundle/nsis/*.exe
+          if-no-files-found: error
 
   # ── Windows (aarch64 / ARM64) ────────────────────────────────────
   # Native build on GitHub's Windows ARM runner (Snapdragon / ARM64 PCs).
   bundle-windows-aarch64:
-    name: Bundle Windows aarch64 (.msi + .exe)
+    name: Bundle Windows aarch64 (NSIS .exe)
     runs-on: windows-11-arm
     timeout-minutes: 120
     permissions:
@@ -259,10 +257,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: agentz-windows-aarch64-bundles
-          path: |
-            target/release/bundle/msi/*.msi
-            target/release/bundle/nsis/*.exe
-          if-no-files-found: warn
+          path: target/release/bundle/nsis/*.exe
+          if-no-files-found: error
 
   # ── macOS (x86_64 / Intel) ───────────────────────────────────────
   # Disabled: macos-13 runners are often unavailable (workflow stuck queued).
