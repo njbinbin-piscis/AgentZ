@@ -1,5 +1,6 @@
 import {
   Component,
+  memo,
   useEffect,
   useRef,
   useState,
@@ -196,7 +197,7 @@ function extractText(node: ReactNode): string {
 }
 
 /** Renders assistant text as rich markdown (GFM, mermaid, HTML, KaTeX). */
-export default function Markdown({
+function Markdown({
   content,
   compact,
 }: {
@@ -302,3 +303,7 @@ export default function Markdown({
     </div>
   );
 }
+
+// Rendering a completed chat turn runs GFM, KaTeX, sanitization and syntax
+// highlighting. Keep immutable history out of the composer render path.
+export default memo(Markdown);
