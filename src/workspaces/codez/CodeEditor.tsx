@@ -62,6 +62,7 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
   const lspRef = useRef<LspProvidersRegistration | null>(null);
+  const lspGenerationRef = useRef(0);
   const lspClientRef = useRef<import("../../services/tauri/lsp").LspClient | null>(null);
   const didChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -497,11 +498,16 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
         // Clean up previous LSP connection
         lspRef.current?.dispose();
         lspRef.current = null;
+        lspClientRef.current?.disconnect();
+        lspClientRef.current = null;
+        const generation = ++lspGenerationRef.current;
 
         lspApi
           .start(projectDir, lang)
           .then(async (port) => {
+            if (generation !== lspGenerationRef.current) return;
             const client = new LspClient(port);
+            lspClientRef.current = client;
             try {
               await client.connect(
                 projectDir,
@@ -509,12 +515,17 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
                 fullPath,
                 tab.content,
               );
-              lspClientRef.current = client;
+              if (generation !== lspGenerationRef.current) {
+                client.disconnect();
+                return;
+              }
               const reg = registerLspProviders(monaco, client, fullPath);
               lspRef.current = reg;
 
               client.requestDiagnostics(fullPath);
             } catch (e) {
+              client.disconnect();
+              if (lspClientRef.current === client) lspClientRef.current = null;
               console.warn("[LSP] Failed to connect:", e);
             }
           })
@@ -541,9 +552,12 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
   }, [tab.path, tab.content, tab.isDirty]);
 
   useEffect(() => {
+    const generation = lspGenerationRef;
     return () => {
       if (didChangeTimerRef.current) clearTimeout(didChangeTimerRef.current);
+      ++generation.current;
       lspRef.current?.dispose();
+      lspClientRef.current?.disconnect();
       lspRef.current = null;
       lspClientRef.current = null;
       bpDisposeRef.current?.dispose?.();

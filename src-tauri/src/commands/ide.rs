@@ -231,7 +231,8 @@ pub async fn ide_read_file(path: String) -> Result<FileContent, String> {
     }
     let size = metadata.len();
 
-    let raw = std::fs::read(&file_path).map_err(|e| e.to_string())?;
+    let raw = crate::bounded_read::read(&file_path, 10 * 1024 * 1024)
+        .map_err(|e| format!("Cannot preview {path} (maximum 10 MiB): {e}"))?;
 
     // Image preview — common raster formats + SVG.
     if let Some(mime) = preview_mime_for_path(&file_path) {
@@ -1070,47 +1071,8 @@ pub async fn ide_git_create_branch(
 
 // ─── Terminal (PTY) ────────────────────────────────────────────────────────
 
-const TERMINAL_BUFFER_MAX_LINES: usize = 5000;
-
-/// Rolling line buffer of PTY stdout/stderr for agent `terminal_read`.
-#[derive(Default)]
-pub struct TerminalOutputLog {
-    lines: std::collections::VecDeque<String>,
-    partial: String,
-}
-
-impl TerminalOutputLog {
-    pub fn append(&mut self, data: &str) {
-        self.partial.push_str(data);
-        while let Some(pos) = self.partial.find('\n') {
-            let line = self.partial[..=pos].to_string();
-            self.partial.drain(..=pos);
-            self.lines.push_back(line);
-        }
-        while self.lines.len() > TERMINAL_BUFFER_MAX_LINES {
-            self.lines.pop_front();
-        }
-    }
-
-    pub fn tail(&self, lines: usize) -> String {
-        let n = lines.min(self.lines.len());
-        self.lines
-            .iter()
-            .skip(self.lines.len().saturating_sub(n))
-            .cloned()
-            .collect()
-    }
-
-    pub fn grep_in_tail(&self, pattern: &str, search_lines: usize) -> String {
-        let n = search_lines.min(self.lines.len());
-        self.lines
-            .iter()
-            .skip(self.lines.len().saturating_sub(n))
-            .filter(|l| l.contains(pattern))
-            .cloned()
-            .collect()
-    }
-}
+pub use crate::terminal_log::TerminalOutputLog;
+use crate::terminal_log::TERMINAL_BUFFER_MAX_LINES;
 
 /// Global terminal session registry.
 pub struct TerminalRegistry {
@@ -1410,14 +1372,29 @@ pub async fn ide_start_watcher(
         return Err(format!("Directory not found: {}", project_dir));
     }
 
-    // Check if already watching
-    {
-        let watchers = state.file_watchers.lock().await;
-        if watchers.contains_key(&project_dir) {
-            return Ok(()); // Already watching
-        }
+    // Serialize start/stop so concurrent mounts cannot create duplicate workers.
+    let mut watchers = state.file_watchers.lock().await;
+    if watchers.contains_key(&project_dir) {
+        return Ok(());
     }
 
+    let index_root = root.clone();
+    let index_worker = crate::index_worker::IndexWorker::start(move |batch| {
+        if batch.rebuild {
+            if let Err(error) = crate::commands::codebase::build_index(&index_root) {
+                tracing::warn!(%error, "Codebase rebuild failed");
+            }
+            crate::commands::graph_index::request_rebuild(index_root.clone());
+        } else {
+            for rel in batch.paths {
+                if let Err(error) = crate::commands::codebase::index_file(&index_root, &rel) {
+                    tracing::warn!(%error, path = %rel, "Incremental index failed");
+                }
+                crate::commands::graph::schedule_patch(index_root.clone(), rel);
+            }
+        }
+    })
+    .map_err(|e| format!("Failed to start index worker: {e}"))?;
     let app_clone = app.clone();
     let dir = project_dir.clone();
 
@@ -1468,18 +1445,7 @@ pub async fn ide_start_watcher(
                             // Incrementally update the codebase index so
                             // @codebase / codebase_search stay fresh (best-effort).
                             if crate::path_filter::should_index_path(&rel_norm) {
-                                let root_clone = PathBuf::from(&dir);
-                                let rel_for_index = rel_norm.clone();
-                                std::thread::spawn(move || {
-                                    let _ = crate::commands::codebase::index_file(
-                                        &root_clone,
-                                        &rel_for_index,
-                                    );
-                                    crate::commands::graph::schedule_patch(
-                                        root_clone,
-                                        rel_for_index,
-                                    );
-                                });
+                                index_worker.enqueue(rel_norm.clone());
                             }
                         }
                     }
@@ -1498,10 +1464,7 @@ pub async fn ide_start_watcher(
     crate::commands::graph_index::ensure_started(&root);
 
     // Store the watcher to keep it alive
-    {
-        let mut watchers = state.file_watchers.lock().await;
-        watchers.insert(project_dir, watcher);
-    }
+    watchers.insert(project_dir, watcher);
 
     Ok(())
 }

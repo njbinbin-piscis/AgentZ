@@ -154,13 +154,16 @@ fn infer_layer(path: &str) -> &'static str {
 }
 
 fn collect_files(root: &Path, out: &mut Vec<PathBuf>, depth: usize) {
-    if depth > 12 || out.len() > 20_000 {
+    if depth > 12 || out.len() >= 20_000 {
         return;
     }
     let Ok(entries) = std::fs::read_dir(root) else {
         return;
     };
     for entry in entries.flatten() {
+        if out.len() >= 20_000 {
+            break;
+        }
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
         let Ok(meta) = entry.metadata() else {
@@ -416,12 +419,12 @@ impl BuildState {
         self.file_set.iter().map(|r| (r.clone(), ())).collect()
     }
 
-    fn ingest_file(&mut self, root: &Path, rel: &str) {
+    fn ingest_file(&mut self, root: &Path, rel: &str, file_index: &HashMap<String, ()>) {
         if !self.file_set.contains(rel) {
             return;
         }
         let full = root.join(rel);
-        let Ok(raw) = std::fs::read(&full) else {
+        let Ok(raw) = crate::bounded_read::read(&full, MAX_FILE_BYTES) else {
             return;
         };
         if raw.len() as u64 > MAX_FILE_BYTES || raw[..raw.len().min(8192)].contains(&0) {
@@ -429,10 +432,9 @@ impl BuildState {
         }
         let content = String::from_utf8_lossy(&raw);
         let imports_raw = extract_imports(&content, rel);
-        let file_index = self.file_index();
         let mut resolved = Vec::new();
         for spec in imports_raw {
-            if let Some(target) = resolve_import(root, rel, &spec, &file_index) {
+            if let Some(target) = resolve_import(root, rel, &spec, file_index) {
                 if target != rel {
                     resolved.push(target);
                 }
@@ -444,8 +446,10 @@ impl BuildState {
     }
 
     fn build_all_files(&mut self, root: &Path) {
+        // The workspace lookup is immutable throughout a rebuild.
+        let file_index = self.file_index();
         for rel in self.file_rels.clone() {
-            self.ingest_file(root, &rel);
+            self.ingest_file(root, &rel, &file_index);
         }
     }
 

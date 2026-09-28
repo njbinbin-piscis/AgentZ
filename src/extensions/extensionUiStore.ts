@@ -84,6 +84,9 @@ export interface ExtensionUiSnapshot {
   hostError: string | null;
 }
 
+export const MAX_OUTPUT_CHARS = 512 * 1024;
+const MAX_LOG_LINE_CHARS = 4096;
+
 const EMPTY: ExtensionUiSnapshot = {
   statusBar: [],
   outputChannels: [],
@@ -163,7 +166,7 @@ class ExtensionUiStore {
   }
 
   appendHostLog(line: string): void {
-    this.hostLog.push(line);
+    this.hostLog.push(line.slice(-MAX_LOG_LINE_CHARS));
     if (this.hostLog.length > 500) this.hostLog.shift();
     this.emit();
   }
@@ -188,7 +191,8 @@ class ExtensionUiStore {
   appendOutput(id: string, value: string): void {
     const ch = this.outputChannels.get(id);
     if (ch) {
-      ch.content += value;
+      ch.content = (ch.content.slice(-MAX_OUTPUT_CHARS) + value.slice(-MAX_OUTPUT_CHARS))
+        .slice(-MAX_OUTPUT_CHARS);
       this.emit();
     }
   }
@@ -324,7 +328,7 @@ class ExtensionUiStore {
 
   // ── debug ──
   appendDebugOutput(line: string): void {
-    this.debugOutput.push(line);
+    this.debugOutput.push(line.slice(-MAX_LOG_LINE_CHARS));
     if (this.debugOutput.length > 1000) this.debugOutput.shift();
     this.emit();
   }

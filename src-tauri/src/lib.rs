@@ -10,6 +10,7 @@ pub mod browser;
 pub mod commands;
 pub mod context_assembly;
 pub mod gateway;
+mod index_worker;
 pub mod journal;
 pub mod lsp;
 pub mod path_filter;
@@ -17,6 +18,8 @@ pub mod runtime;
 pub mod skills;
 pub mod state;
 pub mod tools;
+mod terminal_log;
+mod bounded_read;
 
 use state::AppState;
 use std::sync::OnceLock;
@@ -61,6 +64,11 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             init_logging(app.handle());
+            let previous_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |info| {
+                tracing::error!(panic = %info, backtrace = %std::backtrace::Backtrace::force_capture(), "Rust panic");
+                previous_hook(info);
+            }));
             // Explicitly apply the bundled icon — some Linux WMs skip it in dev otherwise.
             if let Some(icon) = app.default_window_icon().cloned() {
                 if let Some(window) = app.get_webview_window("main") {

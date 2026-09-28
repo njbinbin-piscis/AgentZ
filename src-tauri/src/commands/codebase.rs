@@ -70,13 +70,16 @@ fn is_code_file(path: &Path) -> bool {
 }
 
 fn collect_files(dir: &Path, out: &mut Vec<PathBuf>, depth: usize) {
-    if depth > 12 || out.len() > 20_000 {
+    if depth > 12 || out.len() >= 20_000 {
         return;
     }
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
+        if out.len() >= 20_000 {
+            break;
+        }
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
         let Ok(meta) = entry.metadata() else { continue };
@@ -110,7 +113,7 @@ pub fn build_index(root: &Path) -> Result<usize, String> {
     let mut count = 0usize;
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for file in &files {
-        let Ok(raw) = std::fs::read(file) else {
+        let Ok(raw) = crate::bounded_read::read(file, MAX_FILE_BYTES) else {
             continue;
         };
         if raw[..raw.len().min(8192)].contains(&0) {
@@ -149,7 +152,7 @@ pub fn index_file(root: &Path, rel: &str) -> Result<(), String> {
         .map_err(|e| format!("delete old chunks: {e}"))?;
 
     let full = root.join(rel);
-    let Ok(raw) = std::fs::read(&full) else {
+    let Ok(raw) = crate::bounded_read::read(&full, MAX_FILE_BYTES) else {
         return Ok(()); // deleted — nothing to add
     };
     if raw.len() as u64 > MAX_FILE_BYTES || raw[..raw.len().min(8192)].contains(&0) {
@@ -232,6 +235,7 @@ pub fn search_index(root: &Path, query: &str, limit: usize) -> Result<Vec<CodeSe
         })
         .map_err(|e| format!("query search: {e}"))?;
 
+    let limit = limit.clamp(1, 50);
     let mut hits: Vec<CodeSearchHit> = Vec::new();
     for row in rows.flatten() {
         let (path, start_line, end_line, content, lower) = row;
@@ -261,6 +265,9 @@ pub fn search_index(root: &Path, query: &str, limit: usize) -> Result<Vec<CodeSe
             snippet,
             score,
         });
+        // Keep only the best hits instead of retaining every matching snippet.
+        hits.sort_by(|a, b| b.score.total_cmp(&a.score));
+        hits.truncate(limit);
     }
 
     hits.sort_by(|a, b| {

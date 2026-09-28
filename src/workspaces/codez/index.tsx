@@ -221,6 +221,7 @@ export default function CodeZWorkspace({
   useEffect(() => {
     if (!projectDir) return;
     let unlistenChat: (() => void) | undefined;
+    let disposed = false;
     void listen<ChatEventEnvelope>(CHAT_EVENT, (ev) => {
       const env = ev.payload;
       if (env.channel !== "agent_event") return;
@@ -242,9 +243,11 @@ export default function CodeZWorkspace({
         setAgentBrowserAction(null);
       }
     }).then((fn) => {
-      unlistenChat = fn;
+      if (disposed) fn();
+      else unlistenChat = fn;
     });
     return () => {
+      disposed = true;
       unlistenChat?.();
     };
   }, [projectDir, onBrowserOpenChange]);
@@ -252,12 +255,15 @@ export default function CodeZWorkspace({
   useEffect(() => {
     if (!browserOpen) return;
     let unlistenChanged: (() => void) | undefined;
+    let disposed = false;
     void onBrowserChanged(() => {
       setBrowserRefreshSignal((n) => n + 1);
     }).then((fn) => {
-      unlistenChanged = fn;
+      if (disposed) fn();
+      else unlistenChanged = fn;
     });
     return () => {
+      disposed = true;
       unlistenChanged?.();
     };
   }, [browserOpen]);

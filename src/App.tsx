@@ -255,6 +255,7 @@ export default function App() {
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     void listen("app-before-close", () => {
       setExitToast(true);
       void (async () => {
@@ -267,9 +268,13 @@ export default function App() {
         }
       })();
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, [persistWorkspace]);
 
   useEffect(() => {
