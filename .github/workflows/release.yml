@@ -10,6 +10,13 @@ on:
       - "v*"
   workflow_dispatch:
 
+# tauri-action creates/updates the GitHub Release and uploads bundle assets.
+# Keep this at workflow scope as well as the per-job declarations below: it
+# makes the required token grant explicit to GitHub Actions and avoids a
+# future job losing release access when its local permissions are edited.
+permissions:
+  contents: write
+
 env:
   CARGO_TERM_COLOR: always
   # Retry flaky crates.io downloads (HTTP2 reset / connection reset by peer).
