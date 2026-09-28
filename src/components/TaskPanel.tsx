@@ -14,6 +14,20 @@ export interface ToolStep {
   isError?: boolean;
 }
 
+/**
+ * Tool output is retained by the agent/session store, but never keep an
+ * unbounded duplicate in React state. A single verbose command previously
+ * allocated enough WebKit memory to kill the renderer.
+ */
+export const MAX_TOOL_RESULT_CHARS = 64 * 1024;
+
+export function truncateToolResultForUi(result: string): string {
+  if (result.length <= MAX_TOOL_RESULT_CHARS) return result;
+  const head = Math.floor(MAX_TOOL_RESULT_CHARS * 0.75);
+  const tail = MAX_TOOL_RESULT_CHARS - head;
+  return `${result.slice(0, head)}\n\n… [UI output truncated: ${result.length.toLocaleString()} characters total] …\n\n${result.slice(-tail)}`;
+}
+
 /** Insert or refresh a tool step when `tool_start` arrives (events may repeat). */
 export function upsertToolStep(
   prev: ToolStep[],

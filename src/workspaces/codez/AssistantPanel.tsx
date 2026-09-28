@@ -55,6 +55,7 @@ import AssistantMessageList from "./AssistantMessageList";
 import TaskPanel, {
   mergePlanItems,
   parsePlanFromToolInput,
+  truncateToolResultForUi,
   upsertToolStep,
   type ToolStep,
 } from "../../components/TaskPanel";
@@ -512,7 +513,7 @@ export default function AssistantPanel({
               ? {
                   ...step,
                   completed: true,
-                  result: evt.result,
+                  result: truncateToolResultForUi(evt.result),
                   isError: evt.is_error,
                 }
               : step,
