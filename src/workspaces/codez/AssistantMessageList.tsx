@@ -54,8 +54,11 @@ function AssistantMessageList({
   onPermissionResolved,
 }: AssistantMessageListProps) {
   const { t } = useTranslation();
-  const INITIAL_VISIBLE = 200;
-  const LOAD_MORE = 50;
+  // Keep the DOM bounded even for multi-hour agent sessions. The persisted
+  // session remains intact; older turns are mounted only when the user scrolls
+  // to the history boundary.
+  const INITIAL_VISIBLE = 50;
+  const LOAD_MORE = 10;
   const [visibleFrom, setVisibleFrom] = useState(0);
   const loadLockRef = useRef(false);
 
