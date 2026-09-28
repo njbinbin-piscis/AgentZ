@@ -1140,6 +1140,12 @@ export default function AssistantPanel({
     );
   };
 
+  // AssistantMessageList is memoized so typing does not reparse historical
+  // Markdown. Keep this prop stable; an inline callback defeats that boundary.
+  const handlePermissionResolved = useCallback(() => {
+    setPermissionRequest(null);
+  }, []);
+
   const inputPlaceholder = !projectDir
     ? t("chat.noProject")
     : busy
@@ -1225,7 +1231,7 @@ export default function AssistantPanel({
         onPlanModeChange={onModeChange}
         onPlanBuild={onPlanBuild}
         permissionRequest={permissionRequest}
-        onPermissionResolved={() => setPermissionRequest(null)}
+        onPermissionResolved={handlePermissionResolved}
       />
 
       {error && <div className="agentz-assistant-error">{error}</div>}

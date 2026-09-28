@@ -1,4 +1,4 @@
-import { type ReactNode, type RefObject, useEffect } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { ComposerChip } from "./composerChips";
 import { chipDisplayLabel } from "./composerChips";
@@ -214,15 +214,27 @@ export default function ChatComposer({
   const { t } = useTranslation();
   const canSend = canSendProp ?? Boolean(value.trim() || attachment || chips.length > 0);
   const locked = inputDisabled;
+  const resizeFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     const ta = textareaRef?.current;
     if (!ta) return;
-    ta.style.height = "auto";
-    const maxPx = 20 * 5 + 24;
-    ta.style.height = `${Math.min(ta.scrollHeight, maxPx)}px`;
-    ta.style.overflowY = ta.scrollHeight > maxPx ? "auto" : "hidden";
+    // scrollHeight forces layout; batch it to one measurement per frame.
+    if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+    resizeFrameRef.current = requestAnimationFrame(() => {
+      resizeFrameRef.current = null;
+      ta.style.height = "auto";
+      const maxPx = 20 * 5 + 24;
+      const nextHeight = `${Math.min(ta.scrollHeight, maxPx)}px`;
+      ta.style.height = nextHeight;
+      const nextOverflow = ta.scrollHeight > maxPx ? "auto" : "hidden";
+      if (ta.style.overflowY !== nextOverflow) ta.style.overflowY = nextOverflow;
+    });
   }, [value, textareaRef]);
+
+  useEffect(() => () => {
+    if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+  }, []);
 
   return (
     <div className="agentz-composer-wrap">

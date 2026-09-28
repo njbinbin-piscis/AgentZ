@@ -12,6 +12,12 @@
   overflow-y: visible;
 }
 
+/* Skip layout/paint for old chat turns outside the viewport. */
+.agentz-msg-virtual {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}
+
 .agentz-assistant-header {
   display: flex;
   align-items: center;

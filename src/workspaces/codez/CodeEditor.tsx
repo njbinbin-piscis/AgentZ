@@ -643,6 +643,7 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
 
   const editorLanguage =
     monacoLanguageForFile(tab.path) || tab.language || "plaintext";
+  const isLargeDocument = tab.content.length > 200_000;
 
   // Give Monaco a real file:// model URI so LSP providers (which match on the
   // same URI) and diagnostics line up instead of defaulting to inmemory://.
@@ -680,7 +681,10 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
         language={editorLanguage}
         path={editorModelPath}
         keepCurrentModel
-        value={tab.content}
+        // Keep edits in Monaco's persistent file-backed model. A controlled
+        // value makes the wrapper revisit the buffer after every keystroke and
+        // is a frequent source of scroll/cursor jitter in large files.
+        defaultValue={tab.content}
         loading={<div className="ide-file-loading"><div className="ide-file-loading-spinner" /></div>}
         onChange={(v) => {
           const next = v || "";
@@ -707,12 +711,12 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
         onMount={handleMount}
         options={{
           readOnly: tab.isReadOnly,
-          minimap: { enabled: true },
+          minimap: { enabled: !isLargeDocument },
           glyphMargin: true,
           fontSize: 13,
           fontFamily: 'Consolas, "Courier New", monospace',
           scrollBeyondLastLine: false,
-          wordWrap: "on",
+          wordWrap: isLargeDocument ? "off" : "on",
           lineNumbers: "on",
           renderWhitespace: "selection",
           bracketPairColorization: { enabled: true },
@@ -720,6 +724,8 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
           automaticLayout: true,
           tabSize: 2,
           inlineSuggest: { enabled: true },
+          largeFileOptimizations: true,
+          stopRenderingLineAfter: isLargeDocument ? 10_000 : -1,
         }}
       />
 
