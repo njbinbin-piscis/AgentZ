@@ -101,8 +101,14 @@ function GitRepoSection({
           `Discard changes in ${paths.length} file(s)? This cannot be undone.`,
       );
       if (!ok) return;
-      for (const p of paths) {
-        await ideApi.gitDiscard(projectDir, p, gitRoot).catch(() => {});
+      const results = await Promise.allSettled(
+        paths.map((path) => ideApi.gitDiscard(projectDir, path, gitRoot)),
+      );
+      const failed = results
+        .map((result, index) => result.status === "rejected" ? paths[index] : null)
+        .filter((path): path is string => path !== null);
+      if (failed.length > 0) {
+        window.alert(`Discarded ${paths.length - failed.length}/${paths.length} files. Failed: ${failed.join(", ")}`);
       }
       await refreshRepo();
     },

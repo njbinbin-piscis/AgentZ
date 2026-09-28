@@ -83,6 +83,9 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
   const [inline, setInline] = useState<InlineEditState | null>(null);
   const inlineStateRef = useRef<InlineEditState | null>(null);
   inlineStateRef.current = inline;
+  const inlineRequestGenerationRef = useRef(0);
+  const activeTabPathRef = useRef(tab.path);
+  activeTabPathRef.current = tab.path;
   const editorTheme = useSyncExternalStore(themeStore.subscribe, themeStore.getSnapshot);
 
   // Move the cursor to a target line/column and center it (used by Search
@@ -251,6 +254,10 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
   const runInline = useCallback(async () => {
     const s = inlineStateRef.current;
     if (!s || !s.instruction.trim() || s.busy) return;
+    const editor = editorRef.current;
+    const requestModelUri = editor?.getModel?.()?.uri?.toString?.() ?? "";
+    const requestPath = tab.path;
+    const requestGeneration = ++inlineRequestGenerationRef.current;
     setInline((cur) => (cur ? { ...cur, busy: true, error: null } : cur));
     try {
       const proposed = await inlineEdit({
@@ -261,7 +268,15 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
         afterContext: s.after,
       });
       const fresh = inlineStateRef.current;
-      if (!fresh) return; // cancelled while generating
+      const currentModelUri = editorRef.current?.getModel?.()?.uri?.toString?.() ?? "";
+      if (
+        !fresh ||
+        requestGeneration !== inlineRequestGenerationRef.current ||
+        requestPath !== activeTabPathRef.current ||
+        requestModelUri !== currentModelUri
+      ) {
+        return; // cancelled, superseded, or switched to another editor model
+      }
       const applied = applyInlinePreview(fresh, proposed);
       setInline((cur) => (cur ? { ...cur, proposed, busy: false, applied } : cur));
     } catch (e) {

@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] - 2026-09-28
+
+### Fixed
+
+- **WebView security**: enable a restrictive Tauri CSP while retaining required local LSP, model API, asset and Monaco worker sources.
+- **Inline edit**: discard stale async edit proposals after a tab, Monaco model or request generation changes.
+- **Git**: report per-file failures from Discard All instead of silently hiding them.
+
 ## [0.6.4] - 2026-09-28
 
 ### Fixed
