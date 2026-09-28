@@ -6,6 +6,8 @@ name: Release
 # packages are visible on the public Releases page.
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
