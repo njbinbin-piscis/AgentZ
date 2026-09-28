@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.7] - 2026-09-29
+
+### Performance
+
+- **Chat / Composer**: isolate completed Markdown turns from Composer keystrokes, virtualize offscreen chat layout and batch textarea autosizing to eliminate long-history input lag and code-block flicker.
+- **Editor**: retain Monaco file models between edits and enable large-file rendering safeguards, avoiding controlled-buffer scroll jitter and expensive minimap/soft-wrap work for large documents.
+
 ## [0.6.6] - 2026-09-28
 
 ### Fixed
