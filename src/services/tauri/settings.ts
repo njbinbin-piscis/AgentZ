@@ -27,6 +27,7 @@ export interface LlmSettings {
   custom_base_url: string;
   max_tokens: number;
   context_window: number;
+  max_iterations: number;
   policy_mode: string;
   enable_streaming: boolean;
   language: string;

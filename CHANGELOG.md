@@ -5,6 +5,31 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.6] - 2026-09-28
+
+### Fixed
+
+- **CI / desktop host**: make the workspace pass the current stable Rust Clippy gate, preventing release builds from failing on needless map iteration, a single-pattern match, and a large `ToolResult` error value.
+
+## [0.6.5] - 2026-09-28
+
+### Fixed
+
+- **WebView security**: enable a restrictive Tauri CSP while retaining required local LSP, model API, asset and Monaco worker sources.
+- **Inline edit**: discard stale async edit proposals after a tab, Monaco model or request generation changes.
+- **Git**: report per-file failures from Discard All instead of silently hiding them.
+
+## [0.6.4] - 2026-09-28
+
+### Fixed
+
+- **Agent harness**: restore real permission confirmation for main chat, replace blocking browser dialogs with IDE approval cards, preserve active Todo state, raise the configurable iteration default to 200, and emit lifecycle diagnostics for text-only exits, cancellations and failures.
+- **LSP/editor**: stabilize document URI/session handling and protect inline-edit reject from accidentally undoing subsequent user edits.
+- **AI completion**: cancel stale per-document completion requests in both the editor and host process.
+- **Git**: use NUL-delimited porcelain status parsing and validate selected nested repository roots for diff/add/reset/discard operations.
+- **Markdown security**: use one lazy strict Mermaid loader, sanitize rendered SVG in chat and preview surfaces, and isolate external links.
+- **Plan mode**: remove duplicate Plan/Agent decisions and preserve unfinished Todo work across follow-up messages.
+
 ## [0.6.2] - 2026-06-25
 
 ### Fixed

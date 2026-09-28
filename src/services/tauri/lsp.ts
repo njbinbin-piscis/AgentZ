@@ -2,9 +2,16 @@
 // Connects to the Rust backend's WebSocket bridge and wires
 // Monaco Editor providers for diagnostics, hover, completions,
 // go-to-definition, and find-references.
+//
+// Protocol note: the Rust bridge owns the Content-Length framing. It accepts
+// one bare JSON message per WebSocket text frame, adds the LSP header itself
+// before writing to the language server's stdin, and strips the header off
+// responses before forwarding them to us. We therefore send raw JSON objects
+// (never Content-Length framed) and parse response payloads defensively.
 
 import { invoke } from "@tauri-apps/api/core";
 import type * as Monaco from "monaco-editor";
+import { fileUriString } from "./editorUri";
 
 // ─── Tauri command wrappers ──────────────────────────────────────────────
 
@@ -120,391 +127,6 @@ interface LspDiagnostic {
   code?: string | number;
 }
 
-// ─── LspClient ───────────────────────────────────────────────────────────
-
-type ResponseHandler = (result: unknown) => void;
-
-/**
- * Manages a single WebSocket connection to one LSP bridge.
- * Handles JSON-RPC framing (Content-Length headers) and request/response
- * correlation via numeric request IDs.
- */
-export class LspClient {
-  private ws: WebSocket | null = null;
-  private nextId = 1;
-  private pending = new Map<number, ResponseHandler>();
-  private url: string;
-  private diagnostics: LspDiagnostic[] = [];
-  private onDiagnosticsChange?: (diags: LspDiagnostic[]) => void;
-  private connectPromise: Promise<void> | null = null;
-
-  constructor(port: number) {
-    this.url = `ws://127.0.0.1:${port}`;
-  }
-
-  /** Connect to the bridge and perform the LSP handshake. */
-  async connect(
-    projectDir: string,
-    language: string,
-    filePath: string,
-    fileContent: string,
-  ): Promise<void> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
-    if (this.connectPromise) return this.connectPromise;
-
-    this.connectPromise = new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(this.url);
-      this.ws = ws;
-
-      ws.onopen = async () => {
-        try {
-          // 1) Send initialize request
-          const initReq = this.frame({
-            jsonrpc: "2.0",
-            id: this.nextId++,
-            method: "initialize",
-            params: {
-              processId: null,
-              rootUri: `file://${projectDir}`,
-              capabilities: {
-                textDocument: {
-                  hover: { contentFormat: ["markdown", "plaintext"] },
-                  completion: { completionItem: { snippetSupport: true } },
-                  definition: { linkSupport: true },
-                  references: {},
-                  rename: { prepareSupport: true },
-                  publishDiagnostics: { relatedInformation: true },
-                },
-              },
-              workspaceFolders: [
-                { uri: `file://${projectDir}`, name: "project" },
-              ],
-            },
-          });
-          ws.send(initReq);
-
-          // Wait for init response (the bridge sends a canned one)
-          const initResp = await this.waitForResponse();
-          if (!initResp) {
-            reject(new Error("LSP init: no response"));
-            return;
-          }
-
-          // 2) Send initialized notification
-          ws.send(
-            this.frame({
-              jsonrpc: "2.0",
-              method: "initialized",
-              params: {},
-            }),
-          );
-
-          // 3) Send textDocument/didOpen
-          const lspLang = languageToLspId(language);
-          ws.send(
-            this.frame({
-              jsonrpc: "2.0",
-              method: "textDocument/didOpen",
-              params: {
-                textDocument: {
-                  uri: `file://${filePath}`,
-                  languageId: lspLang,
-                  version: 1,
-                  text: fileContent,
-                },
-              },
-            }),
-          );
-
-          if (import.meta.env.DEV) {
-            console.log(`[LSP] Connected to ${this.url} for ${language}`);
-          }
-          resolve();
-        } catch (err) {
-          reject(err);
-        }
-      };
-
-      ws.onmessage = (evt) => {
-        this.handleMessage(evt.data as string);
-      };
-
-      ws.onerror = (err) => {
-        console.error("[LSP] WebSocket error:", err);
-        reject(new Error("WebSocket connection failed"));
-      };
-
-      ws.onclose = () => {
-        if (import.meta.env.DEV) {
-          console.log("[LSP] WebSocket closed");
-        }
-        this.ws = null;
-      };
-    });
-
-    return this.connectPromise;
-  }
-
-  /** Send a textDocument/didChange notification when content changes. */
-  sendDidChange(filePath: string, content: string) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(
-      this.frame({
-        jsonrpc: "2.0",
-        method: "textDocument/didChange",
-        params: {
-          textDocument: {
-            uri: `file://${filePath}`,
-            version: Date.now(),
-          },
-          contentChanges: [{ text: content }],
-        },
-      }),
-    );
-  }
-
-  /** Request diagnostics for a file. */
-  async requestDiagnostics(filePath: string): Promise<LspDiagnostic[]> {
-    // Some LSP servers don't support textDocument/diagnostic,
-    // but they push diagnostics via publishDiagnostics after didOpen/didChange.
-    // We collect those passively and return what we have.
-    // Also try the pull-model if supported.
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const id = this.nextId++;
-      const promise = new Promise<LspDiagnostic[]>((resolve) => {
-        const handler = (result: unknown) => {
-          const r = result as { items?: LspDiagnostic[] };
-          resolve(r?.items ?? []);
-        };
-        this.pending.set(id, handler as ResponseHandler);
-        // Timeout after 3s
-        setTimeout(() => {
-          if (this.pending.has(id)) {
-            this.pending.delete(id);
-            resolve(this.diagnostics);
-          }
-        }, 3000);
-      });
-
-      this.ws.send(
-        this.frame({
-          jsonrpc: "2.0",
-          id,
-          method: "textDocument/diagnostic",
-          params: {
-            textDocument: { uri: `file://${filePath}` },
-          },
-        }),
-      );
-
-      return promise;
-    }
-    return this.diagnostics;
-  }
-
-  /** Request hover info at a position. */
-  async requestHover(
-    filePath: string,
-    line: number,
-    character: number,
-  ): Promise<string | null> {
-    return this.sendRequest("textDocument/hover", {
-      textDocument: { uri: `file://${filePath}` },
-      position: { line, character },
-    }).then((result) => {
-      const r = result as { contents?: unknown } | undefined;
-      if (!r?.contents) return null;
-      const c = r.contents as
-        | string
-        | { value: string }
-        | { kind: string; value: string };
-      if (typeof c === "string") return c;
-      if ("value" in c && typeof c.value === "string") return c.value;
-      return JSON.stringify(c);
-    });
-  }
-
-  /** Request completion items at a position. */
-  async requestCompletions(
-    filePath: string,
-    line: number,
-    character: number,
-  ): Promise<Monaco.languages.CompletionItem[] | null> {
-    return this.sendRequest("textDocument/completion", {
-      textDocument: { uri: `file://${filePath}` },
-      position: { line, character },
-      context: { triggerKind: 1 },
-    }).then((result) => {
-      const r = result as
-        | { items?: LspCompletionItem[] }
-        | LspCompletionItem[]
-        | undefined;
-      if (!r) return null;
-      const items = Array.isArray(r) ? r : r.items ?? [];
-      return items.map(toMonacoCompletionItem);
-    });
-  }
-
-  /** Request go-to-definition at a position. */
-  async requestDefinition(
-    filePath: string,
-    line: number,
-    character: number,
-  ): Promise<Monaco.languages.Location[] | null> {
-    return this.sendRequest("textDocument/definition", {
-      textDocument: { uri: `file://${filePath}` },
-      position: { line, character },
-    }).then((result) => {
-      const locations: LspLocation[] = Array.isArray(result)
-        ? (result as LspLocation[])
-        : result
-          ? [result as LspLocation]
-          : [];
-      return locations.map(toMonacoLocation);
-    });
-  }
-
-  /** Request find-references at a position. */
-  async requestReferences(
-    filePath: string,
-    line: number,
-    character: number,
-  ): Promise<Monaco.languages.Location[] | null> {
-    return this.sendRequest("textDocument/references", {
-      textDocument: { uri: `file://${filePath}` },
-      position: { line, character },
-      context: { includeDeclaration: true },
-    }).then((result) => {
-      const locations = result as LspLocation[] | undefined;
-      if (!locations?.length) return null;
-      return locations.map(toMonacoLocation);
-    });
-  }
-
-  /** Register a callback for diagnostics changes. */
-  setDiagnosticsCallback(cb: (diags: LspDiagnostic[]) => void) {
-    this.onDiagnosticsChange = cb;
-  }
-
-  /** Disconnect and clean up. */
-  disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-    this.pending.clear();
-    this.connectPromise = null;
-  }
-
-  // ─── Private helpers ──────────────────────────────────────────────────
-
-  private frame(msg: unknown): string {
-    const body = JSON.stringify(msg);
-    return `Content-Length: ${body.length}\r\n\r\n${body}`;
-  }
-
-  private async sendRequest(
-    method: string,
-    params: unknown,
-  ): Promise<unknown> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return null;
-
-    const id = this.nextId++;
-    return new Promise((resolve) => {
-      const handler = (result: unknown) => resolve(result);
-      this.pending.set(id, handler);
-      // Timeout after 5s
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          resolve(null);
-        }
-      }, 5000);
-
-      this.ws!.send(
-        this.frame({
-          jsonrpc: "2.0",
-          id,
-          method,
-          params,
-        }),
-      );
-    });
-  }
-
-  /** Wait for the next JSON-RPC response message. */
-  private waitForResponse(): Promise<unknown> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error("Timeout waiting for LSP response"));
-      }, 10000);
-
-      const origHandler = this.ws!.onmessage;
-      this.ws!.onmessage = (evt) => {
-        const body = this.parseBody(evt.data as string);
-        if (!body) return;
-        try {
-          const msg = JSON.parse(body);
-          if (msg.id !== undefined && msg.result !== undefined) {
-            clearTimeout(timeout);
-            this.ws!.onmessage = origHandler;
-            resolve(msg.result);
-          } else if (msg.id !== undefined && msg.error) {
-            clearTimeout(timeout);
-            this.ws!.onmessage = origHandler;
-            reject(new Error(msg.error.message ?? "LSP error"));
-          }
-        } catch {
-          // ignore parse errors for non-JSON frames
-        }
-      };
-    });
-  }
-
-  /** Parse a Content-Length framed message body. */
-  private parseBody(data: string): string | null {
-    const idx = data.indexOf("\r\n\r\n");
-    if (idx === -1) return data; // no framing
-    return data.slice(idx + 4);
-  }
-
-  /** Handle incoming WebSocket messages. */
-  private handleMessage(data: string) {
-    const body = this.parseBody(data);
-    if (!body) return;
-    try {
-      const msg = JSON.parse(body);
-
-      // Handle responses to our requests
-      if (msg.id !== undefined && this.pending.has(msg.id)) {
-        const handler = this.pending.get(msg.id)!;
-        this.pending.delete(msg.id);
-        if (msg.error) {
-          console.warn(`[LSP] Error for id ${msg.id}:`, msg.error);
-        }
-        handler(msg.result ?? null);
-        return;
-      }
-
-      // Handle pushed diagnostics
-      if (msg.method === "textDocument/publishDiagnostics") {
-        const params = msg.params as {
-          uri: string;
-          diagnostics: LspDiagnostic[];
-        };
-        if (params?.diagnostics) {
-          this.diagnostics = params.diagnostics;
-          this.onDiagnosticsChange?.(params.diagnostics);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-}
-
-// ─── LSP ↔ Monaco type converters ────────────────────────────────────────
-
 interface LspCompletionItem {
   label: string;
   kind?: number;
@@ -518,8 +140,445 @@ interface LspCompletionItem {
   additionalTextEdits?: { range: LspRange; newText: string }[];
 }
 
+// ─── Timings ─────────────────────────────────────────────────────────────
+
+/** Handshake budget for the initialize round-trip. */
+const HANDSHAKE_TIMEOUT_MS = 10_000;
+/** Budget for read-only queries (hover / completion / definition / references). */
+const REQUEST_TIMEOUT_MS = 5_000;
+/** The bridge answers `initialize` with a canned response whose id is 0. */
+const BRIDGE_INIT_ID = 0;
+
+interface Pending {
+  settled: boolean;
+  timeoutId: ReturnType<typeof setTimeout>;
+  timeoutRejects: boolean;
+  settle: (value: unknown) => void;
+  fail: (err: Error) => void;
+  label: string;
+}
+
+// ─── LspClient ───────────────────────────────────────────────────────────
+
+/**
+ * Manages a single WebSocket connection to one LSP bridge.
+ * Sends bare JSON-RPC messages (the bridge owns Content-Length framing) and
+ * correlates responses via numeric request ids. Tracks open documents and
+ * diagnostics per URI so one client can serve several files.
+ */
+export class LspClient {
+  private ws: WebSocket | null = null;
+  private nextId = 1;
+  private pending = new Map<number, Pending>();
+  private url: string;
+  private diagnosticsByUri = new Map<string, LspDiagnostic[]>();
+  private diagnosticsListeners = new Map<string, Set<(d: LspDiagnostic[]) => void>>();
+  private docVersions = new Map<string, number>();
+  private connectPromise: Promise<void> | null = null;
+
+  constructor(port: number) {
+    this.url = `ws://127.0.0.1:${port}`;
+  }
+
+  /** Connect to the bridge and perform the LSP handshake. */
+  async connect(projectDir: string, language: string): Promise<void> {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    if (this.connectPromise) return this.connectPromise;
+
+    this.connectPromise = new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(this.url);
+      this.ws = ws;
+
+      ws.onopen = async () => {
+        try {
+          const rootUri = fileUriString(projectDir);
+          await this.sendRequest(
+            "initialize",
+            {
+              processId: null,
+              rootUri,
+              capabilities: {
+                textDocument: {
+                  hover: { contentFormat: ["markdown", "plaintext"] },
+                  completion: { completionItem: { snippetSupport: true } },
+                  definition: { linkSupport: true },
+                  references: {},
+                  rename: { prepareSupport: true },
+                  publishDiagnostics: { relatedInformation: true },
+                },
+              },
+              workspaceFolders: [{ uri: rootUri, name: "project" }],
+            },
+            {
+              label: "initialize",
+              timeoutMs: HANDSHAKE_TIMEOUT_MS,
+              timeoutRejects: true,
+              // The bridge intercepts initialize and replies with id 0.
+              aliases: [BRIDGE_INIT_ID],
+            },
+          );
+
+          this.send({ jsonrpc: "2.0", method: "initialized", params: {} });
+
+          if (import.meta.env.DEV) {
+            console.log(`[LSP] Connected to ${this.url} for ${language}`);
+          }
+          resolve();
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      };
+
+      ws.onmessage = (evt) => {
+        this.handleMessage(evt.data as string);
+      };
+
+      ws.onerror = () => {
+        console.error("[LSP] WebSocket error");
+        reject(new Error("WebSocket connection failed"));
+      };
+
+      ws.onclose = () => {
+        if (import.meta.env.DEV) console.log("[LSP] WebSocket closed");
+        this.ws = null;
+        this.connectPromise = null;
+        // Fail anything still waiting so callers never hang.
+        this.rejectAllPending(new Error("LSP disconnected"));
+      };
+    });
+
+    return this.connectPromise;
+  }
+
+  /** Notify the server that a document was opened (resets its version to 1). */
+  openDocument(filePath: string, languageId: string, content: string) {
+    const uri = fileUriString(filePath);
+    this.docVersions.set(uri, 1);
+    this.send({
+      jsonrpc: "2.0",
+      method: "textDocument/didOpen",
+      params: {
+        textDocument: { uri, languageId, version: 1, text: content },
+      },
+    });
+  }
+
+  /** Notify the server that a document was closed. */
+  closeDocument(filePath: string) {
+    const uri = fileUriString(filePath);
+    this.docVersions.delete(uri);
+    this.diagnosticsByUri.delete(uri);
+    this.send({
+      jsonrpc: "2.0",
+      method: "textDocument/didClose",
+      params: { textDocument: { uri } },
+    });
+  }
+
+  /** Send a textDocument/didChange notification with a monotonically
+   * increasing per-document version (required by the LSP spec). */
+  sendDidChange(filePath: string, content: string) {
+    const uri = fileUriString(filePath);
+    const version = (this.docVersions.get(uri) ?? 1) + 1;
+    this.docVersions.set(uri, version);
+    this.send({
+      jsonrpc: "2.0",
+      method: "textDocument/didChange",
+      params: {
+        textDocument: { uri, version },
+        contentChanges: [{ text: content }],
+      },
+    });
+  }
+
+  /** Request diagnostics for a file (pull model, falling back to cached push). */
+  async requestDiagnostics(filePath: string): Promise<LspDiagnostic[]> {
+    const uri = fileUriString(filePath);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try {
+        const result = await this.sendRequest(
+          "textDocument/diagnostic",
+          { textDocument: { uri } },
+          { label: "diagnostic", timeoutMs: 3000 },
+        );
+        const items = (result as { items?: LspDiagnostic[] } | null)?.items;
+        if (items) return items;
+      } catch {
+        // Server may not implement pull diagnostics — fall back to cache.
+      }
+    }
+    return this.diagnosticsByUri.get(uri) ?? [];
+  }
+
+  /** Request hover info at a position. */
+  async requestHover(
+    filePath: string,
+    line: number,
+    character: number,
+  ): Promise<string | null> {
+    const result = await this.sendRequest("textDocument/hover", {
+      textDocument: { uri: fileUriString(filePath) },
+      position: { line, character },
+    });
+    const r = result as { contents?: unknown } | undefined;
+    if (!r?.contents) return null;
+    const c = r.contents as
+      | string
+      | { value: string }
+      | { kind: string; value: string };
+    if (typeof c === "string") return c;
+    if ("value" in c && typeof c.value === "string") return c.value;
+    return JSON.stringify(c);
+  }
+
+  /** Request raw completion items at a position. */
+  async requestCompletions(
+    filePath: string,
+    line: number,
+    character: number,
+  ): Promise<LspCompletionItem[] | null> {
+    const result = await this.sendRequest("textDocument/completion", {
+      textDocument: { uri: fileUriString(filePath) },
+      position: { line, character },
+      context: { triggerKind: 1 },
+    });
+    const r = result as
+      | { items?: LspCompletionItem[] }
+      | LspCompletionItem[]
+      | undefined;
+    if (!r) return null;
+    const items = Array.isArray(r) ? r : r.items ?? [];
+    return items;
+  }
+
+  /** Request go-to-definition at a position (raw LSP locations). */
+  async requestDefinition(
+    filePath: string,
+    line: number,
+    character: number,
+  ): Promise<LspLocation[] | null> {
+    const result = await this.sendRequest("textDocument/definition", {
+      textDocument: { uri: fileUriString(filePath) },
+      position: { line, character },
+    });
+    if (!result) return null;
+    const locations: LspLocation[] = Array.isArray(result)
+      ? (result as LspLocation[])
+      : [result as LspLocation];
+    return locations;
+  }
+
+  /** Request find-references at a position (raw LSP locations). */
+  async requestReferences(
+    filePath: string,
+    line: number,
+    character: number,
+  ): Promise<LspLocation[] | null> {
+    const result = await this.sendRequest("textDocument/references", {
+      textDocument: { uri: fileUriString(filePath) },
+      position: { line, character },
+      context: { includeDeclaration: true },
+    });
+    const locations = result as LspLocation[] | undefined;
+    if (!locations?.length) return null;
+    return locations;
+  }
+
+  /**
+   * Subscribe to diagnostics for one document URI. Fires immediately with the
+   * last known set (if any). Returns an unsubscribe function.
+   */
+  setDiagnosticsCallback(
+    uri: string,
+    cb: (diags: LspDiagnostic[]) => void,
+  ): () => void {
+    let listeners = this.diagnosticsListeners.get(uri);
+    if (!listeners) {
+      listeners = new Set();
+      this.diagnosticsListeners.set(uri, listeners);
+    }
+    listeners.add(cb);
+    const cached = this.diagnosticsByUri.get(uri);
+    if (cached) cb(cached);
+    return () => {
+      const set = this.diagnosticsListeners.get(uri);
+      if (!set) return;
+      set.delete(cb);
+      if (set.size === 0) this.diagnosticsListeners.delete(uri);
+    };
+  }
+
+  /** Disconnect and clean up. Fails any in-flight requests. */
+  disconnect() {
+    this.rejectAllPending(new Error("LSP disconnected"));
+    this.docVersions.clear();
+    this.diagnosticsByUri.clear();
+    this.diagnosticsListeners.clear();
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch {
+        // ignore
+      }
+      this.ws = null;
+    }
+    this.connectPromise = null;
+  }
+
+  // ─── Private helpers ──────────────────────────────────────────────────
+
+  /** Send one bare JSON message (the bridge adds LSP framing). */
+  private send(msg: unknown) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify(msg));
+  }
+
+  /**
+   * Register a request and send it. Pending is installed *before* the send so
+   * a synchronous response can never be missed. `aliases` lets callers accept a
+   * response under an id the server substitutes (e.g. the bridge's canned
+   * initialize reply uses id 0).
+   */
+  private sendRequest(
+    method: string,
+    params: unknown,
+    opts: {
+      label?: string;
+      timeoutMs?: number;
+      timeoutRejects?: boolean;
+      aliases?: number[];
+    } = {},
+  ): Promise<unknown> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return Promise.resolve(null);
+    }
+
+    const id = this.nextId++;
+    const timeoutMs = opts.timeoutMs ?? REQUEST_TIMEOUT_MS;
+    const timeoutRejects = opts.timeoutRejects ?? false;
+
+    return new Promise<unknown>((resolve, reject) => {
+      const pending: Pending = {
+        settled: false,
+        timeoutRejects,
+        timeoutId: setTimeout(() => {
+          if (pending.settled) return;
+          pending.settled = true;
+          this.removePending(pending);
+          if (timeoutRejects) {
+            reject(new Error(`LSP request timed out: ${opts.label ?? method}`));
+          } else {
+            resolve(null);
+          }
+        }, timeoutMs),
+        settle: (value: unknown) => {
+          if (pending.settled) return;
+          pending.settled = true;
+          clearTimeout(pending.timeoutId);
+          this.removePending(pending);
+          resolve(value);
+        },
+        fail: (err: Error) => {
+          if (pending.settled) return;
+          pending.settled = true;
+          clearTimeout(pending.timeoutId);
+          this.removePending(pending);
+          reject(err);
+        },
+        label: opts.label ?? method,
+      };
+
+      this.pending.set(id, pending);
+      for (const alias of opts.aliases ?? []) this.pending.set(alias, pending);
+
+      this.send({ jsonrpc: "2.0", id, method, params });
+    });
+  }
+
+  /** Remove every map entry that points at the given pending record. */
+  private removePending(pending: Pending) {
+    for (const [key, value] of this.pending) {
+      if (value === pending) this.pending.delete(key);
+    }
+  }
+
+  private rejectAllPending(err: Error) {
+    const records = new Set(this.pending.values());
+    this.pending.clear();
+    for (const pending of records) {
+      if (pending.settled) continue;
+      // Let fail() flip `settled`, clear the timer and reject. removePending()
+      // inside fail() is a no-op because the map was cleared above.
+      pending.fail(err);
+    }
+  }
+
+  /** Strip a Content-Length header if one is present (defensive; the bridge
+   * normally forwards bare JSON to us). */
+  private parseBody(data: string): string | null {
+    const idx = data.indexOf("\r\n\r\n");
+    if (idx === -1) return data;
+    return data.slice(idx + 4);
+  }
+
+  /** Handle incoming WebSocket messages. */
+  private handleMessage(data: string) {
+    const body = this.parseBody(data);
+    if (!body) return;
+    let msg: {
+      id?: number;
+      result?: unknown;
+      error?: { message?: string };
+      method?: string;
+      params?: unknown;
+    };
+    try {
+      msg = JSON.parse(body);
+    } catch {
+      return; // ignore non-JSON frames
+    }
+
+    // Response to one of our requests.
+    if (msg.id !== undefined && this.pending.has(msg.id)) {
+      const pending = this.pending.get(msg.id)!;
+      if (msg.error) {
+        pending.fail(new Error(msg.error.message ?? "LSP request failed"));
+      } else {
+        pending.settle(msg.result ?? null);
+      }
+      return;
+    }
+
+    // Pushed diagnostics — route to the matching URI only.
+    if (msg.method === "textDocument/publishDiagnostics") {
+      const params = msg.params as
+        | { uri: string; diagnostics: LspDiagnostic[] }
+        | undefined;
+      if (params?.uri) {
+        this.diagnosticsByUri.set(params.uri, params.diagnostics ?? []);
+        this.diagnosticsListeners
+          .get(params.uri)
+          ?.forEach((cb) => cb(params.diagnostics ?? []));
+      }
+    }
+  }
+}
+
+// ─── LSP ↔ Monaco type converters ────────────────────────────────────────
+
+function toMonacoRange(range: LspRange): Monaco.IRange {
+  return {
+    startLineNumber: range.start.line + 1,
+    startColumn: range.start.character + 1,
+    endLineNumber: range.end.line + 1,
+    endColumn: range.end.character + 1,
+  };
+}
+
 function toMonacoCompletionItem(
   item: LspCompletionItem,
+  model: Monaco.editor.ITextModel,
+  position: Monaco.Position,
 ): Monaco.languages.CompletionItem {
   let docString: string | undefined;
   if (typeof item.documentation === "object" && item.documentation && "value" in item.documentation) {
@@ -528,51 +587,42 @@ function toMonacoCompletionItem(
     docString = item.documentation as string | undefined;
   }
 
-  const result: Monaco.languages.CompletionItem = {
+  // Prefer the server-provided edit range; otherwise replace the word under the
+  // cursor rather than a degenerate (1,1)-(1,1) range that mangles the buffer.
+  let range: Monaco.IRange;
+  if (item.textEdit?.range) {
+    range = toMonacoRange(item.textEdit.range);
+  } else {
+    const word = model.getWordUntilPosition(position);
+    range = {
+      startLineNumber: position.lineNumber,
+      startColumn: word.startColumn,
+      endLineNumber: position.lineNumber,
+      endColumn: word.endColumn,
+    };
+  }
+
+  return {
     label: item.label,
     kind: lspKindToMonaco(item.kind ?? 1),
     detail: item.detail,
     documentation: docString,
     insertText: item.insertText ?? item.label,
-    insertTextRules:
-      item.insertTextFormat === 2
-        ? 4 /* InsertAsSnippet */
-        : undefined,
+    insertTextRules: item.insertTextFormat === 2 ? 4 /* InsertAsSnippet */ : undefined,
     sortText: item.sortText,
     filterText: item.filterText,
-    range: item.textEdit?.range
-      ? {
-          startLineNumber: item.textEdit.range.start.line + 1,
-          startColumn: item.textEdit.range.start.character + 1,
-          endLineNumber: item.textEdit.range.end.line + 1,
-          endColumn: item.textEdit.range.end.character + 1,
-        }
-      : { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 },
+    range,
   };
-
-  return result;
 }
 
-function toMonacoLocation(loc: LspLocation): Monaco.languages.Location {
-  const path = loc.uri.replace(/^file:\/\//, "");
+function toMonacoLocation(
+  monaco: typeof Monaco,
+  loc: LspLocation,
+): Monaco.languages.Location {
   return {
-    uri: monacoUri(path),
-    range: {
-      startLineNumber: loc.range.start.line + 1,
-      startColumn: loc.range.start.character + 1,
-      endLineNumber: loc.range.end.line + 1,
-      endColumn: loc.range.end.character + 1,
-    },
+    uri: monaco.Uri.parse(loc.uri),
+    range: toMonacoRange(loc.range),
   };
-}
-
-/** Create a Monaco Uri from a filesystem path. */
-function monacoUri(path: string): Monaco.Uri {
-  // We need to import Monaco dynamically for Uri, but since
-  // this is in a service layer, we use the path directly.
-  // The conversion is handled in the provider functions
-  // which have access to the monaco namespace.
-  return { path, scheme: "file" } as unknown as Monaco.Uri;
 }
 
 function lspKindToMonaco(kind: number): Monaco.languages.CompletionItemKind {
@@ -604,46 +654,52 @@ function lspKindToMonaco(kind: number): Monaco.languages.CompletionItemKind {
     24: 23, // Operator
     25: 24, // TypeParameter
   };
-  return map[kind] ?? 0;
-}
-
-/** Map our language IDs to LSP language IDs. */
-function languageToLspId(lang: string): string {
-  return lang;
+  return (map[kind] ?? 0) as Monaco.languages.CompletionItemKind;
 }
 
 // ─── Monaco provider registration helpers ─────────────────────────────────
 
-/**
- * Register LSP-powered providers on a Monaco languages namespace
- * and editor model. Returns a cleanup function.
- */
 export interface LspProvidersRegistration {
   dispose: () => void;
   client: LspClient;
 }
 
+/**
+ * Register LSP-powered providers on a Monaco languages namespace for a single
+ * file, and bind diagnostics for that file's URI to Monaco markers.
+ *
+ * The client is shared across files (see `lspSession`), so `dispose()` only
+ * unregisters the providers/listeners — it does NOT disconnect the client.
+ */
 export function registerLspProviders(
   monaco: typeof Monaco,
   client: LspClient,
   filePath: string,
 ): LspProvidersRegistration {
   const disposables: Monaco.IDisposable[] = [];
-  const modelUri = monaco.Uri.parse(`file://${filePath}`);
+  const uriString = fileUriString(filePath);
   const langId = languageForFile(filePath) ?? "plaintext";
   const matchesFile = (model: Monaco.editor.ITextModel) =>
-    model.uri.toString() === modelUri.toString();
+    model.uri.toString() === uriString;
 
   // ── Diagnostics via markers ──────────────────────────────────────────
-  client.setDiagnosticsCallback((diags) => {
+  const unsubscribeDiagnostics = client.setDiagnosticsCallback(uriString, (diags) => {
+    const model = monaco.editor.getModel(monaco.Uri.parse(uriString));
+    if (!model) {
+      // The model for this file is not mounted right now; skip rather than
+      // falling back to an unrelated model (which used to cross-contaminate).
+      if (import.meta.env.DEV) console.warn("[LSP] no model for", uriString);
+      return;
+    }
     const markers: Monaco.editor.IMarkerData[] = diags.map((d) => ({
-      severity: d.severity === 1
-        ? monaco.MarkerSeverity.Error
-        : d.severity === 2
-          ? monaco.MarkerSeverity.Warning
-          : d.severity === 4
-            ? monaco.MarkerSeverity.Hint
-            : monaco.MarkerSeverity.Info,
+      severity:
+        d.severity === 1
+          ? monaco.MarkerSeverity.Error
+          : d.severity === 2
+            ? monaco.MarkerSeverity.Warning
+            : d.severity === 4
+              ? monaco.MarkerSeverity.Hint
+              : monaco.MarkerSeverity.Info,
       message: d.message,
       source: d.source,
       code: typeof d.code === "string" ? d.code : String(d.code ?? ""),
@@ -652,85 +708,104 @@ export function registerLspProviders(
       endLineNumber: d.range.end.line + 1,
       endColumn: d.range.end.character + 1,
     }));
-    monaco.editor.setModelMarkers(
-      monaco.editor.getModel(modelUri) ?? monaco.editor.getModels()[0],
-      "lsp",
-      markers,
-    );
+    monaco.editor.setModelMarkers(model, "lsp", markers);
   });
+  disposables.push({ dispose: unsubscribeDiagnostics });
 
   // ── Hover provider ───────────────────────────────────────────────────
-  const hoverDisposable = monaco.languages.registerHoverProvider(langId, {
-    provideHover: async (model, position) => {
-      if (!matchesFile(model)) return null;
-      const result = await client.requestHover(
-        filePath,
-        position.lineNumber - 1,
-        position.column - 1,
-      );
-      if (!result) return null;
-      return {
-        contents: [{ value: result }],
-        range: {
-          startLineNumber: position.lineNumber,
-          startColumn: position.column,
-          endLineNumber: position.lineNumber,
-          endColumn: position.column,
-        },
-      };
-    },
-  });
-  disposables.push(hoverDisposable);
+  disposables.push(
+    monaco.languages.registerHoverProvider(langId, {
+      provideHover: async (model, position) => {
+        if (!matchesFile(model)) return null;
+        try {
+          const result = await client.requestHover(
+            filePath,
+            position.lineNumber - 1,
+            position.column - 1,
+          );
+          if (!result) return null;
+          return {
+            contents: [{ value: result }],
+            range: {
+              startLineNumber: position.lineNumber,
+              startColumn: position.column,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column,
+            },
+          };
+        } catch {
+          return null;
+        }
+      },
+    }),
+  );
 
   // ── Completion provider ──────────────────────────────────────────────
-  const completionDisposable = monaco.languages.registerCompletionItemProvider(
-    langId,
-    {
+  disposables.push(
+    monaco.languages.registerCompletionItemProvider(langId, {
       provideCompletionItems: async (model, position) => {
         if (!matchesFile(model)) return null;
-        const items = await client.requestCompletions(
-          filePath,
-          position.lineNumber - 1,
-          position.column - 1,
-        );
-        if (!items?.length) return null;
-        return { suggestions: items };
+        try {
+          const items = await client.requestCompletions(
+            filePath,
+            position.lineNumber - 1,
+            position.column - 1,
+          );
+          if (!items?.length) return null;
+          return {
+            suggestions: items.map((item) =>
+              toMonacoCompletionItem(item, model, position),
+            ),
+          };
+        } catch {
+          return null;
+        }
       },
       triggerCharacters: [".", ":", '"', "'", "/", "@", "#"],
-    },
+    }),
   );
-  disposables.push(completionDisposable);
 
   // ── Definition provider ──────────────────────────────────────────────
-  const defDisposable = monaco.languages.registerDefinitionProvider(langId, {
-    provideDefinition: async (model, position) => {
-      if (!matchesFile(model)) return null;
-      return await client.requestDefinition(
-        filePath,
-        position.lineNumber - 1,
-        position.column - 1,
-      );
-    },
-  });
-  disposables.push(defDisposable);
+  disposables.push(
+    monaco.languages.registerDefinitionProvider(langId, {
+      provideDefinition: async (model, position) => {
+        if (!matchesFile(model)) return null;
+        try {
+          const locations = await client.requestDefinition(
+            filePath,
+            position.lineNumber - 1,
+            position.column - 1,
+          );
+          return locations?.map((loc) => toMonacoLocation(monaco, loc)) ?? null;
+        } catch {
+          return null;
+        }
+      },
+    }),
+  );
 
   // ── Reference provider ───────────────────────────────────────────────
-  const refDisposable = monaco.languages.registerReferenceProvider(langId, {
-    provideReferences: async (model, position) => {
-      if (!matchesFile(model)) return null;
-      return await client.requestReferences(
-        filePath,
-        position.lineNumber - 1,
-        position.column - 1,
-      );
-    },
-  });
-  disposables.push(refDisposable);
+  disposables.push(
+    monaco.languages.registerReferenceProvider(langId, {
+      provideReferences: async (model, position) => {
+        if (!matchesFile(model)) return null;
+        try {
+          const locations = await client.requestReferences(
+            filePath,
+            position.lineNumber - 1,
+            position.column - 1,
+          );
+          return locations?.map((loc) => toMonacoLocation(monaco, loc)) ?? null;
+        } catch {
+          return null;
+        }
+      },
+    }),
+  );
 
   return {
     dispose: () => {
       disposables.forEach((d) => d.dispose());
-      client.disconnect();
     },
     client,
   };

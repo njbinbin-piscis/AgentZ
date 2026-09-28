@@ -163,6 +163,7 @@ pub async fn chat_send(
         kernel,
         sink,
         state.plan_state.clone(),
+        Some(state.permission_responses.clone()),
         cancel,
         model_id,
         chat_mode.unwrap_or_else(|| "agent".to_string()),

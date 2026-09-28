@@ -486,6 +486,8 @@ const zh = {
     maxTokensHint: "限制模型每次回复的最大输出长度。0 = 使用提供商默认值。",
     contextWindow: "上下文窗口（输入 Token）",
     contextWindowHint: "模型输入上下文上限。0 = 自动（根据模型推断）。",
+    maxIterations: "Agent 最大迭代次数",
+    maxIterationsHint: "一次 Agent 任务最多可进行多少轮模型/工具迭代。默认 200；达到上限会安全停止。",
     policyMode: "Agent 策略",
     policyStrict: "严格（阻止高风险操作）",
     policyBalanced: "均衡（推荐）",

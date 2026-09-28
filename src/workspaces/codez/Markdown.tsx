@@ -19,6 +19,7 @@ import rehypeStringify from "rehype-stringify";
 import "highlight.js/styles/github-dark.css";
 import "katex/dist/katex.min.css";
 import "./Markdown.css";
+import { loadMermaid, sanitizeMermaidSvg } from "./mermaidSafe";
 
 const sanitizeSchema = {
   ...defaultSchema,
@@ -45,21 +46,6 @@ const sanitizeSchema = {
     img: [...(defaultSchema.attributes?.img ?? []), "loading"],
   },
 };
-
-let mermaidPromise: Promise<{
-  parse: (code: string, options?: { suppressErrors?: boolean }) => Promise<unknown>;
-  render: (id: string, code: string) => Promise<{ svg: string }>;
-}> | null = null;
-
-function loadMermaid() {
-  if (!mermaidPromise) {
-    mermaidPromise = import("mermaid").then(({ default: mermaid }) => {
-      mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
-      return mermaid;
-    });
-  }
-  return mermaidPromise;
-}
 
 let mermaidIdCounter = 0;
 
@@ -107,7 +93,7 @@ function MermaidBlock({ code }: { code: string }) {
         await mermaid.parse(code, { suppressErrors: false });
         const { svg } = await mermaid.render(id, code);
         if (!cancelled && ref.current) {
-          ref.current.innerHTML = svg;
+          ref.current.innerHTML = sanitizeMermaidSvg(svg);
         }
       } catch (e) {
         if (!cancelled) {
@@ -247,6 +233,19 @@ export default function Markdown({
               : ""
           }
           components={{
+            a: ({ children, href, target, ...props }) => {
+              const opensNewWindow = target === "_blank" || /^https?:/i.test(href ?? "");
+              return (
+                <a
+                  {...props}
+                  href={href}
+                  target={opensNewWindow ? "_blank" : target}
+                  rel={opensNewWindow ? "noopener noreferrer" : undefined}
+                >
+                  {children}
+                </a>
+              );
+            },
             pre: ({ children }) => <>{children}</>,
             code: ({ className, children, ...props }) => {
               const text = String(children).replace(/\n$/, "");
@@ -275,11 +274,6 @@ export default function Markdown({
                 </code>
               );
             },
-            a: ({ children, href }) => (
-              <a href={href} target="_blank" rel="noopener noreferrer">
-                {children}
-              </a>
-            ),
             table: ({ children }) => (
               <div className="agentz-table-scroll">
                 <table>{children}</table>

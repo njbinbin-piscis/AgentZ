@@ -149,6 +149,7 @@ pub fn run() {
             // Cmd-K inline edit + Tab completion (ghost text)
             commands::edit::inline_edit,
             commands::edit::ai_inline_completion,
+            commands::edit::ai_inline_completion_cancel,
             // Codebase index + semantic-ish search (M5)
             commands::codebase::codebase_index_build,
             commands::codebase::codebase_search,
@@ -321,6 +322,7 @@ pub fn run() {
             commands::project_templates::project_has_agentz,
             // Interactive UI (chat_ui tool)
             commands::interactive::respond_interactive_ui,
+            commands::interactive::respond_permission_request,
             // File journal — Review / Undo of a turn's edits
             commands::journal::journal_list_changes,
             commands::journal::journal_get_turn_diffs,

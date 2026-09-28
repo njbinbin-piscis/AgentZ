@@ -10,6 +10,25 @@
   transition: opacity 0.3s, filter 0.3s;
 }
 
+.agentz-permission-card {
+  border-color: var(--warning, #d99b2b);
+}
+
+.agentz-permission-card p {
+  color: var(--text-secondary, #aaa);
+  font-size: 12px;
+}
+
+.agentz-permission-input {
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--bg-primary, #12121a);
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
 .interactive-card.ic-submitted {
   opacity: 0.85;
   pointer-events: none;

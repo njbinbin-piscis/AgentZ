@@ -27,6 +27,7 @@ export type AgentEvent =
   | { type: "text_delta"; delta: string }
   | { type: "tool_start"; id: string; name: string; input: unknown }
   | { type: "tool_end"; id: string; name: string; result: string; is_error: boolean }
+  | { type: "permission_request"; request_id: string; tool_name: string; tool_input: unknown; description: string }
   | { type: "plan_update"; items: PlanTodoItem[] }
   | {
       type: "context_usage";

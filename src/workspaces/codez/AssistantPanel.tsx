@@ -60,6 +60,7 @@ import TaskPanel, {
 } from "../../components/TaskPanel";
 import type { FileNode } from "./types";
 import { useInteractiveCards } from "../../hooks/useInteractiveCards";
+import type { PermissionRequestCard } from "../../components/chat/PermissionCard";
 import { chipsSnapshot, composerDbg, composerDbgMark, promptPreview } from "../../utils/composerDebug";
 import { useProjectEdge } from "../../contexts/ProjectEdgeContext";
 import {
@@ -102,11 +103,6 @@ interface QueuedTurn {
   text: string;
   attachment: ChatAttachment | null;
   clearPlan: boolean;
-}
-
-interface PlanResumeState {
-  text: string;
-  attachment: ChatAttachment | null;
 }
 
 function revokeImageChipPreviews(chips: ComposerChip[]) {
@@ -180,7 +176,6 @@ export default function AssistantPanel({
   const [taskPanelOpen, setTaskPanelOpen] = useState(true);
   const [taskPanelTab, setTaskPanelTab] = useState<"todo" | "tools">("todo");
   const [modeNotice, setModeNotice] = useState<string | null>(null);
-  const [planResume, setPlanResume] = useState<PlanResumeState | null>(null);
   const [contextUsage, setContextUsage] = useState<ContextUsageSnapshot | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [composerChips, setComposerChips] = useState<ComposerChip[]>([]);
@@ -197,6 +192,7 @@ export default function AssistantPanel({
   const [activeAgent, setActiveAgent] = useState<string>(
     () => localStorage.getItem("agentz-active-agent") ?? "",
   );
+  const [permissionRequest, setPermissionRequest] = useState<PermissionRequestCard | null>(null);
 
   const {
     pendingCards,
@@ -462,6 +458,29 @@ export default function AssistantPanel({
 
     if (evt.type === "error") {
       setError(evt.message);
+      return;
+    }
+    if (evt.type === "permission_request") {
+      setPermissionRequest({
+        requestId: evt.request_id,
+        toolName: evt.tool_name,
+        toolInput: evt.tool_input,
+        description: evt.description,
+      });
+      return;
+    }
+    // Interactive cards and terminal lifecycle events are stateful, not just
+    // visual stream deltas. They may arrive before React commits `busy=true`
+    // or after the turn has already resolved; dropping them leaves stale forms
+    // whose backend response channel no longer exists.
+    if (
+      evt.type === "interactive_ui" ||
+      evt.type === "interactive_ui_patch" ||
+      evt.type === "interactive_ui_listen" ||
+      evt.type === "done" ||
+      evt.type === "cancelled"
+    ) {
+      handleAgentEvent(evt);
       return;
     }
     if (!busyRef.current) return;
@@ -762,27 +781,22 @@ export default function AssistantPanel({
     composerDbg("submit → clear input & chips");
     clearComposer();
 
-    const unfinished = planItems.filter((i) => i.status === "pending" || i.status === "in_progress");
-    if (unfinished.length > 0) {
-      composerDbg("submit → planResume (unfinished todos)", { count: unfinished.length });
-      setPlanResume({ text, attachment: pendingAttachment });
-      done();
-      return;
-    }
+    const preservePlan = planItems.some(
+      (item) => item.status === "pending" || item.status === "in_progress",
+    );
     inputHistory.push(text);
-    composerDbg("submit → doSend");
-    doSend(text, pendingAttachment, true);
+    composerDbg("submit → doSend", { preservePlan });
+    // A follow-up is far more often an answer to an earlier question than a
+    // request to discard work. Keep active todos and let the harness decide
+    // whether the user explicitly starts a replacement task.
+    doSend(text, pendingAttachment, !preservePlan);
     done();
   }, [input, composerChips, projectDir, planItems, doSend, inputHistory, t, busy, mention, clearComposer]);
 
-  const onModeChange = (mode: ChatMode) => {
+  const onModeChange = useCallback((mode: ChatMode) => {
     setChatMode(mode);
     setModeNotice(mode === "plan" ? t("chat.modePlanHint") : t("chat.modeAgentHint"));
     window.setTimeout(() => setModeNotice(null), 4000);
-  };
-
-  const onPlanModeEnter = useCallback(() => {
-    onModeChange("plan");
   }, [t]);
 
   const onPlanBuild = useCallback(
@@ -1022,8 +1036,6 @@ export default function AssistantPanel({
 
   const canSend = Boolean(projectDir && (input.trim() || composerChips.length > 0));
 
-  const unfinishedCount = planItems.filter((i) => i.status === "pending" || i.status === "in_progress").length;
-
   const onInputChange = useCallback((value: string, caret?: number) => {
     setInput(value);
     const pos = caret ?? value.length;
@@ -1210,8 +1222,10 @@ export default function AssistantPanel({
         onRestoreCheckpoint={restoreToCheckpoint}
         onCardSubmitted={markSubmitted}
         onCardActionSent={markActionSent}
-        onPlanModeEnter={onPlanModeEnter}
+        onPlanModeChange={onModeChange}
         onPlanBuild={onPlanBuild}
+        permissionRequest={permissionRequest}
+        onPermissionResolved={() => setPermissionRequest(null)}
       />
 
       {error && <div className="agentz-assistant-error">{error}</div>}
@@ -1328,41 +1342,6 @@ export default function AssistantPanel({
         }
       />
 
-      {planResume && (
-        <div className="agentz-plan-resume-overlay" onClick={() => setPlanResume(null)}>
-          <div className="agentz-plan-resume-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>{t("chat.planResumeTitle")}</h3>
-            <p>{t("chat.planResumeMessage", { count: unfinishedCount })}</p>
-            <div className="agentz-plan-resume-actions">
-              <button
-                type="button"
-                className="primary"
-                onClick={() => {
-                  const pending = planResume;
-                  setPlanResume(null);
-                  doSend(pending.text, pending.attachment, false);
-                }}
-              >
-                {t("chat.planResumeContinue")}
-              </button>
-              <button
-                type="button"
-                className="danger"
-                onClick={() => {
-                  const pending = planResume;
-                  setPlanResume(null);
-                  doSend(pending.text, pending.attachment, true);
-                }}
-              >
-                {t("chat.planResumeClear")}
-              </button>
-              <button type="button" className="muted" onClick={() => setPlanResume(null)}>
-                {t("chat.planResumeCancelSend")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

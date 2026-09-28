@@ -1,16 +1,17 @@
 import { useRef, useEffect, useCallback, useState, useSyncExternalStore } from "react";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
+import type * as Monaco from "monaco-editor";
 import { themeStore, ACTIVE_EDITOR_THEME_KEY, syncEditorThemeWithAppearance } from "./themeStore";
 import type { OpenTab } from "./types";
 import {
-  lspApi,
   languageForFile,
   monacoLanguageForFile,
-  LspClient,
   registerLspProviders,
   type LspProvidersRegistration,
 } from "../../services/tauri/lsp";
-import { inlineEdit, aiInlineCompletion } from "../../services/tauri/edit";
+import { acquireLspSession } from "../../services/tauri/lspSession";
+import { fileUriString } from "../../services/tauri/editorUri";
+import { inlineEdit, aiInlineCompletion, cancelAiInlineCompletion } from "../../services/tauri/edit";
 import { diffLines } from "./lineDiff";
 import { registerPersistedSnippets } from "./extensionStore";
 import { extensionService } from "../../extensions/extensionService";
@@ -29,6 +30,7 @@ function completionModelId(): string | null {
 
 /** Guard so the inline-completion provider is only registered once globally. */
 let inlineCompletionRegistered = false;
+const activeCompletionByDocument = new Map<string, string>();
 
 /** Guard so persisted .vsix snippet providers are only registered once. */
 let persistedSnippetsRegistered = false;
@@ -44,7 +46,14 @@ interface InlineEditState {
   busy: boolean;
   error: string | null;
   /// Set once the proposal is applied in-place for preview (green range).
-  applied: { startLine: number; endLine: number } | null;
+  applied: {
+    startLine: number;
+    endLine: number;
+    /** Exact generated range; used for a scoped inverse edit on Reject. */
+    replacementRange: Monaco.IRange;
+    /** Reject is safe only while the preview remains the latest model edit. */
+    modelVersion: number;
+  } | null;
 }
 
 interface CodeEditorProps {
@@ -64,12 +73,19 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
   const lspRef = useRef<LspProvidersRegistration | null>(null);
   const lspGenerationRef = useRef(0);
   const lspClientRef = useRef<import("../../services/tauri/lsp").LspClient | null>(null);
+  // Monaco namespace captured at mount; the LSP effect below needs it to wire
+  // providers/markers after `onMount` has fired (which happens only once).
+  const monacoRef = useRef<typeof Monaco | null>(null);
+  const [monacoReady, setMonacoReady] = useState(false);
   const didChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bpDisposeRef = useRef<any>(null);
   const [inline, setInline] = useState<InlineEditState | null>(null);
   const inlineStateRef = useRef<InlineEditState | null>(null);
   inlineStateRef.current = inline;
+  const inlineRequestGenerationRef = useRef(0);
+  const activeTabPathRef = useRef(tab.path);
+  activeTabPathRef.current = tab.path;
   const editorTheme = useSyncExternalStore(themeStore.subscribe, themeStore.getSnapshot);
 
   // Move the cursor to a target line/column and center it (used by Search
@@ -215,13 +231,33 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
       });
     }
 
+    const replacementRange: Monaco.IRange = proposedLineCount === 0
+      ? {
+          startLineNumber: startLine,
+          startColumn: s.range.startColumn,
+          endLineNumber: startLine,
+          endColumn: s.range.startColumn,
+        }
+      : {
+          startLineNumber: startLine,
+          startColumn: s.range.startColumn,
+          endLineNumber: endLine,
+          endColumn:
+            proposedLineCount === 1
+              ? s.range.startColumn + proposed.length
+              : proposed.split("\n").slice(-1)[0].length + 1,
+        };
     editor.revealLineInCenter?.(startLine);
-    return { startLine, endLine };
+    return { startLine, endLine, replacementRange, modelVersion: model.getVersionId() };
   }, []);
 
   const runInline = useCallback(async () => {
     const s = inlineStateRef.current;
     if (!s || !s.instruction.trim() || s.busy) return;
+    const editor = editorRef.current;
+    const requestModelUri = editor?.getModel?.()?.uri?.toString?.() ?? "";
+    const requestPath = tab.path;
+    const requestGeneration = ++inlineRequestGenerationRef.current;
     setInline((cur) => (cur ? { ...cur, busy: true, error: null } : cur));
     try {
       const proposed = await inlineEdit({
@@ -232,7 +268,15 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
         afterContext: s.after,
       });
       const fresh = inlineStateRef.current;
-      if (!fresh) return; // cancelled while generating
+      const currentModelUri = editorRef.current?.getModel?.()?.uri?.toString?.() ?? "";
+      if (
+        !fresh ||
+        requestGeneration !== inlineRequestGenerationRef.current ||
+        requestPath !== activeTabPathRef.current ||
+        requestModelUri !== currentModelUri
+      ) {
+        return; // cancelled, superseded, or switched to another editor model
+      }
       const applied = applyInlinePreview(fresh, proposed);
       setInline((cur) => (cur ? { ...cur, proposed, busy: false, applied } : cur));
     } catch (e) {
@@ -287,14 +331,27 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
     setInline(null);
   }, [clearInlinePreview]);
 
-  // Reject: undo the applied edit and drop the overlay.
+  // Reject only the preview edit. Generic Monaco undo could erase a user edit
+  // made after the preview was generated, so use a guarded inverse edit.
   const rejectInline = useCallback(() => {
     const editor = editorRef.current;
-    clearInlinePreview();
-    if (editor && inlineStateRef.current?.applied) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      editor.trigger("agentz-inline-edit", "undo", null);
+    const state = inlineStateRef.current;
+    const applied = state?.applied;
+    const model = editor?.getModel?.();
+    if (editor && model && state && applied) {
+      if (model.getVersionId() !== applied.modelVersion) {
+        setInline((cur) => cur ? {
+          ...cur,
+          error: "The document changed after this preview; reject it manually to avoid overwriting your edit.",
+        } : cur);
+        return;
+      }
+      editor.executeEdits("agentz-inline-reject", [{
+        range: applied.replacementRange,
+        text: state.original,
+      }]);
     }
+    clearInlinePreview();
     setInline(null);
   }, [clearInlinePreview]);
 
@@ -368,6 +425,8 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
   const handleMount: OnMount = useCallback(
     (editor, monaco) => {
       editorRef.current = editor;
+      monacoRef.current = monaco;
+      setMonacoReady(true);
       const model = editor.getModel?.();
       if (model) extensionService.setActiveEditorModel(model);
       editor.onDidFocusEditorWidget?.(() => {
@@ -451,12 +510,25 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
               await new Promise((r) => setTimeout(r, 350));
               if (token?.isCancellationRequested) return { items: [] };
               try {
+                const documentId = model.uri?.toString?.() ?? model.id ?? "unknown";
+                const previousRequest = activeCompletionByDocument.get(documentId);
+                if (previousRequest) void cancelAiInlineCompletion(previousRequest);
+                const requestId = crypto.randomUUID();
+                activeCompletionByDocument.set(documentId, requestId);
+                const cancelListener = token?.onCancellationRequested?.(() => {
+                  void cancelAiInlineCompletion(requestId);
+                });
                 const text = await aiInlineCompletion({
+                  requestId,
                   prefix,
                   suffix,
                   language: model.getLanguageId?.() ?? null,
                   modelId: completionModelId(),
                 });
+                cancelListener?.dispose?.();
+                if (activeCompletionByDocument.get(documentId) === requestId) {
+                  activeCompletionByDocument.delete(documentId);
+                }
                 if (token?.isCancellationRequested || !text) return { items: [] };
                 return {
                   items: [
@@ -480,11 +552,8 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
         );
       }
 
-      // ── LSP integration ────────────────────────────────────────────
-      const lang = tab.language || languageForFile(tab.path);
-      const fullPath = projectDir ? `${projectDir}/${tab.path}` : tab.path;
-
       // ── Debug breakpoints (DAP) — gutter toggling + rendering ───────
+      const fullPath = projectDir ? `${projectDir}/${tab.path}` : tab.path;
       bpDisposeRef.current?.dispose?.();
       if (!tab.isReadOnly) {
         try {
@@ -493,50 +562,61 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
           // non-fatal
         }
       }
-
-      if (lang && projectDir) {
-        // Clean up previous LSP connection
-        lspRef.current?.dispose();
-        lspRef.current = null;
-        lspClientRef.current?.disconnect();
-        lspClientRef.current = null;
-        const generation = ++lspGenerationRef.current;
-
-        lspApi
-          .start(projectDir, lang)
-          .then(async (port) => {
-            if (generation !== lspGenerationRef.current) return;
-            const client = new LspClient(port);
-            lspClientRef.current = client;
-            try {
-              await client.connect(
-                projectDir,
-                lang,
-                fullPath,
-                tab.content,
-              );
-              if (generation !== lspGenerationRef.current) {
-                client.disconnect();
-                return;
-              }
-              const reg = registerLspProviders(monaco, client, fullPath);
-              lspRef.current = reg;
-
-              client.requestDiagnostics(fullPath);
-            } catch (e) {
-              client.disconnect();
-              if (lspClientRef.current === client) lspClientRef.current = null;
-              console.warn("[LSP] Failed to connect:", e);
-            }
-          })
-          .catch((e) => {
-            // LSP server may not be available — that's fine
-            console.debug("[LSP] Server not available for", lang, ":", e);
-          });
-      }
     },
-    [tab.path, tab.language, projectDir, applyReveal],
+    [tab.path, tab.isReadOnly, projectDir, applyReveal],
   );
+
+  // ── LSP: shared session + per-document lifecycle ────────────────────
+  // Re-binds providers and the open-document registration whenever the visible
+  // file (or project/language) changes. The connection itself is shared per
+  // project+language via lspSession, so switching tabs no longer kills LSP.
+  const tabContentRef = useRef(tab.content);
+  tabContentRef.current = tab.content;
+
+  useEffect(() => {
+    if (!monacoReady || !projectDir) return;
+    const monaco = monacoRef.current;
+    const lang = tab.language || languageForFile(tab.path);
+    if (!monaco || !lang) return;
+
+    const fullPath = `${projectDir}/${tab.path}`;
+    const generation = ++lspGenerationRef.current;
+    let disposed = false;
+    let registration: LspProvidersRegistration | null = null;
+    let release: (() => void) | null = null;
+    let client: import("../../services/tauri/lsp").LspClient | null = null;
+
+    acquireLspSession(projectDir, lang)
+      .then((handle) => {
+        if (disposed || generation !== lspGenerationRef.current) {
+          handle.release();
+          return;
+        }
+        client = handle.client;
+        release = handle.release;
+        lspClientRef.current = handle.client;
+        registration = registerLspProviders(monaco, handle.client, fullPath);
+        lspRef.current = registration;
+        handle.client.openDocument(fullPath, lang, tabContentRef.current);
+        // Pull diagnostics where supported; push diagnostics arrive anyway.
+        void handle.client.requestDiagnostics(fullPath);
+      })
+      .catch((e) => {
+        // LSP server may not be installed — degrade silently.
+        console.debug("[LSP] unavailable for", lang, ":", e);
+      });
+
+    return () => {
+      disposed = true;
+      registration?.dispose();
+      lspRef.current = null;
+      if (client) client.closeDocument(fullPath);
+      if (release) {
+        release();
+        lspClientRef.current = null;
+      }
+    };
+  }, [monacoReady, projectDir, tab.path, tab.language]);
 
   useEffect(() => {
     const editor = editorRef.current as { setValue?: (v: string) => void } | null;
@@ -551,15 +631,11 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
     }
   }, [tab.path, tab.content, tab.isDirty]);
 
+  // Breakpoint gutter + pending didChange timer are torn down per tab;
+  // the LSP session lifecycle is handled by the effect above.
   useEffect(() => {
-    const generation = lspGenerationRef;
     return () => {
       if (didChangeTimerRef.current) clearTimeout(didChangeTimerRef.current);
-      ++generation.current;
-      lspRef.current?.dispose();
-      lspClientRef.current?.disconnect();
-      lspRef.current = null;
-      lspClientRef.current = null;
       bpDisposeRef.current?.dispose?.();
       bpDisposeRef.current = null;
     };
@@ -567,6 +643,12 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
 
   const editorLanguage =
     monacoLanguageForFile(tab.path) || tab.language || "plaintext";
+
+  // Give Monaco a real file:// model URI so LSP providers (which match on the
+  // same URI) and diagnostics line up instead of defaulting to inmemory://.
+  const editorModelPath = projectDir
+    ? fileUriString(`${projectDir}/${tab.path}`)
+    : undefined;
 
   if (tab.isDiff && tab.originalContent !== undefined) {
     return (
@@ -596,6 +678,8 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
         height="100%"
         theme={editorTheme}
         language={editorLanguage}
+        path={editorModelPath}
+        keepCurrentModel
         value={tab.content}
         loading={<div className="ide-file-loading"><div className="ide-file-loading-spinner" /></div>}
         onChange={(v) => {

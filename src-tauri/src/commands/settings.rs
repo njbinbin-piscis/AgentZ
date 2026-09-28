@@ -51,6 +51,7 @@ pub struct SaveLlmSettings {
     pub custom_base_url: String,
     pub max_tokens: u32,
     pub context_window: u32,
+    pub max_iterations: u32,
     pub policy_mode: String,
     pub enable_streaming: bool,
     pub language: String,
@@ -77,6 +78,7 @@ pub struct LlmSettingsDto {
     pub custom_base_url: String,
     pub max_tokens: u32,
     pub context_window: u32,
+    pub max_iterations: u32,
     pub policy_mode: String,
     pub enable_streaming: bool,
     pub language: String,
@@ -109,6 +111,18 @@ fn load_settings(app: &AppHandle) -> Result<(Settings, String), String> {
     let config_dir = resolve_config_dir(app)?;
     let config_path = config_dir.join("config.json");
     let mut settings = Settings::load(&config_path).map_err(|e| e.to_string())?;
+    // Settings from before this field was exposed used the kernel's old
+    // implicit 50-iteration default. There was no desktop control for that
+    // value, so migrate the legacy default (and a missing field) to 200; any
+    // subsequent value saved through the new UI is preserved.
+    let has_max_iterations = std::fs::read_to_string(&config_path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+        .and_then(|value| value.get("max_iterations").cloned())
+        .is_some();
+    if !has_max_iterations || settings.max_iterations == 50 {
+        settings.max_iterations = 200;
+    }
     settings.config_path = config_path;
     Ok((settings, config_dir.display().to_string()))
 }
@@ -134,6 +148,7 @@ fn to_dto(settings: &Settings, config_dir: String) -> LlmSettingsDto {
         custom_base_url: settings.custom_base_url.clone(),
         max_tokens: settings.max_tokens,
         context_window: settings.context_window,
+        max_iterations: settings.max_iterations,
         policy_mode: settings.policy_mode.clone(),
         enable_streaming: settings.enable_streaming,
         language: settings.language.clone(),
@@ -196,6 +211,7 @@ pub async fn save_settings(
     settings.custom_base_url = updates.custom_base_url;
     settings.max_tokens = updates.max_tokens;
     settings.context_window = updates.context_window;
+    settings.max_iterations = updates.max_iterations.clamp(1, 1_000);
     settings.policy_mode = updates.policy_mode;
     settings.enable_streaming = updates.enable_streaming;
     settings.vision_enabled = updates.vision_enabled;

@@ -5,12 +5,16 @@
 //! to the editor, which previews a diff and applies on accept. Fast and
 //! side-effect free: nothing is written to disk by this command.
 
-use tauri::AppHandle;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+use tauri::{AppHandle, State};
 
 use piscis_kernel::headless;
 use piscis_kernel::llm::{self, LlmMessage, LlmRequest, MessageContent};
 
 use crate::commands::chat::resolve_config_dir;
+use crate::state::AppState;
 
 const EDIT_SYSTEM_PROMPT: &str = "You are a precise code-editing assistant inside an IDE. \
 Rewrite ONLY the user's selected code according to their instruction. \
@@ -116,6 +120,8 @@ Output an empty string if no useful completion applies.";
 #[tauri::command]
 pub async fn ai_inline_completion(
     app: AppHandle,
+    state: State<'_, AppState>,
+    request_id: String,
     prefix: String,
     suffix: String,
     language: Option<String>,
@@ -199,11 +205,40 @@ pub async fn ai_inline_completion(
         vision_override: Some(false),
     };
 
-    let resp = client
-        .complete(req)
+    let cancel = Arc::new(AtomicBool::new(false));
+    state
+        .completion_cancel
+        .lock()
         .await
-        .map_err(|e| format!("inline completion failed: {e}"))?;
+        .insert(request_id.clone(), cancel.clone());
+
+    let wait_for_cancel = async {
+        while !cancel.load(Ordering::Relaxed) {
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+    };
+    let result = tokio::select! {
+        response = client.complete(req) => response.map(Some).map_err(|e| format!("inline completion failed: {e}")),
+        _ = wait_for_cancel => Ok(None),
+    };
+    state.completion_cancel.lock().await.remove(&request_id);
+    let Some(resp) = result? else {
+        return Ok(String::new());
+    };
     Ok(strip_code_fences(&resp.content))
+}
+
+/// Cancel an in-flight AI completion. Cancellation is intentionally idempotent
+/// because Monaco may cancel a provider both on input and on editor disposal.
+#[tauri::command]
+pub async fn ai_inline_completion_cancel(
+    state: State<'_, AppState>,
+    request_id: String,
+) -> Result<(), String> {
+    if let Some(flag) = state.completion_cancel.lock().await.get(&request_id) {
+        flag.store(true, Ordering::SeqCst);
+    }
+    Ok(())
 }
 
 fn tail(s: &str, max: usize) -> String {
