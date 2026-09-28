@@ -11,7 +11,7 @@ import {
 } from "../../services/tauri/lsp";
 import { acquireLspSession } from "../../services/tauri/lspSession";
 import { fileUriString } from "../../services/tauri/editorUri";
-import { inlineEdit, aiInlineCompletion } from "../../services/tauri/edit";
+import { inlineEdit, aiInlineCompletion, cancelAiInlineCompletion } from "../../services/tauri/edit";
 import { diffLines } from "./lineDiff";
 import { registerPersistedSnippets } from "./extensionStore";
 import { extensionService } from "../../extensions/extensionService";
@@ -30,6 +30,7 @@ function completionModelId(): string | null {
 
 /** Guard so the inline-completion provider is only registered once globally. */
 let inlineCompletionRegistered = false;
+const activeCompletionByDocument = new Map<string, string>();
 
 /** Guard so persisted .vsix snippet providers are only registered once. */
 let persistedSnippetsRegistered = false;
@@ -494,12 +495,25 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
               await new Promise((r) => setTimeout(r, 350));
               if (token?.isCancellationRequested) return { items: [] };
               try {
+                const documentId = model.uri?.toString?.() ?? model.id ?? "unknown";
+                const previousRequest = activeCompletionByDocument.get(documentId);
+                if (previousRequest) void cancelAiInlineCompletion(previousRequest);
+                const requestId = crypto.randomUUID();
+                activeCompletionByDocument.set(documentId, requestId);
+                const cancelListener = token?.onCancellationRequested?.(() => {
+                  void cancelAiInlineCompletion(requestId);
+                });
                 const text = await aiInlineCompletion({
+                  requestId,
                   prefix,
                   suffix,
                   language: model.getLanguageId?.() ?? null,
                   modelId: completionModelId(),
                 });
+                cancelListener?.dispose?.();
+                if (activeCompletionByDocument.get(documentId) === requestId) {
+                  activeCompletionByDocument.delete(documentId);
+                }
                 if (token?.isCancellationRequested || !text) return { items: [] };
                 return {
                   items: [

@@ -50,6 +50,9 @@ pub struct AppState {
     pub interactive_responses: Arc<Mutex<HashMap<String, oneshot::Sender<Value>>>>,
     /// Pending approval channels for shell/file-write policy warnings.
     pub permission_responses: ConfirmationResponseMap,
+    /// Cancellation flags for low-latency editor completion requests, keyed
+    /// by frontend-generated request id.
+    pub completion_cancel: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
     /// Embedded Chromium session shared by the Browser panel and the agent
     /// `browser` tool (lazily launched on first use).
     pub browser: BrowserManager,
@@ -91,6 +94,7 @@ impl AppState {
             plan_state: new_plan_store(),
             interactive_responses: Arc::new(Mutex::new(HashMap::new())),
             permission_responses: Arc::new(Mutex::new(HashMap::new())),
+            completion_cancel: Arc::new(Mutex::new(HashMap::new())),
             browser: BrowserManager::new(),
             browser_activity: BrowserActivity::default(),
             ext_host: Arc::new(ExtHostManager::new()),

@@ -19,6 +19,7 @@ export function inlineEdit(args: {
 
 /** Low-latency Tab / ghost-text completion (M5). Returns "" when unconfigured. */
 export function aiInlineCompletion(args: {
+  requestId: string;
   prefix: string;
   suffix: string;
   language?: string | null;
@@ -27,7 +28,12 @@ export function aiInlineCompletion(args: {
   return invoke<string>("ai_inline_completion", {
     prefix: args.prefix,
     suffix: args.suffix,
+    requestId: args.requestId,
     language: args.language ?? null,
     modelId: args.modelId ?? null,
   });
+}
+
+export function cancelAiInlineCompletion(requestId: string): Promise<void> {
+  return invoke<void>("ai_inline_completion_cancel", { requestId });
 }

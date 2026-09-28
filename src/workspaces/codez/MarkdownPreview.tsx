@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import mermaid from "mermaid";
+import { loadMermaid, sanitizeMermaidSvg } from "./mermaidSafe";
 import "highlight.js/styles/github-dark.css";
 import "./MarkdownPreview.css";
 
@@ -16,18 +16,16 @@ function MermaidBlock({ code }: { code: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: "dark",
-      securityLevel: "strict",
-    });
+    ref.current?.classList.remove("agentz-md-mermaid-error");
     (async () => {
       try {
+        const mermaid = await loadMermaid();
         const { svg } = await mermaid.render(id, code);
-        if (!cancelled && ref.current) ref.current.innerHTML = svg;
+        if (!cancelled && ref.current) ref.current.innerHTML = sanitizeMermaidSvg(svg);
       } catch (e) {
         if (!cancelled && ref.current) {
-          ref.current.innerHTML = `<pre class="agentz-md-mermaid-error">${String(e)}</pre>`;
+          ref.current.textContent = String(e);
+          ref.current.classList.add("agentz-md-mermaid-error");
         }
       }
     })();

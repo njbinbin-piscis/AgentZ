@@ -149,6 +149,7 @@ pub fn run() {
             // Cmd-K inline edit + Tab completion (ghost text)
             commands::edit::inline_edit,
             commands::edit::ai_inline_completion,
+            commands::edit::ai_inline_completion_cancel,
             // Codebase index + semantic-ish search (M5)
             commands::codebase::codebase_index_build,
             commands::codebase::codebase_search,

@@ -1240,7 +1240,10 @@ pub(crate) async fn run_subagent_with_prompt(
     let ctx = ToolContext {
         session_id: session_id.clone(),
         workspace_root: PathBuf::from(&workspace_root),
-        bypass_permissions: true,
+        // The delegated registry is intentionally read-only, but it still
+        // must not bypass the policy gate: future tools can be added to the
+        // registry and should inherit the same default-deny semantics.
+        bypass_permissions: false,
         settings: tool_settings,
         max_iterations: Some(10),
         memory_owner_id: "piscis".to_string(),
