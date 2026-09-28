@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.8] - 2026-09-29
+
+### Performance
+
+- **Session history**: mount only the newest 50 chat turns and restore 10 older turns per upward-scroll request, keeping persisted history intact while bounding WebKit DOM work.
+- **Tool output**: cap the duplicate UI-side result retained for a tool invocation at 64 KiB, preserving diagnostic head/tail text without allowing one command to exhaust renderer memory.
+
 ## [0.6.7] - 2026-09-29
 
 ### Performance
