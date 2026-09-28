@@ -54,7 +54,10 @@ let mermaidPromise: Promise<{
 function loadMermaid() {
   if (!mermaidPromise) {
     mermaidPromise = import("mermaid").then(({ default: mermaid }) => {
-      mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose" });
+      // Assistant, extension, and repository content is untrusted. Mermaid's
+      // strict mode prevents diagram labels/links from becoming executable
+      // DOM in the WebView before the generated SVG is inserted.
+      mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });
       return mermaid;
     });
   }
@@ -62,6 +65,60 @@ function loadMermaid() {
 }
 
 let mermaidIdCounter = 0;
+
+// Mermaid runs in strict mode, but its renderer still returns an SVG string.
+// Do not put that string into the WebView verbatim: a compromised renderer or
+// untrusted diagram must not be able to smuggle scripts, event handlers or
+// external navigation into the application DOM.
+const SAFE_SVG_TAGS = new Set([
+  "svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon",
+  "text", "tspan", "defs", "marker", "title", "desc", "use", "lineargradient",
+  "radialgradient", "stop", "clippath",
+]);
+const SAFE_SVG_ATTRIBUTES = new Set([
+  "id", "class", "style", "viewbox", "width", "height", "x", "y", "x1", "x2", "y1",
+  "y2", "cx", "cy", "r", "rx", "ry", "d", "points", "fill", "fill-opacity", "stroke",
+  "stroke-width", "stroke-dasharray", "stroke-linecap", "stroke-linejoin", "opacity",
+  "transform", "text-anchor", "font-family", "font-size", "font-weight", "dominant-baseline",
+  "marker-start", "marker-mid", "marker-end", "clip-path", "offset", "stop-color",
+  "stop-opacity", "preserveaspectratio", "role", "aria-label", "aria-roledescription",
+]);
+
+function sanitizeMermaidSvg(svg: string): string {
+  const document = new DOMParser().parseFromString(svg, "image/svg+xml");
+  const root = document.documentElement;
+  if (root.nodeName.toLowerCase() !== "svg" || document.querySelector("parsererror")) return "";
+
+  for (const element of Array.from(document.querySelectorAll("*"))) {
+    const tag = element.tagName.toLowerCase();
+    if (!SAFE_SVG_TAGS.has(tag)) {
+      element.remove();
+      continue;
+    }
+    for (const attribute of Array.from(element.attributes)) {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim();
+      const isSafeDataAttribute = name.startsWith("data-");
+      const isSafeReference = value.startsWith("#") || value.startsWith("url(#");
+      if (
+        !SAFE_SVG_ATTRIBUTES.has(name) &&
+        !isSafeDataAttribute
+      ) {
+        element.removeAttribute(attribute.name);
+      } else if (
+        name === "style" &&
+        /(?:url\s*\(|expression\s*\(|@import)/i.test(value)
+      ) {
+        element.removeAttribute(attribute.name);
+      } else if (
+        (name === "href" || name === "xlink:href") && !isSafeReference
+      ) {
+        element.removeAttribute(attribute.name);
+      }
+    }
+  }
+  return new XMLSerializer().serializeToString(root);
+}
 
 class RenderErrorBoundary extends Component<
   { fallback: ReactNode; children: ReactNode },
@@ -107,7 +164,7 @@ function MermaidBlock({ code }: { code: string }) {
         await mermaid.parse(code, { suppressErrors: false });
         const { svg } = await mermaid.render(id, code);
         if (!cancelled && ref.current) {
-          ref.current.innerHTML = svg;
+          ref.current.innerHTML = sanitizeMermaidSvg(svg);
         }
       } catch (e) {
         if (!cancelled) {

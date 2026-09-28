@@ -264,6 +264,7 @@ async fn dispatch_pool_attention(
         kernel,
         sink,
         state.plan_state.clone(),
+        None,
         cancel,
         None,
         "agent".to_string(),

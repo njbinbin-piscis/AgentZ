@@ -4,6 +4,7 @@ import type { JournalFileDiff } from "../../services/tauri/chat";
 import TaskCard from "../../components/TaskCard";
 import FileDiffCard from "../../components/FileDiffCard";
 import InteractiveCard from "../../components/chat/InteractiveCard";
+import PermissionCard, { type PermissionRequestCard } from "../../components/chat/PermissionCard";
 import type { InteractiveCardState } from "../../hooks/useInteractiveCards";
 import Markdown from "./Markdown";
 
@@ -27,8 +28,10 @@ interface AssistantMessageListProps {
   onRestoreCheckpoint: (messageId: string) => void | Promise<void>;
   onCardSubmitted: (requestId: string) => void;
   onCardActionSent: (requestId: string) => void;
-  onPlanModeEnter?: () => void;
+  onPlanModeChange?: (mode: "plan" | "agent") => void;
   onPlanBuild?: (planPath: string) => void;
+  permissionRequest: PermissionRequestCard | null;
+  onPermissionResolved: () => void;
 }
 
 /** Isolated from composer input state so keystrokes do not re-render markdown. */
@@ -45,8 +48,10 @@ function AssistantMessageList({
   onRestoreCheckpoint,
   onCardSubmitted,
   onCardActionSent,
-  onPlanModeEnter,
+  onPlanModeChange,
   onPlanBuild,
+  permissionRequest,
+  onPermissionResolved,
 }: AssistantMessageListProps) {
   const { t } = useTranslation();
   const INITIAL_VISIBLE = 200;
@@ -185,11 +190,14 @@ function AssistantMessageList({
             wizardStepHint={card.wizardStepHint}
             onSubmitted={() => onCardSubmitted(card.requestId)}
             onActionSent={() => onCardActionSent(card.requestId)}
-            onPlanModeEnter={onPlanModeEnter}
+            onPlanModeChange={onPlanModeChange}
             onPlanBuild={onPlanBuild}
           />
         </div>
       ))}
+      {permissionRequest && (
+        <PermissionCard request={permissionRequest} onResolved={onPermissionResolved} />
+      )}
     </div>
   );
 }

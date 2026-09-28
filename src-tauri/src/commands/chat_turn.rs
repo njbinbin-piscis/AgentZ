@@ -38,7 +38,7 @@ use super::session::{
 };
 use super::session_sources::{default_channel_for, SOURCE_CODEZ};
 use super::system_prompt::{
-    agent_active_plan_context, agent_system_prompt, plan_mode_context, session_plan_rel_path,
+    active_todo_context, agent_active_plan_context, agent_system_prompt, plan_mode_context, session_plan_rel_path,
     subagent_system_prompt, swarm_coordinator_append, swarm_coordinator_followup_reminder,
 };
 use super::teams::TeamManifest;
@@ -1511,6 +1511,7 @@ pub async fn run_agentz_turn(
     kernel: KernelState,
     event_sink: Arc<dyn EventSink>,
     plan_store: PlanStore,
+    confirmation_responses: Option<piscis_kernel::agent::loop_::ConfirmationResponseMap>,
     cancel: Arc<AtomicBool>,
     model_id: Option<String>,
     chat_mode: String,
@@ -1884,6 +1885,9 @@ pub async fn run_agentz_turn(
         tool_rate_limit_per_minute,
         allow_outside_workspace,
         vision_enabled_setting,
+        enable_streaming,
+        confirm_shell_commands,
+        confirm_file_writes,
         auto_compact_threshold,
         fallback_models,
         compaction,
@@ -1898,6 +1902,9 @@ pub async fn run_agentz_turn(
             s.tool_rate_limit_per_minute,
             s.allow_outside_workspace,
             s.vision_enabled,
+            s.enable_streaming,
+            s.confirm_shell_commands,
+            s.confirm_file_writes,
             s.auto_compact_input_tokens_threshold,
             s.fallback_models.clone(),
             CompactionSettings::from_settings(&s),
@@ -2008,6 +2015,18 @@ pub async fn run_agentz_turn(
     } else if let Some((plan_path, excerpt)) = active_plan_excerpt(&workspace_root, &session_id) {
         extra_sections.push(agent_active_plan_context(&plan_path, Some(&excerpt)));
     }
+    if chat_mode == "agent" {
+        let retained_todos = {
+            let plans = plan_store.lock().await;
+            plans.get(&session_id).cloned().unwrap_or_default()
+        };
+        if retained_todos
+            .iter()
+            .any(|item| item.status == "pending" || item.status == "in_progress")
+        {
+            extra_sections.push(active_todo_context(&retained_todos));
+        }
+    }
     if let (Some(team_id), Some(_pool_id)) = (
         workz_team_id.as_deref().filter(|s| !s.is_empty()),
         workz_pool_id.as_deref().filter(|s| !s.is_empty()),
@@ -2057,7 +2076,14 @@ pub async fn run_agentz_turn(
             app.clone(),
             Some(db.clone()),
         ));
-    let harness = HarnessConfig::for_scheduler(
+    // This is the interactive desktop chat, not a background scheduler. The
+    // main-chat harness carries the shared PlanStore, so a text-only model
+    // response cannot silently finish while visible todos remain active.
+    let confirm_flags = piscis_kernel::agent::loop_::confirm_flags_handle(
+        confirm_shell_commands,
+        confirm_file_writes,
+    );
+    let harness = HarnessConfig::for_main_chat(
         runtime.model.clone(),
         fallback_models,
         Arc::new(registry),
@@ -2065,13 +2091,18 @@ pub async fn run_agentz_turn(
         system_prompt,
         runtime.max_tokens,
         context_window,
+        confirm_flags,
         Some(vision_override),
+        None,
+        String::new(),
         auto_compact_threshold,
         compaction,
         db.clone(),
+        plan_store.clone(),
     )
-    .with_hooks(hooks);
-    let agent = harness.into_agent_loop(client, None, None);
+    .with_hooks(hooks)
+    .with_streaming(enable_streaming);
+    let agent = harness.into_agent_loop(client, None, confirmation_responses);
 
     // Open a journal turn so before/after-tool hooks group this turn's file
     // snapshots together for Undo / replay.
@@ -2081,7 +2112,7 @@ pub async fn run_agentz_turn(
     let ctx = ToolContext {
         session_id: session_id.clone(),
         workspace_root: workspace_buf,
-        bypass_permissions: true,
+        bypass_permissions: false,
         settings: tool_settings,
         max_iterations: Some(max_iterations),
         memory_owner_id: "piscis".to_string(),
@@ -2098,9 +2129,18 @@ pub async fn run_agentz_turn(
     let collector_session = session_id.clone();
     let collector_app = app.clone();
     let collector_workspace = workspace_root.clone();
+    event_sink.emit_session(
+        &session_id,
+        "agent_lifecycle",
+        serde_json::json!({"state": "executing", "max_iterations": max_iterations}),
+    );
     let collector = tokio::spawn(async move {
         let mut text = String::new();
         let mut errored: Option<String> = None;
+        let mut tool_calls = 0usize;
+        let mut tool_errors = 0usize;
+        let mut iterations = 0u32;
+        let mut waited_for_permission = false;
         let mut tool_inputs: std::collections::HashMap<String, serde_json::Value> =
             std::collections::HashMap::new();
         while let Some(event) = rx.recv().await {
@@ -2108,6 +2148,7 @@ pub async fn run_agentz_turn(
                 ref id, ref input, ..
             } = event
             {
+                tool_calls += 1;
                 tool_inputs.insert(id.clone(), input.clone());
             }
             // Bridge file-modifying tools → ide-file-changed with the real path
@@ -2119,6 +2160,9 @@ pub async fn run_agentz_turn(
                 ..
             } = event
             {
+                if is_error {
+                    tool_errors += 1;
+                }
                 if matches!(name.as_str(), "file_write" | "file_edit") {
                     if let Some(input) = tool_inputs.remove(id) {
                         if let Some(path) = input.get("path").and_then(|v| v.as_str()) {
@@ -2152,6 +2196,23 @@ pub async fn run_agentz_turn(
                     tool_inputs.remove(id);
                 }
             }
+            if matches!(event, AgentEvent::TextSegmentStart { .. }) {
+                iterations += 1;
+            }
+            if matches!(event, AgentEvent::PermissionRequest { .. }) {
+                waited_for_permission = true;
+                collector_sink.emit_session(
+                    &collector_session,
+                    "agent_lifecycle",
+                    serde_json::json!({"state": "waiting_permission"}),
+                );
+            } else if waited_for_permission && matches!(event, AgentEvent::ToolEnd { .. }) {
+                collector_sink.emit_session(
+                    &collector_session,
+                    "agent_lifecycle",
+                    serde_json::json!({"state": "executing"}),
+                );
+            }
             if let Ok(payload) = serde_json::to_value(&event) {
                 collector_sink.emit_session(&collector_session, "agent_event", payload);
             }
@@ -2165,7 +2226,7 @@ pub async fn run_agentz_turn(
                 _ => {}
             }
         }
-        (text, errored)
+        (text, errored, tool_calls, tool_errors, iterations)
     });
 
     let timeout = match request.task_timeout_secs {
@@ -2188,12 +2249,44 @@ pub async fn run_agentz_turn(
         }
     };
 
-    let (streamed_text, stream_error) = collector.await.unwrap_or_default();
+    let (streamed_text, stream_error, tool_calls, tool_errors, iterations) =
+        collector.await.unwrap_or_default();
 
     // Agent loop already persists via harness persistence; do not append
     // `new_messages` again or every turn is duplicated in the DB.
 
     let turn_failed = error_msg.is_some() || stream_error.is_some();
+    let lifecycle_state = if cancel.load(Ordering::SeqCst) {
+        "cancelled"
+    } else if turn_failed {
+        "failed"
+    } else if tool_calls == 0 {
+        // This is the diagnostic needed for small/fast models: a successful
+        // text-only response is distinct from the harness stopping on an
+        // error, timeout or permission decision.
+        "completed_text_only"
+    } else {
+        "completed"
+    };
+    tracing::info!(
+        session_id = %session_id,
+        lifecycle_state,
+        tool_calls,
+        tool_errors,
+        iterations,
+        "agent turn finished"
+    );
+    event_sink.emit_session(
+        &session_id,
+        "agent_lifecycle",
+        serde_json::json!({
+            "state": lifecycle_state,
+            "tool_calls": tool_calls,
+            "tool_errors": tool_errors,
+            "iterations": iterations,
+            "max_iterations": max_iterations,
+        }),
+    );
     if let Some(err) = error_msg.as_deref().or(stream_error.as_deref()) {
         event_sink.emit_session(
             &session_id,

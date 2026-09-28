@@ -146,6 +146,49 @@ pub fn resolve_git_context(
         .ok_or_else(|| format!("no git repository owns path: {path}"))
 }
 
+/// Resolve a workspace-relative path within either the explicitly selected
+/// repository or, when no repository was selected, the repository that owns
+/// it.  Keeping the selection as part of this resolution prevents a nested
+/// repository operation from silently being applied to a different checkout.
+pub fn resolve_git_context_for_root(
+    workspace: &Path,
+    workspace_rel_path: &str,
+    git_root: Option<&str>,
+) -> Result<(PathBuf, String), String> {
+    let path = normalize_workspace_rel_path(workspace_rel_path)?;
+    let (inferred_root, path_in_repo) = resolve_git_context(workspace, &path)?;
+
+    if let Some(selected) = git_root.filter(|root| !root.is_empty()) {
+        let selected_root = resolve_git_dir(workspace, Some(selected), None)?;
+        if selected_root != inferred_root {
+            return Err(format!(
+                "path '{path}' is not owned by selected git repository '{selected}'"
+            ));
+        }
+    }
+
+    Ok((inferred_root, path_in_repo))
+}
+
+/// Reject absolute and parent-traversal paths before joining them to a
+/// workspace directory. Git commands always receive paths relative to their
+/// resolved repository.
+pub fn normalize_workspace_rel_path(path: &str) -> Result<String, String> {
+    let normalized = path.replace('\\', "/");
+    if normalized.is_empty() || normalized == "." {
+        return Err("a concrete workspace-relative path is required".into());
+    }
+    let candidate = Path::new(&normalized);
+    if candidate.is_absolute()
+        || candidate.components().any(|component| {
+            matches!(component, std::path::Component::ParentDir | std::path::Component::RootDir | std::path::Component::Prefix(_))
+        })
+    {
+        return Err(format!("path must stay within workspace: {path}"));
+    }
+    Ok(normalized)
+}
+
 /// Resolve git directory for an operation (explicit `git_root` or infer from file path).
 pub fn resolve_git_dir(
     workspace: &Path,
@@ -170,16 +213,19 @@ pub fn resolve_git_dir(
     }
 }
 
-pub fn parse_git_status_output(output: &str, repo_root_rel: &str) -> Vec<GitFileStatus> {
+pub fn parse_git_status_output(output: &[u8], repo_root_rel: &str) -> Vec<GitFileStatus> {
     let mut statuses = Vec::new();
-    for line in output.lines() {
-        if line.len() < 4 {
+    let mut records = output.split(|byte| *byte == b'\0');
+    while let Some(record) = records.next() {
+        if record.len() < 4 {
             continue;
         }
-        let chars: Vec<char> = line.chars().collect();
-        let index_status = chars[0];
-        let worktree_status = chars[1];
-        let path_in_repo = line[3..].to_string();
+        let index_status = record[0] as char;
+        let worktree_status = record[1] as char;
+        if record[2] != b' ' {
+            continue;
+        }
+        let path_in_repo = String::from_utf8_lossy(&record[3..]).to_string();
         let path = prefix_workspace_path(repo_root_rel, &path_in_repo);
 
         if index_status != ' ' && index_status != '?' {
@@ -202,6 +248,13 @@ pub fn parse_git_status_output(output: &str, repo_root_rel: &str) -> Vec<GitFile
                 status: "untracked".to_string(),
                 staged: false,
             });
+        }
+
+        // With `--porcelain=v1 -z`, rename/copy source paths are emitted as
+        // an additional NUL-delimited record. It is metadata, not another
+        // status entry, so consume it before reading the next XY record.
+        if matches!(index_status, 'R' | 'C') || matches!(worktree_status, 'R' | 'C') {
+            let _ = records.next();
         }
     }
     statuses
@@ -257,5 +310,22 @@ mod tests {
         assert!(!roots.contains(&"node_modules/pkg".to_string()));
 
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn porcelain_z_preserves_newlines_and_rename_records() {
+        let output = b" M ordinary.txt\0R  renamed.txt\0original.txt\0?? line\nbreak.txt\0";
+        let statuses = parse_git_status_output(output, "nested");
+        assert_eq!(statuses.len(), 3);
+        assert_eq!(statuses[0].path, "nested/ordinary.txt");
+        assert_eq!(statuses[1].path, "nested/renamed.txt");
+        assert_eq!(statuses[2].path, "nested/line\nbreak.txt");
+    }
+
+    #[test]
+    fn rejects_workspace_path_traversal() {
+        assert!(normalize_workspace_rel_path("../outside.txt").is_err());
+        assert!(normalize_workspace_rel_path("/outside.txt").is_err());
+        assert_eq!(normalize_workspace_rel_path("nested/file.txt").unwrap(), "nested/file.txt");
     }
 }

@@ -47,8 +47,8 @@ interface InteractiveCardProps {
   wizardStepHint?: number;
   onSubmitted?: () => void;
   onActionSent?: () => void;
-  /** User accepted Plan mode from suggest_enter card */
-  onPlanModeEnter?: () => void;
+  /** Accepted Plan/Agent mode from a suggest_enter card. */
+  onPlanModeChange?: (mode: "plan" | "agent") => void;
   /** User clicked Build on plan_ready card */
   onPlanBuild?: (planPath: string) => void;
 }
@@ -86,7 +86,7 @@ export default function InteractiveCard({
   wizardStepHint,
   onSubmitted,
   onActionSent,
-  onPlanModeEnter,
+  onPlanModeChange,
   onPlanBuild,
 }: InteractiveCardProps) {
   const { t } = useTranslation();
@@ -94,7 +94,18 @@ export default function InteractiveCard({
   const planPath =
     typeof uiDefinition.data?.plan_path === "string" ? uiDefinition.data.plan_path : "";
   const [suggestCountdown, setSuggestCountdown] = useState<number | null>(
-    cardKind === "plan_mode_suggest" && !submittedValues ? 30 : null,
+    cardKind === "plan_mode_suggest" && !submittedValues
+      ? Math.max(
+          0,
+          Math.ceil(
+            ((typeof uiDefinition.data?.expires_at_ms === "number"
+              ? uiDefinition.data.expires_at_ms
+              : Date.now() + 30_000) -
+              Date.now()) /
+              1000,
+          ),
+        )
+      : null,
   );
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -122,7 +133,9 @@ export default function InteractiveCard({
     setErrors({});
   }, [uiDefinition, submittedValues, wizardStep]);
 
-  // Plan suggest: auto-decline after 30s if user does not respond.
+  // Plan suggest: the backend's deadline starts when it emits the card, not
+  // when React eventually renders it. Count down to its absolute deadline so
+  // a delayed event cannot leave an already-expired card clickable.
   useEffect(() => {
     if (cardKind !== "plan_mode_suggest" || submitted || submittedValues) return;
     if (suggestCountdown == null) return;
@@ -142,17 +155,24 @@ export default function InteractiveCard({
             },
           };
           await respondInteractiveUi(requestId, payload);
+        } catch {
+          // The backend timeout can win this race. Either way this card is no
+          // longer actionable and must not remain as a stale form.
+        } finally {
           setSubmitted(true);
           onSubmitted?.();
-        } catch {
-          /* channel may already be gone */
-        } finally {
           setSubmitting(false);
         }
       })();
       return;
     }
-    const timer = window.setTimeout(() => setSuggestCountdown((c) => (c != null ? c - 1 : c)), 1000);
+    const expiresAt =
+      typeof uiDefinition.data?.expires_at_ms === "number"
+        ? uiDefinition.data.expires_at_ms
+        : Date.now() + suggestCountdown * 1000;
+    const timer = window.setTimeout(() => {
+      setSuggestCountdown(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
+    }, Math.min(1000, Math.max(1, expiresAt - Date.now())));
     return () => window.clearTimeout(timer);
   }, [
     cardKind,
@@ -216,10 +236,13 @@ export default function InteractiveCard({
     try {
       const actionType = emit === "action" ? "action" : "submit";
       const payload = buildPayload(requestId, uiDefinition, values, block, button, actionType);
-      if (cardKind === "plan_mode_suggest" && values.decision === "enter_plan") {
-        onPlanModeEnter?.();
-      }
       await respondInteractiveUi(requestId, payload);
+      // Change the local mode only after the backend accepted the decision.
+      // Synchronizing both choices avoids retaining stale Plan mode after the
+      // user explicitly returns to Agent mode.
+      if (cardKind === "plan_mode_suggest") {
+        onPlanModeChange?.(values.decision === "enter_plan" ? "plan" : "agent");
+      }
       if (actionType === "action") {
         setActionSent(true);
         onActionSent?.();

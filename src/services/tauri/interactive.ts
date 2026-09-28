@@ -7,3 +7,8 @@ export function respondInteractiveUi(
 ): Promise<void> {
   return invoke<void>("respond_interactive_ui", { requestId, values });
 }
+
+/** Resolve a pending shell/file-write confirmation from the Agent harness. */
+export function respondPermissionRequest(requestId: string, approved: boolean): Promise<void> {
+  return invoke<void>("respond_permission_request", { requestId, approved });
+}

@@ -49,6 +49,7 @@ import TaskPanel, {
 import Markdown from "../codez/Markdown";
 import InteractiveCard from "../../components/chat/InteractiveCard";
 import { useInteractiveCards } from "../../hooks/useInteractiveCards";
+import PermissionCard, { type PermissionRequestCard } from "../../components/chat/PermissionCard";
 import AgentFilePreview from "./AgentFilePreview";
 import { useProjectEdge } from "../../contexts/ProjectEdgeContext";
 import CollabBoard from "./CollabBoard";
@@ -211,6 +212,7 @@ export default function WorkZWorkspace({
     markActionSent,
     clearCards,
   } = useInteractiveCards();
+  const [permissionRequest, setPermissionRequest] = useState<PermissionRequestCard | null>(null);
 
   // ── Parallel task bookkeeping (M7) ──────────────────────────────────────
   // `live` gates whether incoming kernel events update the foreground view;
@@ -444,7 +446,6 @@ export default function WorkZWorkspace({
       return;
     }
 
-    if (!liveRef.current) return;
     // The kernel multiplexes every session (coordinator turn + each member
     // Koi turn) onto one channel. Apply only events for the bound foreground
     // session; the id is always known up front now (pre-generated for new
@@ -453,6 +454,32 @@ export default function WorkZWorkspace({
     if (!fg || env.sessionId !== fg) return;
     if (env.channel !== "agent_event") return;
     const evt = env.payload as AgentEvent;
+
+    if (evt.type === "permission_request") {
+      setPermissionRequest({
+        requestId: evt.request_id,
+        toolName: evt.tool_name,
+        toolInput: evt.tool_input,
+        description: evt.description,
+      });
+      return;
+    }
+
+    // A card's lifecycle must not depend on the React live flag: an
+    // interactive event can race the initial state update, while a terminal
+    // event can arrive just after the turn resolves. Keep those cards in sync
+    // with their backend response channels in either case.
+    if (
+      evt.type === "interactive_ui" ||
+      evt.type === "interactive_ui_patch" ||
+      evt.type === "interactive_ui_listen" ||
+      evt.type === "done" ||
+      evt.type === "cancelled"
+    ) {
+      handleAgentEvent(evt);
+      return;
+    }
+    if (!liveRef.current) return;
 
     switch (evt.type) {
       case "text_delta":
@@ -1230,6 +1257,17 @@ export default function WorkZWorkspace({
               </div>
             </div>
           ))}
+          {permissionRequest && (
+            <div className="agentz-workz-msg assistant">
+              <div className="agentz-workz-msg-role">{t("agent.role")}</div>
+              <div className="agentz-workz-msg-body">
+                <PermissionCard
+                  request={permissionRequest}
+                  onResolved={() => setPermissionRequest(null)}
+                />
+              </div>
+            </div>
+          )}
             </div>
             )}
           </div>

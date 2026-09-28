@@ -489,6 +489,8 @@ const en = {
     maxTokensHint: "Limits how long each model reply can be. 0 = use provider default.",
     contextWindow: "Context window (input tokens)",
     contextWindowHint: "Input context limit. 0 = auto (inferred from the model).",
+    maxIterations: "Agent maximum iterations",
+    maxIterationsHint: "Maximum model/tool iterations in one Agent task. Default: 200; the task stops safely at the limit.",
     policyMode: "Agent policy",
     policyStrict: "Strict (block risky operations)",
     policyBalanced: "Balanced (recommended)",

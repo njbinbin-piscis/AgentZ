@@ -1,5 +1,5 @@
-/* VS Code extension ecosystem UI surfaces. All colors use the app theme tokens
-   (--bg-*/--text-*/--border/--accent) so light/dark both render correctly. */
+/* VS Code extension ecosystem UI surfaces. All colors use the app theme token
+   families (--bg-, --text-, --border-, --accent) so light/dark both render correctly. */
 
 /* Toasts */
 .agentz-ext-toasts {

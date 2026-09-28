@@ -321,6 +321,7 @@ pub fn run() {
             commands::project_templates::project_has_agentz,
             // Interactive UI (chat_ui tool)
             commands::interactive::respond_interactive_ui,
+            commands::interactive::respond_permission_request,
             // File journal — Review / Undo of a turn's edits
             commands::journal::journal_list_changes,
             commands::journal::journal_get_turn_diffs,

@@ -737,7 +737,7 @@ pub use git_workspace::GitRepoSnapshot;
 // ─── Git Operations ────────────────────────────────────────────────────────
 
 async fn git_status_at(repo: &Path, workspace: &Path) -> Result<Vec<GitFileStatus>, String> {
-    let output = run_git_cmd(repo, &["status", "--porcelain=v1", "-uall"])
+    let output = run_git_cmd_bytes(repo, &["status", "--porcelain=v1", "-z", "-uall"])
         .await
         .map_err(|e| format!("git status failed: {}", e))?;
     let rel = git_workspace::repo_root_rel(workspace, repo);
@@ -797,11 +797,14 @@ pub async fn ide_git_diff(
     project_dir: String,
     path: String,
     base: Option<String>,
-    _git_root: Option<String>,
+    git_root: Option<String>,
 ) -> Result<DiffResult, String> {
     let workspace = PathBuf::from(&project_dir);
-    let (root, path_in_repo) =
-        git_workspace::resolve_git_context(&workspace, &path).map_err(|e| e.to_string())?;
+    let (root, path_in_repo) = git_workspace::resolve_git_context_for_root(
+        &workspace,
+        &path,
+        git_root.as_deref(),
+    )?;
 
     // Get original content (from HEAD or specified base)
     let base_ref = base.as_deref().unwrap_or("HEAD");
@@ -810,7 +813,7 @@ pub async fn ide_git_diff(
         .unwrap_or_default();
 
     // Get current content
-    let full_path = workspace.join(&path);
+    let full_path = root.join(&path_in_repo);
     let modified = if full_path.exists() {
         std::fs::read_to_string(&full_path).unwrap_or_default()
     } else {
@@ -819,9 +822,9 @@ pub async fn ide_git_diff(
 
     // Get unified diff
     let diff_args = if base.is_some() {
-        vec!["diff", base_ref, "--", &path]
+        vec!["diff", base_ref, "--", &path_in_repo]
     } else {
-        vec!["diff", "HEAD", "--", &path]
+        vec!["diff", "HEAD", "--", &path_in_repo]
     };
     let diff_output = run_git_cmd(&root, &diff_args).await.unwrap_or_default();
 
@@ -910,8 +913,8 @@ pub async fn ide_git_file_at_ref(
     git_root: Option<String>,
 ) -> Result<FileContent, String> {
     let workspace = PathBuf::from(&project_dir);
-    let (root, path_in_repo) = git_workspace::resolve_git_context(&workspace, &path)?;
-    let _ = git_root; // reserved for explicit override in future
+    let (root, path_in_repo) =
+        git_workspace::resolve_git_context_for_root(&workspace, &path, git_root.as_deref())?;
     let content = run_git_cmd(&root, &["show", &format!("{}:{}", git_ref, path_in_repo)])
         .await
         .map_err(|e| format!("git show failed: {}", e))?;
@@ -938,8 +941,8 @@ pub async fn ide_git_add(
     git_root: Option<String>,
 ) -> Result<(), String> {
     let workspace = PathBuf::from(&project_dir);
-    let (root, path_in_repo) = git_workspace::resolve_git_context(&workspace, &path)?;
-    let _ = git_root;
+    let (root, path_in_repo) =
+        git_workspace::resolve_git_context_for_root(&workspace, &path, git_root.as_deref())?;
     run_git_cmd(&root, &["add", &path_in_repo])
         .await
         .map_err(|e| format!("git add failed: {}", e))?;
@@ -956,8 +959,8 @@ pub async fn ide_git_discard(
     git_root: Option<String>,
 ) -> Result<(), String> {
     let workspace = PathBuf::from(&project_dir);
-    let (root, path_in_repo) = git_workspace::resolve_git_context(&workspace, &path)?;
-    let _ = git_root;
+    let (root, path_in_repo) =
+        git_workspace::resolve_git_context_for_root(&workspace, &path, git_root.as_deref())?;
 
     // Is the path tracked? `git ls-files --error-unmatch` exits non-zero for
     // untracked paths (run_git_cmd returns Err in that case).
@@ -971,7 +974,7 @@ pub async fn ide_git_discard(
             .map_err(|e| format!("git discard failed: {}", e))?;
     } else {
         // Untracked — delete the file (or directory) from the working tree.
-        let abs = workspace.join(&path);
+        let abs = root.join(&path_in_repo);
         if abs.is_dir() {
             std::fs::remove_dir_all(&abs).map_err(|e| format!("remove dir failed: {}", e))?;
         } else if abs.exists() {
@@ -989,8 +992,8 @@ pub async fn ide_git_reset(
     git_root: Option<String>,
 ) -> Result<(), String> {
     let workspace = PathBuf::from(&project_dir);
-    let (root, path_in_repo) = git_workspace::resolve_git_context(&workspace, &path)?;
-    let _ = git_root;
+    let (root, path_in_repo) =
+        git_workspace::resolve_git_context_for_root(&workspace, &path, git_root.as_deref())?;
     run_git_cmd(&root, &["reset", "HEAD", "--", &path_in_repo])
         .await
         .map_err(|e| format!("git reset failed: {}", e))?;
@@ -1491,6 +1494,10 @@ fn new_git_cmd() -> Command {
 }
 
 async fn run_git_cmd(dir: &Path, args: &[&str]) -> Result<String, String> {
+    Ok(String::from_utf8_lossy(&run_git_cmd_bytes(dir, args).await?).to_string())
+}
+
+async fn run_git_cmd_bytes(dir: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
     let output = timeout(
         Duration::from_secs(30),
         new_git_cmd()
@@ -1509,7 +1516,7 @@ async fn run_git_cmd(dir: &Path, args: &[&str]) -> Result<String, String> {
         return Err(format!("git error: {}", stderr.trim()));
     }
 
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    Ok(output.stdout)
 }
 
 // ─── LSP Commands ──────────────────────────────────────────────────────────

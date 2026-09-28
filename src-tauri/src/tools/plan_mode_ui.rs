@@ -31,13 +31,20 @@ fn emit_event(app: &AppHandle, session_id: &str, event: AgentEvent) {
     }
 }
 
-fn suggest_enter_ui(message: &str) -> Value {
+fn suggest_enter_ui(message: &str, expires_at_ms: u128) -> Value {
     json!({
         "protocol_version": "2",
         "kind": "plan_mode_suggest",
         "title": "建议进入 Plan 模式",
         "description": message,
-        "data": { "decision": "continue_agent" },
+        // The UI must use the same absolute deadline as the backend wait. A
+        // relative client-side 30-second countdown starts only after the
+        // event reaches React, which can otherwise leave an actionable-looking
+        // card on screen after its backend response channel has expired.
+        "data": {
+            "decision": "continue_agent",
+            "expires_at_ms": expires_at_ms
+        },
         "blocks": [
             {
                 "type": "text",
@@ -190,7 +197,8 @@ impl Tool for PlanModeUiTool {
 
     fn description(&self) -> &str {
         "Plan mode workflow UI. Actions:\n\
-         - `suggest_enter` (Agent mode): ask user to enter Plan mode; 30s timeout → continue Agent.\n\
+         - `suggest_enter` (Agent mode): show the exclusive Plan/Agent decision card; never duplicate that choice in plain text. \
+           30s timeout → continue Agent. An accepted Plan choice halts the current turn; the next user message starts Plan mode.\n\
          - `brainstorm` (Plan mode): multi-question survey via chat_ui-style card; blocks until submit.\n\
          - `plan_ready` (Plan mode): show Build button after plan_write; halts agent loop until user clicks Build in UI.\n\
          For brainstorm, pass `questions` array — each item: { id, prompt, options: [{value, label}, ...] }."
@@ -253,7 +261,12 @@ impl Tool for PlanModeUiTool {
                 let message = input["message"]
                     .as_str()
                     .unwrap_or("该任务涉及多步改动或存在多种实现方案，建议先规划再执行。");
-                let ui = suggest_enter_ui(message);
+                let expires_at_ms = std::time::SystemTime::now()
+                    .checked_add(std::time::Duration::from_secs(SUGGEST_TIMEOUT_SECS))
+                    .and_then(|deadline| deadline.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|duration| duration.as_millis())
+                    .unwrap_or(0);
+                let ui = suggest_enter_ui(message, expires_at_ms);
                 match wait_interactive(
                     &self.app,
                     &ctx.session_id,
@@ -273,13 +286,28 @@ impl Tool for PlanModeUiTool {
                         } else {
                             "continue_agent"
                         };
-                        Ok(ToolResult::ok(format!(
-                            "PLAN_MODE_UI_RESULT:\n{}\n\n\
-                             decision={outcome}. \
-                             若 enter_plan：告知用户已切换至 Plan 模式，开始头脑风暴澄清需求（使用 brainstorm），\
-                             问清后再 plan_write。若 continue_agent：直接按 Agent 模式执行，勿再建议 Plan。",
-                            serde_json::to_string_pretty(&values).unwrap_or_default()
-                        )))
+                        if outcome == "enter_plan" {
+                            // A running harness cannot safely switch from its
+                            // Agent registry to the Plan registry in place.
+                            // End this turn; the next user turn is constructed
+                            // from the UI's accepted chat_mode=plan state.
+                            self.loop_halt.store(true, Ordering::SeqCst);
+                            Ok(ToolResult::ok(format!(
+                                "PLAN_MODE_UI_RESULT:\n{}\n\n\
+                                 decision=enter_plan. The UI accepted Plan mode and this Agent turn is now halted. \
+                                 Do NOT ask for another mode decision, do NOT call brainstorm or plan_write in this \
+                                 turn, and do NOT continue implementation. Wait for the user's next message, which \
+                                 will run with the real Plan-mode tool registry.",
+                                serde_json::to_string_pretty(&values).unwrap_or_default()
+                            )))
+                        } else {
+                            Ok(ToolResult::ok(format!(
+                                "PLAN_MODE_UI_RESULT:\n{}\n\n\
+                                 decision=continue_agent. Continue directly in this Agent turn. Do NOT ask the user \
+                                 to choose a mode again and do NOT tell them to toggle the mode selector manually.",
+                                serde_json::to_string_pretty(&values).unwrap_or_default()
+                            )))
+                        }
                     }
                     Err(e) => Ok(ToolResult::ok(format!(
                         "PLAN_MODE_UI_RESULT:\n{{\"decision\":\"timeout\",\"reason\":\"{reason}\"}}\n\n\
@@ -390,9 +418,10 @@ mod tests {
 
     #[test]
     fn suggest_ui_has_kind_and_decision_field() {
-        let ui = suggest_enter_ui("test");
+        let ui = suggest_enter_ui("test", 42);
         assert_eq!(ui["kind"], "plan_mode_suggest");
         assert!(ui["blocks"].as_array().unwrap().len() >= 2);
+        assert_eq!(ui["data"]["expires_at_ms"], 42);
     }
 
     #[test]

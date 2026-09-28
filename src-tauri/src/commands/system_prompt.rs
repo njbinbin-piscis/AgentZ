@@ -1,6 +1,7 @@
 //! AgentZ agent system prompts — behaviour rules distilled from Cursor-style
 //! operational guidance and Piscis collaboration principles.
 
+use piscis_kernel::agent::plan::PlanTodoItem;
 use piscis_kernel::agent::plan_doc::{default_plan_rel_path, PLANS_DIR};
 
 /// Main Agent-mode system prompt. `extra_context` carries skills, project
@@ -65,15 +66,27 @@ pub fn agent_system_prompt(
          - `delegate` — offload scoped read-only investigation to a sub-agent.\n\n\
          **Multi-step work (Agent mode — Level 2)**\n\
          - When executing a plan from `{plans_dir}/`, read the plan file first.\n\
-         - For non-trivial work, mirror each pending plan step into `plan_todo` \
-           (one `in_progress` at a time); skip `plan_todo` for trivial single-step tasks.\n\
-         - After each step: update the plan markdown (**状态** + **执行记录**), produce \
+        - For non-trivial work, mirror each pending plan step into `plan_todo` \
+          (one `in_progress` at a time); skip `plan_todo` for trivial single-step tasks.\n\
+         - For non-trivial work, create and maintain `plan_todo` before the first substantive tool call; \
+           mirror each pending plan step and keep exactly one item `in_progress`. Skip it only for a \
+           genuinely trivial single-step task.\n\
+         - A text-only response is final only when every Todo is `completed` or `cancelled`, or when \
+           information only the user can provide is required. Do not stop after a phase summary: continue \
+           with the next Todo, or use an interactive UI to request the specific missing decision.\n\
+        - After each step: update the plan markdown (**状态** + **执行记录**), produce \
            the listed **预期产物**, and capture **验收证据** (test output, diff, paths).\n\
          - Use `plan_write` or `file_edit` on the plan file to persist progress.\n\n\
          **Plan mode entry (Agent mode only)**\n\
          - For complex / multi-step / ambiguous tasks, call `plan_mode_ui` action=`suggest_enter` \
            **once** before editing code. UI times out in 30s → continue Agent mode.\n\
-         - If user chooses Plan: stop direct implementation; user will send the next message in Plan mode.\n\
+         - `suggest_enter` is the **only** user-facing mode decision. Do NOT ask the user in ordinary text \
+           to choose Plan vs Agent before, alongside, or after showing that card.\n\
+         - If user chooses Plan: the current Agent turn is stopped by the tool. Do NOT call `brainstorm`, \
+           `plan_write`, or any implementation tool in this turn; the user's next message starts a new, \
+           real Plan-mode harness with its restricted tool surface.\n\
+         - If user chooses Agent or the card times out: remain in this same Agent turn and continue directly. \
+           Do not ask the user to toggle the mode selector manually.\n\
          - Do NOT call `suggest_enter` for trivial one-shot tasks.\n\n\
          **Structured user input (`chat_ui` / `plan_mode_ui`)**\n\
          - Use `chat_ui` for multi-field forms, wizards, file pickers, and confirm/cancel — not trivial yes/no.\n\
@@ -175,6 +188,26 @@ pub fn agent_active_plan_context(plan_rel_path: &str, plan_excerpt: Option<&str>
         block.push_str("\n```\n");
     }
     block
+}
+
+/// Injected when a session retains visible execution todos across a follow-up.
+pub fn active_todo_context(items: &[PlanTodoItem]) -> String {
+    let rendered = items
+        .iter()
+        .map(|item| format!("- [{}] {} ({})", item.id, item.content, item.status))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        r#"## Retained execution todos
+The following Todo state belongs to this session and was retained for this follow-up:
+{rendered}
+
+Decide the relationship of the newest user message before acting:
+1. Continue, answer a pending question, provide requested input, or make a scoped adjustment: preserve these todos and continue/update them.
+2. The user explicitly says to abandon, cancel, ignore, or replace the prior task: first mark each unfinished prior item as cancelled with plan_todo merge=true, then create the new task plan.
+3. If the message appears unrelated but intent is ambiguous: preserve the todos and ask one concise, task-specific clarification.
+Do NOT ask a generic resume-or-clear Todo question, and do NOT discard active todos solely because the latest message is short or appears unrelated."#
+    )
 }
 
 /// Default relative plan path for a session (for host context injection).
@@ -288,6 +321,9 @@ mod tests {
         assert!(p.contains("snapshot"));
         assert!(p.contains("/tmp/ws"));
         assert!(p.contains(".agentz/plans"));
+        assert!(p.contains("only** user-facing mode decision"));
+        assert!(p.contains("real Plan-mode harness"));
+        assert!(p.contains("toggle the mode selector manually"));
     }
 
     #[test]
@@ -304,6 +340,18 @@ mod tests {
         let p = agent_active_plan_context(".agentz/plans/s.md", None);
         assert!(p.contains(".agentz/plans/s.md"));
         assert!(p.contains("plan_todo"));
+    }
+
+    #[test]
+    fn retained_todo_context_preserves_ambiguous_followups() {
+        let p = active_todo_context(&[PlanTodoItem {
+            id: "verify".to_string(),
+            content: "Run regression tests".to_string(),
+            status: "in_progress".to_string(),
+        }]);
+        assert!(p.contains("Run regression tests"));
+        assert!(p.contains("resume-or-clear Todo"));
+        assert!(p.contains("cancelled"));
     }
 
     #[test]
