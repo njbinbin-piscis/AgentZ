@@ -158,7 +158,7 @@ async fn wait_interactive(
     request_id: &str,
     ui_def: Value,
     timeout_secs: u64,
-) -> Result<Value, ToolResult> {
+) -> Result<Value, Box<ToolResult>> {
     let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
     {
         let state = app.state::<AppState>();
@@ -175,16 +175,16 @@ async fn wait_interactive(
     );
     match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), resp_rx).await {
         Ok(Ok(values)) => Ok(values),
-        Ok(Err(_)) => Err(ToolResult::err(
+        Ok(Err(_)) => Err(Box::new(ToolResult::err(
             "Plan 模式 UI 响应通道已关闭（用户可能已离开页面）。",
-        )),
+        ))),
         Err(_) => {
             let state = app.state::<AppState>();
             let mut map = state.interactive_responses.lock().await;
             map.remove(request_id);
-            Err(ToolResult::err(format!(
+            Err(Box::new(ToolResult::err(format!(
                 "Plan 模式 UI 在 {timeout_secs} 秒内无响应（视为超时/拒绝）。"
-            )))
+            ))))
         }
     }
 }
@@ -377,7 +377,7 @@ impl Tool for PlanModeUiTool {
                 .await
                 {
                     Ok(values) => Ok(ToolResult::ok(render_interactive_response_result(&values))),
-                    Err(e) => Ok(e),
+                    Err(e) => Ok(*e),
                 }
             }
             "plan_ready" => {

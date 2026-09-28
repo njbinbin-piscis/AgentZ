@@ -40,9 +40,8 @@ impl IndexWorker {
                 while rx.recv().is_ok() {
                     // Fixed window: continuous writes must not starve processing.
                     std::thread::sleep(Duration::from_millis(200));
-                    match rx.try_recv() {
-                        Err(mpsc::TryRecvError::Disconnected) => break,
-                        _ => {}
+                    if let Err(mpsc::TryRecvError::Disconnected) = rx.try_recv() {
+                        break;
                     }
                     let batch =
                         std::mem::take(&mut *shared.lock().unwrap_or_else(|e| e.into_inner()));
