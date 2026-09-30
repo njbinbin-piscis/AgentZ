@@ -68,12 +68,17 @@ export default function WorkflowRunPanel({ runId, onClose, onRerun }: Props) {
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     subscribeWorkflowEvents((e) => {
       if (e.runId === runId) void refresh();
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, [runId, refresh]);
 
   // Stream each agent node's tokens (Koi turns stream over the shared chat

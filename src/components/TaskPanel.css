@@ -4,7 +4,7 @@
   }
 }
 
-/* ── Task panel (Todo / Tools) ───────────────────────────────────────── */
+/* ── Task panel (Todo only — tools render inline in the message stream) ── */
 
 .agentz-task-panel {
   margin: 10px 12px 0;
@@ -61,53 +61,8 @@
   color: var(--text-dim, #9a9ab0);
 }
 
-.agentz-task-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 8px 10px 0;
-}
-
-.agentz-task-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  border: 1px solid var(--border, #2a2a38);
-  border-bottom: none;
-  border-radius: 8px 8px 0 0;
-  background: transparent;
-  color: var(--text-dim, #9a9ab0);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.agentz-task-tab.active {
-  background: var(--bg-elev-2, #1b1b26);
-  color: var(--text, #e8e8f0);
-}
-
-.agentz-task-tab:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.agentz-task-tab-count {
-  font-size: 10px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.agentz-task-panel-content {
+.agentz-task-panel-body {
   max-height: 240px;
-  overflow-y: auto;
-}
-
-.agentz-tool-steps-scroll {
-  display: flex;
-  flex-direction: column;
-  max-height: 200px;
   overflow-y: auto;
 }
 
@@ -186,48 +141,6 @@
 .plan-status-completed { color: #4ade80; background: rgba(74,222,128,0.12); }
 .plan-status-cancelled { color: #f87171; background: rgba(248,113,113,0.12); }
 
-.agentz-tool-step-card {
-  border-bottom: 1px solid var(--border, #2a2a38);
-}
-
-.agentz-tool-step-card:last-child {
-  border-bottom: none;
-}
-
-.agentz-tool-step-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.agentz-tool-step-header:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.agentz-tool-step-icon { font-size: 13px; flex-shrink: 0; }
-.agentz-tool-step-name { font-size: 11px; font-weight: 600; flex-shrink: 0; min-width: 72px; }
-.agentz-tool-step-summary {
-  flex: 1;
-  font-size: 10px;
-  color: var(--text-dim, #9a9ab0);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: Consolas, monospace;
-}
-.agentz-tool-step-status { width: 16px; text-align: center; flex-shrink: 0; }
-.agentz-tool-step-status.step-ok { color: #4ade80; }
-.agentz-tool-step-status.step-error { color: #f87171; }
-.agentz-tool-step-status.step-running { color: var(--accent, #7c6af7); }
-.agentz-tool-step-chevron { font-size: 8px; color: var(--text-dim, #9a9ab0); }
-
 .agentz-step-spinner {
   display: inline-block;
   width: 10px;
@@ -236,50 +149,4 @@
   border-top-color: var(--accent, #7c6af7);
   border-radius: 50%;
   animation: agentz-spin 0.7s linear infinite;
-}
-
-.agentz-tool-step-body {
-  padding: 8px 10px 10px;
-  border-top: 1px solid var(--border, #2a2a38);
-  background: var(--bg, #0e0e14);
-}
-
-.agentz-tool-step-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 6px;
-}
-
-.agentz-tool-step-section-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-dim, #9a9ab0);
-  text-transform: uppercase;
-}
-
-.agentz-tool-step-section-label.label-error { color: #f87171; }
-
-.agentz-tool-step-pre {
-  margin: 0;
-  padding: 8px;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.25);
-  font-size: 10px;
-  line-height: 1.4;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.agentz-tool-step-pre.pre-error { color: #fca5a5; }
-
-.agentz-tool-step-show-more {
-  align-self: flex-start;
-  border: 0;
-  background: transparent;
-  color: var(--accent, #7c6af7);
-  font-size: 10px;
-  cursor: pointer;
-  padding: 0;
 }

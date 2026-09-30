@@ -2139,6 +2139,10 @@ pub async fn run_agentz_turn(
     );
     let collector = tokio::spawn(async move {
         let mut text = String::new();
+        // Text streamed since the last tool call / new LLM response. The kernel
+        // persists a response only when it completes, so on error this tail is
+        // the part that would otherwise be lost.
+        let mut tail = String::new();
         let mut errored: Option<String> = None;
         let mut tool_calls = 0usize;
         let mut tool_errors = 0usize;
@@ -2220,7 +2224,13 @@ pub async fn run_agentz_turn(
                 collector_sink.emit_session(&collector_session, "agent_event", payload);
             }
             match event {
-                AgentEvent::TextDelta { delta } => text.push_str(&delta),
+                AgentEvent::TextDelta { delta } => {
+                    text.push_str(&delta);
+                    tail.push_str(&delta);
+                }
+                AgentEvent::ToolStart { .. } | AgentEvent::TextSegmentStart { .. } => {
+                    tail.clear();
+                }
                 AgentEvent::Error { message } => {
                     errored = Some(message);
                     break;
@@ -2229,7 +2239,7 @@ pub async fn run_agentz_turn(
                 _ => {}
             }
         }
-        (text, errored, tool_calls, tool_errors, iterations)
+        (text, errored, tool_calls, tool_errors, iterations, tail)
     });
 
     let timeout = match request.task_timeout_secs {
@@ -2237,6 +2247,7 @@ pub async fn run_agentz_turn(
         _ => default_timeout,
     };
     let run_fut = agent.run(llm_messages, tx, cancel.clone(), ctx);
+    let mut turn_timeout_secs: Option<u64> = None;
     let run_res = tokio::time::timeout(timeout, run_fut).await;
 
     let (ok, new_messages, error_msg): (bool, Vec<LlmMessage>, Option<String>) = match run_res {
@@ -2244,6 +2255,7 @@ pub async fn run_agentz_turn(
         Ok(Err(e)) => (false, Vec::new(), Some(format!("agent error: {e}"))),
         Err(_) => {
             cancel.store(true, Ordering::SeqCst);
+            turn_timeout_secs = Some(timeout.as_secs());
             (
                 false,
                 Vec::new(),
@@ -2252,14 +2264,50 @@ pub async fn run_agentz_turn(
         }
     };
 
-    let (streamed_text, stream_error, tool_calls, tool_errors, iterations) =
+    let (streamed_text, stream_error, tool_calls, tool_errors, iterations, unsaved_tail) =
         collector.await.unwrap_or_default();
 
     // Agent loop already persists via harness persistence; do not append
     // `new_messages` again or every turn is duplicated in the DB.
 
+    // Unfinished plan todos survive an abnormal turn end (timeout / error).
+    // Surface the count so the host and the next turn can reconcile them.
+    let open_todo_count = {
+        let plans = plan_store.lock().await;
+        plans
+            .get(&session_id)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter(|item| item.status == "pending" || item.status == "in_progress")
+                    .count()
+            })
+            .unwrap_or(0)
+    };
     let turn_failed = error_msg.is_some() || stream_error.is_some();
-    let lifecycle_state = if cancel.load(Ordering::SeqCst) {
+
+    // An interrupted turn (error / timeout / user stop) must not lose the reply
+    // that was streaming: persist the unsaved tail so a reload or the next turn
+    // still shows it. Skipped when the kernel already stored the same text.
+    if (turn_failed || cancel.load(Ordering::SeqCst)) && !unsaved_tail.trim().is_empty() {
+        let db = db.lock().await;
+        let tail = unsaved_tail.trim();
+        let already_saved = db
+            .get_messages_latest(&session_id, 4)
+            .map(|rows| {
+                rows.iter()
+                    .any(|r| r.role == "assistant" && r.content.contains(tail))
+            })
+            .unwrap_or(false);
+        if !already_saved {
+            if let Err(e) = db.append_message(&session_id, "assistant", tail) {
+                tracing::warn!(session_id = %session_id, "failed to persist interrupted reply: {e}");
+            }
+        }
+    }
+    let lifecycle_state = if turn_timeout_secs.is_some() {
+        "timed_out"
+    } else if cancel.load(Ordering::SeqCst) {
         "cancelled"
     } else if turn_failed {
         "failed"
@@ -2288,13 +2336,27 @@ pub async fn run_agentz_turn(
             "tool_errors": tool_errors,
             "iterations": iterations,
             "max_iterations": max_iterations,
+            "open_todos": open_todo_count,
         }),
     );
     if let Some(err) = error_msg.as_deref().or(stream_error.as_deref()) {
+        // Keep the timeout notice calm and actionable — the turn stopped, but
+        // nothing was lost and the user can simply continue.
+        let message = match turn_timeout_secs {
+            Some(secs) => format!(
+                "Turn exceeded its {secs}s limit — continuing automatically with the unfinished task."
+            ),
+            None => err.to_string(),
+        };
         event_sink.emit_session(
             &session_id,
             "agent_final",
-            serde_json::json!({"ok": false, "error": err}),
+            serde_json::json!({
+                "ok": false,
+                "error": message,
+                "timed_out": turn_timeout_secs.is_some(),
+                "open_todos": open_todo_count,
+            }),
         );
     } else {
         event_sink.emit_session(&session_id, "agent_final", serde_json::json!({"ok": true}));
@@ -2369,6 +2431,21 @@ pub async fn run_agentz_turn(
     };
 
     if let Some(err) = error_msg {
+        // A turn-level timeout is recoverable: the session keeps its streamed
+        // text and retained todos, and the next turn is re-prompted with them.
+        // Only a genuine agent error aborts the whole call.
+        if turn_timeout_secs.is_some() {
+            tracing::warn!(session_id = %session_id, %err, "turn timed out; returning partial result");
+            return Ok(HeadlessCliResponse {
+                ok: false,
+                mode: HeadlessCliMode::Piscis.as_str().to_string(),
+                session_id,
+                pool_id: None,
+                response_text,
+                disabled_tools: Vec::new(),
+                pool_wait: None,
+            });
+        }
         return Err(anyhow!(err));
     }
 

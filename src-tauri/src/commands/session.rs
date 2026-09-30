@@ -248,6 +248,113 @@ pub struct MessageDto {
     pub id: String,
     pub role: String,
     pub content: String,
+    /// Tool calls made while producing this (assistant) bubble, in call order.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<ToolDto>,
+}
+
+/// A persisted tool call + its result, reconstructed from the message rows so a
+/// reloaded / error-interrupted session still shows what the agent did.
+#[derive(Debug, Serialize)]
+pub struct ToolDto {
+    pub id: String,
+    pub name: String,
+    pub input: serde_json::Value,
+    pub result: Option<String>,
+    pub is_error: bool,
+    /// Char count of the bubble text preceding this call (interleave position).
+    pub text_offset: usize,
+}
+
+/// Upper bound for a persisted tool result sent to the UI (chars).
+const UI_TOOL_RESULT_MAX_CHARS: usize = 20_000;
+
+/// Build UI bubbles (with tool calls) from raw rows: tool-result rows are folded
+/// into the matching call, consecutive assistant rows of one turn are merged.
+fn messages_rich(msgs: Vec<ChatMessage>) -> Vec<MessageDto> {
+    let mut out: Vec<MessageDto> = Vec::new();
+    for m in msgs {
+        if m.role != "user" && m.role != "assistant" {
+            continue;
+        }
+        if m.role == "user" && m.content.trim().is_empty() {
+            // Tool-result carrier row: attach results to the calls they answer.
+            if let Some(raw) = m.tool_results_json.as_deref() {
+                if let Ok(serde_json::Value::Array(items)) = serde_json::from_str(raw) {
+                    for item in items {
+                        let Some(id) = item.get("tool_use_id").and_then(|v| v.as_str()) else {
+                            continue;
+                        };
+                        let content = item
+                            .get("content")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_default();
+                        let is_error = item
+                            .get("is_error")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        for bubble in out.iter_mut().rev() {
+                            if let Some(t) = bubble.tools.iter_mut().find(|t| t.id == id) {
+                                let truncated: String =
+                                    content.chars().take(UI_TOOL_RESULT_MAX_CHARS).collect();
+                                t.result = Some(truncated);
+                                t.is_error = is_error;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+        let calls: Vec<serde_json::Value> = m
+            .tool_calls_json
+            .as_deref()
+            .and_then(|raw| serde_json::from_str(raw).ok())
+            .unwrap_or_default();
+        if m.role == "assistant" && m.content.trim().is_empty() && calls.is_empty() {
+            continue;
+        }
+        let merge = m.role == "assistant"
+            && out.last().map(|l| l.role == "assistant").unwrap_or(false);
+        if !merge {
+            out.push(MessageDto {
+                id: m.id.clone(),
+                role: m.role.clone(),
+                content: String::new(),
+                tools: Vec::new(),
+            });
+        }
+        let bubble = out.last_mut().expect("bubble pushed above");
+        if !m.content.trim().is_empty() {
+            if !bubble.content.is_empty() {
+                bubble.content.push_str("\n\n");
+            }
+            bubble.content.push_str(&m.content);
+        }
+        if merge {
+            // Anchor checkpoint/fork to the last chunk in the merged turn.
+            bubble.id = m.id.clone();
+        }
+        let offset = bubble.content.chars().count();
+        for call in calls {
+            let (Some(id), Some(name)) = (
+                call.get("id").and_then(|v| v.as_str()),
+                call.get("name").and_then(|v| v.as_str()),
+            ) else {
+                continue;
+            };
+            bubble.tools.push(ToolDto {
+                id: id.to_string(),
+                name: name.to_string(),
+                input: call.get("input").cloned().unwrap_or(serde_json::Value::Null),
+                result: None,
+                is_error: false,
+                text_offset: offset,
+            });
+        }
+    }
+    out
 }
 
 /// Open the project-local session DB.
@@ -265,35 +372,6 @@ async fn with_db<T>(
 fn messages_raw_chronological(db: &Database, session_id: &str) -> Result<Vec<ChatMessage>, String> {
     db.get_messages_latest(session_id, 1000)
         .map_err(|e| format!("get_messages failed: {e}"))
-}
-
-/// UI-facing history: drop empty tool-result user rows and merge consecutive
-/// assistant chunks from the same agent turn into one bubble.
-fn messages_for_ui(msgs: Vec<ChatMessage>) -> Vec<ChatMessage> {
-    let mut out: Vec<ChatMessage> = Vec::new();
-    for m in msgs {
-        if m.role != "user" && m.role != "assistant" {
-            continue;
-        }
-        if m.content.trim().is_empty() {
-            continue;
-        }
-        if let Some(last) = out.last_mut() {
-            if last.role == "assistant" && m.role == "assistant" {
-                last.content.push_str("\n\n");
-                last.content.push_str(&m.content);
-                // Anchor checkpoint/fork to the last chunk in the merged turn.
-                last.id = m.id;
-                continue;
-            }
-        }
-        out.push(m);
-    }
-    out
-}
-
-fn messages_chronological(db: &Database, session_id: &str) -> Result<Vec<ChatMessage>, String> {
-    Ok(messages_for_ui(messages_raw_chronological(db, session_id)?))
 }
 
 fn copy_messages_to_session(
@@ -412,14 +490,68 @@ pub async fn chat_get_messages(
     project_dir: Option<String>,
 ) -> Result<Vec<MessageDto>, String> {
     with_db(&app, ProjectDirParam { project_dir }, |db| {
-        Ok(messages_chronological(db, &session_id)?
-            .into_iter()
-            .map(|m| MessageDto {
-                id: m.id,
-                role: m.role,
-                content: m.content,
-            })
-            .collect())
+        Ok(messages_rich(messages_raw_chronological(db, &session_id)?))
+    })
+    .await
+}
+
+/// One page of history, newest-first paging (see [`chat_get_messages_page`]).
+#[derive(Debug, Serialize)]
+pub struct MessagePageDto {
+    /// Chronological (oldest → newest) within the page.
+    pub messages: Vec<MessageDto>,
+    /// Pass back as `offset` to fetch the next-older page.
+    pub next_offset: i64,
+    pub has_more: bool,
+}
+
+/// Default page size in raw DB rows (tool-result rows count too).
+const HISTORY_PAGE_DEFAULT: i64 = 120;
+
+/// Load history newest-first in pages: `offset` = raw rows already consumed from
+/// the newest end. Each page is returned oldest → newest so the UI can prepend it.
+/// A page is trimmed at its old edge to start on a user message, so an assistant
+/// turn is never split across two pages (it would render as two bubbles).
+#[tauri::command]
+pub async fn chat_get_messages_page(
+    app: AppHandle,
+    session_id: String,
+    project_dir: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<MessagePageDto, String> {
+    with_db(&app, ProjectDirParam { project_dir }, |db| {
+        let limit = limit.unwrap_or(HISTORY_PAGE_DEFAULT).clamp(10, 500);
+        let offset = offset.unwrap_or(0).max(0);
+        let mut raw = db
+            .get_messages_older(&session_id, limit, offset)
+            .map_err(|e| format!("get_messages failed: {e}"))?;
+        let fetched = raw.len() as i64;
+        let mut has_more = fetched == limit;
+        if has_more {
+            if let Ok(Some(sess)) = db.get_session(&session_id) {
+                has_more = offset + fetched < sess.message_count as i64;
+            }
+        }
+        if has_more {
+            // Start the page on a real user message; the trimmed older rows are
+            // picked up (whole) by the next page because `next_offset` excludes them.
+            if let Some(k) = raw
+                .iter()
+                .position(|m| m.role == "user" && !m.content.trim().is_empty())
+            {
+                if k > 0 {
+                    raw.drain(..k);
+                }
+            }
+        }
+        let consumed = raw.len() as i64;
+        let messages = messages_rich(raw);
+        Ok(MessagePageDto {
+            messages,
+            next_offset: offset + consumed,
+            has_more,
+        })
     })
     .await
 }

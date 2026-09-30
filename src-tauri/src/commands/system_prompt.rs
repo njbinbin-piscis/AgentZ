@@ -198,15 +198,15 @@ pub fn active_todo_context(items: &[PlanTodoItem]) -> String {
         .collect::<Vec<_>>()
         .join("\n");
     format!(
-        r#"## Retained execution todos
-The following Todo state belongs to this session and was retained for this follow-up:
+        r#"## Retained execution todos (MANDATORY — reconcile before acting)
+A prior turn ended while these todos were still open (it may have been interrupted or timed out):
 {rendered}
 
-Decide the relationship of the newest user message before acting:
-1. Continue, answer a pending question, provide requested input, or make a scoped adjustment: preserve these todos and continue/update them.
+Before doing anything else, reconcile these open todos with the newest user message:
+1. Continue, answer a pending question, provide requested input, or make a scoped adjustment: preserve these todos and continue/update them (plan_todo merge=true).
 2. The user explicitly says to abandon, cancel, ignore, or replace the prior task: first mark each unfinished prior item as cancelled with plan_todo merge=true, then create the new task plan.
 3. If the message appears unrelated but intent is ambiguous: preserve the todos and ask one concise, task-specific clarification.
-Do NOT ask a generic resume-or-clear Todo question, and do NOT discard active todos solely because the latest message is short or appears unrelated."#
+Do NOT silently start unrelated work while open todos remain: every open item must end this turn as completed, cancelled, or explicitly deferred with the user's agreement. Do NOT ask a generic resume-or-clear Todo question, and do NOT discard active todos solely because the latest message is short or appears unrelated."#
     )
 }
 

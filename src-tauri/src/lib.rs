@@ -205,6 +205,7 @@ pub fn run() {
             // chat session management
             commands::session::chat_list_sessions,
             commands::session::chat_get_messages,
+            commands::session::chat_get_messages_page,
             commands::session::chat_fork_session,
             commands::session::chat_restore_checkpoint,
             commands::session::chat_delete_session,

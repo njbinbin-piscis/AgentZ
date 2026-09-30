@@ -12,11 +12,10 @@
   overflow-y: visible;
 }
 
-/* Skip layout/paint for old chat turns outside the viewport. */
-.agentz-msg-virtual {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 160px;
-}
+/* NOTE: rows deliberately avoid `content-visibility: auto`. Its intrinsic
+   size estimate (160px) under-measures long replies, so `scrollTo(scrollHeight)`
+   landed short and the newest message drifted below the fold. The mounted
+   message window (see AssistantMessageList) already bounds the DOM. */
 
 .agentz-assistant-header {
   display: flex;
@@ -565,12 +564,6 @@
   line-height: 1.45;
   box-shadow: 0 8px 24px color-mix(in srgb, var(--text, #e8e8f0) 12%, transparent);
   pointer-events: none;
-}
-
-/* Off-screen messages skip layout/paint until scrolled near (virtualization-lite). */
-.agentz-msg-virtual {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 120px;
 }
 
 .agentz-streaming {

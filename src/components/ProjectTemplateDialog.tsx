@@ -63,41 +63,48 @@ export default function ProjectTemplateDialog({
   return (
     <div className="agentz-tpl-overlay" onClick={onSkip}>
       <div className="agentz-tpl-dialog" onClick={(e) => e.stopPropagation()}>
-        <h2>{t("projectTemplate.title")}</h2>
-        <p className="agentz-tpl-sub">{t("projectTemplate.subtitle")}</p>
-        {templates.length === 0 ? (
-          <p className="agentz-tpl-empty">{t("projectTemplate.none")}</p>
-        ) : (
-          <ul className="agentz-tpl-list">
-            {templates.map((tpl) => {
-              const name = pickLocalized(tpl.name_zh, tpl.name, i18n.language);
-              const desc = pickLocalized(tpl.description_zh, tpl.description, i18n.language);
-              return (
-                <li key={tpl.id}>
-                  <label className={selected === tpl.id ? "active" : ""}>
-                    <input
-                      type="radio"
-                      name="project-template"
-                      checked={selected === tpl.id}
-                      onChange={() => setSelected(tpl.id)}
-                    />
-                    <span className="agentz-tpl-name">{name}</span>
-                    {desc && <span className="agentz-tpl-desc">{desc}</span>}
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        {selectedTpl && (
-          <p className="agentz-tpl-note">{t("projectTemplate.hint")}</p>
-        )}
-        {error && <p className="agentz-tpl-error">{error}</p>}
+        <div className="agentz-tpl-header">
+          <h2>{t("projectTemplate.title")}</h2>
+          <p className="agentz-tpl-sub">{t("projectTemplate.subtitle")}</p>
+        </div>
+        <div className="agentz-tpl-body">
+          {templates.length === 0 ? (
+            <p className="agentz-tpl-empty">{t("projectTemplate.none")}</p>
+          ) : (
+            <ul className="agentz-tpl-list">
+              {templates.map((tpl) => {
+                const name = pickLocalized(tpl.name_zh, tpl.name, i18n.language);
+                const desc = pickLocalized(tpl.description_zh, tpl.description, i18n.language);
+                return (
+                  <li key={tpl.id}>
+                    <label className={selected === tpl.id ? "active" : ""}>
+                      <input
+                        type="radio"
+                        name="project-template"
+                        checked={selected === tpl.id}
+                        onChange={() => setSelected(tpl.id)}
+                      />
+                      <span className="agentz-tpl-name">{name}</span>
+                      {desc && <span className="agentz-tpl-desc">{desc}</span>}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {selectedTpl && <p className="agentz-tpl-note">{t("projectTemplate.hint")}</p>}
+          {error && <p className="agentz-tpl-error">{error}</p>}
+        </div>
         <div className="agentz-tpl-actions">
           <button type="button" onClick={onSkip} disabled={busy}>
             {t("projectTemplate.skip")}
           </button>
-          <button type="button" className="primary" onClick={() => void apply()} disabled={busy || !selected}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void apply()}
+            disabled={busy || !selected}
+          >
             {busy ? t("common.loading") : t("projectTemplate.apply")}
           </button>
         </div>

@@ -472,6 +472,11 @@ export default function App() {
           await requestGraphIndex(projectDir);
           setGraphIndexRefreshNonce((n) => n + 1);
           setSettingsToast(t("agent.repoWikiGraphQueued"));
+          const queuedMsg = t("agent.repoWikiGraphQueued");
+          window.setTimeout(
+            () => setSettingsToast((cur) => (cur === queuedMsg ? null : cur)),
+            3200,
+          );
         } else {
           const res = await generateRepoWiki(projectDir);
           setIdeWikiOpenPath({ path: res.path, nonce: Date.now() });
@@ -868,7 +873,7 @@ export default function App() {
 
       {(exitToast || settingsToast) && (
         <div className="agentz-exit-toast" role="status" aria-live="polite">
-          {exitToast ?? settingsToast}
+          {exitToast ? t("app.exiting") : settingsToast}
         </div>
       )}
 

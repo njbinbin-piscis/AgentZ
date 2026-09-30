@@ -6,7 +6,7 @@ import {
   onChatEvent,
   listSessions,
   SESSION_SOURCE_CODEZ,
-  getMessages,
+  getMessagesPage,
   forkSession,
   deleteSession,
   restoreCheckpoint,
@@ -52,22 +52,23 @@ import ContextUsageRing, { type ContextUsageSnapshot } from "../../components/Co
 import { formatUserMessageDisplay } from "../../components/chatFileRefs";
 import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import AssistantMessageList from "./AssistantMessageList";
-import TaskPanel, {
-  mergePlanItems,
-  parsePlanFromToolInput,
+import TaskPanel, { mergePlanItems, parsePlanFromToolInput } from "../../components/TaskPanel";
+import {
   truncateToolResultForUi,
   upsertToolStep,
-  type ToolStep,
-} from "../../components/TaskPanel";
+  type ToolTraceItem,
+} from "../../components/ToolTrace";
 import type { FileNode } from "./types";
 import { useInteractiveCards } from "../../hooks/useInteractiveCards";
 import type { PermissionRequestCard } from "../../components/chat/PermissionCard";
-import { chipsSnapshot, composerDbg, composerDbgMark, promptPreview } from "../../utils/composerDebug";
-import { useProjectEdge } from "../../contexts/ProjectEdgeContext";
 import {
-  collectArtifactsFromToolSteps,
-  pathFromToolEvent,
-} from "../workz/agentArtifacts";
+  chipsSnapshot,
+  composerDbg,
+  composerDbgMark,
+  promptPreview,
+} from "../../utils/composerDebug";
+import { useProjectEdge } from "../../contexts/ProjectEdgeContext";
+import { collectArtifactsFromToolSteps, pathFromToolEvent } from "../workz/agentArtifacts";
 import "./AssistantPanel.css";
 
 interface ChatMessage {
@@ -76,6 +77,8 @@ interface ChatMessage {
   text: string;
   /** Journal turn id — used to attach inline diff cards (current session only). */
   turnId?: string;
+  /** Persisted tool calls, so history / interrupted turns keep their tool trace. */
+  tools?: ToolTraceItem[];
 }
 
 function messageFromDto(m: MessageDto): ChatMessage {
@@ -83,6 +86,19 @@ function messageFromDto(m: MessageDto): ChatMessage {
     id: m.id,
     role: m.role,
     text: m.role === "user" ? formatUserMessageDisplay(m.content) : m.content,
+    tools:
+      m.tools && m.tools.length > 0
+        ? m.tools.map(
+            (t): ToolTraceItem => ({
+              id: t.id,
+              name: t.name,
+              input: t.input,
+              result: t.result ?? undefined,
+              status: t.is_error || t.result == null ? "error" : "done",
+              textOffset: t.text_offset,
+            }),
+          )
+        : undefined,
   };
 }
 
@@ -104,6 +120,20 @@ interface QueuedTurn {
   text: string;
   attachment: ChatAttachment | null;
   clearPlan: boolean;
+  /** Bubble label when it differs from the model-facing prompt (auto-resume). */
+  displayText?: string;
+}
+
+/**
+ * How many times a single user request may auto-restart after a turn timeout.
+ * Bounds no-click continuation so a failing turn can never loop forever.
+ */
+const MAX_AUTO_RESUMES = 2;
+/** Raw DB rows fetched per history page (newest first). */
+const HISTORY_PAGE = 120;
+
+function queuedLabels(queue: QueuedTurn[]): string[] {
+  return queue.map((q) => q.displayText ?? q.text);
 }
 
 function revokeImageChipPreviews(chips: ComposerChip[]) {
@@ -173,9 +203,8 @@ export default function AssistantPanel({
   const inputHistory = useInputHistory("agentz-input-history-codez");
   const [toast, setToast] = useState<string | null>(null);
   const [planItems, setPlanItems] = useState<PlanTodoItem[]>([]);
-  const [toolSteps, setToolSteps] = useState<ToolStep[]>([]);
-  const [taskPanelOpen, setTaskPanelOpen] = useState(true);
-  const [taskPanelTab, setTaskPanelTab] = useState<"todo" | "tools">("todo");
+  const [toolSteps, setToolSteps] = useState<ToolTraceItem[]>([]);
+  const [taskPanelOpen, setTaskPanelOpen] = useState(false);
   const [modeNotice, setModeNotice] = useState<string | null>(null);
   const [contextUsage, setContextUsage] = useState<ContextUsageSnapshot | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -195,18 +224,15 @@ export default function AssistantPanel({
   );
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequestCard | null>(null);
 
-  const {
-    pendingCards,
-    handleAgentEvent,
-    markSubmitted,
-    markActionSent,
-    clearCards,
-  } = useInteractiveCards();
+  const { pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards } =
+    useInteractiveCards();
 
   const sessionRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   busyRef.current = busy;
   const streamPendingRef = useRef("");
+  /** Total chars streamed into the in-flight assistant message (incl. unflushed). */
+  const streamLenRef = useRef(0);
   const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flushStreamDelta = useCallback(() => {
@@ -236,18 +262,23 @@ export default function AssistantPanel({
     [],
   );
   const queueRef = useRef<QueuedTurn[]>([]);
+  // Auto-resume (no-click continuation after a timeout): a bounded counter plus
+  // the localized prompt/label, kept in refs so `applyEvent` needs no new dep.
+  const autoResumeRef = useRef(0);
+  const autoResumeTextRef = useRef({ prompt: "", label: "" });
+  autoResumeTextRef.current = {
+    prompt: t("chat.autoContinuePrompt"),
+    label: t("chat.autoContinueLabel"),
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** Newest-first history cursor: raw DB rows loaded so far + whether older ones exist. */
+  const historyCursorRef = useRef({ sessionId: "", offset: 0 });
+  const [hasMoreOlder, setHasMoreOlder] = useState(false);
   const stickToBottomRef = useRef(true);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const {
-    slash,
-    slashMatches,
-    pickSlash,
-    slashLabel,
-    detectSlash,
-    handleSlashKeyDown,
-  } = useSlashCompletion(setInput, taRef);
+  const { slash, slashMatches, pickSlash, slashLabel, detectSlash, handleSlashKeyDown } =
+    useSlashCompletion(setInput, taRef);
   const runTurnRef = useRef<(turn: QueuedTurn) => Promise<void>>(async () => {});
   /** Bumped on send/clear so in-flight paste/attach callbacks cannot re-add chips. */
   const composerGenRef = useRef(0);
@@ -268,6 +299,8 @@ export default function AssistantPanel({
 
   useEffect(() => {
     sessionRef.current = null;
+    historyCursorRef.current = { sessionId: "", offset: 0 };
+    setHasMoreOlder(false);
     queueRef.current = [];
     setQueuedView([]);
     setMessages([]);
@@ -399,7 +432,15 @@ export default function AssistantPanel({
     });
     onAttachRequestHandled?.();
     requestAnimationFrame(() => taRef.current?.focus());
-  }, [attachRequest?.nonce, attachRequest, appSettings, modelId, llmProviders, onAttachRequestHandled, t]);
+  }, [
+    attachRequest?.nonce,
+    attachRequest,
+    appSettings,
+    modelId,
+    llmProviders,
+    onAttachRequestHandled,
+    t,
+  ]);
 
   const clearComposer = useCallback(() => {
     composerGenRef.current += 1;
@@ -433,128 +474,171 @@ export default function AssistantPanel({
       .catch(() => setFiles([]));
   }, [projectDir]);
 
-  const applyEvent = useCallback((env: ChatEventEnvelope) => {
-    if (env.channel === "session_title" && env.sessionId) {
-      const title = (env.payload as { title?: string }).title;
-      if (title) {
-        setSessions((prev) => {
-          const idx = prev.findIndex((s) => s.id === env.sessionId);
-          if (idx < 0) return prev;
-          const next = prev.slice();
-          next[idx] = { ...next[idx], title };
-          return next;
-        });
-      }
-      return;
-    }
-    // Terminal events must be handled even if `busy` state hasn't committed yet
-    // (React batches setState; the backend can finish before re-render).
-    if (env.channel === "agent_final") {
-      const fin = env.payload as { ok: boolean; error?: string };
-      if (!fin.ok && fin.error) setError(fin.error);
-      return;
-    }
-    if (env.channel !== "agent_event") return;
-    const evt = env.payload as AgentEvent;
-
-    if (evt.type === "error") {
-      setError(evt.message);
-      return;
-    }
-    if (evt.type === "permission_request") {
-      setPermissionRequest({
-        requestId: evt.request_id,
-        toolName: evt.tool_name,
-        toolInput: evt.tool_input,
-        description: evt.description,
-      });
-      return;
-    }
-    // Interactive cards and terminal lifecycle events are stateful, not just
-    // visual stream deltas. They may arrive before React commits `busy=true`
-    // or after the turn has already resolved; dropping them leaves stale forms
-    // whose backend response channel no longer exists.
-    if (
-      evt.type === "interactive_ui" ||
-      evt.type === "interactive_ui_patch" ||
-      evt.type === "interactive_ui_listen" ||
-      evt.type === "done" ||
-      evt.type === "cancelled"
-    ) {
-      handleAgentEvent(evt);
-      return;
-    }
-    if (!busyRef.current) return;
-
-    switch (evt.type) {
-      case "text_delta":
-        streamPendingRef.current += evt.delta;
-        if (!streamTimerRef.current) {
-          streamTimerRef.current = setTimeout(flushStreamDelta, 80);
+  const applyEvent = useCallback(
+    (env: ChatEventEnvelope) => {
+      if (env.channel === "session_title" && env.sessionId) {
+        const title = (env.payload as { title?: string }).title;
+        if (title) {
+          setSessions((prev) => {
+            const idx = prev.findIndex((s) => s.id === env.sessionId);
+            if (idx < 0) return prev;
+            const next = prev.slice();
+            next[idx] = { ...next[idx], title };
+            return next;
+          });
         }
-        break;
-      case "tool_start":
-        setTaskPanelOpen(true);
-        setTaskPanelTab("tools");
-        if (evt.name === "plan_todo") {
-          const updates = parsePlanFromToolInput(evt.input);
-          if (updates.length > 0) {
-            const merge = Boolean((evt.input as { merge?: boolean })?.merge);
-            setPlanItems((prev) => (merge ? mergePlanItems(prev, updates) : updates));
-            setTaskPanelTab("todo");
-          }
-        }
-        setToolSteps((prev) => upsertToolStep(prev, evt));
-        break;
-      case "tool_end": {
-        setToolSteps((prev) => {
-          const next = prev.map((step) =>
-            step.id === evt.id
-              ? {
-                  ...step,
-                  completed: true,
-                  result: truncateToolResultForUi(evt.result),
-                  isError: evt.is_error,
-                }
-              : step,
-          );
-          const ended = next.find((step) => step.id === evt.id);
-          if (ended) {
-            const p = pathFromToolEvent(ended.name, ended.input, evt.result);
-            if (p) sessionArtifactsRef.current.add(p);
-          }
-          return next;
-        });
-        break;
+        return;
       }
-      case "plan_update":
-        setPlanItems(evt.items);
-        setTaskPanelOpen(true);
-        setTaskPanelTab("todo");
-        break;
-      case "context_usage":
-        setContextUsage({
-          estimatedInputTokens: evt.estimated_input_tokens,
-          totalInputBudget: evt.total_input_budget,
-          triggerThreshold: evt.trigger_threshold,
-          cumulativeInputTokens: evt.cumulative_input_tokens,
-          cumulativeOutputTokens: evt.cumulative_output_tokens,
-          rollingSummaryVersion: evt.rolling_summary_version,
-          autoCompactThreshold: evt.auto_compact_threshold,
+      // Terminal events must be handled even if `busy` state hasn't committed yet
+      // (React batches setState; the backend can finish before re-render).
+      if (env.channel === "agent_final") {
+        const fin = env.payload as {
+          ok: boolean;
+          error?: string;
+          timed_out?: boolean;
+          open_todos?: number;
+        };
+        if (!fin.ok && fin.error) setError(fin.error);
+        // Auto-resume: a turn-level timeout that left todos open continues on its
+        // own, so the user does not have to click. A user Stop ends the turn
+        // without `timed_out`, so this never fights an explicit cancellation.
+        if (
+          fin.timed_out &&
+          (fin.open_todos ?? 0) > 0 &&
+          autoResumeRef.current < MAX_AUTO_RESUMES
+        ) {
+          autoResumeRef.current += 1;
+          const { prompt, label } = autoResumeTextRef.current;
+          queueRef.current.push({
+            text: prompt,
+            displayText: label,
+            attachment: null,
+            clearPlan: false,
+          });
+          setQueuedView(queuedLabels(queueRef.current));
+          composerDbg("auto-resume queued", {
+            attempt: autoResumeRef.current,
+            openTodos: fin.open_todos,
+          });
+        }
+        return;
+      }
+      if (env.channel !== "agent_event") return;
+      // A turn that errors never returns its session id from `chatSend`; adopt it
+      // from the event stream so the next message continues the same session
+      // instead of silently starting a new one (which made the old work vanish).
+      if (
+        busyRef.current &&
+        !sessionRef.current &&
+        env.sessionId &&
+        !env.sessionId.startsWith("koi_task_")
+      ) {
+        sessionRef.current = env.sessionId;
+        historyCursorRef.current = { sessionId: env.sessionId, offset: 0 };
+      }
+      const evt = env.payload as AgentEvent;
+
+      if (evt.type === "error") {
+        setError(evt.message);
+        return;
+      }
+      if (evt.type === "permission_request") {
+        setPermissionRequest({
+          requestId: evt.request_id,
+          toolName: evt.tool_name,
+          toolInput: evt.tool_input,
+          description: evt.description,
         });
-        break;
-      default:
+        return;
+      }
+      // Interactive cards and terminal lifecycle events are stateful, not just
+      // visual stream deltas. They may arrive before React commits `busy=true`
+      // or after the turn has already resolved; dropping them leaves stale forms
+      // whose backend response channel no longer exists.
+      if (
+        evt.type === "interactive_ui" ||
+        evt.type === "interactive_ui_patch" ||
+        evt.type === "interactive_ui_listen" ||
+        evt.type === "done" ||
+        evt.type === "cancelled"
+      ) {
         handleAgentEvent(evt);
-        break;
-    }
-  }, [handleAgentEvent]);
+        return;
+      }
+      if (!busyRef.current) return;
+
+      switch (evt.type) {
+        case "text_delta":
+          streamPendingRef.current += evt.delta;
+          streamLenRef.current += evt.delta.length;
+          if (!streamTimerRef.current) {
+            streamTimerRef.current = setTimeout(flushStreamDelta, 80);
+          }
+          break;
+        case "tool_start":
+          if (evt.name === "plan_todo") {
+            const updates = parsePlanFromToolInput(evt.input);
+            if (updates.length > 0) {
+              const merge = Boolean((evt.input as { merge?: boolean })?.merge);
+              setPlanItems((prev) => (merge ? mergePlanItems(prev, updates) : updates));
+            }
+          }
+          setToolSteps((prev) => upsertToolStep(prev, evt, streamLenRef.current));
+          break;
+        case "tool_end": {
+          setToolSteps((prev) => {
+            const next = prev.map(
+              (step): ToolTraceItem =>
+                step.id === evt.id
+                  ? {
+                      ...step,
+                      status: evt.is_error ? "error" : "done",
+                      result: truncateToolResultForUi(evt.result),
+                    }
+                  : step,
+            );
+            const ended = next.find((step) => step.id === evt.id);
+            if (ended) {
+              const p = pathFromToolEvent(ended.name, ended.input, evt.result);
+              if (p) sessionArtifactsRef.current.add(p);
+            }
+            return next;
+          });
+          break;
+        }
+        case "plan_update":
+          setPlanItems(evt.items);
+          break;
+        case "context_usage":
+          setContextUsage({
+            estimatedInputTokens: evt.estimated_input_tokens,
+            totalInputBudget: evt.total_input_budget,
+            triggerThreshold: evt.trigger_threshold,
+            cumulativeInputTokens: evt.cumulative_input_tokens,
+            cumulativeOutputTokens: evt.cumulative_output_tokens,
+            rollingSummaryVersion: evt.rolling_summary_version,
+            autoCompactThreshold: evt.auto_compact_threshold,
+          });
+          break;
+        default:
+          handleAgentEvent(evt);
+          break;
+      }
+    },
+    [handleAgentEvent],
+  );
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     onChatEvent(applyEvent).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, [applyEvent]);
 
   const applyDroppedPaths = useCallback(
@@ -622,15 +706,22 @@ export default function AssistantPanel({
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Pin to the newest message after layout has settled. A synchronous scroll
+  // ran before row heights were known, which could leave the scroll position
+  // short and hide the reply that just arrived.
   useEffect(() => {
-    if (stickToBottomRef.current) {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-    }
+    if (!stickToBottomRef.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [messages, queuedView]);
 
   const removeQueued = useCallback((index: number) => {
     queueRef.current.splice(index, 1);
-    setQueuedView(queueRef.current.map((q) => q.text));
+    setQueuedView(queuedLabels(queueRef.current));
   }, []);
 
   runTurnRef.current = async (turn: QueuedTurn) => {
@@ -644,13 +735,19 @@ export default function AssistantPanel({
     });
     setError(null);
     const displayText =
-      turn.attachment && !turn.text.trim()
+      turn.displayText ??
+      (turn.attachment && !turn.text.trim()
         ? `📎 ${turn.attachment.filename ?? turn.attachment.path ?? t("chat.attachment")}`
         : turn.attachment
           ? `${turn.text}${turn.text.trim() ? "\n" : ""}📎 ${turn.attachment.filename ?? turn.attachment.path ?? t("chat.attachment")}`
-          : turn.text;
+          : turn.text);
     composerDbg("runTurn → setMessages (user bubble)");
-    setMessages((m) => [...m, { role: "user", text: displayText }, { role: "assistant", text: "" }]);
+    setMessages((m) => [
+      ...m,
+      { role: "user", text: displayText },
+      { role: "assistant", text: "" },
+    ]);
+    streamLenRef.current = 0;
     setToolSteps([]);
     if (turn.clearPlan) setPlanItems([]);
     busyRef.current = true;
@@ -694,9 +791,7 @@ export default function AssistantPanel({
             journalGetTurnDiffs(projectDir, res.session_id, turnId),
           ]);
           setPendingReview(
-            changes.length > 0
-              ? { sessionId: res.session_id, turnId, changes }
-              : null,
+            changes.length > 0 ? { sessionId: res.session_id, turnId, changes } : null,
           );
           if (diffs.length > 0) {
             setTurnDiffsByTurnId((prev) => ({ ...prev, [turnId]: diffs }));
@@ -734,7 +829,7 @@ export default function AssistantPanel({
       }
       const next = queueRef.current.shift();
       if (next) {
-        setQueuedView(queueRef.current.map((q) => q.text));
+        setQueuedView(queuedLabels(queueRef.current));
         void runTurnRef.current(next);
       }
       done();
@@ -745,7 +840,7 @@ export default function AssistantPanel({
     (text: string, att: ChatAttachment | null, clearPlan: boolean) => {
       if (busy) {
         queueRef.current.push({ text, attachment: att, clearPlan });
-        setQueuedView(queueRef.current.map((q) => q.text));
+        setQueuedView(queuedLabels(queueRef.current));
       } else {
         void runTurnRef.current({ text, attachment: att, clearPlan });
       }
@@ -781,6 +876,8 @@ export default function AssistantPanel({
     }
     composerDbg("submit → clear input & chips");
     clearComposer();
+    // A fresh user request restarts the auto-resume budget.
+    autoResumeRef.current = 0;
 
     const preservePlan = planItems.some(
       (item) => item.status === "pending" || item.status === "in_progress",
@@ -792,13 +889,27 @@ export default function AssistantPanel({
     // whether the user explicitly starts a replacement task.
     doSend(text, pendingAttachment, !preservePlan);
     done();
-  }, [input, composerChips, projectDir, planItems, doSend, inputHistory, t, busy, mention, clearComposer]);
+  }, [
+    input,
+    composerChips,
+    projectDir,
+    planItems,
+    doSend,
+    inputHistory,
+    t,
+    busy,
+    mention,
+    clearComposer,
+  ]);
 
-  const onModeChange = useCallback((mode: ChatMode) => {
-    setChatMode(mode);
-    setModeNotice(mode === "plan" ? t("chat.modePlanHint") : t("chat.modeAgentHint"));
-    window.setTimeout(() => setModeNotice(null), 4000);
-  }, [t]);
+  const onModeChange = useCallback(
+    (mode: ChatMode) => {
+      setChatMode(mode);
+      setModeNotice(mode === "plan" ? t("chat.modePlanHint") : t("chat.modeAgentHint"));
+      window.setTimeout(() => setModeNotice(null), 4000);
+    },
+    [t],
+  );
 
   const onPlanBuild = useCallback(
     (planPath: string) => {
@@ -811,7 +922,7 @@ export default function AssistantPanel({
         void runTurnRef.current({ text: prompt, attachment: null, clearPlan: false });
       } else {
         queueRef.current.push({ text: prompt, attachment: null, clearPlan: false });
-        setQueuedView(queueRef.current.map((q) => q.text));
+        setQueuedView(queuedLabels(queueRef.current));
       }
     },
     [busy, t],
@@ -822,19 +933,33 @@ export default function AssistantPanel({
       setSessions([]);
       return;
     }
-    listSessions(projectDir, [SESSION_SOURCE_CODEZ]).then(setSessions).catch(() => setSessions([]));
+    listSessions(projectDir, [SESSION_SOURCE_CODEZ])
+      .then(setSessions)
+      .catch(() => setSessions([]));
   }, [projectDir]);
 
   const syncMessagesFromDb = useCallback(
     async (sessionId: string) => {
       if (!projectDir) return;
-      const history = await getMessages(sessionId, projectDir);
+      // Reload at least what is already on screen (plus headroom for the rows the
+      // finished turn added) so older pages the user loaded are not thrown away.
+      const cur = historyCursorRef.current;
+      const already = cur.sessionId === sessionId ? cur.offset : 0;
+      const page = await getMessagesPage(
+        sessionId,
+        projectDir,
+        0,
+        Math.max(HISTORY_PAGE, already + 20),
+      );
+      if (sessionRef.current !== sessionId) return;
+      historyCursorRef.current = { sessionId, offset: page.next_offset };
+      setHasMoreOlder(page.has_more);
       setMessages((prev) => {
         const turnById = new Map<string, string>();
         for (const m of prev) {
           if (m.id && m.turnId) turnById.set(m.id, m.turnId);
         }
-        return history.map((dto) => {
+        return page.messages.map((dto) => {
           const msg = messageFromDto(dto);
           const turnId = msg.id ? turnById.get(msg.id) : undefined;
           return turnId ? { ...msg, turnId } : msg;
@@ -844,12 +969,33 @@ export default function AssistantPanel({
     [projectDir],
   );
 
+  /** Prepend the next-older page. Resolves with how many messages were added. */
+  const loadOlderHistory = useCallback(async (): Promise<number> => {
+    const sessionId = sessionRef.current;
+    if (!sessionId || !projectDir) return 0;
+    const cur = historyCursorRef.current;
+    if (cur.sessionId !== sessionId) return 0;
+    const page = await getMessagesPage(sessionId, projectDir, cur.offset);
+    if (sessionRef.current !== sessionId) return 0;
+    historyCursorRef.current = { sessionId, offset: page.next_offset };
+    setHasMoreOlder(page.has_more);
+    const older = page.messages.map(messageFromDto);
+    if (older.length === 0) return 0;
+    setMessages((prev) => {
+      const have = new Set(prev.map((m) => m.id).filter(Boolean));
+      return [...older.filter((m) => !m.id || !have.has(m.id)), ...prev];
+    });
+    return older.length;
+  }, [projectDir]);
+
   useEffect(() => {
     if (showSessions) refreshSessions();
   }, [showSessions, refreshSessions]);
 
   const newSession = useCallback(() => {
     sessionRef.current = null;
+    historyCursorRef.current = { sessionId: "", offset: 0 };
+    setHasMoreOlder(false);
     queueRef.current = [];
     setQueuedView([]);
     setMessages([]);
@@ -860,25 +1006,40 @@ export default function AssistantPanel({
     setShowSessions(false);
     setContextUsage(null);
     clearSessionArtifacts();
-  }, [clearSessionArtifacts]);
+    // A pending `chat_ui` card belongs to the turn that produced it, so a fresh
+    // session must start empty — otherwise the stale form reappears here.
+    clearCards();
+  }, [clearSessionArtifacts, clearCards]);
 
   const switchSession = useCallback(
     async (id: string) => {
       try {
         sessionRef.current = id;
+        historyCursorRef.current = { sessionId: id, offset: 0 };
+        setHasMoreOlder(false);
         setTurnDiffsByTurnId({});
+        // A restored session opens on the newest message; older ones lazy-load
+        // when the user scrolls up.
+        stickToBottomRef.current = true;
         await syncMessagesFromDb(id);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            const el = scrollRef.current;
+            if (el) el.scrollTop = el.scrollHeight;
+          }),
+        );
         setPlanItems([]);
         setToolSteps([]);
         setError(null);
         setShowSessions(false);
         setContextUsage(null);
         clearSessionArtifacts();
+        clearCards();
       } catch (e) {
         setError(String(e));
       }
     },
-    [syncMessagesFromDb, clearSessionArtifacts],
+    [syncMessagesFromDb, clearSessionArtifacts, clearCards],
   );
 
   const forkFromCheckpoint = useCallback(
@@ -903,12 +1064,7 @@ export default function AssistantPanel({
       // The file watcher reloads affected tabs + refreshes git status.
       const restoreFiles = window.confirm(t("chat.checkpointRestoreFiles"));
       try {
-        await restoreCheckpoint(
-          sessionRef.current,
-          messageId,
-          projectDir!,
-          restoreFiles,
-        );
+        await restoreCheckpoint(sessionRef.current, messageId, projectDir!, restoreFiles);
         await syncMessagesFromDb(sessionRef.current);
         setPlanItems([]);
         setToolSteps([]);
@@ -1037,18 +1193,21 @@ export default function AssistantPanel({
 
   const canSend = Boolean(projectDir && (input.trim() || composerChips.length > 0));
 
-  const onInputChange = useCallback((value: string, caret?: number) => {
-    setInput(value);
-    const pos = caret ?? value.length;
-    const before = value.slice(0, pos);
-    const m = before.match(/(?:^|\s)@([^\s]*)$/);
-    if (m) {
-      setMention({ query: m[1], start: pos - m[1].length - 1, caret: pos, active: 0 });
-    } else {
-      setMention(null);
-      detectSlash(value, caret);
-    }
-  }, [detectSlash]);
+  const onInputChange = useCallback(
+    (value: string, caret?: number) => {
+      setInput(value);
+      const pos = caret ?? value.length;
+      const before = value.slice(0, pos);
+      const m = before.match(/(?:^|\s)@([^\s]*)$/);
+      if (m) {
+        setMention({ query: m[1], start: pos - m[1].length - 1, caret: pos, active: 0 });
+      } else {
+        setMention(null);
+        detectSlash(value, caret);
+      }
+    },
+    [detectSlash],
+  );
 
   const matches = useMemo(() => {
     if (!mention) return [];
@@ -1084,10 +1243,7 @@ export default function AssistantPanel({
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
     if (handleSlashKeyDown(e)) return;
-    const mentionActive =
-      mention &&
-      matches.length > 1 &&
-      mention.query.length > 0;
+    const mentionActive = mention && matches.length > 1 && mention.query.length > 0;
     if (mentionActive) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -1135,12 +1291,6 @@ export default function AssistantPanel({
     }
   };
 
-  const toggleToolStep = (id: string) => {
-    setToolSteps((prev) =>
-      prev.map((step) => (step.id === id ? { ...step, expanded: !step.expanded } : step)),
-    );
-  };
-
   // AssistantMessageList is memoized so typing does not reparse historical
   // Markdown. Keep this prop stable; an inline callback defeats that boundary.
   const handlePermissionResolved = useCallback(() => {
@@ -1163,11 +1313,19 @@ export default function AssistantPanel({
         <span>{t("chat.title")}</span>
         <div className="agentz-assistant-actions">
           <ContextUsageRing usage={contextUsage} />
-          <button className={showSessions ? "active" : ""} onClick={() => setShowSessions((v) => !v)} title={t("chat.sessions")}>
+          <button
+            className={showSessions ? "active" : ""}
+            onClick={() => setShowSessions((v) => !v)}
+            title={t("chat.sessions")}
+          >
             ☰
           </button>
-          <button onClick={newSession} title={t("chat.newChat")}>＋</button>
-          <button onClick={() => void fork()} disabled={!sessionRef.current} title={t("chat.fork")}>⑂</button>
+          <button onClick={newSession} title={t("chat.newChat")}>
+            ＋
+          </button>
+          <button onClick={() => void fork()} disabled={!sessionRef.current} title={t("chat.fork")}>
+            ⑂
+          </button>
         </div>
       </div>
 
@@ -1181,7 +1339,9 @@ export default function AssistantPanel({
 
       {showSessions && (
         <div className="agentz-session-list">
-          {sessions.length === 0 && <div className="agentz-session-empty">{t("chat.noSessions")}</div>}
+          {sessions.length === 0 && (
+            <div className="agentz-session-empty">{t("chat.noSessions")}</div>
+          )}
           {sessions.map((s) => (
             <div
               key={s.id}
@@ -1207,23 +1367,22 @@ export default function AssistantPanel({
 
       <TaskPanel
         planItems={planItems}
-        toolSteps={toolSteps}
         busy={busy}
         open={taskPanelOpen}
         onOpenChange={setTaskPanelOpen}
-        tab={taskPanelTab}
-        onTabChange={setTaskPanelTab}
-        onToggleToolStep={toggleToolStep}
       />
 
       <AssistantMessageList
         messages={messages}
+        toolSteps={toolSteps}
         turnDiffsByTurnId={turnDiffsByTurnId}
         busy={busy}
         queuedView={queuedView}
         onRemoveQueued={removeQueued}
         pendingCards={pendingCards}
         scrollRef={scrollRef}
+        hasMoreOlder={hasMoreOlder}
+        onLoadOlder={loadOlderHistory}
         onSelectPath={onSelectPath}
         onForkCheckpoint={forkFromCheckpoint}
         onRestoreCheckpoint={restoreToCheckpoint}
@@ -1250,7 +1409,10 @@ export default function AssistantPanel({
         onRemoveChip={(id) =>
           setComposerChips((cur) => {
             const removed = cur.find((c) => c.id === id);
-            composerDbg("chip removed", { id, removed: removed ? chipsSnapshot([removed])[0] : null });
+            composerDbg("chip removed", {
+              id,
+              removed: removed ? chipsSnapshot([removed])[0] : null,
+            });
             if (removed?.kind === "image-attachment" && removed.preview.startsWith("blob:")) {
               URL.revokeObjectURL(removed.preview);
             }
@@ -1348,7 +1510,6 @@ export default function AssistantPanel({
           ) : null
         }
       />
-
     </div>
   );
 }

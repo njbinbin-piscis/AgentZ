@@ -28,7 +28,8 @@ const zh = {
     fieldRole: "角色",
     fieldModel: "模型",
     modelDefault: "默认（全局）",
-    modelProvidersHint: "下拉列表来自「设置 → 模型」中的 LLM Providers。请先在模型页添加至少一个 Provider，此处才会出现更多选项；留空则使用全局默认模型。",
+    modelProvidersHint:
+      "下拉列表来自「设置 → 模型」中的 LLM Providers。请先在模型页添加至少一个 Provider，此处才会出现更多选项；留空则使用全局默认模型。",
     fieldIcon: "图标",
     fieldDescription: "描述",
     fieldSystemPrompt: "系统提示词",
@@ -43,7 +44,8 @@ const zh = {
     mcpSearchPlaceholder: "搜索 MCP 服务…",
     fieldConnectors: "连接器（外部 API / 服务）",
     connectorsSearchPlaceholder: "搜索连接器…",
-    connectorsHint: "为该智能体额外绑定连接器；即使未全局启用，只要已授权也会注册其工具。API 类连接器本就全局可用。",
+    connectorsHint:
+      "为该智能体额外绑定连接器；即使未全局启用，只要已授权也会注册其工具。API 类连接器本就全局可用。",
     connectorsEmpty: "尚未安装任何连接器，请到「资源库 → 连接器」添加。",
     connectorUnauthorized: "未授权",
     fieldWorkflow: "协作风格",
@@ -79,12 +81,16 @@ const zh = {
     evalExpr: "表达式",
     evalLlm: "LLM 判定",
     expr: "表达式",
-    exprHint: "支持 KEY == 值 / KEY != 值 / KEY contains 值 / KEY !contains 值；返回 true / false。",
+    exprHint:
+      "支持 KEY == 值 / KEY != 值 / KEY contains 值 / KEY !contains 值；返回 true / false。",
     classifierPrompt: "判定提示词",
     labels: "标签（逗号分隔）",
-    branchEdgeHint: "从该分支节点拉出的连线，连线标签需对应上面的标签；留空或写 default 为默认分支。",
-    branchExprHint: "表达式模式：条件成立走 true 出线，不成立走 false 出线（可在上方直接选择目标节点）。",
-    branchExprEdgeHint: "表达式分支的连线标签由「条件成立 / 不成立」面板自动管理；请选中分支节点编辑。",
+    branchEdgeHint:
+      "从该分支节点拉出的连线，连线标签需对应上面的标签；留空或写 default 为默认分支。",
+    branchExprHint:
+      "表达式模式：条件成立走 true 出线，不成立走 false 出线（可在上方直接选择目标节点）。",
+    branchExprEdgeHint:
+      "表达式分支的连线标签由「条件成立 / 不成立」面板自动管理；请选中分支节点编辑。",
     branchPaths: {
       hint: "表达式求值结果为 true / false，请指定两条分支去向（会自动写入连线标签）。",
       whenTrue: "条件成立 →",
@@ -326,7 +332,8 @@ const zh = {
 
   assistantPanel: {
     title: "助理消息",
-    empty: "尚未配置任何 IM 助理。请在设置 · 消息渠道中启用一个渠道（飞书、企业微信、Telegram 等）后再来查看消息。",
+    empty:
+      "尚未配置任何 IM 助理。请在设置 · 消息渠道中启用一个渠道（飞书、企业微信、Telegram 等）后再来查看消息。",
     connect: "连接",
     disconnect: "断开",
     clear: "清空历史",
@@ -376,12 +383,14 @@ const zh = {
     terminal: "终端",
     terminalNewTab: "新建终端",
     terminalCloseTab: "关闭终端",
-    terminalCloseTabConfirm: "关闭此终端将终止其中正在运行的程序（如 top、npm run dev）。是否继续？",
+    terminalCloseTabConfirm:
+      "关闭此终端将终止其中正在运行的程序（如 top、npm run dev）。是否继续？",
     terminalHidePanel: "隐藏终端面板",
     terminalNoProject: "打开项目文件夹以使用终端。",
     terminalTab: "终端 {{n}}",
     terminalNeedProject: "请先打开项目文件夹",
-    terminalCloseProjectConfirm: "当前有 {{count}} 个终端会话正在运行，切换项目将终止其中的进程。是否继续？",
+    terminalCloseProjectConfirm:
+      "当前有 {{count}} 个终端会话正在运行，切换项目将终止其中的进程。是否继续？",
     terminalSendSelectionToChat: "发送到会话",
     terminalSendSelectionShortcut: "Ctrl+Shift+L",
     refresh: "刷新",
@@ -444,7 +453,7 @@ const zh = {
     checkoutDirtyWarn: "存在未提交更改，可能会被覆盖。是否继续？",
     commitFailed: "提交失败：{{error}}",
     gitIdentityHint:
-      "尚未配置 Git 用户信息。请在终端执行：\n  git config --global user.name \"您的姓名\"\n  git config --global user.email \"you@example.com\"",
+      '尚未配置 Git 用户信息。请在终端执行：\n  git config --global user.name "您的姓名"\n  git config --global user.email "you@example.com"',
     assistantBranches: "助理分支",
     noGitRepos: "此文件夹中未找到 Git 仓库。",
     unsavedConfirm: "「{{name}}」有未保存的更改。不保存就关闭？",
@@ -487,7 +496,8 @@ const zh = {
     contextWindow: "上下文窗口（输入 Token）",
     contextWindowHint: "模型输入上下文上限。0 = 自动（根据模型推断）。",
     maxIterations: "Agent 最大迭代次数",
-    maxIterationsHint: "一次 Agent 任务最多可进行多少轮模型/工具迭代。默认 200；达到上限会安全停止。",
+    maxIterationsHint:
+      "一次 Agent 任务最多可进行多少轮模型/工具迭代。默认 200；达到上限会安全停止。",
     policyMode: "Agent 策略",
     policyStrict: "严格（阻止高风险操作）",
     policyBalanced: "均衡（推荐）",
@@ -514,7 +524,8 @@ const zh = {
     llmProviderLabel: "显示名称",
     llmProviderMaxTokens: "最大输出 Token（0 = 继承全局）",
     flashModel: "内置小模型",
-    flashModelHint: "勾选后，该模型作为全局「内置小模型（Flash）」，供委派的子代理执行只关注结果的轻量任务；未勾选则子代理使用主模型。",
+    flashModelHint:
+      "勾选后，该模型作为全局「内置小模型（Flash）」，供委派的子代理执行只关注结果的轻量任务；未勾选则子代理使用主模型。",
     mcpServers: "MCP 服务器",
     mcpServersHint: "配置 Model Context Protocol 服务器，其工具会注入到 Agent/聊天中。",
     mcpServerAdd: "添加 MCP 服务器",
@@ -544,7 +555,8 @@ const zh = {
       skillhub: "SkillHub",
       clawhub: "ClawHub",
     },
-    skillhubHint: "面向中国用户优化的技能社区（api.skillhub.cn），国内访问更快。留空搜索可浏览热门技能。",
+    skillhubHint:
+      "面向中国用户优化的技能社区（api.skillhub.cn），国内访问更快。留空搜索可浏览热门技能。",
     clawhubHint: "OpenClaw 公共技能注册表（clawhub.ai）。留空搜索可浏览热门技能。",
     searchPlaceholder: "搜索技能，如 figma、金融…",
     search: "搜索",
@@ -608,7 +620,8 @@ const zh = {
     title: "扩展（VS Code .vsix）",
     nav: "扩展",
     marketTitle: "VS Code 插件市场（Open VSX）",
-    marketHint: "搜索并安装 VS Code 兼容扩展。安装后在下方列表中启用——打开文件夹后扩展宿主会自动启动。",
+    marketHint:
+      "搜索并安装 VS Code 兼容扩展。安装后在下方列表中启用——打开文件夹后扩展宿主会自动启动。",
     searchOpenVsx: "搜索扩展（如 Python、ESLint）…",
     installVsix: "安装 .vsix…",
     install: "安装",
@@ -667,7 +680,8 @@ const zh = {
     checkpointFork: "从此处分叉",
     checkpointRestore: "恢复到此",
     checkpointRestoreConfirm: "恢复到此 checkpoint 将删除之后的所有消息。是否继续？",
-    checkpointRestoreFiles: "同时撤销该 checkpoint 之后 Agent 修改的文件吗？（点「确定」回滚文件，「取消」仅删除消息）",
+    checkpointRestoreFiles:
+      "同时撤销该 checkpoint 之后 Agent 修改的文件吗？（点「确定」回滚文件，「取消」仅删除消息）",
     mentionCodebase: "在整个代码库中语义检索相关代码",
     mentionGraph: "检索模块/文件依赖关系（知识图谱）",
     reviewChanges: "本轮修改了 {{count}} 个文件",
@@ -678,10 +692,13 @@ const zh = {
     noSessions: "暂无会话。",
     untitled: "未命名",
     delete: "删除",
-    empty: "询问代码库或请求修改。用 @path/to/file 引用文件。Agent 会直接修改文件，编辑器会自动刷新。",
-    placeholder: "向 AgentZ 提问…（@文件 添加上下文；Enter 发送，Shift+Enter 换行，↑↓ 回顾历史发送）",
+    empty:
+      "询问代码库或请求修改。用 @path/to/file 引用文件。Agent 会直接修改文件，编辑器会自动刷新。",
+    placeholder:
+      "向 AgentZ 提问…（@文件 添加上下文；Enter 发送，Shift+Enter 换行，↑↓ 回顾历史发送）",
     placeholderFollowUp: "输入追问…（Enter 发送，Shift+Enter 换行，↑↓ 回顾历史发送）",
-    placeholderPlan: "描述任务，Plan 模式将探索代码并制定计划…（Enter 发送，Shift+Enter 换行，↑↓ 回顾历史发送）",
+    placeholderPlan:
+      "描述任务，Plan 模式将探索代码并制定计划…（Enter 发送，Shift+Enter 换行，↑↓ 回顾历史发送）",
     send: "发送",
     stop: "停止",
     thinking: "思考中…",
@@ -723,6 +740,9 @@ const zh = {
     taskPanel: "任务面板",
     agentWorking: "执行中…",
     agentSteps: "{{count}} 步",
+    autoContinuePrompt:
+      "上一轮因超过时间上限而中断。无需等待用户输入，直接接着完成未完成的任务：先查看 plan_todo 中仍未完成的事项，继续执行并更新其状态；若已无未完成项，简要说明结论。",
+    autoContinueLabel: "（自动继续：上一轮超时）",
     planPending: "待处理",
     planInProgress: "进行中",
     planCompleted: "已完成",
@@ -779,7 +799,8 @@ const zh = {
     untitled: "未命名任务",
     deleteTask: "删除任务",
     title: "WorkZ",
-    subtitle: "描述一个目标。WorkZ 会在 {{project}} 中规划、编辑文件并运行工具 — 变更与产物可在右上角浮窗中查看。",
+    subtitle:
+      "描述一个目标。WorkZ 会在 {{project}} 中规划、编辑文件并运行工具 — 变更与产物可在右上角浮窗中查看。",
     noProject: "请先打开项目文件夹。",
     openProjectFallback: "当前项目",
     goal: "目标",
@@ -822,7 +843,8 @@ const zh = {
     teamHintWorkflow: "工作流团队：按你设计的图确定性执行，逐节点运行各自的智能体，无协调者。",
     agentLabel: "智能体",
     agentGeneric: "通用智能体",
-    agentHint: "单 Agent 模式：选择一个已配置的智能体，用它的提示词＋技能＋工具＋连接器执行；通用智能体可在输入框下方选择模型、技能与连接器（在资源库管理）。",
+    agentHint:
+      "单 Agent 模式：选择一个已配置的智能体，用它的提示词＋技能＋工具＋连接器执行；通用智能体可在输入框下方选择模型、技能与连接器（在资源库管理）。",
     modelSwarmTeam: "蜂群团队：协调者与成员助理使用各自绑定的模型，此处不可选择模型。",
     modelWorkflowTeam: "工作流团队：各节点智能体使用工作室中绑定的模型，此处不可选择模型。",
     modelBoundAgent: "已选智能体使用其绑定的模型；仅「通用智能体」可在此选择模型。",
@@ -887,8 +909,7 @@ const zh = {
     graphTourNext: "下一站",
     graphRefresh: "刷新",
     graphClearDiff: "清除影响分析",
-    graphDiffBanner:
-      "变更 {{base}}…{{head}}：{{changed}} 个文件，{{impacted}} 个节点受影响",
+    graphDiffBanner: "变更 {{base}}…{{head}}：{{changed}} 个文件，{{impacted}} 个节点受影响",
     graphSelectNode: "点击节点查看详情",
     graphInDegree: "跨模块被依赖次数",
     graphInternalImports: "模块内 import 关系",

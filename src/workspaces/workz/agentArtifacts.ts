@@ -7,6 +7,7 @@ export interface AgentToolEvent {
   result?: string;
   path?: string;
   input?: unknown;
+  textOffset?: number;
 }
 
 export interface AgentStep {
@@ -50,7 +51,7 @@ export function normalizeArtifactPath(raw: string): string {
 
 export interface ToolStepLike {
   name: string;
-  input: unknown;
+  input?: unknown;
   result?: string;
 }
 

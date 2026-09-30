@@ -24,9 +24,7 @@ import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { agentTaskApi, type AgentTaskInfo } from "../../services/tauri/agentTask";
 import { generateRepoWiki } from "../../services/tauri/repoWiki";
-import {
-  requestGraphIndex,
-} from "../../services/tauri/graphIndex";
+import { requestGraphIndex } from "../../services/tauri/graphIndex";
 import AgentTaskReview from "./AgentTaskReview";
 import SessionSkillRevisions from "./SessionSkillRevisions";
 import ChatComposer, { type ComposerMenuOption } from "../../components/ChatComposer";
@@ -40,12 +38,8 @@ import {
   dataUrlToBase64,
 } from "../../components/chatComposerUtils";
 import { visionCapable } from "../../components/visionUtils";
-import TaskPanel, {
-  mergePlanItems,
-  parsePlanFromToolInput,
-  upsertToolStep,
-  type ToolStep,
-} from "../../components/TaskPanel";
+import TaskPanel, { mergePlanItems, parsePlanFromToolInput } from "../../components/TaskPanel";
+import ToolTrace, { interleaveTools } from "../../components/ToolTrace";
 import Markdown from "../codez/Markdown";
 import InteractiveCard from "../../components/chat/InteractiveCard";
 import { useInteractiveCards } from "../../hooks/useInteractiveCards";
@@ -65,10 +59,7 @@ import {
   subscribeWorkflowEvents,
   type WorkflowStatus,
 } from "../../services/tauri/workflow";
-import {
-  collectArtifacts,
-  type AgentStep,
-} from "./agentArtifacts";
+import { collectArtifacts, type AgentStep } from "./agentArtifacts";
 import { applyToolEnd, applyToolStart, finalizeTools } from "./agentTools";
 import { taskDisplayTitle, workzGoalFromText } from "./taskTitle";
 import "./Agent.css";
@@ -103,13 +94,8 @@ export default function WorkZWorkspace({
   onOpenLibrary,
 }: WorkZWorkspaceProps) {
   const { t, i18n } = useTranslation();
-  const {
-    setArtifacts,
-    setPreviewPath,
-    previewPath,
-    refreshGitChanges,
-    setPendingReview,
-  } = useProjectEdge();
+  const { setArtifacts, setPreviewPath, previewPath, refreshGitChanges, setPendingReview } =
+    useProjectEdge();
   const [tasks, setTasks] = useState<SessionMeta[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [steps, setSteps] = useState<AgentStep[]>([]);
@@ -125,9 +111,7 @@ export default function WorkZWorkspace({
   const [dragOver, setDragOver] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [planItems, setPlanItems] = useState<PlanTodoItem[]>([]);
-  const [toolSteps, setToolSteps] = useState<ToolStep[]>([]);
-  const [taskPanelOpen, setTaskPanelOpen] = useState(true);
-  const [taskPanelTab, setTaskPanelTab] = useState<"todo" | "tools">("tools");
+  const [taskPanelOpen, setTaskPanelOpen] = useState(false);
   const [isolate, setIsolate] = useState(
     () => localStorage.getItem("agentz-workz-isolate") === "1",
   );
@@ -166,10 +150,7 @@ export default function WorkZWorkspace({
   });
 
   /** All WorkZ user tasks — sidebar lists single-agent and team sessions together. */
-  const workzTaskSources = useMemo(
-    () => [SESSION_SOURCE_WORKZ, SESSION_SOURCE_WORKZ_TEAM],
-    [],
-  );
+  const workzTaskSources = useMemo(() => [SESSION_SOURCE_WORKZ, SESSION_SOURCE_WORKZ_TEAM], []);
   const activePoolRef = useRef<string | null>(null);
   activePoolRef.current = activePoolId;
 
@@ -182,36 +163,27 @@ export default function WorkZWorkspace({
   worktreeRef.current = worktree;
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
-  const {
-    slash,
-    slashMatches,
-    pickSlash,
-    slashLabel,
-    detectSlash,
-    handleSlashKeyDown,
-  } = useSlashCompletion(setGoal, taRef);
-  const {
-    mention,
-    mentionMatches,
-    pickMention,
-    detectAtMention,
-    handleMentionKeyDown,
-  } = useAtMention(setGoal, taRef);
+  const { slash, slashMatches, pickSlash, slashLabel, detectSlash, handleSlashKeyDown } =
+    useSlashCompletion(setGoal, taRef);
+  const { mention, mentionMatches, pickMention, detectAtMention, handleMentionKeyDown } =
+    useAtMention(setGoal, taRef);
   const panelRef = useRef<HTMLDivElement>(null);
-  const runRef = useRef<(text: string, att: ChatAttachment | null) => Promise<void>>(async () => {});
+  const runRef = useRef<(text: string, att: ChatAttachment | null) => Promise<void>>(
+    async () => {},
+  );
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    window.setTimeout(() => setToast((cur) => (cur === msg ? null : cur)), 2800);
-  }, []);
+  const showToast = useCallback((msg: string) => setToast(msg), []);
 
-  const {
-    pendingCards,
-    handleAgentEvent,
-    markSubmitted,
-    markActionSent,
-    clearCards,
-  } = useInteractiveCards();
+  // One timer per visible toast: a newer toast restarts it, so an older
+  // timeout can never dismiss (or leave stuck) a later message.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const { pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards } =
+    useInteractiveCards();
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequestCard | null>(null);
 
   // ── Parallel task bookkeeping (M7) ──────────────────────────────────────
@@ -303,7 +275,6 @@ export default function WorkZWorkspace({
           const msg = String(e);
           setError(msg);
           setToast(msg);
-          window.setTimeout(() => setToast(null), 5000);
         }
       });
 
@@ -344,7 +315,6 @@ export default function WorkZWorkspace({
     clearAttachment();
     setPreviewPath(null);
     setPlanItems([]);
-    setToolSteps([]);
     setWorktree(null);
     setReviewTask(null);
     liveRef.current = false;
@@ -415,158 +385,147 @@ export default function WorkZWorkspace({
   // consume events that belong to the foreground run: once a session id is
   // known we match on it; while a brand-new task is still session-less we
   // accept events that aren't claimed by another running session.
-  const applyEvent = useCallback((env: ChatEventEnvelope) => {
-    if (env.channel === "session_title" && env.sessionId) {
-      const title = (env.payload as { title?: string }).title;
-      if (title) {
-        setTasks((prev) => {
-          const idx = prev.findIndex((task) => task.id === env.sessionId);
-          if (idx < 0) return prev;
-          const next = prev.slice();
-          next[idx] = { ...next[idx], title };
-          return next;
-        });
-      }
-      return;
-    }
-    // Turn completion must update every session — including background runs
-    // after the user clicks「新建」— or the sidebar dot stays yellow forever.
-    if (env.channel === "agent_final") {
-      const fin = env.payload as { ok: boolean; error?: string };
-      const fg = foregroundSessionRef.current;
-      if (liveRef.current && fg && env.sessionId === fg && !fin.ok && fin.error) {
-        setError(fin.error);
-      }
-      markRunning(env.sessionId, false);
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === env.sessionId ? { ...t, status: fin.ok ? "idle" : "error" } : t,
-        ),
-      );
-      return;
-    }
-
-    // The kernel multiplexes every session (coordinator turn + each member
-    // Koi turn) onto one channel. Apply only events for the bound foreground
-    // session; the id is always known up front now (pre-generated for new
-    // tasks), so anything else — broadcasts included — is dropped.
-    const fg = foregroundSessionRef.current;
-    if (!fg || env.sessionId !== fg) return;
-    if (env.channel !== "agent_event") return;
-    const evt = env.payload as AgentEvent;
-
-    if (evt.type === "permission_request") {
-      setPermissionRequest({
-        requestId: evt.request_id,
-        toolName: evt.tool_name,
-        toolInput: evt.tool_input,
-        description: evt.description,
-      });
-      return;
-    }
-
-    // A card's lifecycle must not depend on the React live flag: an
-    // interactive event can race the initial state update, while a terminal
-    // event can arrive just after the turn resolves. Keep those cards in sync
-    // with their backend response channels in either case.
-    if (
-      evt.type === "interactive_ui" ||
-      evt.type === "interactive_ui_patch" ||
-      evt.type === "interactive_ui_listen" ||
-      evt.type === "done" ||
-      evt.type === "cancelled"
-    ) {
-      handleAgentEvent(evt);
-      return;
-    }
-    if (!liveRef.current) return;
-
-    switch (evt.type) {
-      case "text_delta":
-        setSteps((prev) => {
-          if (prev.length === 0) return prev;
-          const copy = prev.slice();
-          const last = { ...copy[copy.length - 1] };
-          if (last.role !== "assistant") return prev;
-          last.text += evt.delta;
-          copy[copy.length - 1] = last;
-          return copy;
-        });
-        break;
-      case "tool_start":
-        setTaskPanelOpen(true);
-        setTaskPanelTab("tools");
-        if (evt.name === "plan_todo") {
-          const updates = parsePlanFromToolInput(evt.input);
-          if (updates.length > 0) {
-            const merge = Boolean((evt.input as { merge?: boolean })?.merge);
-            setPlanItems((prev) => (merge ? mergePlanItems(prev, updates) : updates));
-            setTaskPanelTab("todo");
-          }
+  const applyEvent = useCallback(
+    (env: ChatEventEnvelope) => {
+      if (env.channel === "session_title" && env.sessionId) {
+        const title = (env.payload as { title?: string }).title;
+        if (title) {
+          setTasks((prev) => {
+            const idx = prev.findIndex((task) => task.id === env.sessionId);
+            if (idx < 0) return prev;
+            const next = prev.slice();
+            next[idx] = { ...next[idx], title };
+            return next;
+          });
         }
-        setToolSteps((prev) => upsertToolStep(prev, evt));
-        setSteps((prev) => {
-          if (prev.length === 0) return prev;
-          const copy = prev.slice();
-          const last = { ...copy[copy.length - 1] };
-          if (last.role !== "assistant") return prev;
-          last.tools = applyToolStart(last.tools.slice(), evt);
-          copy[copy.length - 1] = last;
-          return copy;
-        });
-        break;
-      case "tool_end":
-        setToolSteps((prev) =>
-          prev.map((step) =>
-            step.id === evt.id
-              ? {
-                  ...step,
-                  completed: true,
-                  result: evt.result,
-                  isError: evt.is_error,
-                  expanded: false,
-                }
-              : step,
+        return;
+      }
+      // Turn completion must update every session — including background runs
+      // after the user clicks「新建」— or the sidebar dot stays yellow forever.
+      if (env.channel === "agent_final") {
+        const fin = env.payload as { ok: boolean; error?: string };
+        const fg = foregroundSessionRef.current;
+        if (liveRef.current && fg && env.sessionId === fg && !fin.ok && fin.error) {
+          setError(fin.error);
+        }
+        markRunning(env.sessionId, false);
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === env.sessionId ? { ...t, status: fin.ok ? "idle" : "error" } : t,
           ),
         );
-        setSteps((prev) => {
-          if (prev.length === 0) return prev;
-          const copy = prev.slice();
-          const last = { ...copy[copy.length - 1] };
-          if (last.role !== "assistant") return prev;
-          last.tools = applyToolEnd(last.tools.slice(), evt);
-          copy[copy.length - 1] = last;
-          return copy;
+        return;
+      }
+
+      // The kernel multiplexes every session (coordinator turn + each member
+      // Koi turn) onto one channel. Apply only events for the bound foreground
+      // session; the id is always known up front now (pre-generated for new
+      // tasks), so anything else — broadcasts included — is dropped.
+      const fg = foregroundSessionRef.current;
+      if (!fg || env.sessionId !== fg) return;
+      if (env.channel !== "agent_event") return;
+      const evt = env.payload as AgentEvent;
+
+      if (evt.type === "permission_request") {
+        setPermissionRequest({
+          requestId: evt.request_id,
+          toolName: evt.tool_name,
+          toolInput: evt.tool_input,
+          description: evt.description,
         });
-        break;
-      case "plan_update":
-        setPlanItems(evt.items);
-        setTaskPanelOpen(true);
-        setTaskPanelTab("todo");
-        break;
-      case "error":
-        setSteps((prev) => {
-          if (prev.length === 0) return prev;
-          const copy = prev.slice();
-          const last = { ...copy[copy.length - 1] };
-          if (last.role !== "assistant") return prev;
-          last.text += `\n\n⚠️ ${evt.message}`;
-          copy[copy.length - 1] = last;
-          return copy;
-        });
-        break;
-      default:
+        return;
+      }
+
+      // A card's lifecycle must not depend on the React live flag: an
+      // interactive event can race the initial state update, while a terminal
+      // event can arrive just after the turn resolves. Keep those cards in sync
+      // with their backend response channels in either case.
+      if (
+        evt.type === "interactive_ui" ||
+        evt.type === "interactive_ui_patch" ||
+        evt.type === "interactive_ui_listen" ||
+        evt.type === "done" ||
+        evt.type === "cancelled"
+      ) {
         handleAgentEvent(evt);
-        break;
-    }
-  }, [handleAgentEvent, markRunning]);
+        return;
+      }
+      if (!liveRef.current) return;
+
+      switch (evt.type) {
+        case "text_delta":
+          setSteps((prev) => {
+            if (prev.length === 0) return prev;
+            const copy = prev.slice();
+            const last = { ...copy[copy.length - 1] };
+            if (last.role !== "assistant") return prev;
+            last.text += evt.delta;
+            copy[copy.length - 1] = last;
+            return copy;
+          });
+          break;
+        case "tool_start":
+          if (evt.name === "plan_todo") {
+            const updates = parsePlanFromToolInput(evt.input);
+            if (updates.length > 0) {
+              const merge = Boolean((evt.input as { merge?: boolean })?.merge);
+              setPlanItems((prev) => (merge ? mergePlanItems(prev, updates) : updates));
+            }
+          }
+          setSteps((prev) => {
+            if (prev.length === 0) return prev;
+            const copy = prev.slice();
+            const last = { ...copy[copy.length - 1] };
+            if (last.role !== "assistant") return prev;
+            last.tools = applyToolStart(last.tools.slice(), evt, last.text.length);
+            copy[copy.length - 1] = last;
+            return copy;
+          });
+          break;
+        case "tool_end":
+          setSteps((prev) => {
+            if (prev.length === 0) return prev;
+            const copy = prev.slice();
+            const last = { ...copy[copy.length - 1] };
+            if (last.role !== "assistant") return prev;
+            last.tools = applyToolEnd(last.tools.slice(), evt);
+            copy[copy.length - 1] = last;
+            return copy;
+          });
+          break;
+        case "plan_update":
+          setPlanItems(evt.items);
+          break;
+        case "error":
+          setSteps((prev) => {
+            if (prev.length === 0) return prev;
+            const copy = prev.slice();
+            const last = { ...copy[copy.length - 1] };
+            if (last.role !== "assistant") return prev;
+            last.text += `\n\n⚠️ ${evt.message}`;
+            copy[copy.length - 1] = last;
+            return copy;
+          });
+          break;
+        default:
+          handleAgentEvent(evt);
+          break;
+      }
+    },
+    [handleAgentEvent, markRunning],
+  );
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     onChatEvent(applyEvent).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, [applyEvent]);
 
   useEffect(() => {
@@ -586,7 +545,6 @@ export default function WorkZWorkspace({
       { role: "user", text: displayText, tools: [] },
       { role: "assistant", text: "", tools: [] },
     ]);
-    setToolSteps([]);
     setPlanItems([]);
     setBusy(true);
 
@@ -800,7 +758,6 @@ export default function WorkZWorkspace({
     setWorkflowStatus(null);
     setSteps([]);
     setPlanItems([]);
-    setToolSteps([]);
     setError(null);
     setGoal("");
     clearAttachment();
@@ -808,8 +765,11 @@ export default function WorkZWorkspace({
     // Land on the main chat so a fresh task is visibly empty (instead of the
     // previous run's Koi chatroom / coordination view lingering).
     setSwarmMainTab("main");
+    // A pending `chat_ui` card belongs to the task that produced it; the new
+    // task view must start empty or the stale form leaks into it.
+    clearCards();
     requestAnimationFrame(() => taRef.current?.focus());
-  }, [projectDir, clearAttachment]);
+  }, [projectDir, clearAttachment, clearCards]);
 
   const openTask = useCallback(
     async (id: string) => {
@@ -837,15 +797,15 @@ export default function WorkZWorkspace({
         setSelectedId(id);
         setSteps(history.map((m) => ({ id: m.id, role: m.role, text: m.content, tools: [] })));
         setPlanItems([]);
-        setToolSteps([]);
         setError(null);
         setPreviewPath(null);
         refreshGitChanges();
+        clearCards();
       } catch (e) {
         setError(String(e));
       }
     },
-    [projectDir, refreshGitChanges, tasks, applyTaskModeBinding],
+    [projectDir, refreshGitChanges, tasks, applyTaskModeBinding, clearCards],
   );
 
   // Cancel the task bound to the active view (foreground run, or a reopened
@@ -853,8 +813,7 @@ export default function WorkZWorkspace({
   const stopActive = useCallback(() => {
     const sid = sessionRef.current;
     const key =
-      foregroundTaskKeyRef.current ??
-      (sid ? taskKeyBySessionRef.current.get(sid) ?? null : null);
+      foregroundTaskKeyRef.current ?? (sid ? (taskKeyBySessionRef.current.get(sid) ?? null) : null);
     void chatCancel(key);
   }, []);
 
@@ -1065,17 +1024,8 @@ export default function WorkZWorkspace({
     return opts;
   }, [llmProviders, defaultModelLabel, defaultModelHint, t]);
 
-  const toggleToolStep = useCallback((id: string) => {
-    setToolSteps((prev) =>
-      prev.map((step) => (step.id === id ? { ...step, expanded: !step.expanded } : step)),
-    );
-  }, []);
-
   const canSend = Boolean(projectDir && (goal.trim() || attachment));
-  const selectedTeam = useMemo(
-    () => teams.find((tm) => tm.id === activeTeam),
-    [teams, activeTeam],
-  );
+  const selectedTeam = useMemo(() => teams.find((tm) => tm.id === activeTeam), [teams, activeTeam]);
   const isSwarmTeam = selectedTeam?.mode === "swarm";
   const isWorkflowTeam = selectedTeam?.mode === "workflow";
   /** Generic single-agent: model + skill + connector pickers (no team, no named agent). */
@@ -1129,7 +1079,9 @@ export default function WorkZWorkspace({
           </button>
         </div>
         <div className="agentz-workz-tasklist">
-          {tasks.length === 0 && <div className="agentz-workz-tasks-empty">{t("agent.noTasks")}</div>}
+          {tasks.length === 0 && (
+            <div className="agentz-workz-tasks-empty">{t("agent.noTasks")}</div>
+          )}
           {tasks.map((task) => (
             <div
               key={task.id}
@@ -1198,77 +1150,92 @@ export default function WorkZWorkspace({
                 <div className="agentz-workz-feed-loading">{t("common.loading")}</div>
               )
             ) : (
-            <div className="agentz-workz-steps" ref={scrollRef}>
-          {steps.length === 0 && (
-            <div className="agentz-workz-empty">
-              <div className="agentz-workz-title">{t("agent.title")}</div>
-              <p className="agentz-workz-sub">
-                {t("agent.subtitle", {
-                  project: projectDir || t("agent.openProjectFallback"),
+              <div className="agentz-workz-steps" ref={scrollRef}>
+                {steps.length === 0 && (
+                  <div className="agentz-workz-empty">
+                    <div className="agentz-workz-title">{t("agent.title")}</div>
+                    <p className="agentz-workz-sub">
+                      {t("agent.subtitle", {
+                        project: projectDir || t("agent.openProjectFallback"),
+                      })}
+                    </p>
+                    {!projectDir && (
+                      <>
+                        <p className="agentz-workz-note">{t("agent.noProject")}</p>
+                        <button
+                          type="button"
+                          className="agentz-workz-open-folder"
+                          onClick={onOpenFolder}
+                        >
+                          {t("app.openFolder")}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+                {steps.map((m, i) => {
+                  const isStreamingLast = m.role === "assistant" && busy && i === steps.length - 1;
+                  return (
+                    <div key={m.id ?? `step-${i}`} className={`agentz-workz-msg ${m.role}`}>
+                      <div className="agentz-workz-msg-role">
+                        {m.role === "user" ? t("chat.you") : t("agent.role")}
+                      </div>
+                      <div className="agentz-workz-msg-body">
+                        {m.role === "assistant" && m.tools.length > 0 ? (
+                          interleaveTools(m.text, m.tools).map((seg, si) => (
+                            <div key={`seg-${si}`}>
+                              {seg.text && (
+                                <div className="agentz-workz-msg-bubble">
+                                  <Markdown content={seg.text} />
+                                </div>
+                              )}
+                              {seg.tools.length > 0 && <ToolTrace items={seg.tools} />}
+                            </div>
+                          ))
+                        ) : m.text ? (
+                          <div className="agentz-workz-msg-bubble">
+                            {m.role === "assistant" ? (
+                              <Markdown content={m.text} />
+                            ) : (
+                              <div className="agentz-workz-msg-text">{m.text}</div>
+                            )}
+                          </div>
+                        ) : isStreamingLast ? (
+                          <div className="agentz-workz-msg-bubble agentz-workz-msg-thinking">
+                            {t("agent.working")}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
                 })}
-              </p>
-              {!projectDir && (
-                <>
-                  <p className="agentz-workz-note">{t("agent.noProject")}</p>
-                  <button type="button" className="agentz-workz-open-folder" onClick={onOpenFolder}>
-                    {t("app.openFolder")}
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-          {steps.map((m, i) => {
-            const isStreamingLast = m.role === "assistant" && busy && i === steps.length - 1;
-            return (
-              <div key={m.id ?? `step-${i}`} className={`agentz-workz-msg ${m.role}`}>
-                <div className="agentz-workz-msg-role">
-                  {m.role === "user" ? t("chat.you") : t("agent.role")}
-                </div>
-                <div className="agentz-workz-msg-body">
-                  {m.text ? (
-                    <div className="agentz-workz-msg-bubble">
-                      {m.role === "assistant" ? (
-                        <Markdown content={m.text} />
-                      ) : (
-                        <div className="agentz-workz-msg-text">{m.text}</div>
-                      )}
+                {pendingCards.map((card) => (
+                  <div key={card.requestId} className="agentz-workz-msg assistant">
+                    <div className="agentz-workz-msg-role">{t("agent.role")}</div>
+                    <div className="agentz-workz-msg-body">
+                      <InteractiveCard
+                        requestId={card.requestId}
+                        uiDefinition={card.uiDefinition}
+                        listenOpen={card.listenOpen}
+                        wizardStepHint={card.wizardStepHint}
+                        onSubmitted={() => markSubmitted(card.requestId)}
+                        onActionSent={() => markActionSent(card.requestId)}
+                      />
                     </div>
-                  ) : isStreamingLast ? (
-                    <div className="agentz-workz-msg-bubble agentz-workz-msg-thinking">
-                      {t("agent.working")}
+                  </div>
+                ))}
+                {permissionRequest && (
+                  <div className="agentz-workz-msg assistant">
+                    <div className="agentz-workz-msg-role">{t("agent.role")}</div>
+                    <div className="agentz-workz-msg-body">
+                      <PermissionCard
+                        request={permissionRequest}
+                        onResolved={() => setPermissionRequest(null)}
+                      />
                     </div>
-                  ) : null}
-                </div>
+                  </div>
+                )}
               </div>
-            );
-          })}
-          {pendingCards.map((card) => (
-            <div key={card.requestId} className="agentz-workz-msg assistant">
-              <div className="agentz-workz-msg-role">{t("agent.role")}</div>
-              <div className="agentz-workz-msg-body">
-                <InteractiveCard
-                  requestId={card.requestId}
-                  uiDefinition={card.uiDefinition}
-                  listenOpen={card.listenOpen}
-                  wizardStepHint={card.wizardStepHint}
-                  onSubmitted={() => markSubmitted(card.requestId)}
-                  onActionSent={() => markActionSent(card.requestId)}
-                />
-              </div>
-            </div>
-          ))}
-          {permissionRequest && (
-            <div className="agentz-workz-msg assistant">
-              <div className="agentz-workz-msg-role">{t("agent.role")}</div>
-              <div className="agentz-workz-msg-body">
-                <PermissionCard
-                  request={permissionRequest}
-                  onResolved={() => setPermissionRequest(null)}
-                />
-              </div>
-            </div>
-          )}
-            </div>
             )}
           </div>
           {previewPath && projectDir && (
@@ -1286,13 +1253,9 @@ export default function WorkZWorkspace({
         <TaskPanel
           className="agentz-workz-task-panel"
           planItems={planItems}
-          toolSteps={toolSteps}
           busy={busy}
           open={taskPanelOpen}
           onOpenChange={setTaskPanelOpen}
-          tab={taskPanelTab}
-          onTabChange={setTaskPanelTab}
-          onToggleToolStep={toggleToolStep}
         />
 
         <div className="agentz-workz-isolate-bar">
@@ -1383,15 +1346,15 @@ export default function WorkZWorkspace({
               </button>
             )}
             {worktree && (
-                <button
-                  type="button"
-                  className="agentz-workz-review-btn"
-                  onClick={() => setReviewTask(worktree)}
-                  disabled={busy}
-                  title={worktree.branch}
-                >
-                  {t("agent.review")}
-                </button>
+              <button
+                type="button"
+                className="agentz-workz-review-btn"
+                onClick={() => setReviewTask(worktree)}
+                disabled={busy}
+                title={worktree.branch}
+              >
+                {t("agent.review")}
+              </button>
             )}
           </div>
         </div>
@@ -1496,7 +1459,11 @@ export default function WorkZWorkspace({
                   options: connectors.map((c) => ({
                     id: c.id,
                     label: `${c.icon ? `${c.icon} ` : ""}${c.name}`,
-                    hint: [c.category, c.authorized ? undefined : t("studio.connectorUnauthorized"), c.description]
+                    hint: [
+                      c.category,
+                      c.authorized ? undefined : t("studio.connectorUnauthorized"),
+                      c.description,
+                    ]
                       .filter(Boolean)
                       .join(" · "),
                   })),

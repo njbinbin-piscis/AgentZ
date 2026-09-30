@@ -1,0 +1,174 @@
+/* ── Inline tool trace (Cursor/Codex-style collapsible rows) ─────────── */
+
+.agentz-tool-trace {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 8px;
+  padding-left: 2px;
+  border-left: 2px solid var(--border, #2a2a38);
+}
+
+.agentz-tool-trace-row {
+  min-width: 0;
+}
+
+.agentz-tool-trace-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim, #9a9ab0);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  text-align: left;
+}
+
+.agentz-tool-trace-head:hover {
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text, #e8e8f0);
+}
+
+.agentz-tool-trace-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.agentz-tool-trace-row.is-done .agentz-tool-trace-status {
+  color: #4ade80;
+}
+
+.agentz-tool-trace-row.is-error .agentz-tool-trace-status {
+  color: #f87171;
+}
+
+.agentz-tool-trace-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(124, 106, 247, 0.25);
+  border-top-color: var(--accent, #7c6af7);
+  border-radius: 50%;
+  animation: agentz-tool-trace-spin 0.7s linear infinite;
+}
+
+@keyframes agentz-tool-trace-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.agentz-tool-trace-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.agentz-tool-trace-name {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--text, #e8e8f0);
+}
+
+.agentz-tool-trace-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono, ui-monospace, Consolas, monospace);
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.agentz-tool-trace-chevron {
+  flex-shrink: 0;
+  font-size: 9px;
+  opacity: 0.55;
+}
+
+.agentz-tool-trace-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 3px 0 6px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 8px;
+  background: var(--bg, #0e0e14);
+}
+
+.agentz-tool-trace-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.agentz-tool-trace-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim, #9a9ab0);
+}
+
+.agentz-tool-trace-label.is-error {
+  color: #f87171;
+}
+
+.agentz-tool-trace-pre {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  font-family: var(--mono, ui-monospace, Consolas, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agentz-tool-trace-pre.is-error {
+  color: #fca5a5;
+}
+
+.agentz-tool-trace-more {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--accent, #7c6af7);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.agentz-tool-trace-more:hover {
+  text-decoration: underline;
+}
+
+.agentz-tool-trace-preview {
+  margin: 0 0 2px 27px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono, ui-monospace, Consolas, monospace);
+  font-size: 11px;
+  color: var(--text-dim, #9a9ab0);
+  opacity: 0.6;
+}
+
+.agentz-tool-trace-preview.is-error {
+  color: #fca5a5;
+  opacity: 0.85;
+}

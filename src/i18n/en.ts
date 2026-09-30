@@ -28,7 +28,8 @@ const en = {
     fieldRole: "Role",
     fieldModel: "Model",
     modelDefault: "Default (global)",
-    modelProvidersHint: "Options come from Settings → Models → LLM Providers. Add at least one provider there to see more choices; leave empty to use the global default model.",
+    modelProvidersHint:
+      "Options come from Settings → Models → LLM Providers. Add at least one provider there to see more choices; leave empty to use the global default model.",
     fieldIcon: "Icon",
     fieldDescription: "Description",
     fieldSystemPrompt: "System prompt",
@@ -36,14 +37,17 @@ const en = {
     fieldSkills: "Skills",
     fieldMcp: "MCP servers",
     fieldTools: "Tools (allowlist)",
-    toolsHint: "Search and pick builtin tools to force-enable for this agent; leave empty for no extra restriction.",
+    toolsHint:
+      "Search and pick builtin tools to force-enable for this agent; leave empty for no extra restriction.",
     toolsSearchPlaceholder: "Search tools…",
     skillsSearchPlaceholder: "Search skills…",
-    skillsPickerHint: "Type to filter when you have many skills; selected items appear as removable tags.",
+    skillsPickerHint:
+      "Type to filter when you have many skills; selected items appear as removable tags.",
     mcpSearchPlaceholder: "Search MCP servers…",
     fieldConnectors: "Connectors (external APIs / services)",
     connectorsSearchPlaceholder: "Search connectors…",
-    connectorsHint: "Bind extra connectors for this agent; even if not globally enabled, authorized ones register their tools. API-kind connectors are already globally available.",
+    connectorsHint:
+      "Bind extra connectors for this agent; even if not globally enabled, authorized ones register their tools. API-kind connectors are already globally available.",
     connectorsEmpty: "No connectors installed yet — add them in Resource library → Connectors.",
     connectorUnauthorized: "Unauthorized",
     fieldWorkflow: "Workflow",
@@ -69,8 +73,10 @@ const en = {
     onError: "On error",
     onErrorFail: "Fail the run",
     onErrorSkip: "Skip and continue",
-    onErrorHint: "After retries are exhausted: abort the whole workflow, or write an empty output and advance to the next node.",
-    inspectorHint: "Select a node or edge to edit. Drag from a handle to connect; handles snap and highlight when close.",
+    onErrorHint:
+      "After retries are exhausted: abort the whole workflow, or write an empty output and advance to the next node.",
+    inspectorHint:
+      "Select a node or edge to edit. Drag from a handle to connect; handles snap and highlight when close.",
     nodeLabel: "Node label",
     agent: "Agent",
     promptTemplate: "Prompt template",
@@ -79,10 +85,12 @@ const en = {
     evalExpr: "Expression",
     evalLlm: "LLM judge",
     expr: "Expression",
-    exprHint: "Supports KEY == val / KEY != val / KEY contains val / KEY !contains val; yields true / false.",
+    exprHint:
+      "Supports KEY == val / KEY != val / KEY contains val / KEY !contains val; yields true / false.",
     classifierPrompt: "Classifier prompt",
     labels: "Labels (comma-separated)",
-    branchEdgeHint: "Edges out of this branch must carry a label matching one above; empty or 'default' is the fallback.",
+    branchEdgeHint:
+      "Edges out of this branch must carry a label matching one above; empty or 'default' is the fallback.",
     branchExprHint:
       "Expression mode: when the condition is true, follow the true edge; otherwise the false edge (set targets above).",
     branchExprEdgeHint:
@@ -105,7 +113,8 @@ const en = {
       useAdvanced: "Advanced: edit raw text",
       useBuilder: "Use builder",
       advancedPlaceholder: "review contains approved",
-      unknownKey: 'Key "{{key}}" is not in this graph\'s blackboard keys — check upstream output keys.',
+      unknownKey:
+        'Key "{{key}}" is not in this graph\'s blackboard keys — check upstream output keys.',
       op: {
         contains: "contains",
         not_contains: "does not contain",
@@ -116,7 +125,8 @@ const en = {
     },
     maxIterations: "Max iterations",
     exitWhen: "Exit-when condition (expression)",
-    loopEdgeHint: "Label the edge to the loop body 'body'; the other unlabeled edge is the exit path.",
+    loopEdgeHint:
+      "Label the edge to the loop body 'body'; the other unlabeled edge is the exit path.",
     humanPrompt: "Question for the user",
     edge: "Edge",
     edgeReconnectHint: "Drag either endpoint to reattach, or delete and redraw.",
@@ -208,7 +218,8 @@ const en = {
     title: "Resource library",
     subtitle: "Discover, manage, and compose skills, agents, teams, and connectors",
     cloudBase: "Official market source",
-    cloudBaseHint: "Official marketplace backend (theAgentOS). Dev builds default to http://localhost:8137.",
+    cloudBaseHint:
+      "Official marketplace backend (theAgentOS). Dev builds default to http://localhost:8137.",
     cat_skill: "Skills",
     cat_command: "Commands",
     cat_tool: "Tools",
@@ -246,7 +257,8 @@ const en = {
 
   projectTemplate: {
     title: "Project template",
-    subtitle: "This folder has no .agentz setup yet. Optionally apply a CodeBuddy rules/hooks template.",
+    subtitle:
+      "This folder has no .agentz setup yet. Optionally apply a CodeBuddy rules/hooks template.",
     none: "No templates available.",
     hint: "Templates write .agentz/rules and hooks.json only when absent (hooks default to disabled).",
     skip: "Skip",
@@ -273,7 +285,8 @@ const en = {
     kindApi: "HTTP API",
     apiNew: "+ New API connector",
     apiHide: "Hide API form",
-    apiHint: "Set the endpoint and API key; use-case and parameter docs are shown to the agent when choosing how to call the service.",
+    apiHint:
+      "Set the endpoint and API key; use-case and parameter docs are shown to the agent when choosing how to call the service.",
     apiPreset: "Scenario template",
     apiPresetCustom: "Custom",
     apiId: "ID (slug)",
@@ -328,7 +341,8 @@ const en = {
 
   assistantPanel: {
     title: "Assistant messages",
-    empty: "No IM assistant configured yet. Enable a channel (Feishu, WeCom, Telegram, …) under Settings · Message channels, then come back to see messages here.",
+    empty:
+      "No IM assistant configured yet. Enable a channel (Feishu, WeCom, Telegram, …) under Settings · Message channels, then come back to see messages here.",
     connect: "Connect",
     disconnect: "Disconnect",
     clear: "Clear history",
@@ -378,12 +392,14 @@ const en = {
     terminal: "Terminal",
     terminalNewTab: "New Terminal",
     terminalCloseTab: "Close Terminal",
-    terminalCloseTabConfirm: "Closing this terminal will stop any running programs (e.g. top, npm run dev). Continue?",
+    terminalCloseTabConfirm:
+      "Closing this terminal will stop any running programs (e.g. top, npm run dev). Continue?",
     terminalHidePanel: "Hide Terminal Panel",
     terminalNoProject: "Open a project folder to use the terminal.",
     terminalTab: "Terminal {{n}}",
     terminalNeedProject: "Open a project folder first",
-    terminalCloseProjectConfirm: "{{count}} terminal session(s) are active. Switching projects will terminate running processes. Continue?",
+    terminalCloseProjectConfirm:
+      "{{count}} terminal session(s) are active. Switching projects will terminate running processes. Continue?",
     terminalSendSelectionToChat: "Send to Chat",
     terminalSendSelectionShortcut: "Ctrl+Shift+L",
     refresh: "Refresh",
@@ -400,7 +416,7 @@ const en = {
     welcomeHint: "Use the file tree on the left to browse and open files.",
     openingFile: "Opening {{name}}…",
     fileErrorTitle: "Could not open file",
-    binaryFileError: "\"{{name}}\" is a binary file and cannot be opened in the editor.",
+    binaryFileError: '"{{name}}" is a binary file and cannot be opened in the editor.',
     viewSource: "Source",
     viewPreview: "Preview",
     openFile: "Open",
@@ -410,8 +426,8 @@ const en = {
     copyPath: "Copy Path",
     copyRelPath: "Copy Relative Path",
     revealInExplorer: "Reveal in File Manager",
-    confirmDeleteFile: "Delete file \"{{name}}\"?",
-    confirmDeleteFolder: "Delete folder \"{{name}}\" and all its contents?",
+    confirmDeleteFile: 'Delete file "{{name}}"?',
+    confirmDeleteFolder: 'Delete folder "{{name}}" and all its contents?',
     confirmDeleteMany: "Delete {{count}} items?",
     closeCurrent: "Close",
     closeOther: "Close Others",
@@ -435,7 +451,7 @@ const en = {
     unstageAll: "Unstage All",
     discard: "Discard Changes",
     discardAll: "Discard All Changes",
-    discardConfirm: "Discard changes to \"{{name}}\"?",
+    discardConfirm: 'Discard changes to "{{name}}"?',
     discardAllConfirm: "Discard all {{count}} changed file(s)?",
     openFileAction: "Open File",
     branches: "Branches",
@@ -446,7 +462,7 @@ const en = {
     checkoutDirtyWarn: "You have uncommitted changes that may be overwritten. Continue?",
     commitFailed: "Commit failed: {{error}}",
     gitIdentityHint:
-      "Git user.name / user.email is not configured. Run in a terminal:\n  git config --global user.name \"Your Name\"\n  git config --global user.email \"you@example.com\"",
+      'Git user.name / user.email is not configured. Run in a terminal:\n  git config --global user.name "Your Name"\n  git config --global user.email "you@example.com"',
     assistantBranches: "Assistant branches",
     noGitRepos: "No git repositories found in this folder.",
     unsavedConfirm: '"{{name}}" has unsaved changes. Close without saving?',
@@ -490,7 +506,8 @@ const en = {
     contextWindow: "Context window (input tokens)",
     contextWindowHint: "Input context limit. 0 = auto (inferred from the model).",
     maxIterations: "Agent maximum iterations",
-    maxIterationsHint: "Maximum model/tool iterations in one Agent task. Default: 200; the task stops safely at the limit.",
+    maxIterationsHint:
+      "Maximum model/tool iterations in one Agent task. Default: 200; the task stops safely at the limit.",
     policyMode: "Agent policy",
     policyStrict: "Strict (block risky operations)",
     policyBalanced: "Balanced (recommended)",
@@ -510,16 +527,19 @@ const en = {
     visionEnabled: "Enable vision (image input)",
     visionEnabledHint: "When enabled, multimodal models can understand attached images in chat.",
     llmProviders: "Multi-model profiles",
-    llmProvidersHint: "Configure named models for quick switching in chat. The global default above is used when none is selected.",
+    llmProvidersHint:
+      "Configure named models for quick switching in chat. The global default above is used when none is selected.",
     llmProviderAdd: "Add model",
     llmProviderEdit: "Edit model",
     llmProviderId: "ID (unique)",
     llmProviderLabel: "Display name",
     llmProviderMaxTokens: "Max output tokens (0 = inherit global)",
     flashModel: "Built-in small model",
-    flashModelHint: "When checked, this model becomes the global \"flash\" small model used by delegated sub-agents for lightweight, result-only tasks; otherwise sub-agents use the main model.",
+    flashModelHint:
+      'When checked, this model becomes the global "flash" small model used by delegated sub-agents for lightweight, result-only tasks; otherwise sub-agents use the main model.',
     mcpServers: "MCP servers",
-    mcpServersHint: "Configure Model Context Protocol servers; their tools are injected into Agent / chat.",
+    mcpServersHint:
+      "Configure Model Context Protocol servers; their tools are injected into Agent / chat.",
     mcpServerAdd: "Add MCP server",
     mcpName: "Name",
     mcpEnabled: "Enabled",
@@ -537,11 +557,12 @@ const en = {
     installedTitle: "Installed skills",
     installedHint:
       "Skills (SKILL.md) are installed in the global config dir and injected into the agent when a task matches.",
-    empty: "No skills installed yet. Go to Resource library → Skills · Discover to search SkillHub or ClawHub.",
+    empty:
+      "No skills installed yet. Go to Resource library → Skills · Discover to search SkillHub or ClawHub.",
     uninstall: "Uninstall",
     uninstallBlockedByAnonymousAgent:
-      "Delete anonymous agent \"{{agent}}\" before uninstalling this skill",
-    linkedAnonymousAgent: "Referenced by anonymous agent \"{{agent}}\"",
+      'Delete anonymous agent "{{agent}}" before uninstalling this skill',
+    linkedAnonymousAgent: 'Referenced by anonymous agent "{{agent}}"',
     marketTitle: "Skill marketplace",
     marketHint: "Search and install community skills. Leave empty to browse popular skills.",
     registryTabs: "Skill source",
@@ -569,7 +590,8 @@ const en = {
     unlock: "Unlock",
     reviewEnabled: "Background skill review after each turn",
     curatorTitle: "Curator maintenance",
-    curatorHint: "Stale drafts are marked and archived when idle. LLM merge combines near-duplicates.",
+    curatorHint:
+      "Stale drafts are marked and archived when idle. LLM merge combines near-duplicates.",
     curatorStats: "Draft {{draft}} · Learned {{learned}} · Archived {{archived}}",
     curatorDryRun: "Dry run",
     curatorRun: "Run curator",
@@ -616,7 +638,8 @@ const en = {
     title: "Extensions (VS Code .vsix)",
     nav: "Extensions",
     marketTitle: "VS Code Extension Marketplace (Open VSX)",
-    marketHint: "Search and install VS Code–compatible extensions. After installing, enable them below — the extension host starts automatically when a folder is open.",
+    marketHint:
+      "Search and install VS Code–compatible extensions. After installing, enable them below — the extension host starts automatically when a folder is open.",
     searchOpenVsx: "Search extensions (e.g. Python, ESLint)…",
     installVsix: "Install .vsix…",
     install: "Install",
@@ -630,7 +653,8 @@ const en = {
     importing: "Importing…",
     resetTheme: "Reset theme",
     themesSection: "Themes & snippets (import only)",
-    themesSectionHint: "Import a .vsix for editor color themes and snippets only — JavaScript is not executed.",
+    themesSectionHint:
+      "Import a .vsix for editor color themes and snippets only — JavaScript is not executed.",
     empty: "No theme/snippet packs imported yet.",
     themes: "Themes",
     applied: "✓ applied",
@@ -640,9 +664,11 @@ const en = {
     hostRunning: "Extension host running — click for output",
     hostStopped: "Extension host stopped",
     hostOff: "Extensions off",
-    hostOffHint: "Click to start the extension host; open the sidebar to install from Open VSX if none are enabled",
+    hostOffHint:
+      "Click to start the extension host; open the sidebar to install from Open VSX if none are enabled",
     hostStart: "Start host",
-    hostStartHint: "Manually start the extension host (use after switching projects if auto-start did not run)",
+    hostStartHint:
+      "Manually start the extension host (use after switching projects if auto-start did not run)",
     hostStarting: "Starting extension host…",
     hostStarted: "Extension host started",
     hostNoEnabled: "No enabled extensions — enable at least one below first",
@@ -674,8 +700,10 @@ const en = {
     checkpoint: "Checkpoint",
     checkpointFork: "Fork from here",
     checkpointRestore: "Restore here",
-    checkpointRestoreConfirm: "Restoring to this checkpoint will delete all messages after it. Continue?",
-    checkpointRestoreFiles: "Also revert the files the agent changed after this checkpoint? (OK = roll back files, Cancel = only delete messages)",
+    checkpointRestoreConfirm:
+      "Restoring to this checkpoint will delete all messages after it. Continue?",
+    checkpointRestoreFiles:
+      "Also revert the files the agent changed after this checkpoint? (OK = roll back files, Cancel = only delete messages)",
     mentionCodebase: "Search the whole codebase for relevant code",
     mentionGraph: "Search module/file dependencies (knowledge graph)",
     reviewChanges: "{{count}} file(s) changed this turn",
@@ -686,14 +714,18 @@ const en = {
     noSessions: "No sessions yet.",
     untitled: "Untitled",
     delete: "Delete",
-    empty: "Ask about the codebase or request a change. Reference files with @path/to/file. The agent edits files in place; the editor reloads automatically.",
-    placeholder: "Ask AgentZ… (@file for context; Enter send, Shift+Enter newline, ↑↓ recall history)",
+    empty:
+      "Ask about the codebase or request a change. Reference files with @path/to/file. The agent edits files in place; the editor reloads automatically.",
+    placeholder:
+      "Ask AgentZ… (@file for context; Enter send, Shift+Enter newline, ↑↓ recall history)",
     placeholderFollowUp: "Add a follow-up… (Enter send, Shift+Enter newline, ↑↓ recall history)",
-    placeholderPlan: "Describe the task — Plan mode explores and builds a todo list… (Enter send, Shift+Enter newline, ↑↓ recall history)",
+    placeholderPlan:
+      "Describe the task — Plan mode explores and builds a todo list… (Enter send, Shift+Enter newline, ↑↓ recall history)",
     send: "Send",
     stop: "Stop",
     thinking: "Thinking…",
-    llmBalanceError: "LLM account balance insufficient (402). Change the model in Settings or add credits, then retry.",
+    llmBalanceError:
+      "LLM account balance insufficient (402). Change the model in Settings or add credits, then retry.",
     queued: "Queued",
     you: "You",
     agentRole: "Agent",
@@ -705,14 +737,16 @@ const en = {
     modeAgentHint: "Agent mode: read/write files and run commands",
     modePlanHint: "Plan mode: brainstorm → write plan to .agentz/plans/ only",
     planSuggestCountdown: "Continuing in Agent mode in {{seconds}}s",
-    planBuildPrompt: "Execute the plan at {{path}} step by step; update the plan file and capture verification evidence.",
+    planBuildPrompt:
+      "Execute the plan at {{path}} step by step; update the plan file and capture verification evidence.",
     modelDefault: "Default (global settings)",
     attachFile: "Attach file",
     removeAttachment: "Remove attachment",
     attachment: "Attachment",
     dropToAttach: "Drop file to attach",
     dropToAddRefs: "Drop files to add references",
-    visionRequired: "The current model does not support images. Enable vision in Settings or switch to a multimodal model.",
+    visionRequired:
+      "The current model does not support images. Enable vision in Settings or switch to a multimodal model.",
     chipTerminal: "Terminal",
     chipTerminalLines: "Terminal · {{count}} lines",
     chipTerminalSelection: "Terminal · selection",
@@ -731,12 +765,16 @@ const en = {
     taskPanel: "Task panel",
     agentWorking: "Working…",
     agentSteps: "{{count}} steps",
+    autoContinuePrompt:
+      "The previous turn was interrupted by the time limit. Do not wait for the user — resume the unfinished work: review the items still open in plan_todo, continue them, and update their status. If nothing remains, state the conclusion briefly.",
+    autoContinueLabel: "(auto-continuing after timeout)",
     planPending: "Pending",
     planInProgress: "In progress",
     planCompleted: "Completed",
     planCancelled: "Cancelled",
     planResumeTitle: "Unfinished tasks exist",
-    planResumeMessage: "There are {{count}} unfinished tasks. Continue or clear the plan and start fresh?",
+    planResumeMessage:
+      "There are {{count}} unfinished tasks. Continue or clear the plan and start fresh?",
     planResumeContinue: "Continue unfinished tasks",
     planResumeClear: "Clear and start fresh",
     planResumeCancelSend: "Cancel",
@@ -787,7 +825,8 @@ const en = {
     untitled: "Untitled task",
     deleteTask: "Delete task",
     title: "WorkZ",
-    subtitle: "Describe a goal. WorkZ plans, edits files, and runs tools in {{project}} — review changes and artifacts in the top-right panel.",
+    subtitle:
+      "Describe a goal. WorkZ plans, edits files, and runs tools in {{project}} — review changes and artifacts in the top-right panel.",
     noProject: "Open a project folder to start.",
     openProjectFallback: "the open project",
     goal: "Goal",
@@ -825,12 +864,16 @@ const en = {
     team: "Team",
     teamNone: "Single agent",
     modeLocked: "This task is bound to its mode. Start a new task to switch team or agent.",
-    teamHint: "With a team selected, the coordinator dispatches work to member assistants via collaboration-pool tools",
-    teamHintSwarm: "Swarm team: the main agent coordinates, splitting work to member assistants via collaboration-pool tools and integrating results.",
-    teamHintWorkflow: "Workflow team: runs your designed graph deterministically, node by node with each node's agent — no coordinator.",
+    teamHint:
+      "With a team selected, the coordinator dispatches work to member assistants via collaboration-pool tools",
+    teamHintSwarm:
+      "Swarm team: the main agent coordinates, splitting work to member assistants via collaboration-pool tools and integrating results.",
+    teamHintWorkflow:
+      "Workflow team: runs your designed graph deterministically, node by node with each node's agent — no coordinator.",
     agentLabel: "Agent",
     agentGeneric: "Generic agent",
-    agentHint: "Single-agent mode: pick a configured agent to run with its prompt + skills + tools + connectors; the generic agent can pick model, skills, and connectors below the input (manage them in Resource library).",
+    agentHint:
+      "Single-agent mode: pick a configured agent to run with its prompt + skills + tools + connectors; the generic agent can pick model, skills, and connectors below the input (manage them in Resource library).",
     modelSwarmTeam:
       "Swarm team: the coordinator and member assistants use their bound models — model selection is disabled here.",
     modelWorkflowTeam:
@@ -871,11 +914,13 @@ const en = {
     graphBreadcrumbFiles: "Files",
     graphExpandCluster: "Expand subdirs",
     graphDrillFiles: "File dependency graph",
-    graphFocusHint: "Click a directory to highlight upstream/downstream; double-click to drill; use detail panel for file graph",
+    graphFocusHint:
+      "Click a directory to highlight upstream/downstream; double-click to drill; use detail panel for file graph",
     graphClusterEdges: "cross-dir imports",
     graphShowAllClusters: "Show all directories",
     graphNoImports: "No import edges found — refresh to rebuild the graph",
-    graphModuleArchHint: "No cross-module imports at top level — switch to Structure view for directory dependencies",
+    graphModuleArchHint:
+      "No cross-module imports at top level — switch to Structure view for directory dependencies",
     graphViewLayer: "Layer view",
     graphViewDomain: "Domain view",
     graphDomainTitle: "Inferred domains",
@@ -885,8 +930,10 @@ const en = {
     graphPersonaJunior: "Junior dev",
     graphPersonaPm: "PM",
     graphPersonaPower: "Power user",
-    graphSelectNodeJunior: "Click a directory or file to see dependencies; double-click to drill; or ask Agent with @graph",
-    graphJuniorHint: "Layers: api = entrypoints, service = logic, data = storage, ui = presentation.",
+    graphSelectNodeJunior:
+      "Click a directory or file to see dependencies; double-click to drill; or ask Agent with @graph",
+    graphJuniorHint:
+      "Layers: api = entrypoints, service = logic, data = storage, ui = presentation.",
     graphModuleDomain: "Domain: {{domain}}",
     graphDomainModules: "Modules in this domain",
     graphSelectModuleInDomain: "Click a module on the graph or pick one below",
@@ -898,8 +945,7 @@ const en = {
     graphTourNext: "Next",
     graphRefresh: "Refresh",
     graphClearDiff: "Clear impact overlay",
-    graphDiffBanner:
-      "Changes {{base}}…{{head}}: {{changed}} files, {{impacted}} nodes impacted",
+    graphDiffBanner: "Changes {{base}}…{{head}}: {{changed}} files, {{impacted}} nodes impacted",
     graphSelectNode: "Click a node for details",
     graphInDegree: "Cross-module in-degree",
     graphInternalImports: "Internal import edges",
@@ -971,7 +1017,7 @@ const en = {
     empty: "Enter keywords or browse popular skills.",
     install: "Install",
     installing: "Installing…",
-    installSuccess: "Installed \"{{name}}\"",
+    installSuccess: 'Installed "{{name}}"',
   },
 };
 

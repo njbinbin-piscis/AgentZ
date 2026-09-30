@@ -1,55 +1,7 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { PlanTodoItem } from "../services/tauri/chat";
-import { toolIcon, toolSummary } from "./toolDisplay";
 import "./TaskPanel.css";
-
-export interface ToolStep {
-  id: string;
-  name: string;
-  input: unknown;
-  completed: boolean;
-  expanded: boolean;
-  result?: string;
-  isError?: boolean;
-}
-
-/**
- * Tool output is retained by the agent/session store, but never keep an
- * unbounded duplicate in React state. A single verbose command previously
- * allocated enough WebKit memory to kill the renderer.
- */
-export const MAX_TOOL_RESULT_CHARS = 64 * 1024;
-
-export function truncateToolResultForUi(result: string): string {
-  if (result.length <= MAX_TOOL_RESULT_CHARS) return result;
-  const head = Math.floor(MAX_TOOL_RESULT_CHARS * 0.75);
-  const tail = MAX_TOOL_RESULT_CHARS - head;
-  return `${result.slice(0, head)}\n\n… [UI output truncated: ${result.length.toLocaleString()} characters total] …\n\n${result.slice(-tail)}`;
-}
-
-/** Insert or refresh a tool step when `tool_start` arrives (events may repeat). */
-export function upsertToolStep(
-  prev: ToolStep[],
-  evt: Pick<ToolStep, "id" | "name" | "input">,
-): ToolStep[] {
-  const idx = prev.findIndex((s) => s.id === evt.id);
-  if (idx >= 0) {
-    const next = prev.slice();
-    next[idx] = { ...next[idx], name: evt.name, input: evt.input };
-    return next;
-  }
-  return [
-    ...prev,
-    {
-      id: evt.id,
-      name: evt.name,
-      input: evt.input,
-      completed: false,
-      expanded: false,
-    },
-  ];
-}
 
 export function mergePlanItems(existing: PlanTodoItem[], updates: PlanTodoItem[]): PlanTodoItem[] {
   const merged = existing.slice();
@@ -115,107 +67,24 @@ export function PlanPanel({ items }: { items: PlanTodoItem[] }) {
   );
 }
 
-export function ToolStepCard({
-  step,
-  onToggle,
-}: {
-  step: ToolStep;
-  onToggle: () => void;
-}) {
-  const { t } = useTranslation();
-  const maxResultLen = 400;
-  const result = step.result ?? "";
-  const truncated = result.length > maxResultLen;
-  const [showFull, setShowFull] = useState(false);
-  const statusClass = !step.completed ? "step-running" : step.isError ? "step-error" : "step-ok";
-
-  return (
-    <div className={`agentz-tool-step-card ${statusClass}`}>
-      <button type="button" className="agentz-tool-step-header" onClick={onToggle} aria-expanded={step.expanded}>
-        <span className="agentz-tool-step-icon">{toolIcon(step.name)}</span>
-        <span className="agentz-tool-step-name">{step.name}</span>
-        <span className="agentz-tool-step-summary">{toolSummary(step.name, step.input)}</span>
-        <span className={`agentz-tool-step-status ${statusClass}`}>
-          {!step.completed ? (
-            <span className="agentz-step-spinner" aria-label="running" />
-          ) : step.isError ? (
-            "✕"
-          ) : (
-            "✓"
-          )}
-        </span>
-        <span className="agentz-tool-step-chevron">{step.expanded ? "▲" : "▼"}</span>
-      </button>
-      {step.expanded && (
-        <div className="agentz-tool-step-body">
-          <div className="agentz-tool-step-section">
-            <span className="agentz-tool-step-section-label">{t("chat.toolStepInput")}</span>
-            <pre className="agentz-tool-step-pre">
-              {typeof step.input === "string" ? step.input : JSON.stringify(step.input, null, 2)}
-            </pre>
-          </div>
-          {step.completed && (
-            <div className="agentz-tool-step-section">
-              <span className={`agentz-tool-step-section-label ${step.isError ? "label-error" : ""}`}>
-                {step.isError ? t("chat.toolStepError") : t("chat.toolStepOutput")}
-              </span>
-              <pre className={`agentz-tool-step-pre ${step.isError ? "pre-error" : ""}`}>
-                {showFull || !truncated ? result : `${result.slice(0, maxResultLen)}…`}
-              </pre>
-              {truncated && (
-                <button
-                  type="button"
-                  className="agentz-tool-step-show-more"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowFull((v) => !v);
-                  }}
-                >
-                  {showFull ? t("chat.toolStepShowLess") : t("chat.toolStepShowMore")}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export interface TaskPanelProps {
   planItems: PlanTodoItem[];
-  toolSteps: ToolStep[];
   busy: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tab: "todo" | "tools";
-  onTabChange: (tab: "todo" | "tools") => void;
-  onToggleToolStep: (id: string) => void;
   /** Extra class for layout tweaks (e.g. agent vs IDE spacing). */
   className?: string;
 }
 
-function TaskPanel({
-  planItems,
-  toolSteps,
-  busy,
-  open,
-  onOpenChange,
-  tab,
-  onTabChange,
-  onToggleToolStep,
-  className,
-}: TaskPanelProps) {
+/**
+ * Collapsible Todo panel. Tool calls render inline in the message stream
+ * (see {@link ToolTrace}), so this panel is purely the task plan: it hides
+ * when there is no plan and never auto-expands.
+ */
+function TaskPanel({ planItems, busy, open, onOpenChange, className }: TaskPanelProps) {
   const { t } = useTranslation();
-  const toolsScrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!busy || tab !== "tools") return;
-    const el = toolsScrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [toolSteps, busy, tab]);
-
-  if (planItems.length === 0 && toolSteps.length === 0) return null;
+  if (planItems.length === 0) return null;
 
   return (
     <div className={`agentz-task-panel${className ? ` ${className}` : ""}`}>
@@ -227,53 +96,15 @@ function TaskPanel({
       >
         <div className="agentz-task-panel-title">
           <span className="agentz-task-panel-label">{t("chat.taskPanel")}</span>
-          {planItems.length > 0 && (
-            <span className="agentz-task-badge">
-              Todo · {busy ? t("chat.planWorking", { count: planItems.length }) : planItems.length}
-            </span>
-          )}
-          {toolSteps.length > 0 && (
-            <span className="agentz-task-badge">
-              Tools · {busy ? t("chat.agentWorking") : t("chat.agentSteps", { count: toolSteps.length })}
-            </span>
-          )}
+          <span className="agentz-task-badge">
+            Todo · {busy ? t("chat.planWorking", { count: planItems.length }) : planItems.length}
+          </span>
         </div>
         <span className="agentz-task-chevron">{open ? "▲" : "▼"}</span>
       </button>
       {open && (
         <div className="agentz-task-panel-body">
-          <div className="agentz-task-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              className={`agentz-task-tab ${tab === "todo" ? "active" : ""}`}
-              onClick={() => onTabChange("todo")}
-              disabled={planItems.length === 0}
-            >
-              Todo
-              {planItems.length > 0 && <span className="agentz-task-tab-count">{planItems.length}</span>}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              className={`agentz-task-tab ${tab === "tools" ? "active" : ""}`}
-              onClick={() => onTabChange("tools")}
-              disabled={toolSteps.length === 0}
-            >
-              Tools
-              {toolSteps.length > 0 && <span className="agentz-task-tab-count">{toolSteps.length}</span>}
-            </button>
-          </div>
-          <div className="agentz-task-panel-content">
-            {tab === "todo" && planItems.length > 0 && <PlanPanel items={planItems} />}
-            {tab === "tools" && toolSteps.length > 0 && (
-              <div className="agentz-tool-steps-scroll" ref={toolsScrollRef}>
-                {toolSteps.map((step) => (
-                  <ToolStepCard key={step.id} step={step} onToggle={() => onToggleToolStep(step.id)} />
-                ))}
-              </div>
-            )}
-          </div>
+          <PlanPanel items={planItems} />
         </div>
       )}
     </div>

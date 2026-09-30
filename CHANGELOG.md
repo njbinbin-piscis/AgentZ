@@ -5,6 +5,22 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.9] - 2026-10-01
+
+### Fixed
+
+- **Streaming**: every token rendered twice because an `onChatEvent` subscription leaked when its effect was cleaned up before the listener registered; subscriptions are now disposal-safe.
+- **Layout**: raising the UI font scale left blank strips on the right/bottom (percent size was divided by the zoom factor).
+- **Interrupted turns**: a reply streaming when an error/timeout/stop hit is now persisted, tool calls and results are rebuilt from history, and the session id is adopted from events so the next message no longer starts a new session.
+- **Toasts**: the always-empty capsule at the bottom (exit/settings toast) now shows its text; stuck toasts in CodeZ/WorkZ are cleared by a single timer.
+- **Turn timeout**: no longer a hard failure; partial output and open todos are kept and the turn auto-resumes (max 2).
+- **Interactive cards**: a pending `chat_ui` card no longer leaks into a new/switched session.
+
+### Changed
+
+- **Tool calls** are shown inline, interleaved with the reply text, with a grey one-line result preview; persisted history keeps the tool trace.
+- **Session restore** loads newest-first in pages, opens on the latest message and lazy-loads older messages on scroll-up.
+
 ## [0.6.8] - 2026-09-29
 
 ### Performance

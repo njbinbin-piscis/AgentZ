@@ -102,6 +102,7 @@ export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoard
   // over the shared chat channel keyed by `koi_task_{owner}_{todo8}`.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     onChatEvent((env: ChatEventEnvelope) => {
       if (env.channel !== "agent_event") return;
       if (!env.sessionId || !env.sessionId.startsWith("koi_task_")) return;
@@ -123,9 +124,13 @@ export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoard
         };
       });
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []);
 
   const memberName = useCallback(

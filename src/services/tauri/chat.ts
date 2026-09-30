@@ -158,10 +158,22 @@ export interface SessionMeta {
   pool_id?: string | null;
 }
 
+export interface ToolDto {
+  id: string;
+  name: string;
+  input: unknown;
+  result: string | null;
+  is_error: boolean;
+  /** Chars of bubble text preceding this call (interleave position). */
+  text_offset: number;
+}
+
 export interface MessageDto {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** Persisted tool calls for this bubble (assistant only). */
+  tools?: ToolDto[];
 }
 
 export function listSessions(
@@ -173,6 +185,29 @@ export function listSessions(
     projectDir,
     sources: sources && sources.length > 0 ? sources : null,
     teamId: teamId?.trim() ? teamId : null,
+  });
+}
+
+export interface MessagePageDto {
+  /** Chronological within the page (oldest → newest). */
+  messages: MessageDto[];
+  /** Pass back as `offset` to fetch the next-older page. */
+  next_offset: number;
+  has_more: boolean;
+}
+
+/** Newest-first paging: `offset` = raw rows already loaded from the newest end. */
+export function getMessagesPage(
+  sessionId: string,
+  projectDir: string,
+  offset = 0,
+  limit?: number,
+): Promise<MessagePageDto> {
+  return invoke<MessagePageDto>("chat_get_messages_page", {
+    sessionId,
+    projectDir,
+    offset,
+    limit: limit ?? null,
   });
 }
 
