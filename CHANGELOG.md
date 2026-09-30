@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Engine**: upgrade `piscis-engine` to v0.8.64 (RobotZ v0.1.8). Fixes DeepSeek `tool_call_ids did not have response messages` for parallel tool calls, makes `file_edit` tolerate CRLF/LF mismatches in multi-line edits, and broadens DeepSeek thinking-mode detection.
 - **Tool calls** are shown inline, interleaved with the reply text, with a grey one-line result preview; persisted history keeps the tool trace.
 - **Session restore** loads newest-first in pages, opens on the latest message and lazy-loads older messages on scroll-up.
 

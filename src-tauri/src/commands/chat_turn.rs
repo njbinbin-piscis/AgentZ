@@ -2231,7 +2231,7 @@ pub async fn run_agentz_turn(
                 AgentEvent::ToolStart { .. } | AgentEvent::TextSegmentStart { .. } => {
                     tail.clear();
                 }
-                AgentEvent::Error { message } => {
+                AgentEvent::Error { message, .. } => {
                     errored = Some(message);
                     break;
                 }
