@@ -11,6 +11,7 @@ import {
   type LayoutSnapshot,
   type WorkspaceSnapshot,
 } from "./services/tauri/workspace";
+import { CodeMapPanel } from "./workspaces/codez/CodeMap";
 import { generateRepoWiki } from "./services/tauri/repoWiki";
 import {
   graphIndexVisualState,
@@ -107,6 +108,7 @@ export default function App() {
   const [wikiBuildAction, setWikiBuildAction] = useState<WikiBuildAction>("overview");
   const [wikiBusy, setWikiBusy] = useState(false);
   const [wikiMenuOpen, setWikiMenuOpen] = useState(false);
+  const [codeMapOpen, setCodeMapOpen] = useState(false);
   const [graphIndexRefreshNonce, setGraphIndexRefreshNonce] = useState(0);
   const wikiMenuRef = useRef<HTMLDivElement>(null);
   const graphIndexStatus = useGraphIndexStatus(projectDir, graphIndexRefreshNonce);
@@ -677,6 +679,17 @@ export default function App() {
                 <button
                   type="button"
                   role="menuitem"
+                  onClick={() => {
+                    setWikiMenuOpen(false);
+                    setCodeMapOpen(true);
+                  }}
+                >
+                  {t("agent.codeMapOpen")}
+                  <span>{t("agent.codeMapOpenHint")}</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
                   onClick={() => handleWikiAction("overview")}
                 >
                   {t("agent.repoWikiOverview")}
@@ -791,6 +804,26 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {codeMapOpen && projectDir && (
+        <CodeMapPanel
+          projectDir={projectDir}
+          onClose={() => setCodeMapOpen(false)}
+          onOpenFile={(rel) => {
+            setCodeMapOpen(false);
+            setMode("codez");
+            setIdeWikiOpenPath({
+              path: `${projectDir.replace(/[\\/]+$/, "")}/${rel}`,
+              nonce: Date.now(),
+            });
+          }}
+          onAskAgent={(rel) => {
+            setCodeMapOpen(false);
+            setMode("codez");
+            handleSendToChat([`${projectDir.replace(/[\\/]+$/, "")}/${rel}`]);
+          }}
+        />
+      )}
 
       <main className="agentz-main">
         <div className="agentz-pane" hidden={mode !== "codez"}>
