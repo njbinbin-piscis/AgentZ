@@ -5,6 +5,22 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-10-01
+
+### Added
+
+- **WorkZ projects and sessions**: the sidebar is organized as Projects (directory or repository) -> sessions, plus "Sessions without project". Add or remove projects from the sidebar; projects opened in CodeZ are registered automatically.
+- **Plain sessions work without opening a folder**: they run in a default working directory (configurable in Settings, falls back to a `workspace` folder in the app data directory). The Composer has a working-directory picker (default, recent, choose folder); the choice is remembered per session.
+- Settings: default working directory and the list of registered projects.
+
+### Fixed
+
+- Light theme: Markdown code blocks no longer render as black on black (themed code background and a light highlight.js palette).
+
+### Known limitations
+
+- Plain sessions have no worktree isolation and no repo Wiki; the agent journal for them is written under the chosen working directory.
+
 ## [0.6.11] - 2026-10-01
 
 ### Added

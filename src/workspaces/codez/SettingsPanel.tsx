@@ -17,6 +17,7 @@ import ExtensionsManager from "./ExtensionsManager";
 import AssistantsTab from "./settings/AssistantsTab";
 import RulesTab from "./settings/RulesTab";
 import HooksTab from "./settings/HooksTab";
+import WorkzDirSection from "./settings/WorkzDirSection";
 import DropdownSelect from "../../components/DropdownSelect";
 import "./SettingsPanel.css";
 
@@ -337,6 +338,8 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                   />
                 </div>
               </section>
+
+              <WorkzDirSection />
 
               <div className="agentz-settings-status">
                 <span

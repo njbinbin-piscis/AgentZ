@@ -813,3 +813,16 @@ Fixed in the local `piscis-engine` clone (`C:\Projects\piscis-engine`, commit `a
 - New: Code map panel and `symbol_search` / `impact` tools (name-based call
   resolution, so common names may over-approximate). Not yet verified in the
   running desktop app; covered by unit tests and an index-this-repo test.
+
+---
+
+## Fix batch 9 (2026-10-01) — WorkZ projects/sessions, light-theme code blocks
+
+- Markdown code blocks were black on black in the light theme (hard-coded dark
+  background plus the dark-only highlight.js palette): fixed with theme variables
+  `--code-bg` / `--code-border` and light overrides in `components/hljs-light.css`.
+- WorkZ no longer requires an open folder. Plain sessions are stored in an internal
+  `free-sessions` project folder under the config dir; their working directory is a
+  per-session setting (`cwd` in the session state frame).
+- Limitations: plain sessions cannot use worktree isolation or the repo Wiki; teams
+  still bind to the scope's database. Not verified in the running desktop app.
