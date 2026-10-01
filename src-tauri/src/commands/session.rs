@@ -530,7 +530,7 @@ pub async fn chat_get_messages_page(
         let mut has_more = fetched == limit;
         if has_more {
             if let Ok(Some(sess)) = db.get_session(&session_id) {
-                has_more = offset + fetched < sess.message_count as i64;
+                has_more = offset + fetched < sess.message_count;
             }
         }
         if has_more {
