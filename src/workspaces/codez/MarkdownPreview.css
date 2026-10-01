@@ -57,15 +57,15 @@
   padding: 14px 16px;
   border-radius: 8px;
   overflow-x: auto;
-  background: #0d1117 !important;
-  border: 1px solid var(--border, #2a2a38);
+  background: var(--code-bg, #0d1117) !important;
+  border: 1px solid var(--code-border, #2a2a38);
   font-size: 13px;
 }
 
 .agentz-md-inline-code {
   padding: 0.15em 0.4em;
   border-radius: 4px;
-  background: var(--bg-tertiary, #242430);
+  background: var(--inline-code-bg, #242430);
   font-family: var(--font-mono, Consolas, monospace);
   font-size: 0.9em;
 }

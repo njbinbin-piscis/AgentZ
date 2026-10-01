@@ -63,8 +63,8 @@
 
 .agentz-codeblock pre {
   margin: 0;
-  background: #0c0c12;
-  border: 1px solid var(--border, #2a2a38);
+  background: var(--code-bg, #0c0c12);
+  border: 1px solid var(--code-border, #2a2a38);
   border-radius: 8px;
   padding: 12px;
   overflow-x: auto;

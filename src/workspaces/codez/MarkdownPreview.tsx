@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { loadMermaid, sanitizeMermaidSvg } from "./mermaidSafe";
 import "highlight.js/styles/github-dark.css";
+import "../../components/hljs-light.css";
 import "./MarkdownPreview.css";
 
 interface MarkdownPreviewProps {

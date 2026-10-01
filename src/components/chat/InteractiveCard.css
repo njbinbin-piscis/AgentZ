@@ -138,7 +138,7 @@
   padding: 10px;
   font-size: 12px;
   overflow-x: auto;
-  background: #0d0d14;
+  background: var(--code-bg, #0d0d14);
 }
 
 .ic-progress-track {

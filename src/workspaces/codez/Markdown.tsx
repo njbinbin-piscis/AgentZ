@@ -18,6 +18,7 @@ import { unified } from "unified";
 import rehypeParse from "rehype-parse";
 import rehypeStringify from "rehype-stringify";
 import "highlight.js/styles/github-dark.css";
+import "../../components/hljs-light.css";
 import "katex/dist/katex.min.css";
 import "./Markdown.css";
 import { loadMermaid, sanitizeMermaidSvg } from "./mermaidSafe";

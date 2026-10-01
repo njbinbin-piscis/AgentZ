@@ -29,6 +29,9 @@
   --scrollbar-thumb: #3a3a50;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Cascadia Code", "Fira Code", Consolas, monospace;
+  --code-bg: #0d1117;
+  --code-border: #2a2a38;
+  --inline-code-bg: #242430;
 
   color-scheme: dark;
 }
@@ -55,6 +58,9 @@
   --sidebar-bg: #f0f0f6;
   --sidebar-border: #d8d8e4;
   --scrollbar-thumb: #b8b8cc;
+  --code-bg: #f6f8fa;
+  --code-border: #d0d7de;
+  --inline-code-bg: #e8e8f0;
 
   color-scheme: light;
 }
