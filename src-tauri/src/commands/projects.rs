@@ -109,7 +109,7 @@ fn touch_project(store: &mut Store, path: &str, now: i64) {
         path: path.trim().trim_end_matches(['/', '\\']).to_string(),
         last_opened: now,
     });
-    store.projects.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
+    store.projects.sort_by_key(|p| std::cmp::Reverse(p.last_opened));
     store.projects.truncate(MAX_PROJECTS);
 }
 
@@ -157,7 +157,7 @@ fn view_of(store: &Store) -> Vec<ProjectView> {
             }
         })
         .collect();
-    out.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
+    out.sort_by_key(|p| std::cmp::Reverse(p.last_opened));
     out
 }
 
