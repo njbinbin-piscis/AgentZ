@@ -805,6 +805,14 @@ const zh = {
     removeFromQueue: "从队列中移除",
   },
 
+  appChanges: {
+    title: "Agent 配置变更记录",
+    hint: "Agent 通过 app_control 修改的设置、助手与团队。可一键回滚；密钥类字段不会被 Agent 修改。",
+    empty: "暂无变更",
+    rollback: "回滚",
+    rolledBack: "已回滚",
+    confirmRollback: "确定回滚这条变更吗？",
+  },
   workz: {
     projects: "项目",
     addProject: "添加",

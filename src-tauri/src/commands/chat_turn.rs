@@ -979,6 +979,8 @@ fn build_tool_registry(
     // runtime + event sink) so `pool_org` / `pool_chat` register and team
     // (Pool) collaboration can fan out to member Koi. Sub-agent / plan
     // registries pass `enable_pool = false` to avoid recursion.
+    let devenv_sink = event_sink.clone();
+    let devenv_plan = plan_store.clone();
     let (subagent_runtime, pool_event_sink) = if enable_pool {
         let (rt, sink) = crate::runtime::koi::pool_wiring(&app);
         (Some(rt), Some(sink))
@@ -1084,6 +1086,10 @@ fn build_tool_registry(
                     terminals: app.state::<crate::state::AppState>().terminals.clone(),
                 }));
             }
+            registry.register(Box::new(crate::tools::devenv::DevEnvTool {
+                plan_store: devenv_plan,
+                event_sink: devenv_sink,
+            }));
             // App self-management: update settings, create assistants & teams.
             registry.register(Box::new(crate::tools::app_control::AppControlTool { app }));
             if enable_skill_manage {
@@ -2081,6 +2087,17 @@ pub async fn run_agentz_turn(
         extra_sections.push(agent_active_plan_context(&plan_path, Some(&excerpt)));
     }
     if chat_mode == "agent" {
+        if let Some(hint) = crate::commands::devenv::context_for_turn(
+            std::path::Path::new(&workspace_root),
+            &session_id,
+            &plan_store,
+            &event_sink,
+            prefer_zh,
+        )
+        .await
+        {
+            extra_sections.push(hint);
+        }
         let retained_todos = {
             let plans = plan_store.lock().await;
             plans.get(&session_id).cloned().unwrap_or_default()

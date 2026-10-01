@@ -2,6 +2,8 @@
 
 pub mod api_connector;
 pub mod app_control;
+pub mod devenv;
+pub mod settings_catalog;
 pub mod call_fish;
 pub mod chat_ui;
 pub mod chat_ui_listen;

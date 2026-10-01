@@ -832,6 +832,14 @@ const en = {
     removeFromQueue: "Remove from queue",
   },
 
+  appChanges: {
+    title: "Agent change log",
+    hint: "Settings, assistants and teams changed by the agent via app_control. Each change can be rolled back; secrets are never modifiable by the agent.",
+    empty: "No changes yet",
+    rollback: "Roll back",
+    rolledBack: "Rolled back",
+    confirmRollback: "Roll back this change?",
+  },
   workz: {
     projects: "Projects",
     addProject: "Add",

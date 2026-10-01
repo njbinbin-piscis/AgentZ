@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-10-02
+
+### Added
+
+- Dev environment clues: on an agent turn the project is scanned (Rust, Node/TS, Python, Go, Java/Kotlin, .NET, C/C++, Tauri, PHP, Ruby, Dart/Flutter) and missing or outdated toolchains are injected as an implicit `devenv-setup` todo plus a system-prompt hint. The agent configures them via `shell` (user confirms) and settles the todo with the new `devenv` tool (`check` / `resolve` / `dismiss`; dismissals persist in `.agentz/devenv.json`).
+- `app_control` is now a tiered, audited settings tool: `describe_settings`, free / privileged / locked fields (secrets and authorization switches are locked; safety, harness and routing fields prompt every time), field-level diffs, `append_instructions` (append-only), assistant/team `get` / `update` / `delete`, `list_changes` and `rollback`, plus a per-session write rate limit.
+- Settings panel: "Agent change log" with one-click rollback.
+
 ## [0.7.3] - 2026-10-01
 
 ### Fixed

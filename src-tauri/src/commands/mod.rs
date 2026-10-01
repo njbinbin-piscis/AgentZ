@@ -46,6 +46,8 @@ pub mod skill_review;
 pub mod skills_migrate;
 pub mod system_prompt;
 pub mod teams;
+pub mod app_changes;
+pub mod devenv;
 pub mod user_tools;
 pub mod vsix;
 pub mod workbench;

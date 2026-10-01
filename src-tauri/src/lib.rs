@@ -255,6 +255,8 @@ pub fn run() {
             commands::connectors::connectors_create_api,
             // Agents (Phase 2): installable single-Koi personas + kois sync
             commands::agents::agents_list,
+            commands::app_changes::app_changes_list,
+            commands::app_changes::app_changes_rollback,
             commands::agents::agents_list_builtin_tools,
             commands::agents::agents_get,
             commands::agents::agents_save,
