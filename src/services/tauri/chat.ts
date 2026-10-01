@@ -156,6 +156,7 @@ export interface SessionMeta {
   source: string;
   team_id?: string | null;
   pool_id?: string | null;
+  cwd?: string | null;
 }
 
 export interface ToolDto {

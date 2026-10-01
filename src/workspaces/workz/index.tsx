@@ -61,7 +61,17 @@ import {
 } from "../../services/tauri/workflow";
 import { collectArtifacts, type AgentStep } from "./agentArtifacts";
 import { applyToolEnd, applyToolStart, finalizeTools } from "./agentTools";
-import { taskDisplayTitle, workzGoalFromText } from "./taskTitle";
+import { workzGoalFromText } from "./taskTitle";
+import WorkzSidebar from "./WorkzSidebar";
+import {
+  chatSetSessionCwd,
+  workzListAllSessions,
+  workzOverview,
+  workzProjectAdd,
+  workzProjectRemove,
+  type WorkzOverview,
+} from "../../services/tauri/workz";
+import { openFolderDialog } from "../../services/tauri";
 import "./Agent.css";
 
 import type { LibraryInitialState } from "../codez/resources/types";
@@ -109,9 +119,43 @@ function readLastTask(projectDir: string): string | null {
 
 const MAX_AUTO_RESUMES = 6;
 
+type WorkzScope = { kind: "free" } | { kind: "project"; dir: string };
+const SCOPE_KEY = "agentz-workz-scope";
+const COLLAPSED_KEY = "agentz-workz-collapsed";
+const RECENT_CWDS_KEY = "agentz-workz-recent-cwds";
+
+function readScope(appProjectDir: string | null): WorkzScope {
+  try {
+    const raw = localStorage.getItem(SCOPE_KEY);
+    if (raw) {
+      const v = JSON.parse(raw) as WorkzScope;
+      if (v.kind === "free" || (v.kind === "project" && v.dir)) return v;
+    }
+  } catch {
+    // fall through to default
+  }
+  return appProjectDir ? { kind: "project", dir: appProjectDir } : { kind: "free" };
+}
+
+function readCollapsed(): Record<string, boolean> {
+  try {
+    return JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "{}") as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
+function readRecentCwds(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(RECENT_CWDS_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function WorkZWorkspace({
-  projectDir,
-  onOpenFolder,
+  projectDir: appProjectDir,
   wikiBuildNonce = 0,
   wikiBuildAction = "overview",
   onWikiBusyChange,
@@ -177,6 +221,73 @@ export default function WorkZWorkspace({
   const workzTaskSources = useMemo(() => [SESSION_SOURCE_WORKZ, SESSION_SOURCE_WORKZ_TEAM], []);
   const activePoolRef = useRef<string | null>(null);
   activePoolRef.current = activePoolId;
+
+  const [overview, setOverview] = useState<WorkzOverview | null>(null);
+  const [scope, setScope] = useState<WorkzScope>(() => readScope(appProjectDir));
+  const [groups, setGroups] = useState<Record<string, SessionMeta[]>>({});
+  const [groupErrors, setGroupErrors] = useState<Record<string, string>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(readCollapsed);
+  const [cwd, setCwd] = useState<string | null>(null);
+  const [recentCwds, setRecentCwds] = useState<string[]>(readRecentCwds);
+  const isFree = scope.kind === "free";
+  /** Session database / project root: a registered project, or the internal free-session folder. */
+  const projectDir: string | null = isFree ? (overview?.free_dir ?? null) : scope.dir;
+  /** Where the agent actually works for plain sessions. */
+  const freeCwd = cwd ?? overview?.default_work_dir ?? null;
+
+  useEffect(() => {
+    workzOverview()
+      .then(setOverview)
+      .catch(() => setOverview(null));
+  }, []);
+
+  useEffect(() => {
+    if (!appProjectDir) return;
+    workzProjectAdd(appProjectDir)
+      .then(setOverview)
+      .catch(() => {});
+  }, [appProjectDir]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SCOPE_KEY, JSON.stringify(scope));
+    } catch {
+      // best-effort persistence
+    }
+  }, [scope]);
+
+  const refreshGroups = useCallback(() => {
+    if (!overview) return;
+    const dirs = [...overview.projects.filter((p) => p.exists).map((p) => p.path), overview.free_dir];
+    workzListAllSessions(dirs, workzTaskSources)
+      .then((list) => {
+        const g: Record<string, SessionMeta[]> = {};
+        const errs: Record<string, string> = {};
+        for (const item of list) {
+          g[item.project_dir] = item.sessions;
+          if (item.error) errs[item.project_dir] = item.error;
+        }
+        setGroups(g);
+        setGroupErrors(errs);
+      })
+      .catch(() => {});
+  }, [overview, workzTaskSources]);
+
+  useEffect(() => {
+    refreshGroups();
+  }, [refreshGroups]);
+
+  const rememberCwd = useCallback((dir: string) => {
+    setRecentCwds((prev) => {
+      const next = [dir, ...prev.filter((d) => d !== dir)].slice(0, 8);
+      try {
+        localStorage.setItem(RECENT_CWDS_KEY, JSON.stringify(next));
+      } catch {
+        // best-effort persistence
+      }
+      return next;
+    });
+  }, []);
 
   // Session ids of tasks currently running (foreground or background). Drives
   // the sidebar running indicators and whether the active task shows as busy.
@@ -344,9 +455,9 @@ export default function WorkZWorkspace({
     liveRef.current = false;
     foregroundSessionRef.current = null;
     foregroundTaskKeyRef.current = null;
-    runningSessionsRef.current.clear();
-    taskKeyBySessionRef.current.clear();
-    setRunningIds([]);
+    restoredTaskForRef.current = null;
+    setBusy(false);
+    setCwd(null);
     clearCards();
   }, [projectDir, clearAttachment, clearCards]);
 
@@ -358,7 +469,8 @@ export default function WorkZWorkspace({
     listSessions(projectDir, workzTaskSources, null)
       .then(setTasks)
       .catch(() => setTasks([]));
-  }, [projectDir, workzTaskSources]);
+    refreshGroups();
+  }, [projectDir, workzTaskSources, refreshGroups]);
 
   /** True once a task session (or workflow run) is bound — mode pickers lock. */
   const taskBound = selectedId !== null || workflowRunId !== null;
@@ -635,7 +747,7 @@ export default function WorkZWorkspace({
       // Isolated run: create a dedicated worktree + branch on first turn, then
       // keep the agent working inside it for the rest of the task.
       let wt = worktreeRef.current;
-      if (isolate && !wt) {
+      if (isolate && !isFree && !wt) {
         try {
           const taskId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
           wt = await agentTaskApi.create(projectDir!, taskId);
@@ -675,12 +787,13 @@ export default function WorkZWorkspace({
           setError(String(e));
         }
       }
+      const runCwd = isFree ? freeCwd : null;
       const res = await chatSend({
         prompt: effectivePrompt,
         displayPrompt: text,
         sessionId: effectiveSessionId,
         projectDir: projectDir!,
-        workspaceDir: wt?.worktree_path ?? null,
+        workspaceDir: wt?.worktree_path ?? runCwd,
         attachment: att,
         chatMode: "agent",
         modelId: showModelSelector ? modelId || null : null,
@@ -697,6 +810,11 @@ export default function WorkZWorkspace({
       });
       // The backend echoes the (pre-generated) session id; keep the maps in
       // sync in case it ever differs, then fold in the final assistant text.
+      if (isFree && !startSession && runCwd) {
+        void chatSetSessionCwd(projectDir!, res.session_id, runCwd).catch(() => {});
+        rememberCwd(runCwd);
+        if (isForeground()) setCwd(runCwd);
+      }
       if (res.session_id !== effectiveSessionId) {
         taskKeyBySessionRef.current.set(res.session_id, taskKey);
         markRunning(res.session_id, true);
@@ -810,6 +928,7 @@ export default function WorkZWorkspace({
     setGoal("");
     clearAttachment();
     setWorktree(null);
+    setCwd(null);
     // Land on the main chat so a fresh task is visibly empty (instead of the
     // previous run's Koi chatroom / coordination view lingering).
     setSwarmMainTab("main");
@@ -832,6 +951,7 @@ export default function WorkZWorkspace({
       try {
         const meta = tasks.find((task) => task.id === id);
         applyTaskModeBinding(meta);
+        setCwd(meta?.cwd ?? null);
         const history = await getMessages(id, projectDir);
         // Switching to a different task detaches live streaming from the
         // previous foreground run (it keeps going in the background). We show
@@ -913,7 +1033,11 @@ export default function WorkZWorkspace({
 
   const buildWiki = useCallback(
     async (action: WikiBuildAction) => {
-      if (!projectDir || wikiBusy) return;
+      if (wikiBusy) return;
+      if (isFree || !projectDir) {
+        setError(t("workz.wikiNeedsProject"));
+        return;
+      }
       setWikiBusy(true);
       onWikiBusyChange?.(true);
       setError(null);
@@ -931,7 +1055,7 @@ export default function WorkZWorkspace({
         onWikiBusyChange?.(false);
       }
     },
-    [projectDir, wikiBusy, onWikiBusyChange, setPreviewPath],
+    [projectDir, isFree, t, wikiBusy, onWikiBusyChange, setPreviewPath],
   );
 
   const wikiTriggerRef = useRef(0);
@@ -940,6 +1064,127 @@ export default function WorkZWorkspace({
     wikiTriggerRef.current = wikiBuildNonce;
     void buildWiki(wikiBuildAction);
   }, [wikiBuildNonce, wikiBuildAction, buildWiki]);
+
+  const sameScope = useCallback(
+    (dir: string) => (isFree ? dir === overview?.free_dir : dir === scope.dir),
+    [isFree, overview, scope],
+  );
+
+  const scopeForDir = useCallback(
+    (dir: string): WorkzScope =>
+      dir === overview?.free_dir ? { kind: "free" } : { kind: "project", dir },
+    [overview],
+  );
+
+  const openSession = useCallback(
+    (dir: string, id: string) => {
+      if (sameScope(dir)) {
+        void openTask(id);
+        return;
+      }
+      rememberLastTask(dir, id);
+      setScope(scopeForDir(dir));
+    },
+    [sameScope, openTask, scopeForDir],
+  );
+
+  const newSessionIn = useCallback(
+    (dir: string) => {
+      if (sameScope(dir)) {
+        newTask();
+        return;
+      }
+      rememberLastTask(dir, null);
+      setScope(scopeForDir(dir));
+    },
+    [sameScope, newTask, scopeForDir],
+  );
+
+  const deleteSessionIn = useCallback(
+    (dir: string, id: string) => {
+      if (sameScope(dir)) {
+        void removeTask(id);
+        return;
+      }
+      deleteSession(id, dir)
+        .then(refreshGroups)
+        .catch((e) => setError(String(e)));
+    },
+    [sameScope, removeTask, refreshGroups],
+  );
+
+  const addProject = useCallback(async () => {
+    try {
+      const dir = await openFolderDialog(appProjectDir);
+      if (!dir) return;
+      const ov = await workzProjectAdd(dir);
+      setOverview(ov);
+      const added = ov.projects.find((p) => p.path.replace(/[\\/]+$/, "") === dir.replace(/[\\/]+$/, ""));
+      const key = added?.path ?? dir;
+      rememberLastTask(key, null);
+      setScope({ kind: "project", dir: key });
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [appProjectDir]);
+
+  const removeProject = useCallback(
+    async (dir: string) => {
+      try {
+        const ov = await workzProjectRemove(dir);
+        setOverview(ov);
+        if (!isFree && scope.dir === dir) setScope({ kind: "free" });
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [isFree, scope],
+  );
+
+  const toggleGroup = useCallback((dir: string) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [dir]: !(prev[dir] ?? false) };
+      try {
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next));
+      } catch {
+        // best-effort persistence
+      }
+      return next;
+    });
+  }, []);
+
+  const changeCwd = useCallback(
+    async (dir: string) => {
+      let target = dir;
+      if (dir === "__pick__") {
+        const picked = await openFolderDialog(freeCwd);
+        if (!picked) return;
+        target = picked;
+      }
+      setCwd(target);
+      rememberCwd(target);
+      if (selectedId && projectDir) {
+        try {
+          await chatSetSessionCwd(projectDir, selectedId, target);
+        } catch (e) {
+          setError(String(e));
+        }
+      }
+    },
+    [freeCwd, rememberCwd, selectedId, projectDir],
+  );
+
+  const cwdOptions = useMemo((): DropdownOption[] => {
+    const opts: DropdownOption[] = [];
+    const def = overview?.default_work_dir;
+    if (def) opts.push({ id: def, label: `${t("workz.cwdDefault")} · ${def}` });
+    for (const d of recentCwds) {
+      if (d !== def) opts.push({ id: d, label: d });
+    }
+    if (freeCwd && !opts.some((o) => o.id === freeCwd)) opts.push({ id: freeCwd, label: freeCwd });
+    opts.push({ id: "__pick__", label: t("workz.cwdPick") });
+    return opts;
+  }, [overview, recentCwds, freeCwd, t]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
@@ -1146,46 +1391,22 @@ export default function WorkZWorkspace({
       )}
       {toast && <div className="agentz-workz-toast">{toast}</div>}
       <aside className="agentz-workz-sidebar">
-        <div className="agentz-workz-sidebar-head">
-          <span>{t("agent.tasks")}</span>
-          <button
-            onClick={newTask}
-            disabled={!projectDir}
-            title={!projectDir ? t("agent.noProject") : t("agent.newTask")}
-          >
-            ＋ {t("agent.new")}
-          </button>
-        </div>
-        <div className="agentz-workz-tasklist">
-          {tasks.length === 0 && (
-            <div className="agentz-workz-tasks-empty">{t("agent.noTasks")}</div>
-          )}
-          {tasks.map((task) => (
-            <div
-              key={task.id}
-              className={`agentz-workz-task ${task.id === selectedId ? "active" : ""} ${runningIds.includes(task.id) ? "running" : ""}`}
-              onClick={() => void openTask(task.id)}
-            >
-              <span
-                className={`agentz-workz-task-dot ${runningIds.includes(task.id) ? "running" : task.status}`}
-              />
-              <span className="agentz-workz-task-title">
-                {taskDisplayTitle(task.title, t("agent.untitled"))}
-              </span>
-              <span className="agentz-workz-task-count">{task.message_count}</span>
-              <button
-                className="agentz-workz-task-del"
-                title={t("agent.deleteTask")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void removeTask(task.id);
-                }}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
+        <WorkzSidebar
+          overview={overview}
+          activeDir={projectDir}
+          activeTasks={tasks}
+          groups={groups}
+          groupErrors={groupErrors}
+          collapsed={collapsed}
+          selectedId={selectedId}
+          runningIds={runningIds}
+          onToggle={toggleGroup}
+          onOpenSession={openSession}
+          onNewSession={newSessionIn}
+          onDeleteSession={deleteSessionIn}
+          onAddProject={() => void addProject()}
+          onRemoveProject={(dir) => void removeProject(dir)}
+        />
         <SessionSkillRevisions sessionId={selectedId} />
       </aside>
 
@@ -1233,22 +1454,12 @@ export default function WorkZWorkspace({
                   <div className="agentz-workz-empty">
                     <div className="agentz-workz-title">{t("agent.title")}</div>
                     <p className="agentz-workz-sub">
-                      {t("agent.subtitle", {
-                        project: projectDir || t("agent.openProjectFallback"),
-                      })}
+                      {isFree
+                        ? t("workz.freeSubtitle", { dir: freeCwd ?? "…" })
+                        : t("agent.subtitle", {
+                            project: projectDir || t("agent.openProjectFallback"),
+                          })}
                     </p>
-                    {!projectDir && (
-                      <>
-                        <p className="agentz-workz-note">{t("agent.noProject")}</p>
-                        <button
-                          type="button"
-                          className="agentz-workz-open-folder"
-                          onClick={onOpenFolder}
-                        >
-                          {t("app.openFolder")}
-                        </button>
-                      </>
-                    )}
                   </div>
                 )}
                 {steps.map((m, i) => {
@@ -1320,7 +1531,7 @@ export default function WorkZWorkspace({
             <AgentFilePreview
               projectDir={projectDir}
               path={previewPath}
-              workspaceDir={worktree?.worktree_path ?? null}
+              workspaceDir={worktree?.worktree_path ?? (isFree ? freeCwd : null)}
               onClose={() => setPreviewPath(null)}
             />
           )}
@@ -1338,18 +1549,32 @@ export default function WorkZWorkspace({
 
         <div className="agentz-workz-isolate-bar">
           <div className="agentz-workz-bar-left">
-            <label
-              className="agentz-workz-isolate-toggle"
-              title={taskBound ? t("agent.modeLocked") : t("agent.isolateHint")}
-            >
-              <input
-                type="checkbox"
-                checked={isolate}
-                disabled={busy || taskBound}
-                onChange={(e) => setIsolate(e.target.checked)}
-              />
-              <span>{isolate ? t("agent.isolateOn") : t("agent.isolateOff")}</span>
-            </label>
+            {isFree ? (
+              <div className="agentz-workz-pill-menu" title={t("workz.cwdTitle")}>
+                <span className="agentz-workz-pill-label">{t("workz.cwdLabel")}</span>
+                <DropdownSelect
+                  variant="pill"
+                  placement="up"
+                  value={freeCwd ?? ""}
+                  options={cwdOptions}
+                  disabled={busy}
+                  onChange={(v) => void changeCwd(v)}
+                />
+              </div>
+            ) : (
+              <label
+                className="agentz-workz-isolate-toggle"
+                title={taskBound ? t("agent.modeLocked") : t("agent.isolateHint")}
+              >
+                <input
+                  type="checkbox"
+                  checked={isolate}
+                  disabled={busy || taskBound}
+                  onChange={(e) => setIsolate(e.target.checked)}
+                />
+                <span>{isolate ? t("agent.isolateOn") : t("agent.isolateOff")}</span>
+              </label>
+            )}
 
             {teams.length > 0 && (
               <div
