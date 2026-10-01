@@ -20,6 +20,9 @@ pub struct WorkzSessionMeta {
     pub team_id: Option<String>,
     #[serde(default)]
     pub pool_id: Option<String>,
+    /// Working directory chosen for this session (plain sessions).
+    #[serde(default)]
+    pub cwd: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -53,6 +56,10 @@ pub fn persist_workz_meta(
     if let Some(p) = pool_id.filter(|s| !s.trim().is_empty()) {
         meta.pool_id = Some(p.to_string());
     }
+    save_workz_meta(db, session_id, meta)
+}
+
+fn save_workz_meta(db: &Database, session_id: &str, meta: WorkzSessionMeta) -> Result<(), String> {
     let frame = StateFrameEnvelope {
         agentz_workz: Some(meta),
     };
@@ -105,6 +112,8 @@ pub struct SessionMeta {
     pub team_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pool_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
 }
 
 fn truncate_title_line(text: &str, max_chars: usize) -> String {
@@ -475,6 +484,7 @@ pub async fn chat_list_sessions(
                     source: s.source,
                     team_id: meta.team_id,
                     pool_id: meta.pool_id,
+                    cwd: meta.cwd,
                 }
             })
             .collect())
@@ -604,7 +614,30 @@ pub async fn chat_fork_session(
             source: refreshed.source,
             team_id: meta.team_id,
             pool_id: meta.pool_id,
+            cwd: meta.cwd,
         })
+    })
+    .await
+}
+
+/// Remember the working directory of a (plain) session. `None` clears it.
+#[tauri::command]
+pub async fn chat_set_session_cwd(
+    app: AppHandle,
+    project_dir: Option<String>,
+    session_id: String,
+    cwd: Option<String>,
+) -> Result<(), String> {
+    let cwd = cwd.map(|c| c.trim().to_string()).filter(|c| !c.is_empty());
+    if let Some(c) = &cwd {
+        if !std::path::Path::new(c).is_dir() {
+            return Err(format!("directory not found: {c}"));
+        }
+    }
+    with_db(&app, ProjectDirParam { project_dir }, move |db| {
+        let mut meta = load_workz_meta(db, &session_id)?;
+        meta.cwd = cwd;
+        save_workz_meta(db, &session_id, meta)
     })
     .await
 }

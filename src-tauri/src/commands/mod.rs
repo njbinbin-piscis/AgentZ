@@ -28,6 +28,7 @@ pub mod pool;
 pub mod post_turn;
 pub mod code_map;
 pub mod graph;
+pub mod projects;
 pub mod symbols;
 pub mod graph_agent;
 pub mod graph_db;
