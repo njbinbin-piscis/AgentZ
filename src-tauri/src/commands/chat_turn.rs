@@ -1211,12 +1211,18 @@ pub(crate) async fn run_subagent_with_prompt(
         read_timeout,
     );
 
-    let policy = Arc::new(PolicyGate::with_profile_and_flags(
-        &workspace_root,
-        &policy_mode,
-        rate,
-        allow_outside,
-    ));
+    // Research sub-agents have a read-only tool surface, so they may read
+    // dependency sources (cargo checkouts / registry) that the engine and its
+    // crates live in — otherwise upstream investigation is impossible.
+    let policy = Arc::new(
+        PolicyGate::with_profile_and_flags(
+            &workspace_root,
+            &policy_mode,
+            rate,
+            allow_outside,
+        )
+        .with_extra_read_roots(dependency_source_roots()),
+    );
 
     let harness = HarnessConfig::for_scheduler(
         runtime.model.clone(),
@@ -1449,6 +1455,25 @@ fn project_rules_context(workspace_root: &str) -> Option<String> {
         return None;
     }
     Some(format!("## Project rules\n{}", blocks.join("\n\n")))
+}
+
+/// Read-only dependency source directories (Cargo git checkouts and registry).
+fn dependency_source_roots() -> Vec<PathBuf> {
+    let cargo_home = std::env::var_os("CARGO_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("USERPROFILE")
+                .or_else(|| std::env::var_os("HOME"))
+                .map(|h| PathBuf::from(h).join(".cargo"))
+        });
+    let Some(home) = cargo_home else {
+        return Vec::new();
+    };
+    ["git/checkouts", "registry/src"]
+        .iter()
+        .map(|p| home.join(p))
+        .filter(|p| p.is_dir())
+        .collect()
 }
 
 /// Inject compact coding brief so the agent has structural repo context without

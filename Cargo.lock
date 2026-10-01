@@ -3843,7 +3843,7 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 [[package]]
 name = "piscis-core"
 version = "0.8.63"
-source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.64#af31d8d5a437f927ca4d28b56d7564e34c7337e1"
+source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.65#5e5b64e5a454e9f8f6b72fe3b15f63fafde946b8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3855,7 +3855,7 @@ dependencies = [
 [[package]]
 name = "piscis-ide-tools"
 version = "0.1.0"
-source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.64#af31d8d5a437f927ca4d28b56d7564e34c7337e1"
+source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.65#5e5b64e5a454e9f8f6b72fe3b15f63fafde946b8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3873,7 +3873,7 @@ dependencies = [
 [[package]]
 name = "piscis-kernel"
 version = "0.8.63"
-source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.64#af31d8d5a437f927ca4d28b56d7564e34c7337e1"
+source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.65#5e5b64e5a454e9f8f6b72fe3b15f63fafde946b8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4597,8 +4597,8 @@ dependencies = [
 
 [[package]]
 name = "robotz-browser"
-version = "0.1.8"
-source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.8#041f6b61bc9b40443accdc629f0aa8a682a5d68b"
+version = "0.1.9"
+source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.9#779e3516f9e2dca6a124b2e7f17b21fa2f1f9eac"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4621,8 +4621,8 @@ dependencies = [
 
 [[package]]
 name = "robotz-core"
-version = "0.1.8"
-source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.8#041f6b61bc9b40443accdc629f0aa8a682a5d68b"
+version = "0.1.9"
+source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.9#779e3516f9e2dca6a124b2e7f17b21fa2f1f9eac"
 dependencies = [
  "anyhow",
  "async-trait",
