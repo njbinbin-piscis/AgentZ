@@ -9,6 +9,10 @@ export interface LlmProviderConfig {
   api_key: string;
   base_url: string;
   max_tokens: number;
+  temperature?: number | null;
+  top_p?: number | null;
+  thinking?: boolean | null;
+  stream?: boolean | null;
 }
 
 export interface McpServerConfig {
@@ -30,6 +34,9 @@ export interface LlmSettings {
   max_iterations: number;
   policy_mode: string;
   enable_streaming: boolean;
+  temperature?: number | null;
+  top_p?: number | null;
+  thinking?: boolean | null;
   language: string;
   vision_enabled: boolean;
   anthropic_api_key: string;

@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Model settings: temperature, top_p and thinking mode for the main model and each multi-model entry; per-model streaming override.
+- Model settings: base URL is auto-filled with the provider default when switching provider (also in the multi-model editor); OpenAI now has a base URL field.
+
+### Fixed
+
+- Custom base URL is now honored for every provider (DeepSeek, Qwen, Kimi, MiniMax, Zhipu, Anthropic); previously the engine ignored it for all but OpenAI/custom. Requires piscis-engine v0.8.66.
+
 ## [0.7.1] - 2026-10-01
 
 ### Added

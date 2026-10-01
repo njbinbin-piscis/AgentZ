@@ -50,6 +50,22 @@ const MODEL_PLACEHOLDERS: Record<string, string> = {
   custom: "your-model-id",
 };
 
+const PROVIDER_BASE_URLS: Record<string, string> = {
+  openai: "https://api.openai.com/v1",
+  deepseek: "https://api.deepseek.com/v1",
+  qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  custom: "https://api.example.com/v1",
+};
+
+const BASE_URL_PROVIDERS = ["custom", "qwen", "deepseek", "openai"];
+
+function nextBaseUrl(current: string, prevProvider: string, nextProvider: string): string {
+  const prevDefault = PROVIDER_BASE_URLS[prevProvider];
+  if (current.trim() && current !== prevDefault) return current;
+  if (nextProvider === "custom") return "";
+  return PROVIDER_BASE_URLS[nextProvider] ?? "";
+}
+
 const KEY_FIELDS: Record<string, keyof LlmSettings> = {
   anthropic: "anthropic_api_key",
   openai: "openai_api_key",
@@ -70,6 +86,9 @@ const DEFAULT_FORM: LlmSettings = {
   max_iterations: 200,
   policy_mode: "balanced",
   enable_streaming: true,
+  temperature: null,
+  top_p: null,
+  thinking: null,
   language: "zh",
   vision_enabled: false,
   anthropic_api_key: "",
@@ -82,6 +101,102 @@ const DEFAULT_FORM: LlmSettings = {
   llm_providers: [],
   mcp_servers: [],
 };
+
+interface SamplingValue {
+  temperature?: number | null;
+  top_p?: number | null;
+  thinking?: boolean | null;
+  stream?: boolean | null;
+}
+
+function parseOptionalNumber(raw: string, min: number, max: number): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(max, Math.max(min, n));
+}
+
+function triState(v: boolean | null | undefined): string {
+  return v === true ? "on" : v === false ? "off" : "default";
+}
+
+function fromTriState(v: string): boolean | null {
+  return v === "on" ? true : v === "off" ? false : null;
+}
+
+function SamplingFields({
+  value,
+  onChange,
+  showStream,
+  idPrefix,
+}: {
+  value: SamplingValue;
+  onChange: (patch: SamplingValue) => void;
+  showStream: boolean;
+  idPrefix: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="agentz-settings-field">
+        <label htmlFor={`${idPrefix}-temperature`}>{t("settings.temperature")}</label>
+        <input
+          id={`${idPrefix}-temperature`}
+          type="number"
+          min={0}
+          max={2}
+          step={0.1}
+          value={value.temperature ?? ""}
+          placeholder={t("settings.samplingDefault")}
+          onChange={(e) => onChange({ temperature: parseOptionalNumber(e.target.value, 0, 2) })}
+        />
+        <p className="agentz-settings-hint">{t("settings.temperatureHint")}</p>
+      </div>
+      <div className="agentz-settings-field">
+        <label htmlFor={`${idPrefix}-top-p`}>{t("settings.topP")}</label>
+        <input
+          id={`${idPrefix}-top-p`}
+          type="number"
+          min={0}
+          max={1}
+          step={0.05}
+          value={value.top_p ?? ""}
+          placeholder={t("settings.samplingDefault")}
+          onChange={(e) => onChange({ top_p: parseOptionalNumber(e.target.value, 0, 1) })}
+        />
+      </div>
+      <div className="agentz-settings-field">
+        <label>{t("settings.thinking")}</label>
+        <DropdownSelect
+          variant="field"
+          value={value.thinking === true ? "on" : "default"}
+          options={[
+            { id: "default", label: t("settings.thinkingOff") },
+            { id: "on", label: t("settings.thinkingOn") },
+          ]}
+          onChange={(v) => onChange({ thinking: fromTriState(v) })}
+        />
+        <p className="agentz-settings-hint">{t("settings.thinkingHint")}</p>
+      </div>
+      {showStream && (
+        <div className="agentz-settings-field">
+          <label>{t("settings.llmProviderStream")}</label>
+          <DropdownSelect
+            variant="field"
+            value={triState(value.stream)}
+            options={[
+              { id: "default", label: t("settings.streamInherit") },
+              { id: "on", label: t("settings.streamOn") },
+              { id: "off", label: t("settings.streamOff") },
+            ]}
+            onChange={(v) => onChange({ stream: fromTriState(v) })}
+          />
+        </div>
+      )}
+    </>
+  );
+}
 
 const EMPTY_MCP_SERVER: McpServerConfig = {
   name: "",
@@ -101,6 +216,10 @@ const EMPTY_LLM_PROVIDER: LlmProviderConfig = {
   api_key: "",
   base_url: "",
   max_tokens: 0,
+  temperature: null,
+  top_p: null,
+  thinking: null,
+  stream: null,
 };
 
 function parseEnv(text: string): Record<string, string> {
@@ -125,6 +244,9 @@ function toForm(data: SettingsResponse): LlmSettings {
     context_window: data.context_window ?? 0,
     policy_mode: data.policy_mode || "balanced",
     enable_streaming: data.enable_streaming ?? true,
+    temperature: data.temperature ?? null,
+    top_p: data.top_p ?? null,
+    thinking: data.thinking ?? null,
     language: data.language === "en" ? "en" : "zh",
     vision_enabled: data.vision_enabled ?? false,
     anthropic_api_key: data.anthropic_api_key || "",
@@ -366,7 +488,10 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     variant="field"
                     value={provider}
                     options={PROVIDER_KEYS.map((p) => ({ id: p, label: providerLabel(p) }))}
-                    onChange={(v) => update("provider", v)}
+                    onChange={(v) => {
+                      update("custom_base_url", nextBaseUrl(form.custom_base_url, provider, v));
+                      update("provider", v);
+                    }}
                   />
                 </div>
 
@@ -380,20 +505,14 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                   />
                 </div>
 
-                {(provider === "custom" || provider === "qwen" || provider === "deepseek") && (
+                {BASE_URL_PROVIDERS.includes(provider) && (
                   <div className="agentz-settings-field">
                     <label htmlFor="agentz-settings-base-url">{t("settings.baseUrl")}</label>
                     <input
                       id="agentz-settings-base-url"
                       value={form.custom_base_url}
                       onChange={(e) => update("custom_base_url", e.target.value)}
-                      placeholder={
-                        provider === "qwen"
-                          ? "https://dashscope.aliyuncs.com/compatible-mode/v1"
-                          : provider === "deepseek"
-                            ? "https://api.deepseek.com/v1"
-                            : "https://api.example.com/v1"
-                      }
+                      placeholder={PROVIDER_BASE_URLS[provider] ?? ""}
                     />
                   </div>
                 )}
@@ -496,6 +615,13 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     {t("settings.enableStreaming")}
                   </label>
                 </div>
+
+                <SamplingFields
+                  idPrefix="agentz-settings-main"
+                  value={form}
+                  showStream={false}
+                  onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+                />
               </section>
 
               <section className="agentz-settings-section">
@@ -581,7 +707,13 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                           variant="field"
                           value={llmEditForm.provider}
                           options={PROVIDER_KEYS.map((p) => ({ id: p, label: providerLabel(p) }))}
-                          onChange={(v) => setLlmEditForm((f) => ({ ...f, provider: v }))}
+                          onChange={(v) =>
+                            setLlmEditForm((f) => ({
+                              ...f,
+                              provider: v,
+                              base_url: nextBaseUrl(f.base_url, f.provider, v),
+                            }))
+                          }
                         />
                       </div>
                       <div className="agentz-settings-field">
@@ -606,13 +738,12 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                           </button>
                         </div>
                       </div>
-                      {(llmEditForm.provider === "custom" ||
-                        llmEditForm.provider === "qwen" ||
-                        llmEditForm.provider === "deepseek") && (
+                      {BASE_URL_PROVIDERS.includes(llmEditForm.provider) && (
                         <div className="agentz-settings-field agentz-llm-span-2">
                           <label>{t("settings.baseUrl")}</label>
                           <input
                             value={llmEditForm.base_url}
+                            placeholder={PROVIDER_BASE_URLS[llmEditForm.provider] ?? ""}
                             onChange={(e) => setLlmEditForm((f) => ({ ...f, base_url: e.target.value }))}
                           />
                         </div>
@@ -628,6 +759,12 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                           }
                         />
                       </div>
+                      <SamplingFields
+                        idPrefix="agentz-llm-edit"
+                        value={llmEditForm}
+                        showStream
+                        onChange={(patch) => setLlmEditForm((f) => ({ ...f, ...patch }))}
+                      />
                     </div>
                     <div className="agentz-llm-provider-form-actions">
                       <button

@@ -42,6 +42,14 @@ pub struct LlmProviderDto {
     pub api_key: String,
     pub base_url: String,
     pub max_tokens: u32,
+    #[serde(default)]
+    pub temperature: Option<f32>,
+    #[serde(default)]
+    pub top_p: Option<f32>,
+    #[serde(default)]
+    pub thinking: Option<bool>,
+    #[serde(default)]
+    pub stream: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -54,6 +62,12 @@ pub struct SaveLlmSettings {
     pub max_iterations: u32,
     pub policy_mode: String,
     pub enable_streaming: bool,
+    #[serde(default)]
+    pub temperature: Option<f32>,
+    #[serde(default)]
+    pub top_p: Option<f32>,
+    #[serde(default)]
+    pub thinking: Option<bool>,
     pub language: String,
     pub vision_enabled: bool,
     pub anthropic_api_key: String,
@@ -81,6 +95,9 @@ pub struct LlmSettingsDto {
     pub max_iterations: u32,
     pub policy_mode: String,
     pub enable_streaming: bool,
+    pub temperature: Option<f32>,
+    pub top_p: Option<f32>,
+    pub thinking: Option<bool>,
     pub language: String,
     pub vision_enabled: bool,
     pub anthropic_api_key: String,
@@ -136,6 +153,10 @@ fn provider_to_dto(p: &LlmProviderConfig) -> LlmProviderDto {
         api_key: p.api_key.clone(),
         base_url: p.base_url.clone(),
         max_tokens: p.max_tokens,
+        temperature: p.temperature,
+        top_p: p.top_p,
+        thinking: p.thinking,
+        stream: p.stream,
     }
 }
 
@@ -151,6 +172,9 @@ fn to_dto(settings: &Settings, config_dir: String) -> LlmSettingsDto {
         max_iterations: settings.max_iterations,
         policy_mode: settings.policy_mode.clone(),
         enable_streaming: settings.enable_streaming,
+        temperature: settings.temperature,
+        top_p: settings.top_p,
+        thinking: settings.thinking,
         language: settings.language.clone(),
         vision_enabled: settings.vision_enabled,
         anthropic_api_key: settings.anthropic_api_key.clone(),
@@ -214,6 +238,9 @@ pub async fn save_settings(
     settings.max_iterations = updates.max_iterations.clamp(1, 1_000);
     settings.policy_mode = updates.policy_mode;
     settings.enable_streaming = updates.enable_streaming;
+    settings.temperature = updates.temperature;
+    settings.top_p = updates.top_p;
+    settings.thinking = updates.thinking;
     settings.vision_enabled = updates.vision_enabled;
     if updates.language == "zh" || updates.language == "en" {
         settings.language = updates.language;
@@ -242,6 +269,10 @@ pub async fn save_settings(
             },
             base_url: item.base_url,
             max_tokens: item.max_tokens,
+            temperature: item.temperature,
+            top_p: item.top_p,
+            thinking: item.thinking,
+            stream: item.stream,
         });
     }
     settings.llm_providers = providers;

@@ -64,6 +64,8 @@ struct LlmRuntime {
     api_key: String,
     base_url: String,
     max_tokens: u32,
+    options: llm::ClientOptions,
+    stream: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +74,9 @@ struct SettingsSnapshot {
     model: String,
     custom_base_url: String,
     max_tokens: u32,
+    temperature: Option<f32>,
+    top_p: Option<f32>,
+    thinking: Option<bool>,
     anthropic_api_key: String,
     openai_api_key: String,
     deepseek_api_key: String,
@@ -87,6 +92,9 @@ fn snapshot_settings(settings: &Settings) -> SettingsSnapshot {
         model: settings.model.clone(),
         custom_base_url: settings.custom_base_url.clone(),
         max_tokens: settings.max_tokens,
+        temperature: settings.temperature,
+        top_p: settings.top_p,
+        thinking: settings.thinking,
         anthropic_api_key: settings.anthropic_api_key.clone(),
         openai_api_key: settings.openai_api_key.clone(),
         deepseek_api_key: settings.deepseek_api_key.clone(),
@@ -102,6 +110,9 @@ fn restore_settings(settings: &mut Settings, snap: SettingsSnapshot) {
     settings.model = snap.model;
     settings.custom_base_url = snap.custom_base_url;
     settings.max_tokens = snap.max_tokens;
+    settings.temperature = snap.temperature;
+    settings.top_p = snap.top_p;
+    settings.thinking = snap.thinking;
     settings.anthropic_api_key = snap.anthropic_api_key;
     settings.openai_api_key = snap.openai_api_key;
     settings.deepseek_api_key = snap.deepseek_api_key;
@@ -129,6 +140,12 @@ pub(crate) fn apply_llm_provider(settings: &mut Settings, provider: &LlmProvider
     settings.custom_base_url = provider.base_url.clone();
     if provider.max_tokens > 0 {
         settings.max_tokens = provider.max_tokens;
+    }
+    settings.temperature = provider.temperature;
+    settings.top_p = provider.top_p;
+    settings.thinking = provider.thinking;
+    if let Some(stream) = provider.stream {
+        settings.enable_streaming = stream;
     }
     let key = provider.effective_api_key();
     if !key.trim().is_empty() {
@@ -282,6 +299,12 @@ fn resolve_llm_runtime(settings: &Settings, model_id: Option<&str>) -> Result<Ll
             } else {
                 settings.max_tokens.max(1024)
             },
+            options: llm::ClientOptions {
+                temperature: provider.temperature,
+                top_p: provider.top_p,
+                thinking: provider.thinking,
+            },
+            stream: provider.stream,
         });
     }
 
@@ -313,6 +336,12 @@ fn resolve_llm_runtime(settings: &Settings, model_id: Option<&str>) -> Result<Ll
                 } else {
                     settings.max_tokens.max(1024)
                 },
+                options: llm::ClientOptions {
+                    temperature: first.temperature,
+                    top_p: first.top_p,
+                    thinking: first.thinking,
+                },
+                stream: first.stream,
             });
         }
     }
@@ -330,6 +359,8 @@ fn resolve_llm_runtime(settings: &Settings, model_id: Option<&str>) -> Result<Ll
         api_key,
         base_url: settings.custom_base_url.clone(),
         max_tokens: settings.max_tokens.max(1024),
+        options: settings.client_options(),
+        stream: None,
     })
 }
 
@@ -1935,7 +1966,7 @@ pub async fn run_agentz_turn(
             s.tool_rate_limit_per_minute,
             s.allow_outside_workspace,
             s.vision_enabled,
-            s.enable_streaming,
+            runtime.stream.unwrap_or(s.enable_streaming),
             s.confirm_shell_commands,
             s.confirm_file_writes,
             s.auto_compact_input_tokens_threshold,
@@ -1993,7 +2024,7 @@ pub async fn run_agentz_turn(
         inject_image_block(&mut llm_messages, media_type, data_b64);
     }
 
-    let client = llm::build_client_with_timeout(
+    let client = llm::build_client_with_options(
         &runtime.provider,
         &runtime.api_key,
         if runtime.base_url.is_empty() {
@@ -2002,6 +2033,7 @@ pub async fn run_agentz_turn(
             Some(&runtime.base_url)
         },
         read_timeout,
+        runtime.options,
     );
 
     // Compose extra system context: caller-supplied context + installed
