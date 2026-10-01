@@ -85,6 +85,28 @@ interface WorkZWorkspaceProps {
  * tools in the open project, streaming its steps. The task list shows past runs
  * and a Changes panel surfaces the resulting `git status` for review.
  */
+const LAST_TASK_KEY_PREFIX = "agentz-workz-last-task:";
+
+/** Remember the open WorkZ task so a restart can reopen it (per project). */
+function rememberLastTask(projectDir: string | null | undefined, id: string | null): void {
+  if (!projectDir) return;
+  try {
+    const key = LAST_TASK_KEY_PREFIX + projectDir;
+    if (id) localStorage.setItem(key, id);
+    else localStorage.removeItem(key);
+  } catch {
+    // storage unavailable — restore is best-effort
+  }
+}
+
+function readLastTask(projectDir: string): string | null {
+  try {
+    return localStorage.getItem(LAST_TASK_KEY_PREFIX + projectDir);
+  } catch {
+    return null;
+  }
+}
+
 export default function WorkZWorkspace({
   projectDir,
   onOpenFolder,
@@ -566,6 +588,7 @@ export default function WorkZWorkspace({
     foregroundSessionRef.current = effectiveSessionId;
     foregroundTaskKeyRef.current = taskKey;
     sessionRef.current = effectiveSessionId;
+    rememberLastTask(projectDir, effectiveSessionId);
     taskKeyBySessionRef.current.set(effectiveSessionId, taskKey);
     markRunning(effectiveSessionId, true);
     setSelectedId(effectiveSessionId);
@@ -753,6 +776,7 @@ export default function WorkZWorkspace({
     foregroundTaskKeyRef.current = null;
     setBusy(false);
     sessionRef.current = null;
+    rememberLastTask(projectDir, null);
     setSelectedId(null);
     setWorkflowRunId(null);
     setWorkflowStatus(null);
@@ -793,9 +817,24 @@ export default function WorkZWorkspace({
         foregroundTaskKeyRef.current = null;
         foregroundSessionRef.current = id;
         sessionRef.current = id;
+        rememberLastTask(projectDir, id);
         setBusy(runningSessionsRef.current.has(id));
         setSelectedId(id);
-        setSteps(history.map((m) => ({ id: m.id, role: m.role, text: m.content, tools: [] })));
+        setSteps(
+          history.map((m) => ({
+            id: m.id,
+            role: m.role,
+            text: m.content,
+            tools: (m.tools ?? []).map((t) => ({
+              id: t.id,
+              name: t.name,
+              input: t.input,
+              result: t.result ?? undefined,
+              status: t.is_error || t.result == null ? ("error" as const) : ("done" as const),
+              textOffset: t.text_offset,
+            })),
+          })),
+        );
         setPlanItems([]);
         setError(null);
         setPreviewPath(null);
@@ -807,6 +846,21 @@ export default function WorkZWorkspace({
     },
     [projectDir, refreshGitChanges, tasks, applyTaskModeBinding, clearCards],
   );
+
+  // After a restart, reopen the task that was active when the app closed.
+  const openTaskRef = useRef(openTask);
+  openTaskRef.current = openTask;
+  const restoredTaskForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!projectDir || tasks.length === 0) return;
+    if (restoredTaskForRef.current === projectDir) return;
+    restoredTaskForRef.current = projectDir;
+    if (sessionRef.current || liveRef.current) return;
+    const lastId = readLastTask(projectDir);
+    if (!lastId) return;
+    if (tasks.some((task) => task.id === lastId)) void openTaskRef.current(lastId);
+    else rememberLastTask(projectDir, null);
+  }, [projectDir, tasks]);
 
   // Cancel the task bound to the active view (foreground run, or a reopened
   // background run we still hold the key for).
