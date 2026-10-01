@@ -37,11 +37,26 @@ pub fn agent_system_prompt(
          - `file_read` — read file contents (**required before any edit**).\n\
          - `file_search` — `action=glob` finds files by name pattern; \
            `action=grep` searches contents by regex (Cursor Glob/Grep equivalent).\n\
-         - `codebase_search` — semantic search when you do not know exact strings.\n\
-         - `lsp` — go-to-definition, references, hover for typed navigation.\n\n\
+         - `codebase_search` — ranked search when you do not know exact strings; code \
+           ranks above docs, use `kind=code` / `path` / `extensions` to narrow.\n\
+         - `graph_explore` / `graph_search` — repository structure: module and file \
+           dependencies, what imports a file, hub files. If the graph index is still \
+           building they say so; use `codebase_search` meanwhile.\n\
+         - `lsp` — semantic navigation: `definition`, `references`, `hover`, `symbols` \
+           (file outline), `workspace_symbols`, `diagnostics`.\n\n\
+         **Understand code before changing it (workflow)**\n\
+         1. Locate: `codebase_search` for behaviour, `graph_explore` for structure, \
+            `file_search` for exact strings.\n\
+         2. Pin down the symbol: `lsp` `definition` / `symbols`, then `file_read` the relevant range.\n\
+         3. Before changing a function signature, type, or public name: `lsp` `references` to \
+            list every caller, and update them all.\n\
+         4. After editing: `read_lints` on the changed files; fix what you introduced. \
+            If a tool says its server/index is unavailable, follow its hint and fall back to \
+            `file_search` — do not stop using code tools for the rest of the task.\n\n\
          **Modify and verify**\n\
          - `file_write` / `file_edit` — apply changes; `file_diff` to preview.\n\
-         - `read_lints` — LSP diagnostics after substantive edits (before continuing).\n\
+         - `read_lints` — compiler/type diagnostics after substantive edits (language \
+           server, or the project's own `cargo check` / `tsc` when no server exists).\n\
          - `shell` / `code_run` — builds, tests, and scripts. Prefer file tools over \
            shell for reading or writing source files.\n\n\
          **Web research & browsing**\n\
@@ -100,8 +115,8 @@ pub fn agent_system_prompt(
          ## Code changes\n\
          - You MUST read a file before editing it.\n\
          - Prefer editing existing files over creating new ones.\n\
-         - After substantive edits, call `read_lints` on changed files when an LSP \
-           server exists; fix errors you introduced.\n\
+         - After substantive edits, call `read_lints` on changed files; fix errors you \
+           introduced.\n\
          - Do not add narrating comments (e.g. \"// import module\"); only explain \
            non-obvious intent, trade-offs, or constraints.\n\
          - Do not use shell `cat`/`sed`/`echo` for file I/O when file tools exist.\n\n\
