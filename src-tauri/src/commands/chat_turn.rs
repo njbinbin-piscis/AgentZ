@@ -1738,7 +1738,6 @@ pub async fn run_agentz_turn(
             }
         }
     }
-    let default_timeout = Duration::from_secs(600);
 
     // Resolve session id early so we can clear plan state before the turn.
     let workspace_root = request
@@ -2242,9 +2241,12 @@ pub async fn run_agentz_turn(
         (text, errored, tool_calls, tool_errors, iterations, tail)
     });
 
+    // No wall-clock limit unless the agent/team explicitly configures one:
+    // long-running coding tasks must be able to run until done or until the
+    // user presses Stop.
     let timeout = match request.task_timeout_secs {
         Some(s) if s > 0 => Duration::from_secs(u64::from(s)),
-        _ => default_timeout,
+        _ => Duration::from_secs(60 * 60 * 24 * 365),
     };
     let run_fut = agent.run(llm_messages, tx, cancel.clone(), ctx);
     let mut turn_timeout_secs: Option<u64> = None;
