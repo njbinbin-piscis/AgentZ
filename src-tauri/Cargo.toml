@@ -31,7 +31,7 @@ piscis-kernel = { workspace = true }
 piscis-ide-tools = { workspace = true }
 
 # RobotZ browser tool
-robotz-browser = { git = "https://github.com/njbinbin-piscis/RobotZ.git", package = "robotz-browser", rev = "v0.1.9", features = ["piscis-kernel"] }
+robotz-browser = { git = "https://github.com/njbinbin-piscis/RobotZ.git", package = "robotz-browser", rev = "v0.1.10", features = ["piscis-kernel"] }
 
 # Tauri runtime + the plugins the IDE workspace needs.
 tauri = { version = "2", features = [] }
