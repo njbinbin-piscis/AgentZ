@@ -747,6 +747,7 @@ const en = {
     dropToAddRefs: "Drop files to add references",
     visionRequired:
       "The current model does not support images. Enable vision in Settings or switch to a multimodal model.",
+    turnTimeoutResuming: "Turn hit its time limit — continuing the unfinished task automatically…",
     chipTerminal: "Terminal",
     chipTerminalLines: "Terminal · {{count}} lines",
     chipTerminalSelection: "Terminal · selection",

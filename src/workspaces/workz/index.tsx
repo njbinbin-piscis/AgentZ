@@ -107,6 +107,8 @@ function readLastTask(projectDir: string): string | null {
   }
 }
 
+const MAX_AUTO_RESUMES = 6;
+
 export default function WorkZWorkspace({
   projectDir,
   onOpenFolder,
@@ -425,10 +427,24 @@ export default function WorkZWorkspace({
       // Turn completion must update every session — including background runs
       // after the user clicks「新建」— or the sidebar dot stays yellow forever.
       if (env.channel === "agent_final") {
-        const fin = env.payload as { ok: boolean; error?: string };
+        const fin = env.payload as { ok: boolean; error?: string; timed_out?: boolean };
         const fg = foregroundSessionRef.current;
-        if (liveRef.current && fg && env.sessionId === fg && !fin.ok && fin.error) {
-          setError(fin.error);
+        const isFg = liveRef.current && !!fg && env.sessionId === fg;
+        if (isFg && fin.ok) autoResumeRef.current = 0;
+        // A wall-clock turn timeout is not a failure: the run loop restarts the
+        // turn itself once this one has fully wound down.
+        const willResume =
+          isFg && !!fin.timed_out && autoResumeRef.current < MAX_AUTO_RESUMES;
+        if (willResume) {
+          autoResumeRef.current += 1;
+          pendingResumeRef.current = true;
+          setToast(t("chat.turnTimeoutResuming"));
+        } else if (isFg && !fin.ok && fin.error) {
+          setError(
+            fin.timed_out
+              ? `${fin.error} (stopped after ${MAX_AUTO_RESUMES} automatic continuations — send a message to continue.)`
+              : fin.error,
+          );
         }
         markRunning(env.sessionId, false);
         setTasks((prev) =>
@@ -553,6 +569,9 @@ export default function WorkZWorkspace({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [steps]);
+
+  const autoResumeRef = useRef(0);
+  const pendingResumeRef = useRef(false);
 
   runRef.current = async (text: string, att: ChatAttachment | null) => {
     setError(null);
@@ -735,12 +754,17 @@ export default function WorkZWorkspace({
       }
       refreshTasks();
       refreshGitChanges();
+      if (pendingResumeRef.current) {
+        pendingResumeRef.current = false;
+        if (isForeground()) void runRef.current?.(t("chat.autoContinuePrompt"), null);
+      }
     }
   };
 
   const run = useCallback(() => {
     const text = goal.trim();
     if ((!text && !attachment) || busy) return;
+    autoResumeRef.current = 0;
     if (!projectDir) {
       setError(t("agent.noProject"));
       return;

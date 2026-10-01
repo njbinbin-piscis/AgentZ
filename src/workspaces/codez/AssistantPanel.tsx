@@ -128,7 +128,7 @@ interface QueuedTurn {
  * How many times a single user request may auto-restart after a turn timeout.
  * Bounds no-click continuation so a failing turn can never loop forever.
  */
-const MAX_AUTO_RESUMES = 2;
+const MAX_AUTO_RESUMES = 6;
 
 const LAST_SESSION_KEY_PREFIX = "agentz-codez-last-session:";
 
@@ -522,15 +522,22 @@ export default function AssistantPanel({
           timed_out?: boolean;
           open_todos?: number;
         };
-        if (!fin.ok && fin.error) setError(fin.error);
-        // Auto-resume: a turn-level timeout that left todos open continues on its
-        // own, so the user does not have to click. A user Stop ends the turn
-        // without `timed_out`, so this never fights an explicit cancellation.
-        if (
-          fin.timed_out &&
-          (fin.open_todos ?? 0) > 0 &&
-          autoResumeRef.current < MAX_AUTO_RESUMES
-        ) {
+        // Auto-resume: a turn-level wall-clock timeout is not a failure. Whatever
+        // was streamed is already persisted, so the turn is restarted on its own
+        // (no click). A user Stop ends the turn without `timed_out`, so this never
+        // fights an explicit cancellation.
+        const willResume = !!fin.timed_out && autoResumeRef.current < MAX_AUTO_RESUMES;
+        if (fin.ok) autoResumeRef.current = 0;
+        if (willResume) {
+          setToast(t("chat.turnTimeoutResuming"));
+        } else if (!fin.ok && fin.error) {
+          setError(
+            fin.timed_out
+              ? `${fin.error} (stopped after ${MAX_AUTO_RESUMES} automatic continuations — send a message to continue.)`
+              : fin.error,
+          );
+        }
+        if (willResume) {
           autoResumeRef.current += 1;
           const { prompt, label } = autoResumeTextRef.current;
           queueRef.current.push({
