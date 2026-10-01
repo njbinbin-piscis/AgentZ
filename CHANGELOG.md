@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-10-01
+
+### Fixed
+
+- Chat now stays pinned to the newest message through tool calls (CodeZ and WorkZ); content growth is no longer mistaken for the user scrolling up.
+- Light theme: settings-saved toast, file diff cards, tool status colors, tool trace output, Markdown fallback blocks, mermaid blocks, collaboration board CLI output and the notebook extension are now readable.
+- LSP tool: rust-analyzer / typescript-language-server / pyright / clangd are now found in `~/.cargo/bin`, the npm global dir and other per-user tool dirs even when the app inherits a trimmed PATH (piscis-engine v0.8.67).
+
 ## [0.7.2] - 2026-10-01
 
 ### Added

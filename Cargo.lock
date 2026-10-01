@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "agentz-desktop"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "aes",
  "anyhow",
@@ -2365,7 +2365,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -3849,7 +3849,7 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 [[package]]
 name = "piscis-core"
 version = "0.8.63"
-source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.66#4fd8c4ff539570f52e4e2da7ca77bc38394cd1a8"
+source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.67#1c41b5df28f5741032e0f70e76b08cee0c70d7b1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3861,7 +3861,7 @@ dependencies = [
 [[package]]
 name = "piscis-ide-tools"
 version = "0.1.0"
-source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.66#4fd8c4ff539570f52e4e2da7ca77bc38394cd1a8"
+source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.67#1c41b5df28f5741032e0f70e76b08cee0c70d7b1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3879,7 +3879,7 @@ dependencies = [
 [[package]]
 name = "piscis-kernel"
 version = "0.8.63"
-source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.66#4fd8c4ff539570f52e4e2da7ca77bc38394cd1a8"
+source = "git+https://github.com/njbinbin-piscis/piscis-engine.git?rev=v0.8.67#1c41b5df28f5741032e0f70e76b08cee0c70d7b1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4603,8 +4603,8 @@ dependencies = [
 
 [[package]]
 name = "robotz-browser"
-version = "0.1.10"
-source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.10#c13fe1fa13ddca92bcb599a0aedac02ea386d9ab"
+version = "0.1.11"
+source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.11#b2436f81dc90218060682c9f69c29cd15217a642"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4627,8 +4627,8 @@ dependencies = [
 
 [[package]]
 name = "robotz-core"
-version = "0.1.10"
-source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.10#c13fe1fa13ddca92bcb599a0aedac02ea386d9ab"
+version = "0.1.11"
+source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.11#b2436f81dc90218060682c9f69c29cd15217a642"
 dependencies = [
  "anyhow",
  "async-trait",
