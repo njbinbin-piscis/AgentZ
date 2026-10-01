@@ -129,6 +129,28 @@ interface QueuedTurn {
  * Bounds no-click continuation so a failing turn can never loop forever.
  */
 const MAX_AUTO_RESUMES = 2;
+
+const LAST_SESSION_KEY_PREFIX = "agentz-codez-last-session:";
+
+/** Remember which session was open so a restart can reopen it (per project). */
+function rememberLastSession(projectDir: string | null | undefined, id: string | null): void {
+  if (!projectDir) return;
+  try {
+    const key = LAST_SESSION_KEY_PREFIX + projectDir;
+    if (id) localStorage.setItem(key, id);
+    else localStorage.removeItem(key);
+  } catch {
+    // storage unavailable — restore is best-effort
+  }
+}
+
+function readLastSession(projectDir: string): string | null {
+  try {
+    return localStorage.getItem(LAST_SESSION_KEY_PREFIX + projectDir);
+  } catch {
+    return null;
+  }
+}
 /** Raw DB rows fetched per history page (newest first). */
 const HISTORY_PAGE = 120;
 
@@ -230,6 +252,8 @@ export default function AssistantPanel({
   const sessionRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   busyRef.current = busy;
+  const projectDirRef = useRef(projectDir);
+  projectDirRef.current = projectDir;
   const streamPendingRef = useRef("");
   /** Total chars streamed into the in-flight assistant message (incl. unflushed). */
   const streamLenRef = useRef(0);
@@ -534,6 +558,7 @@ export default function AssistantPanel({
         !env.sessionId.startsWith("koi_task_")
       ) {
         sessionRef.current = env.sessionId;
+        rememberLastSession(projectDirRef.current, env.sessionId);
         historyCursorRef.current = { sessionId: env.sessionId, offset: 0 };
       }
       const evt = env.payload as AgentEvent;
@@ -774,6 +799,7 @@ export default function AssistantPanel({
         responseLen: res.response_text.length,
       });
       sessionRef.current = res.session_id;
+      rememberLastSession(projectDir, res.session_id);
       const turnId = res.turn_id ?? undefined;
       setMessages((m) => {
         const copy = m.slice();
@@ -994,6 +1020,7 @@ export default function AssistantPanel({
 
   const newSession = useCallback(() => {
     sessionRef.current = null;
+    rememberLastSession(projectDir, null);
     historyCursorRef.current = { sessionId: "", offset: 0 };
     setHasMoreOlder(false);
     queueRef.current = [];
@@ -1009,12 +1036,13 @@ export default function AssistantPanel({
     // A pending `chat_ui` card belongs to the turn that produced it, so a fresh
     // session must start empty — otherwise the stale form reappears here.
     clearCards();
-  }, [clearSessionArtifacts, clearCards]);
+  }, [projectDir, clearSessionArtifacts, clearCards]);
 
   const switchSession = useCallback(
     async (id: string) => {
       try {
         sessionRef.current = id;
+        rememberLastSession(projectDir, id);
         historyCursorRef.current = { sessionId: id, offset: 0 };
         setHasMoreOlder(false);
         setTurnDiffsByTurnId({});
@@ -1039,8 +1067,31 @@ export default function AssistantPanel({
         setError(String(e));
       }
     },
-    [syncMessagesFromDb, clearSessionArtifacts, clearCards],
+    [projectDir, syncMessagesFromDb, clearSessionArtifacts, clearCards],
   );
+
+  // After a restart, reopen the session that was active when the app closed.
+  const switchSessionRef = useRef(switchSession);
+  switchSessionRef.current = switchSession;
+  useEffect(() => {
+    if (!projectDir || sessionRef.current || busyRef.current) return;
+    const lastId = readLastSession(projectDir);
+    if (!lastId) return;
+    let cancelled = false;
+    listSessions(projectDir, [SESSION_SOURCE_CODEZ])
+      .then((list) => {
+        if (cancelled || sessionRef.current || busyRef.current) return;
+        if (list.some((s) => s.id === lastId)) {
+          void switchSessionRef.current(lastId);
+        } else {
+          rememberLastSession(projectDir, null);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projectDir]);
 
   const forkFromCheckpoint = useCallback(
     async (messageId: string) => {
