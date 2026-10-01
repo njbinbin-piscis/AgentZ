@@ -17,6 +17,7 @@ import {
   type SessionMeta,
 } from "../../services/tauri/chat";
 import { useAppSettings, pruneModelId } from "../../hooks/useAppSettings";
+import { useStickToBottom } from "../../hooks/useStickToBottom";
 import { loadScopedModelId, saveScopedModelId } from "../../utils/modelPrefs";
 import { useInputHistory } from "../../components/useInputHistory";
 import { useAtMention, CODEBASE_MENTION, GRAPH_MENTION } from "../../hooks/useAtMention";
@@ -681,9 +682,7 @@ export default function WorkZWorkspace({
     };
   }, [applyEvent]);
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [steps]);
+  useStickToBottom(scrollRef);
 
   const autoResumeRef = useRef(0);
   const pendingResumeRef = useRef(false);

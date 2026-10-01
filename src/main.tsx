@@ -5,6 +5,7 @@ import "./i18n";
 import { initAppearanceTheme, initUiFontScale } from "./theme";
 import App from "./App";
 import "./index.css";
+import "./theme-light-fixes.css";
 
 initAppearanceTheme();
 initUiFontScale();

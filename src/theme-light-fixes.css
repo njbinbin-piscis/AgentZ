@@ -1,0 +1,32 @@
+/* Light-theme overrides for components that hardcode dark-theme colors. */
+
+[data-theme="light"] .agentz-file-diff-line.add { color: #166534; background: rgba(34, 197, 94, 0.16); }
+[data-theme="light"] .agentz-file-diff-line.del { color: #991b1b; background: rgba(248, 113, 113, 0.16); }
+[data-theme="light"] .agentz-file-diff-tag.new { color: #15803d; }
+[data-theme="light"] .agentz-file-diff-tag.mod { color: #a16207; }
+
+[data-theme="light"] .agentz-tool.running { color: #a16207; border-color: #e0c866; }
+[data-theme="light"] .agentz-tool.done { color: #15803d; border-color: #86d3a0; }
+[data-theme="light"] .agentz-tool.error { color: #b91c1c; border-color: #f0a3a3; }
+[data-theme="light"] .agentz-msg.queued .agentz-msg-role { color: #a16207; }
+
+[data-theme="light"] .agentz-tool-trace-pre { background: rgba(0, 0, 0, 0.05); }
+[data-theme="light"] .agentz-tool-trace-pre.is-error,
+[data-theme="light"] .agentz-tool-trace-label.is-error { color: #b91c1c; }
+
+[data-theme="light"] .agentz-markdown-fallback { background: var(--code-bg); color: var(--text); }
+[data-theme="light"] .agentz-mermaid-block { background: rgba(0, 0, 0, 0.03); }
+
+[data-theme="light"] .agentz-collab-card-cli { background: rgba(0, 0, 0, 0.06); color: #3f4a2c; }
+
+[data-theme="light"] .agentz-queue-remove { background: rgba(0, 0, 0, 0.08); }
+
+[data-theme="light"] .agentz-nb { background: var(--bg-elev); color: var(--text); }
+[data-theme="light"] .agentz-nb-toolbar { border-bottom-color: var(--border); }
+[data-theme="light"] .agentz-nb-toolbar button { background: var(--bg-elev-2); border-color: var(--border); color: var(--text); }
+[data-theme="light"] .agentz-nb-toolbar button:hover { background: var(--accent-dim); }
+[data-theme="light"] .agentz-nb-cell { background: var(--bg); border-color: var(--border); }
+[data-theme="light"] .agentz-nb-cell-rail button { color: var(--text-dim); }
+[data-theme="light"] .agentz-nb-cell-rail button:hover { background: var(--bg-hover); color: var(--text); }
+[data-theme="light"] .agentz-nb-md-edit { background: var(--bg-elev); border-color: var(--border); color: var(--text); }
+[data-theme="light"] .agentz-nb-output { background: var(--code-bg); }

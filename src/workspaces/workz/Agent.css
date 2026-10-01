@@ -215,6 +215,7 @@
 .agentz-workz-steps {
   flex: 1;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: 16px;
   padding-right: 36px;
   display: flex;

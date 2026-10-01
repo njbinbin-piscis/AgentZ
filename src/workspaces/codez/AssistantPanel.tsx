@@ -22,6 +22,7 @@ import {
   type SessionMeta,
 } from "../../services/tauri/chat";
 import { useAppSettings, pruneModelId } from "../../hooks/useAppSettings";
+import { useStickToBottom } from "../../hooks/useStickToBottom";
 import { loadScopedModelId, saveScopedModelId } from "../../utils/modelPrefs";
 import { useInputHistory } from "../../components/useInputHistory";
 import { listInstalledSkills, type InstalledSkill } from "../../services/tauri/workbench";
@@ -298,7 +299,7 @@ export default function AssistantPanel({
   /** Newest-first history cursor: raw DB rows loaded so far + whether older ones exist. */
   const historyCursorRef = useRef({ sessionId: "", offset: 0 });
   const [hasMoreOlder, setHasMoreOlder] = useState(false);
-  const stickToBottomRef = useRef(true);
+  const { stickRef: stickToBottomRef } = useStickToBottom(scrollRef);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const { slash, slashMatches, pickSlash, slashLabel, detectSlash, handleSlashKeyDown } =
@@ -726,30 +727,6 @@ export default function AssistantPanel({
       unlisten?.();
     };
   }, [applyDroppedPaths]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
-      stickToBottomRef.current = gap < Math.max(48, el.clientHeight * 0.1);
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Pin to the newest message after layout has settled. A synchronous scroll
-  // ran before row heights were known, which could leave the scroll position
-  // short and hide the reply that just arrived.
-  useEffect(() => {
-    if (!stickToBottomRef.current) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const raf = requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [messages, queuedView]);
 
   const removeQueued = useCallback((index: number) => {
     queueRef.current.splice(index, 1);
