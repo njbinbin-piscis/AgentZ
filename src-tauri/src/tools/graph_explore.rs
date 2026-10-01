@@ -57,6 +57,17 @@ impl Tool for GraphExploreTool {
         let limit = input.get("limit").and_then(|l| l.as_u64()).unwrap_or(12) as usize;
         let root = ctx.workspace_root.clone();
 
+        let notice_root = root.clone();
+        if let Some(msg) = tokio::task::spawn_blocking(move || {
+            crate::commands::graph_index::not_ready_message(&notice_root, "graph_explore")
+        })
+        .await
+        .ok()
+        .flatten()
+        {
+            return Ok(ToolResult::ok(msg));
+        }
+
         match tokio::task::spawn_blocking(move || explore_graph(&root, &query, limit)).await {
             Ok(Ok(text)) => Ok(ToolResult::ok(text)),
             Ok(Err(e)) => Ok(ToolResult::err(format!("graph_explore failed: {e}"))),

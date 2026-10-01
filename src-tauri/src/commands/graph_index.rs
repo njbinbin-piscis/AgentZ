@@ -118,6 +118,30 @@ pub fn ensure_started(root: &Path) {
     }
 }
 
+/// When the graph index is not usable yet, make sure a build is running and
+/// return an explanation the agent can act on (instead of a raw error that
+/// teaches it to avoid the tool). `None` means the index is ready.
+pub fn not_ready_message(root: &Path, tool: &str) -> Option<String> {
+    let ready = graph_db_status(root)
+        .ok()
+        .flatten()
+        .map(|s| s.nodes > 0)
+        .unwrap_or(false);
+    if ready {
+        return None;
+    }
+    let _ = request_rebuild(root.to_path_buf());
+    let st = status(root);
+    let phase = match st.phase {
+        IndexPhase::Building => "building now",
+        _ => "queued",
+    };
+    Some(format!(
+        "{tool}: the repository graph index is not ready yet ({phase}; it is built automatically in the background, usually within a minute). \
+         For this question use `codebase_search` or `file_search` now, then retry {tool} later."
+    ))
+}
+
 fn enqueue(root: PathBuf, rel: Option<String>) -> IndexBuildAck {
     let key = project_key(&root);
     let spawn_worker = {

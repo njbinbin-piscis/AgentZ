@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use piscis_kernel::agent::tool::{Tool, ToolContext, ToolResult};
 use serde_json::{json, Value};
 
-use crate::commands::codebase::search_index;
+use crate::commands::codebase::{search_index_opts, SearchKind, SearchOptions};
 
 pub struct CodebaseSearchTool;
 
@@ -25,9 +25,16 @@ impl Tool for CodebaseSearchTool {
          find where something is implemented / used and you do NOT know the exact \
          string to grep for. Complements `file_search` (literal ripgrep match).\n\
          \n\
+         Source code is ranked above docs/config; chunks that DEFINE a queried \
+         symbol rank highest. Index lives in .agentz/index.db and is built on first use.\n\
+         \n\
          Parameters:\n\
          - 'query' (string): what you're looking for, in words or symbol names.\n\
          - 'limit' (number): max results (default 12).\n\
+         - 'kind' ('auto' | 'code' | 'docs'): 'code' returns source files only, \
+         'docs' only documentation. Default 'auto'.\n\
+         - 'path' (string): only paths containing this text, e.g. 'src-tauri/'.\n\
+         - 'extensions' (string[]): only these extensions, e.g. ['rs','tsx'].\n\
          \n\
          Output: ranked `path:start-end` locations with a code snippet each."
     }
@@ -37,7 +44,10 @@ impl Tool for CodebaseSearchTool {
             "type": "object",
             "properties": {
                 "query": { "type": "string", "description": "Natural-language or keyword query." },
-                "limit": { "type": "integer", "description": "Max results (default 12)." }
+                "limit": { "type": "integer", "description": "Max results (default 12)." },
+                "kind": { "type": "string", "enum": ["auto", "code", "docs"], "description": "Restrict to code or docs. Default auto." },
+                "path": { "type": "string", "description": "Only paths containing this text." },
+                "extensions": { "type": "array", "items": { "type": "string" }, "description": "Only these file extensions (no dots)." }
             },
             "required": ["query"]
         })
@@ -58,9 +68,33 @@ impl Tool for CodebaseSearchTool {
         }
         let limit = input.get("limit").and_then(|l| l.as_u64()).unwrap_or(12) as usize;
 
+        let opts = SearchOptions {
+            kind: match input.get("kind").and_then(|k| k.as_str()) {
+                Some("code") => SearchKind::Code,
+                Some("docs") => SearchKind::Docs,
+                _ => SearchKind::Auto,
+            },
+            path_filter: input
+                .get("path")
+                .and_then(|p| p.as_str())
+                .map(|p| p.to_string()),
+            extensions: input
+                .get("extensions")
+                .and_then(|e| e.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str())
+                        .map(|s| s.trim_start_matches('.').to_string())
+                        .collect()
+                })
+                .unwrap_or_default(),
+        };
         let root = ctx.workspace_root.clone();
-        let hits =
-            match tokio::task::spawn_blocking(move || search_index(&root, &query, limit)).await {
+        let hits = match tokio::task::spawn_blocking(move || {
+            search_index_opts(&root, &query, limit, &opts)
+        })
+        .await
+        {
                 Ok(Ok(h)) => h,
                 Ok(Err(e)) => return Ok(ToolResult::err(format!("codebase_search failed: {e}"))),
                 Err(e) => return Ok(ToolResult::err(format!("codebase_search task failed: {e}"))),

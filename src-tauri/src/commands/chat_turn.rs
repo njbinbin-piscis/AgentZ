@@ -1459,6 +1459,10 @@ fn wiki_agent_coding_context(workspace_root: &str, chat_mode: &str) -> Option<St
         return None;
     }
 
+    // Opening a turn on an unindexed project kicks off the graph build so the
+    // structural tools are ready by the time the agent wants them.
+    crate::commands::graph_index::ensure_started(root);
+
     // Agent / plan modes get a richer inline brief; ask mode gets a shorter excerpt.
     let max_chars = if chat_mode == "agent" { 4500 } else { 2200 };
 

@@ -180,10 +180,65 @@ pub fn index_file(root: &Path, rel: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Which kinds of files a search may return.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SearchKind {
+    /// Everything, but prose/config chunks are down-weighted below code.
+    #[default]
+    Auto,
+    /// Source code only.
+    Code,
+    /// Documentation / prose only.
+    Docs,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SearchOptions {
+    pub kind: SearchKind,
+    /// Case-insensitive substring a path must contain (e.g. `src-tauri/`).
+    pub path_filter: Option<String>,
+    /// Allowed file extensions without dots (e.g. `["rs", "ts"]`); empty = any.
+    pub extensions: Vec<String>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FileClass {
+    Code,
+    Config,
+    Docs,
+}
+
+fn classify(path: &str) -> FileClass {
+    let lower = path.to_lowercase();
+    if lower.starts_with("docs/") || lower.contains("/docs/") {
+        return FileClass::Docs;
+    }
+    match lower.rsplit('.').next().unwrap_or("") {
+        "md" | "txt" => FileClass::Docs,
+        "json" | "toml" | "yaml" | "yml" => FileClass::Config,
+        _ => FileClass::Code,
+    }
+}
+
+fn is_test_path(path: &str) -> bool {
+    let l = path.to_lowercase();
+    l.contains("/tests/") || l.contains("test.") || l.contains(".test.") || l.contains("_test.")
+}
+
+const STOPWORDS: &[&str] = &[
+    "the", "and", "for", "with", "that", "this", "from", "how", "what", "where", "when", "does",
+    "are", "was", "into", "its", "not", "all", "can", "has", "have", "use", "used", "using",
+];
+
+const DEFINITION_PREFIXES: &[&str] = &[
+    "fn ", "struct ", "enum ", "trait ", "impl ", "class ", "interface ", "function ", "def ",
+    "type ", "const ", "mod ",
+];
+
 fn tokenize(q: &str) -> Vec<String> {
     q.to_lowercase()
         .split(|c: char| !c.is_alphanumeric() && c != '_')
-        .filter(|t| t.len() >= 2)
+        .filter(|t| t.len() >= 2 && !STOPWORDS.contains(t))
         .map(|t| t.to_string())
         .collect::<HashSet<_>>()
         .into_iter()
@@ -206,6 +261,15 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
 /// Search the index for `query`, building it lazily if empty. Returns the
 /// top `limit` chunks ranked by term frequency + path-name boost.
 pub fn search_index(root: &Path, query: &str, limit: usize) -> Result<Vec<CodeSearchHit>, String> {
+    search_index_opts(root, query, limit, &SearchOptions::default())
+}
+
+pub fn search_index_opts(
+    root: &Path,
+    query: &str,
+    limit: usize,
+    opts: &SearchOptions,
+) -> Result<Vec<CodeSearchHit>, String> {
     let terms = tokenize(query);
     if terms.is_empty() {
         return Ok(vec![]);
@@ -240,16 +304,41 @@ pub fn search_index(root: &Path, query: &str, limit: usize) -> Result<Vec<CodeSe
     for row in rows.flatten() {
         let (path, start_line, end_line, content, lower) = row;
         let path_lower = path.to_lowercase();
+        let class = classify(&path);
+        match opts.kind {
+            SearchKind::Code if class != FileClass::Code => continue,
+            SearchKind::Docs if class != FileClass::Docs => continue,
+            _ => {}
+        }
+        if let Some(f) = opts.path_filter.as_deref().filter(|f| !f.is_empty()) {
+            if !path_lower.contains(&f.to_lowercase().replace('\\', "/")) {
+                continue;
+            }
+        }
+        if !opts.extensions.is_empty() {
+            let ext = path_lower.rsplit('.').next().unwrap_or("");
+            if !opts.extensions.iter().any(|e| e.eq_ignore_ascii_case(ext)) {
+                continue;
+            }
+        }
         let mut score = 0.0f64;
         let mut matched_terms = 0;
         for term in &terms {
             let c = count_occurrences(&lower, term);
             if c > 0 {
                 matched_terms += 1;
-                score += c as f64;
+                score += 1.0 + (c as f64).ln(); // saturating tf: repetition must not dominate
             }
             if path_lower.contains(term) {
                 score += 3.0; // path-name relevance boost
+            }
+            // A chunk that *defines* the term is far more useful than one that
+            // merely mentions it.
+            if DEFINITION_PREFIXES
+                .iter()
+                .any(|p| lower.contains(&format!("{p}{term}")))
+            {
+                score += 12.0;
             }
         }
         if matched_terms == 0 {
@@ -257,6 +346,13 @@ pub fn search_index(root: &Path, query: &str, limit: usize) -> Result<Vec<CodeSe
         }
         // Reward chunks that hit more distinct query terms.
         score *= 1.0 + matched_terms as f64;
+        // Prose repeats words heavily; keep it below code for the same terms.
+        score *= match class {
+            FileClass::Code if is_test_path(&path) => 0.8,
+            FileClass::Code => 1.0,
+            FileClass::Config => 0.5,
+            FileClass::Docs => 0.25,
+        };
         let snippet: String = content.lines().take(12).collect::<Vec<_>>().join("\n");
         hits.push(CodeSearchHit {
             path,
@@ -304,4 +400,61 @@ pub async fn codebase_search(
     tokio::task::spawn_blocking(move || search_index(&root, &query, lim))
         .await
         .map_err(|e| format!("search task failed: {e}"))?
+}
+
+#[cfg(test)]
+mod search_ranking_tests {
+    use super::*;
+
+    fn setup() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "agentz-search-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = dir.as_path();
+        std::fs::create_dir_all(root.join("docs")).unwrap();
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(
+            root.join("docs/notes.md"),
+            "agent turn timeout handling and auto resume\n".repeat(20),
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("src/turn.rs"),
+            "fn handle_timeout() {\n    // timeout handling for the agent turn\n}\n",
+        )
+        .unwrap();
+        dir
+    }
+
+    #[test]
+    fn code_ranks_above_docs_and_filters_work() {
+        let dir = setup();
+        let q = "agent turn timeout handling";
+        let hits = search_index(dir.as_path(), q, 5).unwrap();
+        assert_eq!(hits[0].path, "src/turn.rs", "{hits:?}");
+
+        let docs = search_index_opts(
+            dir.as_path(),
+            q,
+            5,
+            &SearchOptions { kind: SearchKind::Docs, ..Default::default() },
+        )
+        .unwrap();
+        assert!(docs.iter().all(|h| h.path.starts_with("docs/")));
+
+        let code = search_index_opts(
+            dir.as_path(),
+            q,
+            5,
+            &SearchOptions { kind: SearchKind::Code, ..Default::default() },
+        )
+        .unwrap();
+        assert!(code.iter().all(|h| h.path == "src/turn.rs"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
