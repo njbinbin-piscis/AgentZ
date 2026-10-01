@@ -5,12 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.11] - 2026-10-01
 
 ### Added
 
 - **Code map**: new title-bar entry with a module dependency graph (expand to files), a size/90-day-churn treemap and a detail sidebar (imports, imported-by, open in editor, send to agent).
-- **`symbol_search` / `impact` tools**: tree-sitter symbol and call index (Rust, TS/JS, Python, Go) for finding definitions and the callers/files affected by a change.
+- **`symbol_search` / `impact` tools**: tree-sitter symbol and call index (Rust, TS/JS, Python, Go), persisted in `.agentz/graph.db`, for finding definitions and the callers/files affected by a change.
+- **Call graph view** in the Code map: pick a function to see its callers and callees.
+- Code map dependency graph now uses ELK layered layout.
 - **Real LSP client** for the `lsp` tool; `read_lints` falls back to `cargo check` / `tsc` when no language server exists.
 - Delegated sub-agents can read dependency sources (cargo registry, node_modules).
 

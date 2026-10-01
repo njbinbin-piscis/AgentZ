@@ -9,14 +9,18 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import {
+  fetchCallGraph,
   fetchCodeMap,
+  findSymbols,
+  type CallGraphData,
+  type CallGraphNode,
   type CodeMapData,
   type CodeMapFile,
 } from "../../../services/tauri/codeMap";
-import { churnColor, hashColor, layerize, squarify } from "./layout";
+import { churnColor, elkLayout, hashColor, squarify } from "./layout";
 import "./CodeMap.css";
 
-type ViewMode = "graph" | "treemap";
+type ViewMode = "graph" | "treemap" | "calls";
 type Selection = { kind: "group" | "file"; id: string } | null;
 
 interface Props {
@@ -37,6 +41,37 @@ export function CodeMapPanel({ projectDir, onClose, onOpenFile, onAskAgent }: Pr
   const [selection, setSelection] = useState<Selection>(null);
   const [query, setQuery] = useState("");
   const [onlyRelated, setOnlyRelated] = useState(false);
+  const [callQuery, setCallQuery] = useState("");
+  const [callHits, setCallHits] = useState<CallGraphNode[]>([]);
+  const [callGraph, setCallGraph] = useState<CallGraphData | null>(null);
+  const [positions, setPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+
+  useEffect(() => {
+    if (mode !== "calls" || !callQuery.trim()) {
+      setCallHits([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      findSymbols(projectDir, callQuery)
+        .then((r) => !cancelled && setCallHits(r))
+        .catch(() => !cancelled && setCallHits([]));
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [mode, callQuery, projectDir]);
+
+  const pickSymbol = useCallback(
+    (id: number) => {
+      setCallHits([]);
+      fetchCallGraph(projectDir, id, 2)
+        .then(setCallGraph)
+        .catch((e) => setError(String(e)));
+    },
+    [projectDir],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -93,8 +128,53 @@ export function CodeMapPanel({ projectDir, onClose, onOpenFile, onAskAgent }: Pr
     return set;
   }, [data, selection, focusGroup]);
 
-  const { nodes, edges } = useMemo(() => {
-    if (!data || !data.ready) return { nodes: [] as Node[], edges: [] as Edge[] };
+  const { nodes: rawNodes, edges, layoutInput } = useMemo(() => {
+    const empty = { nodes: [] as Node[], edges: [] as Edge[], layoutInput: null as null | { key: string; nodes: { id: string; w: number; h: number }[]; edges: { from: string; to: string }[] } };
+    if (mode === "calls") {
+      if (!callGraph) return empty;
+      const sid = (i: number) => `s${i}`;
+      const ns: Node[] = callGraph.nodes.map((n) => ({
+        id: sid(n.id),
+        position: { x: 0, y: 0 },
+        data: {
+          label: (
+            <div className="cm-node-body" title={`${n.file}:${n.start_line}`}>
+              <div className="cm-node-title">
+                {n.container ? `${n.container}::` : ""}
+                {n.name}
+              </div>
+              <div className="cm-node-sub">
+                {n.file}:{n.start_line}
+              </div>
+            </div>
+          ),
+        },
+        style: {
+          width: 230,
+          borderRadius: 8,
+          border: `2px solid ${n.center ? "#f59e0b" : hashColor(n.file)}`,
+          background: "var(--bg-elev)",
+          color: "var(--fg)",
+        },
+      }));
+      const es: Edge[] = callGraph.edges.map((e, i) => ({
+        id: `c${i}`,
+        source: sid(e.from),
+        target: sid(e.to),
+        markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
+        style: { stroke: "var(--border)", strokeWidth: 1.5 },
+      }));
+      return {
+        nodes: ns,
+        edges: es,
+        layoutInput: {
+          key: `calls:${ns.map((n) => n.id).join(",")}|${es.length}`,
+          nodes: ns.map((n) => ({ id: n.id, w: 230, h: 56 })),
+          edges: callGraph.edges.map((e) => ({ from: sid(e.from), to: sid(e.to) })),
+        },
+      };
+    }
+    if (!data || !data.ready) return empty;
     type Item = { id: string; label: string; sub: string; color: string; match: boolean; size: number };
     let items: Item[];
     let rawEdges: { from: string; to: string; weight: number }[];
@@ -134,26 +214,15 @@ export function CodeMapPanel({ projectDir, onClose, onOpenFile, onAskAgent }: Pr
       rawEdges = rawEdges.filter((e) => keep.has(e.from) && keep.has(e.to));
     }
 
-    const layer = layerize(
-      items.map((i) => i.id),
-      rawEdges,
-    );
-    const columns = new Map<number, Item[]>();
-    items.forEach((i) => {
-      const l = layer.get(i.id) ?? 0;
-      columns.set(l, [...(columns.get(l) ?? []), i]);
-    });
-
     const outNodes: Node[] = [];
-    [...columns.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .forEach(([l, col]) => {
-        col.forEach((it, row) => {
+    {
+      {
+        items.forEach((it) => {
           const isSel = selection?.id === it.id;
           const isRel = related.has(it.id);
           outNodes.push({
             id: it.id,
-            position: { x: l * 280, y: row * 84 },
+            position: { x: 0, y: 0 },
             data: {
               label: (
                 <div className="cm-node-body">
@@ -173,7 +242,8 @@ export function CodeMapPanel({ projectDir, onClose, onOpenFile, onAskAgent }: Pr
             },
           });
         });
-      });
+      }
+    }
 
     const outEdges: Edge[] = rawEdges.map((e, idx) => {
       const active = selection && (e.from === selection.id || e.to === selection.id);
@@ -189,18 +259,50 @@ export function CodeMapPanel({ projectDir, onClose, onOpenFile, onAskAgent }: Pr
         },
       };
     });
-    return { nodes: outNodes, edges: outEdges };
-  }, [data, focusGroup, onlyRelated, q, related, selection, t]);
+    return {
+      nodes: outNodes,
+      edges: outEdges,
+      layoutInput: {
+        key: `${focusGroup ?? ""}|${onlyRelated}|${items.map((i) => i.id).join(",")}|${rawEdges.length}`,
+        nodes: items.map((i) => ({ id: i.id, w: 230, h: 56 })),
+        edges: rawEdges.map((e) => ({ from: e.from, to: e.to })),
+      },
+    };
+  }, [data, mode, callGraph, focusGroup, onlyRelated, q, related, selection, t]);
+
+  const layoutKey = layoutInput?.key ?? "";
+  useEffect(() => {
+    if (!layoutInput) return;
+    let cancelled = false;
+    void elkLayout(layoutInput.nodes, layoutInput.edges).then((p) => {
+      if (!cancelled) setPositions(p);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutKey]);
+
+  const nodes = useMemo(
+    () => rawNodes.map((n) => ({ ...n, position: positions.get(n.id) ?? n.position })),
+    [rawNodes, positions],
+  );
 
   const onNodeClick = useCallback(
     (_: unknown, node: Node) => {
+      if (mode === "calls") return;
       setSelection({ kind: focusGroup ? "file" : "group", id: node.id });
     },
-    [focusGroup],
+    [focusGroup, mode],
   );
 
   const onNodeDoubleClick = useCallback(
     (_: unknown, node: Node) => {
+      if (mode === "calls") {
+        const n = callGraph?.nodes.find((x) => `s${x.id}` === node.id);
+        if (n) onOpenFile(n.file);
+        return;
+      }
       if (focusGroup) {
         onOpenFile(node.id);
       } else {
@@ -208,7 +310,7 @@ export function CodeMapPanel({ projectDir, onClose, onOpenFile, onAskAgent }: Pr
         setSelection(null);
       }
     },
-    [focusGroup, onOpenFile],
+    [focusGroup, mode, callGraph, onOpenFile],
   );
 
   const detail = useMemo(() => {
@@ -258,9 +360,12 @@ export function CodeMapPanel({ projectDir, onClose, onOpenFile, onAskAgent }: Pr
 
   const renderBody = () => {
     if (error) return <div className="cm-empty">{error}</div>;
+    if (mode === "calls" && !callGraph) {
+      return <div className="cm-empty">{t("codeMap.callsHint")}</div>;
+    }
     if (!data) return <div className="cm-empty">{t("codeMap.loading")}</div>;
     if (!data.ready) return <div className="cm-empty">{t("codeMap.building")}</div>;
-    if (data.files.length === 0) return <div className="cm-empty">{t("codeMap.empty")}</div>;
+    if (mode !== "calls" && data.files.length === 0) return <div className="cm-empty">{t("codeMap.empty")}</div>;
     if (mode === "treemap") {
       return (
         <div className="cm-treemap-wrap">
@@ -340,6 +445,9 @@ export function CodeMapPanel({ projectDir, onClose, onOpenFile, onAskAgent }: Pr
             <button className={mode === "graph" ? "active" : ""} onClick={() => setMode("graph")}>
               {t("codeMap.viewGraph")}
             </button>
+            <button className={mode === "calls" ? "active" : ""} onClick={() => setMode("calls")}>
+              {t("codeMap.viewCalls")}
+            </button>
             <button
               className={mode === "treemap" ? "active" : ""}
               onClick={() => setMode("treemap")}
@@ -358,12 +466,38 @@ export function CodeMapPanel({ projectDir, onClose, onOpenFile, onAskAgent }: Pr
               ← {focusGroup}
             </button>
           )}
-          <input
-            className="cm-search"
-            placeholder={t("codeMap.search")}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          {mode === "calls" ? (
+            <div className="cm-callsearch">
+              <input
+                className="cm-search"
+                placeholder={t("codeMap.searchSymbol")}
+                value={callQuery}
+                onChange={(e) => setCallQuery(e.target.value)}
+              />
+              {callHits.length > 0 && (
+                <ul className="cm-hits">
+                  {callHits.map((h) => (
+                    <li key={h.id}>
+                      <button onClick={() => pickSymbol(h.id)}>
+                        {h.container ? `${h.container}::` : ""}
+                        {h.name}
+                        <span>
+                          {h.file}:{h.start_line}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : (
+            <input
+              className="cm-search"
+              placeholder={t("codeMap.search")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          )}
           {mode === "graph" && (
             <label className="cm-check">
               <input

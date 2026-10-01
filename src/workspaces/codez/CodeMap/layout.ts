@@ -1,3 +1,36 @@
+import ELK from "elkjs/lib/elk.bundled.js";
+
+const elk = new ELK();
+
+/** Layered left-to-right layout via ELK. Falls back to an empty map on failure. */
+export async function elkLayout(
+  nodes: { id: string; w: number; h: number }[],
+  edges: { from: string; to: string }[],
+): Promise<Map<string, { x: number; y: number }>> {
+  const ids = new Set(nodes.map((n) => n.id));
+  try {
+    const res = await elk.layout({
+      id: "root",
+      layoutOptions: {
+        "elk.algorithm": "layered",
+        "elk.direction": "RIGHT",
+        "elk.spacing.nodeNode": "28",
+        "elk.layered.spacing.nodeNodeBetweenLayers": "70",
+        "elk.layered.cycleBreaking.strategy": "GREEDY",
+      },
+      children: nodes.map((n) => ({ id: n.id, width: n.w, height: n.h })),
+      edges: edges
+        .filter((e) => ids.has(e.from) && ids.has(e.to) && e.from !== e.to)
+        .map((e, i) => ({ id: `e${i}`, sources: [e.from], targets: [e.to] })),
+    });
+    const out = new Map<string, { x: number; y: number }>();
+    res.children?.forEach((c) => out.set(c.id, { x: c.x ?? 0, y: c.y ?? 0 }));
+    return out;
+  } catch {
+    return new Map();
+  }
+}
+
 export interface Rect {
   x: number;
   y: number;

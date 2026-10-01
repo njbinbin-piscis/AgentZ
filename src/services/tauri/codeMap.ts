@@ -47,3 +47,31 @@ export interface CodeMapData {
 export function fetchCodeMap(projectDir: string): Promise<CodeMapData> {
   return invoke<CodeMapData>("code_map_data", { projectDir });
 }
+
+export interface CallGraphNode {
+  id: number;
+  name: string;
+  kind: string;
+  file: string;
+  start_line: number;
+  container: string | null;
+  center: boolean;
+}
+
+export interface CallGraphData {
+  nodes: CallGraphNode[];
+  edges: { from: number; to: number }[];
+  truncated: boolean;
+}
+
+export function findSymbols(projectDir: string, query: string): Promise<CallGraphNode[]> {
+  return invoke<CallGraphNode[]>("symbol_find", { projectDir, query });
+}
+
+export function fetchCallGraph(
+  projectDir: string,
+  symbolId: number,
+  depth = 2,
+): Promise<CallGraphData> {
+  return invoke<CallGraphData>("symbol_call_graph", { projectDir, symbolId, depth });
+}

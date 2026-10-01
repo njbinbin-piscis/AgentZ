@@ -48,6 +48,18 @@
   background: var(--bg-elev);
   color: var(--fg);
 }
+.cm-callsearch { position: relative; }
+.cm-hits {
+  position: absolute; top: 100%; left: 0; z-index: 5; margin: 4px 0 0; padding: 4px;
+  list-style: none; width: 380px; max-height: 320px; overflow: auto;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px;
+}
+.cm-hits button {
+  display: flex; justify-content: space-between; gap: 8px; width: 100%;
+  background: none; border: none; color: var(--fg); cursor: pointer; padding: 3px 6px; font-size: 12px; text-align: left;
+}
+.cm-hits button:hover { background: var(--bg); }
+.cm-hits span { opacity: 0.55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cm-check { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
 .cm-main { flex: 1; display: flex; min-height: 0; }
 .cm-canvas { flex: 1; position: relative; min-width: 0; }

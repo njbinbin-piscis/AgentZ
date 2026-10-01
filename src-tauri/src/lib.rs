@@ -186,6 +186,8 @@ pub fn run() {
             commands::graph::graph_index_rebuild,
             commands::graph::graph_index_status,
             commands::code_map::code_map_data,
+            commands::symbols::symbol_find,
+            commands::symbols::symbol_call_graph,
             commands::graph_agent::graph_domain_read,
             commands::graph_agent::graph_validate,
             // VS Code .vsix contribution-point ingestion

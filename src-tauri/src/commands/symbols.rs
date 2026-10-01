@@ -45,6 +45,24 @@ pub struct SymbolIndex {
     pub calls: Vec<(Option<usize>, String, String, usize)>,
     pub by_name: HashMap<String, Vec<usize>>,
     pub callers_of: HashMap<String, Vec<usize>>,
+    pub calls_by_caller: HashMap<usize, Vec<usize>>,
+}
+
+impl SymbolIndex {
+    fn finish(&mut self) {
+        self.by_name.clear();
+        self.callers_of.clear();
+        self.calls_by_caller.clear();
+        for (i, s) in self.symbols.iter().enumerate() {
+            self.by_name.entry(s.name.clone()).or_default().push(i);
+        }
+        for (i, c) in self.calls.iter().enumerate() {
+            self.callers_of.entry(c.1.clone()).or_default().push(i);
+            if let Some(caller) = c.0 {
+                self.calls_by_caller.entry(caller).or_default().push(i);
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -300,13 +318,104 @@ pub fn build_index(root: &Path, files: &[PathBuf]) -> SymbolIndex {
                 .push((c.caller.map(|i| base + i), c.callee, rel.clone(), c.line));
         }
     }
-    for (i, s) in idx.symbols.iter().enumerate() {
-        idx.by_name.entry(s.name.clone()).or_default().push(i);
-    }
-    for (i, c) in idx.calls.iter().enumerate() {
-        idx.callers_of.entry(c.1.clone()).or_default().push(i);
-    }
+    idx.finish();
     idx
+}
+
+fn kind_static(k: &str) -> &'static str {
+    const KINDS: [&str; 15] = [
+        "fn", "struct", "enum", "trait", "mod", "type", "const", "function", "class", "method",
+        "interface", "func", "var", "let", "other",
+    ];
+    KINDS.iter().find(|x| **x == k).copied().unwrap_or("other")
+}
+
+fn persist_index(root: &Path, idx: &SymbolIndex, fp: u64) -> Result<(), String> {
+    let conn = crate::commands::graph_db::open_graph_db(root)?;
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS symbols (
+            id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, file TEXT NOT NULL,
+            start_line INTEGER NOT NULL, end_line INTEGER NOT NULL, container TEXT);
+         CREATE TABLE IF NOT EXISTS symbol_calls (
+            caller INTEGER, callee TEXT NOT NULL, file TEXT NOT NULL, line INTEGER NOT NULL);
+         CREATE TABLE IF NOT EXISTS symbol_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+         CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
+         CREATE INDEX IF NOT EXISTS idx_symbol_calls_callee ON symbol_calls(callee);",
+    )
+    .map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute_batch("DELETE FROM symbols; DELETE FROM symbol_calls; DELETE FROM symbol_meta;")
+        .map_err(|e| e.to_string())?;
+    {
+        let mut ins = tx
+            .prepare("INSERT INTO symbols VALUES (?1,?2,?3,?4,?5,?6,?7)")
+            .map_err(|e| e.to_string())?;
+        for (i, s) in idx.symbols.iter().enumerate() {
+            ins.execute(rusqlite::params![
+                i as i64, s.name, s.kind, s.file, s.start_line as i64, s.end_line as i64, s.container
+            ])
+            .map_err(|e| e.to_string())?;
+        }
+        let mut insc = tx
+            .prepare("INSERT INTO symbol_calls VALUES (?1,?2,?3,?4)")
+            .map_err(|e| e.to_string())?;
+        for c in &idx.calls {
+            insc.execute(rusqlite::params![c.0.map(|v| v as i64), c.1, c.2, c.3 as i64])
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    tx.execute(
+        "INSERT INTO symbol_meta VALUES ('fingerprint', ?1)",
+        rusqlite::params![fp.to_string()],
+    )
+    .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())
+}
+
+fn load_persisted(root: &Path, fp: u64) -> Option<SymbolIndex> {
+    if !root.join(".agentz").join("graph.db").exists() {
+        return None;
+    }
+    let conn = crate::commands::graph_db::open_graph_db(root).ok()?;
+    let stored: String = conn
+        .query_row("SELECT value FROM symbol_meta WHERE key='fingerprint'", [], |r| r.get(0))
+        .ok()?;
+    if stored != fp.to_string() {
+        return None;
+    }
+    let mut idx = SymbolIndex::default();
+    let mut st = conn
+        .prepare("SELECT name, kind, file, start_line, end_line, container FROM symbols ORDER BY id")
+        .ok()?;
+    let rows = st
+        .query_map([], |r| {
+            Ok(Symbol {
+                name: r.get(0)?,
+                kind: kind_static(&r.get::<_, String>(1)?),
+                file: r.get(2)?,
+                start_line: r.get::<_, i64>(3)? as usize,
+                end_line: r.get::<_, i64>(4)? as usize,
+                container: r.get(5)?,
+            })
+        })
+        .ok()?;
+    idx.symbols = rows.flatten().collect();
+    let mut sc = conn
+        .prepare("SELECT caller, callee, file, line FROM symbol_calls")
+        .ok()?;
+    let crows = sc
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, Option<i64>>(0)?.map(|v| v as usize),
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, i64>(3)? as usize,
+            ))
+        })
+        .ok()?;
+    idx.calls = crows.flatten().collect();
+    idx.finish();
+    Some(idx)
 }
 
 type Cache = Mutex<HashMap<PathBuf, (u64, Arc<SymbolIndex>)>>;
@@ -324,7 +433,14 @@ pub fn index_for(root: &Path) -> Arc<SymbolIndex> {
             return idx;
         }
     }
-    let idx = Arc::new(build_index(root, &files));
+    let idx = match load_persisted(root, fp) {
+        Some(i) => Arc::new(i),
+        None => {
+            let built = build_index(root, &files);
+            let _ = persist_index(root, &built, fp);
+            Arc::new(built)
+        }
+    };
     if let Ok(mut c) = cache().lock() {
         c.insert(root.to_path_buf(), (fp, idx.clone()));
     }
@@ -449,6 +565,178 @@ pub fn impact_report(idx: &SymbolIndex, symbol: &str, depth: usize, limit: usize
     out
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CallGraphNode {
+    pub id: usize,
+    pub name: String,
+    pub kind: String,
+    pub file: String,
+    pub start_line: usize,
+    pub container: Option<String>,
+    pub center: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CallGraphEdge {
+    pub from: usize,
+    pub to: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize, Default)]
+pub struct CallGraph {
+    pub nodes: Vec<CallGraphNode>,
+    pub edges: Vec<CallGraphEdge>,
+    pub truncated: bool,
+}
+
+const MAX_CALLEE_DEFS: usize = 3;
+
+/// Callers and callees around `center` (a symbol index), `depth` hops each way.
+pub fn call_graph(idx: &SymbolIndex, center: usize, depth: usize, max_nodes: usize) -> CallGraph {
+    let mut g = CallGraph::default();
+    if center >= idx.symbols.len() {
+        return g;
+    }
+    let mut included: HashSet<usize> = HashSet::from([center]);
+    let mut order = vec![center];
+    let mut edges: HashSet<(usize, usize)> = HashSet::new();
+
+    for outgoing in [true, false] {
+        let mut frontier = vec![center];
+        for _ in 0..depth {
+            let mut next = Vec::new();
+            for &s in &frontier {
+                let pairs: Vec<(usize, usize)> = if outgoing {
+                    idx.calls_by_caller
+                        .get(&s)
+                        .into_iter()
+                        .flatten()
+                        .flat_map(|&ci| {
+                            idx.by_name
+                                .get(&idx.calls[ci].1)
+                                .into_iter()
+                                .flatten()
+                                .take(MAX_CALLEE_DEFS)
+                                .map(move |&d| (s, d))
+                        })
+                        .collect()
+                } else {
+                    let name = &idx.symbols[s].name;
+                    idx.callers_of
+                        .get(name)
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|&ci| idx.calls[ci].0.map(|c| (c, s)))
+                        .collect()
+                };
+                for (from, to) in pairs {
+                    let other = if outgoing { to } else { from };
+                    if from == to {
+                        continue;
+                    }
+                    if !included.contains(&other) {
+                        if included.len() >= max_nodes {
+                            g.truncated = true;
+                            continue;
+                        }
+                        included.insert(other);
+                        order.push(other);
+                        next.push(other);
+                    }
+                    edges.insert((from, to));
+                }
+            }
+            frontier = next;
+        }
+    }
+    g.nodes = order
+        .iter()
+        .map(|&i| {
+            let s = &idx.symbols[i];
+            CallGraphNode {
+                id: i,
+                name: s.name.clone(),
+                kind: s.kind.to_string(),
+                file: s.file.clone(),
+                start_line: s.start_line,
+                container: s.container.clone(),
+                center: i == center,
+            }
+        })
+        .collect();
+    let mut es: Vec<_> = edges.into_iter().collect();
+    es.sort();
+    g.edges = es
+        .into_iter()
+        .map(|(from, to)| CallGraphEdge { from, to })
+        .collect();
+    g
+}
+
+/// Symbol indexes whose name matches `query`, best matches first.
+pub fn find_symbols(idx: &SymbolIndex, query: &str, limit: usize) -> Vec<usize> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return Vec::new();
+    }
+    let mut scored: Vec<(i32, usize)> = idx
+        .symbols
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| matches!(s.kind, "fn" | "function" | "method" | "func"))
+        .filter_map(|(i, s)| {
+            let n = s.name.to_lowercase();
+            let sc = if n == q { 100 } else if n.starts_with(&q) { 70 } else if n.contains(&q) { 40 } else { return None };
+            Some((sc, i))
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+    scored.into_iter().take(limit).map(|(_, i)| i).collect()
+}
+
+#[tauri::command]
+pub async fn symbol_find(
+    project_dir: Option<String>,
+    query: String,
+) -> Result<Vec<CallGraphNode>, String> {
+    let root = PathBuf::from(crate::commands::data_scope::require_project_dir(project_dir.as_deref())?);
+    tokio::task::spawn_blocking(move || {
+        let idx = index_for(&root);
+        find_symbols(&idx, &query, 30)
+            .into_iter()
+            .map(|i| {
+                let s = &idx.symbols[i];
+                CallGraphNode {
+                    id: i,
+                    name: s.name.clone(),
+                    kind: s.kind.to_string(),
+                    file: s.file.clone(),
+                    start_line: s.start_line,
+                    container: s.container.clone(),
+                    center: false,
+                }
+            })
+            .collect()
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn symbol_call_graph(
+    project_dir: Option<String>,
+    symbol_id: usize,
+    depth: Option<usize>,
+) -> Result<CallGraph, String> {
+    let root = PathBuf::from(crate::commands::data_scope::require_project_dir(project_dir.as_deref())?);
+    tokio::task::spawn_blocking(move || {
+        let idx = index_for(&root);
+        call_graph(&idx, symbol_id, depth.unwrap_or(2).clamp(1, 4), 80)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -464,12 +752,7 @@ mod tests {
                     .push((c.caller.map(|i| base + i), c.callee, rel.to_string(), c.line));
             }
         }
-        for (i, s) in idx.symbols.iter().enumerate() {
-            idx.by_name.entry(s.name.clone()).or_default().push(i);
-        }
-        for (i, c) in idx.calls.iter().enumerate() {
-            idx.callers_of.entry(c.1.clone()).or_default().push(i);
-        }
+        idx.finish();
         idx
     }
 
@@ -504,6 +787,16 @@ mod tests {
         let go = extract_file(Path::new("a.go"), "a.go", "package p\nfunc F() { G() }\nfunc (r T) M() { r.F2() }\n").unwrap();
         assert!(go.symbols.iter().any(|s| s.name == "M"));
         assert!(go.calls.iter().any(|c| c.callee == "F2"));
+    }
+
+    #[test]
+    fn call_graph_has_both_directions() {
+        let idx = idx_of(&[("a.rs", "fn a() { b(); }\nfn b() { c(); }\nfn c() {}\n")]);
+        let b = find_symbols(&idx, "b", 5)[0];
+        let g = call_graph(&idx, b, 1, 50);
+        let names: Vec<_> = g.nodes.iter().map(|n| n.name.as_str()).collect();
+        assert!(names.contains(&"a") && names.contains(&"c"), "{names:?}");
+        assert_eq!(g.edges.len(), 2);
     }
 
     #[test]
