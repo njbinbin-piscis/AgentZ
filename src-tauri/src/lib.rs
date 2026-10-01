@@ -185,6 +185,7 @@ pub fn run() {
             // Knowledge graph — background index (CodeGraph-style)
             commands::graph::graph_index_rebuild,
             commands::graph::graph_index_status,
+            commands::code_map::code_map_data,
             commands::graph_agent::graph_domain_read,
             commands::graph_agent::graph_validate,
             // VS Code .vsix contribution-point ingestion
