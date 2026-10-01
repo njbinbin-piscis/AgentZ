@@ -366,6 +366,8 @@ const en = {
     settings: "Settings",
     settingsTitle: "LLM & agent configuration",
     exiting: "Saving workspace and exiting…",
+    exitWhileRunning:
+      "A task is still running. Exiting will interrupt it (output so far is kept). Exit anyway?",
     extensions: "Extensions",
     extensionsTitle: "VS Code extensions (.vsix)",
     openFolder: "Open Folder",

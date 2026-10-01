@@ -146,6 +146,8 @@ pub fn run() {
             // AI chat (agent turn on the piscis-engine kernel)
             commands::chat::chat_send,
             commands::chat::chat_cancel,
+            commands::chat::chat_running_count,
+            commands::chat::chat_cancel_all,
             // Cmd-K inline edit + Tab completion (ghost text)
             commands::edit::inline_edit,
             commands::edit::ai_inline_completion,

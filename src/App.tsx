@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openFolderDialog } from "./services/tauri";
 import {
@@ -257,9 +258,12 @@ export default function App() {
     let unlisten: (() => void) | undefined;
     let disposed = false;
     void listen("app-before-close", () => {
-      setExitToast(true);
       void (async () => {
         try {
+          const running = await invoke<number>("chat_running_count");
+          if (running > 0 && !window.confirm(t("app.exitWhileRunning"))) return;
+          setExitToast(true);
+          if (running > 0) await invoke("chat_cancel_all");
           await persistWorkspace();
           await workspaceCloseAck();
         } catch (e) {

@@ -357,6 +357,7 @@ const zh = {
     settings: "设置",
     settingsTitle: "LLM 与 Agent 配置",
     exiting: "正在保存工作区并退出…",
+    exitWhileRunning: "有任务正在运行，退出会中断它（已生成的内容会保留）。确定退出吗？",
     extensions: "扩展",
     extensionsTitle: "VS Code 扩展（.vsix）",
     openFolder: "打开文件夹",

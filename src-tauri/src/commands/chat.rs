@@ -204,6 +204,35 @@ pub async fn chat_send(
     })
 }
 
+/// Number of chat turns currently running (IDE chat + parallel Agent tasks).
+#[tauri::command]
+pub async fn chat_running_count(state: State<'_, AppState>) -> Result<u32, String> {
+    let single = state.chat_cancel.lock().await.is_some() as u32;
+    let parallel = state.task_cancel.lock().await.len() as u32;
+    Ok(single + parallel)
+}
+
+/// Cancel every running turn and wait (bounded) for each to wind down, so the
+/// streamed tail is persisted and session status is reset before the app exits.
+#[tauri::command]
+pub async fn chat_cancel_all(state: State<'_, AppState>) -> Result<(), String> {
+    if let Some(flag) = state.chat_cancel.lock().await.as_ref() {
+        flag.store(true, Ordering::SeqCst);
+    }
+    for flag in state.task_cancel.lock().await.values() {
+        flag.store(true, Ordering::SeqCst);
+    }
+    for _ in 0..50 {
+        let idle = state.chat_cancel.lock().await.is_none()
+            && state.task_cancel.lock().await.is_empty();
+        if idle {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    Ok(())
+}
+
 /// Stop an in-flight chat turn. With `task_key` it stops just that parallel
 /// Agent task; without one it stops the sequential IDE chat turn.
 #[tauri::command]
