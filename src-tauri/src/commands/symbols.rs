@@ -517,4 +517,15 @@ mod tests {
         let s = search_symbols(&idx, "mi", None, 5);
         assert!(s.contains("`mid`"), "{s}");
     }
+
+    #[test]
+    fn indexes_this_repository() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let idx = index_for(root);
+        assert!(idx.symbols.len() > 200, "symbols: {}", idx.symbols.len());
+        let hit = search_symbols(&idx, "build_code_map", None, 5);
+        assert!(hit.contains("code_map.rs"), "{hit}");
+        let r = impact_report(&idx, "build_code_map", 2, 20);
+        assert!(r.contains("code_map_data"), "{r}");
+    }
 }

@@ -5,6 +5,21 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Code map**: new title-bar entry with a module dependency graph (expand to files), a size/90-day-churn treemap and a detail sidebar (imports, imported-by, open in editor, send to agent).
+- **`symbol_search` / `impact` tools**: tree-sitter symbol and call index (Rust, TS/JS, Python, Go) for finding definitions and the callers/files affected by a change.
+- **Real LSP client** for the `lsp` tool; `read_lints` falls back to `cargo check` / `tsc` when no language server exists.
+- Delegated sub-agents can read dependency sources (cargo registry, node_modules).
+
+### Changed
+
+- Search ranking favors code over docs; graph tools explain when the index is still building; the system prompt now teaches a locate -> pin down -> impact -> verify workflow.
+- Turns have no default wall clock; a timed-out turn resumes automatically. Closing the window while turns run asks for confirmation and cancels them cleanly.
+- Wiki menu: "Code map" plus "Generate architecture doc".
+
 ## [0.6.10] - 2026-10-01
 
 ### Fixed

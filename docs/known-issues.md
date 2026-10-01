@@ -798,3 +798,18 @@ Fixed in the local `piscis-engine` clone (`C:\Projects\piscis-engine`, commit `a
 - To consume: push + tag `piscis-engine`, bump `rev` in the root `Cargo.toml`
   (or enable the commented `[patch]` block). Includes the earlier CRLF
   `file_edit` commit (`19357cd`).
+
+---
+
+## Fix batch 8 (2026-10-01) — code intelligence
+
+- #9–#14, #16: fixed (real LSP client, `read_lints` checker fallback, search
+  ranking/filters, graph tools "index building" message, prompt workflow,
+  dependency-read access for delegated sub-agents).
+- #17: LSP session manager evicts dead sessions; the Monaco WebSocket bridge is
+  unchanged.
+- #15 (`sanitize_tool_use_result_pairing` reporting `satisfied={}` / stale
+  checkpoint): **needs repro** — not reproduced, no code change.
+- New: Code map panel and `symbol_search` / `impact` tools (name-based call
+  resolution, so common names may over-approximate). Not yet verified in the
+  running desktop app; covered by unit tests and an index-this-repo test.
