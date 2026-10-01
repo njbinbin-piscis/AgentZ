@@ -2343,8 +2343,11 @@ pub async fn run_agentz_turn(
         // Keep the timeout notice calm and actionable — the turn stopped, but
         // nothing was lost and the user can simply continue.
         let message = match turn_timeout_secs {
-            Some(secs) => format!(
+            Some(secs) if open_todo_count > 0 => format!(
                 "Turn exceeded its {secs}s limit — continuing automatically with the unfinished task."
+            ),
+            Some(secs) => format!(
+                "Turn exceeded its {secs}s limit and stopped. Partial output was kept — send a message to continue."
             ),
             None => err.to_string(),
         };
