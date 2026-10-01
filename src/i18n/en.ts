@@ -827,6 +827,7 @@ const en = {
     noProjects: "No projects yet. Click Add to pick a folder or repository.",
     projectMissing: "Folder not found",
     newInProject: "New session in this project",
+    openInCodeZ: "Open this project in CodeZ",
     removeProject: "Remove from list (files on disk are kept)",
     freeSessions: "Sessions without project",
     newSessionHint: "New plain session (no folder needed)",

@@ -20,6 +20,7 @@ interface Props {
   onDeleteSession: (dir: string, id: string) => void;
   onAddProject: () => void;
   onRemoveProject: (dir: string) => void;
+  onOpenInCodeZ?: (dir: string) => void;
 }
 
 export default function WorkzSidebar({
@@ -37,6 +38,7 @@ export default function WorkzSidebar({
   onDeleteSession,
   onAddProject,
   onRemoveProject,
+  onOpenInCodeZ,
 }: Props) {
   const { t } = useTranslation();
   const freeDir = overview?.free_dir ?? null;
@@ -114,6 +116,18 @@ export default function WorkzSidebar({
                 <span className="agentz-workz-group-icon">{p.kind === "repo" ? "⎇" : "▤"}</span>
                 <span className="agentz-workz-group-name">{p.name}</span>
                 {groupRunning(p.path) && <span className="agentz-workz-task-dot running" />}
+                {p.exists && onOpenInCodeZ && (
+                  <button
+                    className="agentz-workz-group-btn"
+                    title={t("workz.openInCodeZ")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenInCodeZ(p.path);
+                    }}
+                  >
+                    ⌨
+                  </button>
+                )}
                 {p.exists && (
                   <button
                     className="agentz-workz-group-btn"

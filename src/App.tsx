@@ -366,10 +366,9 @@ export default function App() {
     return () => document.removeEventListener("mousedown", close);
   }, [wikiMenuOpen]);
 
-  const pickFolder = useCallback(async () => {
+  const switchProject = useCallback(
+    async (dir: string) => {
     try {
-      const dir = await openFolderDialog(projectDir);
-      if (!dir) return;
       if (projectDir && normProjectPath(dir) === normProjectPath(projectDir)) return;
       if (projectDir) {
         const ok = await confirmTerminalCloseOnProjectChange(t);
@@ -387,9 +386,28 @@ export default function App() {
         // Non-fatal — user can apply templates from settings later.
       }
     } catch (e) {
+      console.error("switchProject failed:", e);
+    }
+    },
+    [projectDir, t, persistWorkspace],
+  );
+
+  const pickFolder = useCallback(async () => {
+    try {
+      const dir = await openFolderDialog(projectDir);
+      if (dir) await switchProject(dir);
+    } catch (e) {
       console.error("pickFolder failed:", e);
     }
-  }, [projectDir, t, persistWorkspace]);
+  }, [projectDir, switchProject]);
+
+  const openProjectInCodeZ = useCallback(
+    async (dir: string) => {
+      await switchProject(dir);
+      setMode("codez");
+    },
+    [switchProject],
+  );
 
   const closeProject = useCallback(async () => {
     if (!projectDir) return;
@@ -869,6 +887,7 @@ export default function App() {
           <WorkZWorkspace
             projectDir={projectDir}
             onOpenFolder={pickFolder}
+            onOpenProjectInCodeZ={(dir) => void openProjectInCodeZ(dir)}
             wikiBuildNonce={wikiBuildNonce}
             wikiBuildAction={wikiBuildAction}
             onWikiBusyChange={setWikiBusy}

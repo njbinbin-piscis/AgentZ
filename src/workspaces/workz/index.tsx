@@ -81,6 +81,8 @@ export type WikiBuildAction = "overview" | "graph";
 interface WorkZWorkspaceProps {
   projectDir: string | null;
   onOpenFolder: () => void;
+  /** Switch the CodeZ project to `dir` and show CodeZ. */
+  onOpenProjectInCodeZ?: (dir: string) => void;
   /** Increment from title bar to trigger repo wiki generation. */
   wikiBuildNonce?: number;
   wikiBuildAction?: WikiBuildAction;
@@ -156,6 +158,7 @@ function readRecentCwds(): string[] {
 
 export default function WorkZWorkspace({
   projectDir: appProjectDir,
+  onOpenProjectInCodeZ,
   wikiBuildNonce = 0,
   wikiBuildAction = "overview",
   onWikiBusyChange,
@@ -1406,6 +1409,7 @@ export default function WorkZWorkspace({
           onDeleteSession={deleteSessionIn}
           onAddProject={() => void addProject()}
           onRemoveProject={(dir) => void removeProject(dir)}
+          onOpenInCodeZ={onOpenProjectInCodeZ}
         />
         <SessionSkillRevisions sessionId={selectedId} />
       </aside>

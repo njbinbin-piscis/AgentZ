@@ -800,6 +800,7 @@ const zh = {
     noProjects: "还没有项目。点击“添加”选择一个目录或仓库。",
     projectMissing: "目录不存在",
     newInProject: "在此项目新建会话",
+    openInCodeZ: "在 CodeZ 中打开此项目",
     removeProject: "从列表移除（不会删除磁盘文件）",
     freeSessions: "无项目会话",
     newSessionHint: "新建普通会话（无需打开文件夹）",
