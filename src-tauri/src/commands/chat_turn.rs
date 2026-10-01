@@ -983,6 +983,8 @@ fn build_tool_registry(
         registry.register(Box::new(crate::tools::codebase_search::CodebaseSearchTool));
         registry.register(Box::new(crate::tools::graph_search::GraphSearchTool));
         registry.register(Box::new(crate::tools::graph_explore::GraphExploreTool));
+        registry.register(Box::new(crate::tools::symbols::SymbolSearchTool));
+        registry.register(Box::new(crate::tools::symbols::ImpactTool));
         if let Ok(config_dir) = crate::commands::data_scope::resolve_global_config_dir(&app) {
             registry.register(Box::new(crate::tools::api_connector::ApiConnectorTool {
                 config_dir,

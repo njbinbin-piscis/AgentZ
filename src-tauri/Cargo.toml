@@ -96,6 +96,12 @@ hmac = "0.12"
 sha2 = "0.10"
 getrandom = "0.2"
 qrcode = "0.14"
+tree-sitter = "0.26.13"
+tree-sitter-rust = "0.24.2"
+tree-sitter-typescript = "0.23.2"
+tree-sitter-javascript = "0.25.0"
+tree-sitter-python = "0.25.0"
+tree-sitter-go = "0.25.0"
 
 [lints]
 workspace = true

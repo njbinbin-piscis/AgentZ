@@ -13,6 +13,7 @@ pub mod graph_explore;
 pub mod delegate;
 pub mod plan_mode_ui;
 pub mod skill_manage;
+pub mod symbols;
 pub mod terminal_read;
 
 pub use piscis_ide_tools::{LspTool, ReadLintsTool};

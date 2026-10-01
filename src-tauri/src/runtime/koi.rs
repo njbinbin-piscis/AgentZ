@@ -219,6 +219,8 @@ async fn build_koi_registry(
     registry.register(Box::new(crate::tools::codebase_search::CodebaseSearchTool));
     registry.register(Box::new(crate::tools::graph_search::GraphSearchTool));
     registry.register(Box::new(crate::tools::graph_explore::GraphExploreTool));
+    registry.register(Box::new(crate::tools::symbols::SymbolSearchTool));
+    registry.register(Box::new(crate::tools::symbols::ImpactTool));
 
     let mcp_servers = { settings.lock().await.mcp_servers.clone() };
     if !mcp_servers.is_empty() {

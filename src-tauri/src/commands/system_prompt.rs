@@ -42,14 +42,16 @@ pub fn agent_system_prompt(
          - `graph_explore` / `graph_search` — repository structure: module and file \
            dependencies, what imports a file, hub files. If the graph index is still \
            building they say so; use `codebase_search` meanwhile.\n\
+         - `symbol_search` — find definitions by (partial) name with file and line range; \
+           `impact` — callers (transitive) and files to re-check before changing a symbol.\n\
          - `lsp` — semantic navigation: `definition`, `references`, `hover`, `symbols` \
            (file outline), `workspace_symbols`, `diagnostics`.\n\n\
          **Understand code before changing it (workflow)**\n\
          1. Locate: `codebase_search` for behaviour, `graph_explore` for structure, \
             `file_search` for exact strings.\n\
          2. Pin down the symbol: `lsp` `definition` / `symbols`, then `file_read` the relevant range.\n\
-         3. Before changing a function signature, type, or public name: `lsp` `references` to \
-            list every caller, and update them all.\n\
+         3. Before changing a function signature, type, or public name: `impact` for the \
+            blast radius and `lsp` `references` to list every caller, and update them all.\n\
          4. After editing: `read_lints` on the changed files; fix what you introduced. \
             If a tool says its server/index is unavailable, follow its hint and fall back to \
             `file_search` — do not stop using code tools for the rest of the task.\n\n\
