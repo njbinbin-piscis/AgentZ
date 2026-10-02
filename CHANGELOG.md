@@ -5,6 +5,21 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-10-02
+
+### Added
+
+- Remote development (preview) over SSH, Docker and WSL: open `agentz-remote://` projects; files, search, git (incl. nested repos), file watching and terminals run on the target through a deployed agentz-server. A pinned Node runtime is bundled and uploaded when the remote has none.
+- Remote language servers (bridged with URI rewriting), remote debugging (debug adapter runs on the target, paths mapped both ways), port detection with auto-forward and a Ports panel, SSH key setup for password hosts.
+- Code index, code graph and symbol tools work on remote projects via an incremental local mirror that honours `.gitignore`.
+
+### Fixed
+
+- Debug sessions with debugpy no longer hang: launch/attach now follows the `initialized` → `configurationDone` handshake.
+- A hung extension host can no longer block every other request (separate stdin lock, 30s write timeout).
+- The extension host exits when its broker disconnects instead of spinning at 100% CPU; processes it spawned are stopped.
+- Linux file watching no longer walks `node_modules` (per-directory watcher with ignore list and cap).
+
 ## [0.8.0] - 2026-10-02
 
 ### Added
