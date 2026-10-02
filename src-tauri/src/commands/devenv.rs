@@ -251,6 +251,7 @@ fn env_dir(key: &str) -> Option<PathBuf> {
     std::env::var_os(key).map(PathBuf::from)
 }
 
+#[cfg(windows)]
 fn glob_children(base: &Path, tail: &str) -> Vec<PathBuf> {
     let mut out = Vec::new();
     if let Ok(read) = std::fs::read_dir(base) {
