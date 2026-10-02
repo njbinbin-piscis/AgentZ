@@ -56,6 +56,12 @@
   background: var(--text-muted);
 }
 .ide-status-ext.running .ide-status-dot { background: var(--success); }
+.ide-status-remote {
+  background: var(--warning);
+  color: #1a1a1a;
+  font-weight: 600;
+}
+.ide-status-remote.running { background: var(--accent); color: #fff; }
 .ide-status-error { color: var(--warning); }
 .ide-status-error:hover { background: rgba(251, 191, 36, 0.12); }
 

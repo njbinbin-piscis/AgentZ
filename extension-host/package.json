@@ -9,6 +9,7 @@
   "scripts": {
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
+    "fetch-node": "node scripts/fetch-node.mjs --remote",
     "smoke": "node build.mjs && node dist/smoke.js"
   },
   "devDependencies": {

@@ -19,10 +19,20 @@ function normalize(filePath: string): string {
  * Matches `monaco.Uri.file(path).toString()` for the same input.
  */
 export function fileUriString(filePath: string): string {
-  return URI.file(normalize(filePath)).toString();
+  return fileUri(filePath).toString();
 }
 
-/** Absolute filesystem path → Monaco URI value (same as `<Editor path>` yields). */
+/**
+ * Absolute filesystem path → Monaco URI value (same as `<Editor path>` yields).
+ * Remote workspace paths are already `agentz-remote://` URIs and must keep
+ * that scheme — extension and LSP bridges key on it.
+ */
+/** Inverse of `fileUri`: the path string the `ide_*` commands accept. */
+export function uriToIdePath(uri: { scheme: string; authority: string; path: string; fsPath: string }): string {
+  return uri.scheme === "agentz-remote" ? `agentz-remote://${uri.authority}${uri.path}` : uri.fsPath;
+}
+
 export function fileUri(filePath: string): URI {
-  return URI.file(normalize(filePath));
+  const p = normalize(filePath);
+  return p.startsWith("agentz-remote://") ? URI.parse(p) : URI.file(p);
 }

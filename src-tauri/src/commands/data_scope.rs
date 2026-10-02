@@ -54,6 +54,15 @@ pub fn require_project_dir(project_dir: Option<&str>) -> Result<String, String> 
     Ok(dir.to_string())
 }
 
+/// Like [`require_project_dir`], but also accepts `agentz-remote://` projects
+/// (callers index them through the local mirror).
+pub fn require_indexable_project_dir(project_dir: Option<&str>) -> Result<String, String> {
+    match project_dir.map(str::trim) {
+        Some(dir) if crate::remote::is_remote(dir) => Ok(dir.to_string()),
+        _ => require_project_dir(project_dir),
+    }
+}
+
 fn open_kernel_state_split(config_dir: &Path, db_dir: &Path) -> anyhow::Result<KernelState> {
     std::fs::create_dir_all(config_dir)
         .with_context(|| format!("failed to create config dir {}", config_dir.display()))?;

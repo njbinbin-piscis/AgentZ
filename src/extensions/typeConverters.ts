@@ -26,7 +26,27 @@ export function toDtoPosition(p: monaco.Position): dto.IPosition {
   return { line: p.lineNumber - 1, character: p.column - 1 };
 }
 
+export const REMOTE_SCHEME = "agentz-remote";
+
+/**
+ * Authority of the remote the host runs on (null = local). The host only sees
+ * `file:` URIs on its own machine, so remote models are rewritten at this
+ * boundary in both directions.
+ */
+let remoteAuthority: string | null = null;
+
+export function setRemoteAuthority(authority: string | null): void {
+  remoteAuthority = authority;
+}
+
+export function getRemoteAuthority(): string | null {
+  return remoteAuthority;
+}
+
 export function uriToDto(uri: monaco.Uri): dto.UriComponents {
+  if (remoteAuthority && uri.scheme === REMOTE_SCHEME && uri.authority === remoteAuthority) {
+    return { scheme: "file", authority: "", path: uri.path, query: uri.query, fragment: uri.fragment };
+  }
   return {
     scheme: uri.scheme,
     authority: uri.authority,
@@ -37,6 +57,9 @@ export function uriToDto(uri: monaco.Uri): dto.UriComponents {
 }
 
 export function dtoToUri(c: dto.UriComponents): monaco.Uri {
+  if (remoteAuthority && c.scheme === "file") {
+    return monaco.Uri.from({ scheme: REMOTE_SCHEME, authority: remoteAuthority, path: c.path, query: c.query, fragment: c.fragment });
+  }
   return monaco.Uri.from({
     scheme: c.scheme,
     authority: c.authority,

@@ -58,6 +58,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Fetch bundled Node runtime
+        run: npm --prefix extension-host run fetch-node
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -127,6 +129,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Fetch bundled Node runtime
+        run: npm --prefix extension-host run fetch-node
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -180,6 +184,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Fetch bundled Node runtime
+        run: npm --prefix extension-host run fetch-node
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -232,6 +238,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Fetch bundled Node runtime
+        run: npm --prefix extension-host run fetch-node
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -287,6 +295,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Fetch bundled Node runtime
+        run: npm --prefix extension-host run fetch-node
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -342,6 +352,8 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Fetch bundled Node runtime
+        run: npm --prefix extension-host run fetch-node
 
       - uses: dtolnay/rust-toolchain@stable
         with:

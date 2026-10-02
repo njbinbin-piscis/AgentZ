@@ -34,6 +34,18 @@ pub struct GitRepoSnapshot {
 
 /// If the workspace root is a repo, return only it; otherwise scan nested folders.
 pub fn discover_git_repos(workspace: &Path) -> Vec<PathBuf> {
+    // Remote workspaces can't be scanned synchronously: use the list from the
+    // last async discovery, else assume the root (git reports if it isn't).
+    let ws = workspace.to_string_lossy();
+    if crate::remote::is_remote(&ws) {
+        return match crate::remote::cached_git_repos(&ws) {
+            Some(rels) => rels
+                .iter()
+                .map(|r| if r.is_empty() { workspace.to_path_buf() } else { PathBuf::from(format!("{}/{}", ws.trim_end_matches('/'), r)) })
+                .collect(),
+            None => vec![workspace.to_path_buf()],
+        };
+    }
     if workspace.join(".git").exists() {
         return vec![workspace.to_path_buf()];
     }
@@ -197,7 +209,7 @@ pub fn resolve_git_dir(
 ) -> Result<PathBuf, String> {
     if let Some(rel) = git_root.filter(|s| !s.is_empty()) {
         let root = workspace.join(rel);
-        if !root.join(".git").exists() {
+        if !crate::remote::is_remote(&root.to_string_lossy()) && !root.join(".git").exists() {
             return Err(format!("not a git repository: {rel}"));
         }
         return Ok(root);

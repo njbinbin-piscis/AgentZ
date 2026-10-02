@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{params, Connection};
 use serde::Serialize;
 
-use crate::commands::data_scope::require_project_dir;
+use crate::commands::data_scope::require_indexable_project_dir;
 
 /// One ranked search hit returned to callers.
 #[derive(Debug, Clone, Serialize)]
@@ -380,8 +380,8 @@ pub fn search_index_opts(
 /// Build / rebuild the codebase index. Returns the chunk count.
 #[tauri::command]
 pub async fn codebase_index_build(project_dir: Option<String>) -> Result<usize, String> {
-    let project = require_project_dir(project_dir.as_deref())?;
-    let root = PathBuf::from(project);
+    let project = require_indexable_project_dir(project_dir.as_deref())?;
+    let root = crate::remote::mirror::index_root(&project, true).await?;
     tokio::task::spawn_blocking(move || build_index(&root))
         .await
         .map_err(|e| format!("index task failed: {e}"))?
@@ -394,8 +394,8 @@ pub async fn codebase_search(
     query: String,
     limit: Option<usize>,
 ) -> Result<Vec<CodeSearchHit>, String> {
-    let project = require_project_dir(project_dir.as_deref())?;
-    let root = PathBuf::from(project);
+    let project = require_indexable_project_dir(project_dir.as_deref())?;
+    let root = crate::remote::mirror::index_root(&project, true).await?;
     let lim = limit.unwrap_or(12);
     tokio::task::spawn_blocking(move || search_index(&root, &query, lim))
         .await

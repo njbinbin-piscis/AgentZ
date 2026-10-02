@@ -97,7 +97,7 @@ impl AppState {
             completion_cancel: Arc::new(Mutex::new(HashMap::new())),
             browser: BrowserManager::new(),
             browser_activity: BrowserActivity::default(),
-            ext_host: Arc::new(ExtHostManager::new()),
+            ext_host: crate::remote::register_manager(Arc::new(ExtHostManager::new())),
             dap: Arc::new(DapManager::new()),
             terminal_snippets: Arc::new(Mutex::new(HashMap::new())),
             gateway: Arc::new(GatewayManager::new()),

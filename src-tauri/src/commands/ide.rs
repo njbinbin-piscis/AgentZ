@@ -96,6 +96,16 @@ pub async fn ide_list_files(
     project_dir: String,
     depth: Option<usize>,
 ) -> Result<Vec<FileNode>, String> {
+    if let Some(remote_root) = crate::remote::resolve(&project_dir).await? {
+        let v = crate::remote::call(
+            "fs.tree",
+            serde_json::json!({ "path": remote_root, "depth": depth.unwrap_or(10) }),
+        )
+        .await?;
+        let mut nodes: Vec<FileNode> = serde_json::from_value(v).map_err(|e| e.to_string())?;
+        sort_file_nodes(&mut nodes);
+        return Ok(nodes);
+    }
     let root = PathBuf::from(&project_dir);
     if !root.exists() {
         return Err(format!("Directory not found: {}", project_dir));
@@ -217,8 +227,28 @@ fn sort_file_nodes(nodes: &mut [FileNode]) {
 
 /// Read a file's content with encoding detection.
 #[tauri::command]
-pub async fn ide_read_file(path: String) -> Result<FileContent, String> {
+pub async fn ide_read_file(
+    state: tauri::State<'_, crate::state::AppState>,
+    path: String,
+) -> Result<FileContent, String> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+    if let Some(remote_path) = super::remote::resolve_remote(&state, &path).await? {
+        let (raw, size) = super::remote::read_remote_text(&state, &remote_path).await?;
+        let (content, is_binary) = match String::from_utf8(raw) {
+            Ok(text) => (text, false),
+            Err(_) => (String::new(), true),
+        };
+        return Ok(FileContent {
+            path,
+            content,
+            encoding: if is_binary { "binary" } else { "utf-8" }.to_string(),
+            is_binary,
+            size,
+            language: None,
+            preview_data: None,
+        });
+    }
 
     let file_path = PathBuf::from(&path);
     if !file_path.exists() {
@@ -384,7 +414,14 @@ fn detect_language(path: &Path) -> Option<String> {
 
 /// Write content to a file. Creates parent directories if needed.
 #[tauri::command]
-pub async fn ide_write_file(path: String, content: String) -> Result<(), String> {
+pub async fn ide_write_file(
+    state: tauri::State<'_, crate::state::AppState>,
+    path: String,
+    content: String,
+) -> Result<(), String> {
+    if let Some(remote_path) = super::remote::resolve_remote(&state, &path).await? {
+        return super::remote::write_remote(&state, &remote_path, content.as_bytes()).await;
+    }
     let file_path = PathBuf::from(&path);
     if let Some(parent) = file_path.parent() {
         std::fs::create_dir_all(parent)
@@ -400,6 +437,20 @@ pub async fn ide_file_action(
     action: String,
     new_path: Option<String>,
 ) -> Result<(), String> {
+    if let Some(remote_path) = crate::remote::resolve(&path).await? {
+        let (method, params) = match action.as_str() {
+            "create_file" => ("fs.writeFile", serde_json::json!({ "path": remote_path, "text": "" })),
+            "create_dir" => ("fs.mkdir", serde_json::json!({ "path": remote_path })),
+            "delete" => ("fs.delete", serde_json::json!({ "path": remote_path, "recursive": true })),
+            "rename" => {
+                let target = new_path.ok_or("rename requires 'new_path' parameter")?;
+                let to = crate::remote::resolve(&target).await?.unwrap_or(target);
+                ("fs.rename", serde_json::json!({ "from": remote_path, "to": to }))
+            }
+            _ => return Err(format!("Unknown action: {}", action)),
+        };
+        return crate::remote::call(method, params).await.map(|_| ());
+    }
     let file_path = PathBuf::from(&path);
 
     match action.as_str() {
@@ -447,12 +498,29 @@ pub async fn ide_search_files(
     use_regex: Option<bool>,
     exclude_pattern: Option<String>,
 ) -> Result<Vec<SearchResult>, String> {
+    if query.trim().is_empty() {
+        return Ok(vec![]);
+    }
+    if let Some(remote_root) = crate::remote::resolve(&project_dir).await? {
+        let v = crate::remote::call(
+            "search",
+            serde_json::json!({
+                "root": remote_root,
+                "query": query,
+                "filePattern": file_pattern,
+                "excludePattern": exclude_pattern,
+                "caseSensitive": case_sensitive.unwrap_or(false),
+                "wholeWord": whole_word.unwrap_or(false),
+                "useRegex": use_regex.unwrap_or(false),
+                "maxResults": 1000,
+            }),
+        )
+        .await?;
+        return serde_json::from_value(v).map_err(|e| e.to_string());
+    }
     let root = PathBuf::from(&project_dir);
     if !root.exists() {
         return Err(format!("Directory not found: {}", project_dir));
-    }
-    if query.trim().is_empty() {
-        return Ok(vec![]);
     }
 
     let case = case_sensitive.unwrap_or(false);
@@ -761,6 +829,9 @@ async fn git_branches_at(repo: &Path) -> Result<Vec<BranchInfo>, String> {
 /// Discover all git repositories under a workspace (nested repos when root has no `.git`).
 #[tauri::command]
 pub async fn ide_git_workspace_status(project_dir: String) -> Result<Vec<GitRepoSnapshot>, String> {
+    if crate::remote::is_remote(&project_dir) {
+        crate::remote::refresh_git_repos(&project_dir).await?;
+    }
     let workspace = PathBuf::from(&project_dir);
     let repos = git_workspace::discover_git_repos(&workspace);
     let mut snapshots = Vec::new();
@@ -782,6 +853,9 @@ pub async fn ide_git_workspace_status(project_dir: String) -> Result<Vec<GitRepo
 /// Get git status for all files in the project directory (flattened across repos).
 #[tauri::command]
 pub async fn ide_git_status(project_dir: String) -> Result<Vec<GitFileStatus>, String> {
+    if crate::remote::is_remote(&project_dir) && crate::remote::cached_git_repos(&project_dir).is_none() {
+        crate::remote::refresh_git_repos(&project_dir).await?;
+    }
     let workspace = PathBuf::from(&project_dir);
     let repos = git_workspace::discover_git_repos(&workspace);
     let mut all = Vec::new();
@@ -814,7 +888,18 @@ pub async fn ide_git_diff(
 
     // Get current content
     let full_path = root.join(&path_in_repo);
-    let modified = if full_path.exists() {
+    let modified = if let Some(remote_path) = crate::remote::resolve(&full_path.to_string_lossy()).await? {
+        crate::remote::call("fs.readFile", serde_json::json!({ "path": remote_path }))
+            .await
+            .ok()
+            .and_then(|v| v.get("base64").and_then(|b| b.as_str()).map(str::to_string))
+            .and_then(|b| {
+                use base64::Engine as _;
+                base64::engine::general_purpose::STANDARD.decode(b).ok()
+            })
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+            .unwrap_or_default()
+    } else if full_path.exists() {
         std::fs::read_to_string(&full_path).unwrap_or_default()
     } else {
         String::new()
@@ -975,7 +1060,10 @@ pub async fn ide_git_discard(
     } else {
         // Untracked — delete the file (or directory) from the working tree.
         let abs = root.join(&path_in_repo);
-        if abs.is_dir() {
+        if let Some(remote_path) = crate::remote::resolve(&abs.to_string_lossy()).await? {
+            crate::remote::call("fs.delete", serde_json::json!({ "path": remote_path, "recursive": true }))
+                .await?;
+        } else if abs.is_dir() {
             std::fs::remove_dir_all(&abs).map_err(|e| format!("remove dir failed: {}", e))?;
         } else if abs.exists() {
             std::fs::remove_file(&abs).map_err(|e| format!("remove file failed: {}", e))?;
@@ -1113,8 +1201,13 @@ pub async fn ide_terminal_create(
     cols: Option<u16>,
     rows: Option<u16>,
 ) -> Result<(), String> {
+    let remote_cwd = crate::remote::resolve(&project_dir).await?;
+    let remote_target = match &remote_cwd {
+        Some(_) => Some(state.ext_host.target().await.ok_or("remote is not connected")?),
+        None => None,
+    };
     let root = PathBuf::from(&project_dir);
-    if !root.exists() {
+    if remote_cwd.is_none() && !root.exists() {
         return Err(format!("Directory not found: {}", project_dir));
     }
 
@@ -1135,8 +1228,19 @@ pub async fn ide_terminal_create(
     let shell = "powershell.exe".to_string();
     #[cfg(not(windows))]
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_string());
-    let mut cmd = CommandBuilder::new(shell);
-    cmd.cwd(&root);
+    let mut cmd = match (&remote_target, &remote_cwd) {
+        (Some(target), Some(cwd)) => {
+            let argv = target.interactive_shell_argv(cwd);
+            let mut c = CommandBuilder::new(&argv[0]);
+            c.args(&argv[1..]);
+            c
+        }
+        _ => {
+            let mut c = CommandBuilder::new(shell);
+            c.cwd(&root);
+            c
+        }
+    };
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
 
@@ -1370,6 +1474,11 @@ pub async fn ide_start_watcher(
 ) -> Result<(), String> {
     use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 
+    // Remote: the server watches on its side; no local index/graph workers.
+    if let Some(remote_root) = crate::remote::resolve(&project_dir).await? {
+        return state.ext_host.watch_remote(&project_dir, &remote_root).await;
+    }
+
     let root = PathBuf::from(&project_dir);
     if !root.exists() {
         return Err(format!("Directory not found: {}", project_dir));
@@ -1478,6 +1587,10 @@ pub async fn ide_stop_watcher(
     state: State<'_, AppState>,
     project_dir: String,
 ) -> Result<(), String> {
+    if crate::remote::is_remote(&project_dir) {
+        state.ext_host.unwatch_remote(&project_dir).await;
+        return Ok(());
+    }
     let mut watchers = state.file_watchers.lock().await;
     watchers.remove(&project_dir);
     Ok(())
@@ -1498,6 +1611,23 @@ async fn run_git_cmd(dir: &Path, args: &[&str]) -> Result<String, String> {
 }
 
 async fn run_git_cmd_bytes(dir: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
+    if let Some(remote_dir) = crate::remote::resolve(&dir.to_string_lossy()).await? {
+        let v = crate::remote::call(
+            "exec",
+            serde_json::json!({ "command": "git", "args": args, "cwd": remote_dir, "timeoutMs": 30_000 }),
+        )
+        .await?;
+        if v.get("code").and_then(|c| c.as_i64()) != Some(0) {
+            let stderr = v.get("stderr").and_then(|s| s.as_str()).unwrap_or_default();
+            return Err(format!("git error: {}", stderr.trim()));
+        }
+        return Ok(v
+            .get("stdout")
+            .and_then(|s| s.as_str())
+            .unwrap_or_default()
+            .as_bytes()
+            .to_vec());
+    }
     let output = timeout(
         Duration::from_secs(30),
         new_git_cmd()
@@ -1553,6 +1683,11 @@ pub async fn ide_lsp_start(
     project_dir: String,
     language: String,
 ) -> Result<u16, String> {
+    if let Some(uri) = crate::remote::vfs::parse(&project_dir) {
+        let mgr = crate::remote::manager().ok_or("remote broker unavailable")?;
+        let target = mgr.wait_for_authority(&uri.authority).await?;
+        return crate::remote::lsp::start(target, &project_dir, &language).await;
+    }
     state.lsp_manager.start(&project_dir, &language).await
 }
 
@@ -1563,5 +1698,9 @@ pub async fn ide_lsp_stop(
     project_dir: String,
     language: String,
 ) -> Result<(), String> {
+    if crate::remote::is_remote(&project_dir) {
+        crate::remote::lsp::stop(&project_dir, &language);
+        return Ok(());
+    }
     state.lsp_manager.stop(&project_dir, &language).await
 }

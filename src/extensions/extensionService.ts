@@ -14,6 +14,7 @@ import * as conv from "./typeConverters";
 import { extensionUiStore } from "./extensionUiStore";
 import { compatStore } from "./compatStore";
 import { composerDbg } from "../utils/composerDebug";
+import { parseRemoteDir, targetForAuthority, type RemoteTarget } from "./remoteTargets";
 
 interface InstalledExtensionRaw {
   id: string;
@@ -27,6 +28,12 @@ interface InstalledExtensionRaw {
   activation_events: string[];
   contributes: unknown;
   enabled: boolean;
+}
+
+export type { RemoteTarget };
+
+function sameTarget(a: RemoteTarget, b: RemoteTarget): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 const CONFIG_KEY = "agentz.ext.config";
@@ -58,6 +65,8 @@ export class ExtensionService {
   private opChain: Promise<void> = Promise.resolve();
   /** Only the focused editor model is synced to the extension host (RPC reduction). */
   private activeModelKey: string | null = null;
+  private remote: RemoteTarget = { kind: "local" };
+  private reconnectAttempts = 0;
   projectDir = "";
 
   setActiveEditorModel(model: monaco.editor.ITextModel | null): void {
@@ -87,7 +96,19 @@ export class ExtensionService {
   }
 
   /** Boot the extension host for a project and activate startup extensions. */
-  async start(projectDir: string, opts?: { force?: boolean }): Promise<void> {
+  /**
+   * `projectDir` may be a local path or an `agentz-remote://` project URI; the
+   * latter connects to the remembered target and runs the host there.
+   */
+  async start(projectDir: string, opts?: { force?: boolean; remote?: RemoteTarget }): Promise<void> {
+    const parsedRemote = parseRemoteDir(projectDir);
+    let remote: RemoteTarget = opts?.remote ?? { kind: "local" };
+    const hostDir = parsedRemote ? parsedRemote.path : projectDir;
+    if (parsedRemote && !opts?.remote) {
+      const target = targetForAuthority(parsedRemote.authority);
+      if (!target) throw new Error(`unknown remote ${parsedRemote.authority}`);
+      remote = target;
+    }
     return this.runExclusive(async () => {
       // Skip redundant restart — a stop+wireDocumentSync during an active chat
       // turn was freezing the renderer (black screen).
@@ -95,6 +116,7 @@ export class ExtensionService {
         !opts?.force &&
         this.started &&
         this.projectDir === projectDir &&
+        sameTarget(this.remote, remote) &&
         this.rpc
       ) {
         composerDbg("extensionService.start skipped (already running)", { projectDir });
@@ -115,7 +137,7 @@ export class ExtensionService {
       invoke<InstalledExtensionRaw[]>("vsix_list").catch(() => [] as InstalledExtensionRaw[]),
     ]);
 
-    const extensions: ExtensionDescriptionDto[] = installed
+    let extensions: ExtensionDescriptionDto[] = installed
       .filter((e) => e.enabled)
       .map((e) => ({
         id: e.id,
@@ -129,7 +151,7 @@ export class ExtensionService {
         // Host reads package.json from extensionPath; omit huge contributes blobs.
       }));
 
-    if (extensions.length === 0) {
+    if (extensions.length === 0 && remote.kind === "local") {
       extensionUiStore.setRunning(false);
       extensionUiStore.setHostError("no_enabled_extensions");
       return;
@@ -140,18 +162,33 @@ export class ExtensionService {
 
     // Register the ready waiter *before* spawning — the host can log "ready"
     // within milliseconds and we must not miss that line.
-    const readyWait = this.transport.waitForReady();
-    await invoke("ext_host_start", { projectDir });
+    // Remote deploys (upload + optional Node runtime) can take a while.
+    const readyWait = this.transport.waitForReady(remote.kind === "local" ? 15_000 : 180_000);
+    const status = await invoke<{ authority: string | null }>("ext_host_start", { projectDir: hostDir, remote });
     await readyWait;
     // Process is up — reflect that immediately so manual start / status bar
     // don't look like a no-op while $initialize is still in flight.
     extensionUiStore.setRunning(true);
+    this.remote = remote;
+    const authority = remote.kind === "local" ? null : status.authority;
+    conv.setRemoteAuthority(authority);
+
+    if (authority) {
+      const remotePaths = await invoke<Record<string, string>>("remote_sync_extensions", {
+        extensions: extensions.map((e) => ({ id: e.id, version: e.version, extension_path: e.extensionPath })),
+      });
+      extensions = extensions
+        .filter((e) => remotePaths[e.id])
+        .map((e) => ({ ...e, extensionPath: remotePaths[e.id] }));
+    }
 
     this.rpc = new RPCProtocol(this.transport);
+    this.reconnectAttempts = 0;
     this.transport.onConnectionLost((reason) => {
       this.rpc?.failAllPending(reason);
       extensionUiStore.setRunning(false);
       extensionUiStore.setHostError(reason);
+      this.scheduleReconnect(projectDir, remote);
     });
     compatStore.reset();
     this.rpc.onMissingApi((nid, method) => compatStore.recordMissing(nid, method));
@@ -159,8 +196,11 @@ export class ExtensionService {
     const config = loadConfig();
     const ctx: MainThreadContext = { rpc: this.rpc, projectDir, config, saveConfig };
 
+    const workspaceUri = authority
+      ? monaco.Uri.from({ scheme: conv.REMOTE_SCHEME, authority, path: hostDir })
+      : monaco.Uri.file(projectDir);
     const initData: InitDataDto = {
-      workspaceFolders: [conv.uriToDto(monaco.Uri.file(projectDir))],
+      workspaceFolders: [conv.uriToDto(workspaceUri)],
       configuration: config,
       extensions,
       extensionsDir,
@@ -183,6 +223,29 @@ export class ExtensionService {
 
     this.started = true;
     });
+  }
+
+  /** Remote hosts drop on network blips; retry with backoff (local crashes don't loop). */
+  private scheduleReconnect(projectDir: string, remote: RemoteTarget): void {
+    if (remote.kind === "local" || this.reconnectAttempts >= 5) return;
+    const attempt = ++this.reconnectAttempts;
+    const delay = Math.min(30_000, 1000 * 2 ** attempt);
+    extensionUiStore.appendHostLog(`[remote] connection lost, reconnecting in ${delay / 1000}s (attempt ${attempt}/5)`);
+    window.setTimeout(() => {
+      if (this.projectDir !== projectDir || !sameTarget(this.remote, remote)) return;
+      const attempts = this.reconnectAttempts;
+      void this.start(projectDir, { force: true, remote })
+        .then(() => (this.reconnectAttempts = 0))
+        .catch((e) => {
+          this.reconnectAttempts = attempts;
+          extensionUiStore.setHostError(String(e));
+          this.scheduleReconnect(projectDir, remote);
+        });
+    }, delay);
+  }
+
+  get remoteTarget(): RemoteTarget {
+    return this.remote;
   }
 
   private modelSyncs = new Map<
@@ -377,6 +440,7 @@ export class ExtensionService {
     this.transport = undefined;
     this.handles = undefined;
     this.started = false;
+    conv.setRemoteAuthority(null);
     extensionUiStore.setRunning(false);
     try {
       await invoke("ext_host_stop");

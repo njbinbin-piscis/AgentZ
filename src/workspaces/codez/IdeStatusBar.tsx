@@ -2,6 +2,8 @@ import { useTranslation } from "react-i18next";
 import { useExtensionUi } from "../../extensions/ui/useExtensionUi";
 import { extensionService } from "../../extensions/extensionService";
 import { extensionUiStore } from "../../extensions/extensionUiStore";
+import { describeRemoteDir } from "../../extensions/remoteTargets";
+import { useRemotePortWatch } from "../../extensions/remotePorts";
 import type { BottomTab } from "./BottomPanel";
 
 interface IdeStatusBarProps {
@@ -48,8 +50,32 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
     onOpenExtensions();
   };
 
+  const remoteLabel = projectDir ? describeRemoteDir(projectDir) : null;
+  const forwards = useRemotePortWatch(!!remoteLabel && running);
+
   return (
     <div className="ide-status-bar">
+      {remoteLabel && (
+        <button
+          className={`ide-status-item ide-status-remote ${running ? "running" : ""}`}
+          title={running ? t("remote.statusConnected") : t("remote.statusReconnect")}
+          onClick={() => {
+            if (!running && projectDir) void extensionService.start(projectDir, { force: true }).catch(() => undefined);
+            else onOpenExtensions();
+          }}
+        >
+          {running ? "⇄" : "⚠"} {remoteLabel}
+        </button>
+      )}
+      {forwards.length > 0 && (
+        <button
+          className="ide-status-item"
+          title={forwards.map((f) => `${f.remote_port} → localhost:${f.local_port}`).join("\n")}
+          onClick={onOpenExtensions}
+        >
+          {t("remote.ports.statusCount", { count: forwards.length })}
+        </button>
+      )}
       <button
         className={`ide-status-item ide-status-ext ${running ? "running" : ""}`}
         title={running ? t("extensions.hostRunning") : t("extensions.hostOffHint")}

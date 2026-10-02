@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::commands::data_scope::require_project_dir;
+use crate::commands::data_scope::require_indexable_project_dir;
 
 const GRAPH_VERSION: &str = "1.0";
 const MAX_FILE_BYTES: u64 = 1_000_000;
@@ -720,16 +720,18 @@ pub fn schedule_patch(root: PathBuf, rel: String) {
 pub async fn graph_index_rebuild(
     project_dir: Option<String>,
 ) -> Result<crate::commands::graph_index::IndexBuildAck, String> {
-    let project = require_project_dir(project_dir.as_deref())?;
-    Ok(crate::commands::graph_index::request_rebuild(PathBuf::from(project)))
+    let project = require_indexable_project_dir(project_dir.as_deref())?;
+    let root = crate::remote::mirror::index_root(&project, true).await?;
+    Ok(crate::commands::graph_index::request_rebuild(root))
 }
 
 #[tauri::command]
 pub async fn graph_index_status(
     project_dir: Option<String>,
 ) -> Result<crate::commands::graph_index::IndexBuildStatus, String> {
-    let project = require_project_dir(project_dir.as_deref())?;
-    Ok(crate::commands::graph_index::status(Path::new(&project)))
+    let project = require_indexable_project_dir(project_dir.as_deref())?;
+    let root = crate::remote::mirror::index_root(&project, false).await?;
+    Ok(crate::commands::graph_index::status(&root))
 }
 
 #[cfg(test)]

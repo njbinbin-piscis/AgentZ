@@ -14,6 +14,7 @@ mod index_worker;
 pub mod journal;
 pub mod lsp;
 pub mod path_filter;
+pub mod remote;
 pub mod runtime;
 pub mod skills;
 pub mod state;
@@ -209,6 +210,18 @@ pub fn run() {
             commands::ext_host::ext_host_send,
             commands::ext_host::ext_host_stop,
             commands::ext_host::ext_host_status,
+            commands::remote::remote_list_targets,
+            commands::remote::remote_probe,
+            commands::remote::remote_ssh_setup_key,
+            commands::remote::remote_ports_detect,
+            commands::remote::remote_forward_start,
+            commands::remote::remote_forward_stop,
+            commands::remote::remote_forward_list,
+            commands::remote::remote_devcontainer_up,
+            commands::remote::remote_sync_extensions,
+            commands::remote::remote_request,
+            commands::remote::remote_fs_list,
+            commands::remote::remote_fs_action,
             // Debug Adapter Protocol broker
             commands::dap::dap_start,
             commands::dap::dap_send,

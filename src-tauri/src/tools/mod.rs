@@ -14,6 +14,7 @@ pub mod graph_search;
 pub mod graph_explore;
 pub mod delegate;
 pub mod plan_mode_ui;
+pub mod remote_fs;
 pub mod skill_manage;
 pub mod symbols;
 pub mod terminal_read;

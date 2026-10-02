@@ -32,6 +32,7 @@
     "resources": {
       "../extension-host/dist/host.js": "extension-host/host.js",
       "../extension-host/dist/host.js.map": "extension-host/host.js.map",
+      "resources/node/": "resources/node/",
       "../bundled/preinstall/": "preinstall/",
       "../bundled/codebuddy/exclude.json": "codebuddy/exclude.json",
       "../bundled/codebuddy/manifest.json": "codebuddy/manifest.json"

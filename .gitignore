@@ -3,6 +3,7 @@
 *.pdb
 .DS_Store
 node_modules
+src-tauri/resources/node/
 dist
 
 # Tauri generated artifacts

@@ -5,6 +5,7 @@ import { ITransport, RpcMessage } from "../common/rpcProtocol";
 
 export class StdioTransport implements ITransport {
   private handler: ((m: RpcMessage) => void) | undefined;
+  private controlHandler: ((m: unknown) => boolean) | undefined;
   private buffer = "";
 
   constructor(
@@ -13,14 +14,29 @@ export class StdioTransport implements ITransport {
   ) {
     this.input.setEncoding?.("utf8");
     this.input.on("data", (chunk: string) => this.onData(chunk));
+    // The broker (local Tauri or the ssh session) is gone: an orphaned host
+    // would otherwise spin on EPIPE writes forever.
+    const shutdown = () => process.exit(0);
+    this.input.on("end", shutdown);
+    this.input.on("close", shutdown);
+    this.output.on("error", shutdown);
   }
 
   send(message: RpcMessage): void {
-    this.output.write(JSON.stringify(message) + "\n");
+    this.writeFrame(message);
+  }
+
+  writeFrame(frame: unknown): void {
+    this.output.write(JSON.stringify(frame) + "\n");
   }
 
   onMessage(handler: (m: RpcMessage) => void): void {
     this.handler = handler;
+  }
+
+  /** Intercepts out-of-band frames; return true to consume the frame. */
+  onControl(handler: (m: unknown) => boolean): void {
+    this.controlHandler = handler;
   }
 
   private onData(chunk: string): void {
@@ -31,8 +47,9 @@ export class StdioTransport implements ITransport {
       this.buffer = this.buffer.slice(idx + 1);
       if (!line) continue;
       try {
-        const msg = JSON.parse(line) as RpcMessage;
-        this.handler?.(msg);
+        const msg = JSON.parse(line);
+        if (this.controlHandler?.(msg)) continue;
+        this.handler?.(msg as RpcMessage);
       } catch (err) {
         process.stderr.write(`[host] bad RPC line: ${String(err)}\n`);
       }

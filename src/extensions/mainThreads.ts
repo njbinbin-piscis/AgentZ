@@ -43,6 +43,7 @@ import type {
   DebugConfigurationDto,
 } from "./common/dto";
 import * as conv from "./typeConverters";
+import { uriToIdePath } from "../services/tauri/editorUri";
 import { extensionUiStore } from "./extensionUiStore";
 
 export interface MainThreadContext {
@@ -360,15 +361,15 @@ export class MainThreadWorkspace implements MainThreadWorkspaceShape {
     }
   }
   async $readFile(uri: UriComponents): Promise<string> {
-    const res = await invoke<{ content: string }>("ide_read_file", { path: conv.dtoToUri(uri).fsPath });
+    const res = await invoke<{ content: string }>("ide_read_file", { path: uriToIdePath(conv.dtoToUri(uri)) });
     return res.content;
   }
   async $writeFile(uri: UriComponents, content: string): Promise<void> {
-    await invoke<void>("ide_write_file", { path: conv.dtoToUri(uri).fsPath, content });
+    await invoke<void>("ide_write_file", { path: uriToIdePath(conv.dtoToUri(uri)), content });
   }
   async $stat(uri: UriComponents): Promise<{ type: number; size: number } | null> {
     try {
-      const res = await invoke<{ content: string }>("ide_read_file", { path: conv.dtoToUri(uri).fsPath });
+      const res = await invoke<{ content: string }>("ide_read_file", { path: uriToIdePath(conv.dtoToUri(uri)) });
       return { type: 1, size: res.content.length };
     } catch {
       return null;
@@ -377,7 +378,7 @@ export class MainThreadWorkspace implements MainThreadWorkspaceShape {
   async $readDirectory(uri: UriComponents): Promise<[string, number][]> {
     try {
       const nodes = await invoke<{ name: string; path: string; is_dir?: boolean; isDir?: boolean }[]>("ide_list_files", {
-        projectDir: conv.dtoToUri(uri).fsPath,
+        projectDir: uriToIdePath(conv.dtoToUri(uri)),
         depth: 1,
       });
       return nodes.map((n) => [n.name, (n.is_dir ?? n.isDir) ? 2 : 1]);
@@ -387,7 +388,7 @@ export class MainThreadWorkspace implements MainThreadWorkspaceShape {
   }
   async $delete(uri: UriComponents, _recursive: boolean): Promise<void> {
     try {
-      await invoke<void>("ide_file_action", { path: conv.dtoToUri(uri).fsPath, action: "delete" });
+      await invoke<void>("ide_file_action", { path: uriToIdePath(conv.dtoToUri(uri)), action: "delete" });
     } catch {
       /* best-effort */
     }
@@ -404,7 +405,7 @@ export class MainThreadDocuments {
     const model = monaco.editor.getModel(conv.dtoToUri(uri));
     if (!model) return false;
     try {
-      await invoke<void>("ide_write_file", { path: conv.dtoToUri(uri).fsPath, content: model.getValue() });
+      await invoke<void>("ide_write_file", { path: uriToIdePath(conv.dtoToUri(uri)), content: model.getValue() });
       return true;
     } catch {
       return false;
@@ -519,7 +520,7 @@ export class MainThreadTerminal implements MainThreadTerminalShape {
 
 export class MainThreadScm implements MainThreadScmShape {
   $registerSourceControl(handle: number, id: string, label: string, rootUri: UriComponents | undefined): void {
-    extensionUiStore.registerScm({ handle, id, label, rootPath: rootUri ? conv.dtoToUri(rootUri).fsPath : undefined, groups: [] });
+    extensionUiStore.registerScm({ handle, id, label, rootPath: rootUri ? uriToIdePath(conv.dtoToUri(rootUri)) : undefined, groups: [] });
   }
   $updateGroups(handle: number, groups: ScmGroupDto[]): void {
     extensionUiStore.updateScmGroups(handle, groups);

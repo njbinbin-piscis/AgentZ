@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openFolderDialog } from "./services/tauri";
+import { isRemoteDir, OPEN_PROJECT_EVENT } from "./extensions/remoteTargets";
 import {
   workspaceLoad,
   workspaceSave,
@@ -379,11 +380,13 @@ export default function App() {
       setChatInsertElement(null);
       await persistWorkspace();
       setProjectDir(dir);
-      try {
-        const hasAgentz = await projectHasAgentz(dir);
-        if (!hasAgentz) setTemplateProjectDir(dir);
-      } catch {
-        // Non-fatal — user can apply templates from settings later.
+      if (!isRemoteDir(dir)) {
+        try {
+          const hasAgentz = await projectHasAgentz(dir);
+          if (!hasAgentz) setTemplateProjectDir(dir);
+        } catch {
+          // Non-fatal — user can apply templates from settings later.
+        }
       }
     } catch (e) {
       console.error("switchProject failed:", e);
@@ -391,6 +394,15 @@ export default function App() {
     },
     [projectDir, t, persistWorkspace],
   );
+
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const dir = (e as CustomEvent<string>).detail;
+      if (dir) void switchProject(dir);
+    };
+    window.addEventListener(OPEN_PROJECT_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_PROJECT_EVENT, onOpen);
+  }, [switchProject]);
 
   const pickFolder = useCallback(async () => {
     try {

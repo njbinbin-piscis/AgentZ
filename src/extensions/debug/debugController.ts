@@ -10,6 +10,8 @@ import { DapClient } from "./dapClient";
 import { breakpointStore } from "./breakpoints";
 import { debugStore, type StackFrame, type Variable } from "./debugStore";
 import { extensionUiStore } from "../extensionUiStore";
+import { extensionService } from "../extensionService";
+import { isRemoteDir } from "../remoteTargets";
 
 interface DebugConfig {
   type: string;
@@ -66,10 +68,17 @@ class DebugController {
     extensionUiStore.appendDebugOutput(`Launching adapter: ${adapter.command} ${adapter.args.join(" ")}`);
 
     this.client.onLog((line) => extensionUiStore.appendDebugOutput(line));
-    this.client.onEvent((event, body) => void this.onEvent(event, body));
+    let markInitialized = () => {};
+    const initialized = new Promise<void>((resolve) => (markInitialized = resolve));
+    this.client.onEvent((event, body) => {
+      if (event === "initialized") markInitialized();
+      void this.onEvent(event, body);
+    });
 
     try {
-      await this.client.connect(adapter.command, adapter.args, config.cwd);
+      const projectDir = extensionService.projectDir;
+      const remoteDir = isRemoteDir(projectDir) ? projectDir : undefined;
+      await this.client.connect(adapter.command, adapter.args, config.cwd, remoteDir);
       await this.client.request("initialize", {
         clientID: "agentz",
         adapterID: config.type,
@@ -78,13 +87,16 @@ class DebugController {
         pathFormat: "path",
         supportsRunInTerminalRequest: false,
       });
+      // Adapters like debugpy only answer launch/attach after configurationDone,
+      // which in turn must follow the `initialized` event.
+      const launched = this.client.request(
+        config.request === "attach" ? "attach" : "launch",
+        config as unknown as Record<string, unknown>,
+      );
+      await Promise.race([initialized, launched, new Promise((r) => setTimeout(r, 10_000))]);
       await this.sendBreakpoints();
-      if (config.request === "attach") {
-        await this.client.request("attach", config as unknown as Record<string, unknown>);
-      } else {
-        await this.client.request("launch", config as unknown as Record<string, unknown>);
-      }
-      await this.client.request("configurationDone").catch(() => undefined);
+      await this.client?.request("configurationDone").catch(() => undefined);
+      await launched;
     } catch (err) {
       extensionUiStore.appendDebugOutput(`Debug start failed: ${String(err)}`);
       await this.stop();

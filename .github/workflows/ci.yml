@@ -59,6 +59,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm --prefix extension-host run fetch-node
       - run: npm run build:exthost
       - run: npm run build
       - name: cargo clippy (workspace, deny warnings)

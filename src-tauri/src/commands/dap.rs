@@ -51,6 +51,7 @@ pub async fn dap_start(
     command: String,
     args: Vec<String>,
     cwd: Option<String>,
+    remote_dir: Option<String>,
 ) -> Result<DapStatus, String> {
     let mgr = state.dap.clone();
     {
@@ -59,15 +60,21 @@ pub async fn dap_start(
         inner.child = None;
     }
 
-    let mut cmd = piscis_kernel::proc::tokio_command(&command);
-    cmd.args(&args)
-        .stdin(Stdio::piped())
+    let mut cmd = match remote_dir.as_deref().and_then(crate::remote::vfs::parse) {
+        Some(uri) => remote_adapter_command(&uri, &command, &args, cwd.as_deref()).await?,
+        None => {
+            let mut cmd = piscis_kernel::proc::tokio_command(&command);
+            cmd.args(&args);
+            if let Some(dir) = cwd.filter(|d| !d.is_empty()) {
+                cmd.current_dir(dir);
+            }
+            cmd
+        }
+    };
+    cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
-    if let Some(dir) = cwd.filter(|d| !d.is_empty()) {
-        cmd.current_dir(dir);
-    }
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to spawn debug adapter '{command}': {e}"))?;
@@ -156,6 +163,37 @@ pub async fn dap_stop(state: State<'_, AppState>) -> Result<(), String> {
     inner.stdin = None;
     inner.child = None;
     Ok(())
+}
+
+/// The adapter runs on the remote host (next to the debuggee), spawned through
+/// the target transport with stdio piped.
+async fn remote_adapter_command(
+    uri: &crate::remote::vfs::RemoteUri,
+    command: &str,
+    args: &[String],
+    cwd: Option<&str>,
+) -> Result<tokio::process::Command, String> {
+    let mgr = crate::remote::manager().ok_or("remote broker unavailable")?;
+    let target = mgr.wait_for_authority(&uri.authority).await?;
+    let dir = cwd.filter(|d| d.starts_with('/')).unwrap_or(&uri.path);
+    target.sh(&remote_adapter_script(dir, command, args))
+}
+
+pub(crate) fn remote_adapter_script(dir: &str, command: &str, args: &[String]) -> String {
+    use crate::remote::shell_quote;
+    // Many distros ship only `python3`.
+    let exe = if command == "python" {
+        "\"$(command -v python3 || command -v python)\"".to_string()
+    } else {
+        shell_quote(command)
+    };
+    let argv: Vec<String> = args.iter().map(|a| shell_quote(a)).collect();
+    format!(
+        "cd {} || exit 1; {}; exec {exe} {}",
+        shell_quote(dir),
+        crate::remote::TOOL_PATH_SETUP,
+        argv.join(" ")
+    )
 }
 
 /// Pull complete `Content-Length` frames out of the accumulation buffer and

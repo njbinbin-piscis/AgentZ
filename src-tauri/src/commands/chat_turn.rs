@@ -847,6 +847,112 @@ fn expand_terminal_snippets(
     )
 }
 
+async fn remote_read_text(path: &str) -> Option<String> {
+    use base64::Engine as _;
+    let v = crate::remote::call("fs.readFile", serde_json::json!({ "path": path }))
+        .await
+        .ok()?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(v.get("base64")?.as_str()?)
+        .ok()?;
+    if bytes[..bytes.len().min(8192)].contains(&0) {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// `@file` expansion for remote workspaces (`@codebase` / `@graph` need local
+/// indexes and are skipped).
+async fn expand_file_refs_remote(raw: &str, workspace_root: &str) -> String {
+    let refs = collect_at_refs(raw);
+    if refs.is_empty() {
+        return raw.to_string();
+    }
+    let Ok(Some(root)) = crate::remote::resolve(workspace_root).await else {
+        return raw.to_string();
+    };
+    let mut blocks = Vec::new();
+    let mut total = 0usize;
+    for ref_path in refs.iter().filter(|r| *r != "codebase" && *r != "graph") {
+        if total >= MAX_TOTAL_REF_CHARS {
+            blocks.push(format!(
+                "[Skipped remaining @file references — total inline limit ({MAX_TOTAL_REF_CHARS} chars) reached.]"
+            ));
+            break;
+        }
+        let full = format!("{}/{}", root.trim_end_matches('/'), ref_path.trim_start_matches(['/', '\\']));
+        let Some(content) = remote_read_text(&full).await else { continue };
+        let body = if content.len() > MAX_FILE_REF_CHARS {
+            let mut cut = MAX_FILE_REF_CHARS;
+            while !content.is_char_boundary(cut) {
+                cut -= 1;
+            }
+            format!("{}\n… [truncated, {} chars omitted]", &content[..cut], content.len() - cut)
+        } else {
+            content
+        };
+        let block = format!("```{ref_path}\n{body}\n```");
+        total += block.len();
+        blocks.push(block);
+    }
+    let wants_codebase = refs.iter().any(|r| r == "codebase");
+    let wants_graph = refs.iter().any(|r| r == "graph");
+    if wants_codebase || wants_graph {
+        if let Ok(mirror) = crate::remote::mirror::sync(workspace_root, false).await {
+            let mirror = mirror.to_string_lossy().to_string();
+            let raw_owned = raw.to_string();
+            let extra = tokio::task::spawn_blocking(move || {
+                let mut v = Vec::new();
+                if wants_codebase {
+                    v.extend(codebase_context_block(&raw_owned, &mirror));
+                }
+                if wants_graph {
+                    v.extend(graph_context_block(&raw_owned, &mirror));
+                }
+                v
+            })
+            .await
+            .unwrap_or_default();
+            blocks.extend(extra);
+        }
+    }
+    if blocks.is_empty() {
+        return raw.to_string();
+    }
+    format!("Context from referenced files:\n\n{}\n\n---\n\n{}", blocks.join("\n\n"), raw)
+}
+
+/// Project rules (`.agentz/rules`, `.cursor/rules`) read from a remote workspace.
+async fn project_rules_context_remote(workspace_root: &str) -> Option<String> {
+    let root = crate::remote::resolve(workspace_root).await.ok()??;
+    for dir in [".agentz/rules", ".cursor/rules"] {
+        let dir_path = format!("{}/{dir}", root.trim_end_matches('/'));
+        let Ok(entries) = crate::remote::call("fs.readDir", serde_json::json!({ "path": dir_path })).await else {
+            continue;
+        };
+        let mut names: Vec<String> = entries
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.get("name")?.as_str().map(str::to_string))
+            .filter(|n| n.ends_with(".md") || n.ends_with(".mdc"))
+            .collect();
+        names.sort();
+        let mut blocks = Vec::new();
+        for n in names {
+            if let Some(c) = remote_read_text(&format!("{dir_path}/{n}")).await {
+                if !c.trim().is_empty() {
+                    blocks.push(c.trim().to_string());
+                }
+            }
+        }
+        if !blocks.is_empty() {
+            return Some(format!("## Project rules\n{}", blocks.join("\n\n")));
+        }
+    }
+    None
+}
+
 fn expand_file_refs(raw: &str, workspace_root: &str) -> String {
     let refs = collect_at_refs(raw);
     if refs.is_empty() {
@@ -1203,7 +1309,7 @@ pub(crate) async fn run_subagent_with_prompt(
         resolve_llm_runtime(&s, flash.as_deref())?
     };
 
-    let registry = build_subagent_registry(
+    let mut registry = build_subagent_registry(
         app,
         db.clone(),
         settings.clone(),
@@ -1213,6 +1319,7 @@ pub(crate) async fn run_subagent_with_prompt(
         plan_store,
         lsp_manager,
     );
+    crate::tools::remote_fs::install_if_remote(&mut registry, &workspace_root);
 
     let (
         context_window,
@@ -1821,6 +1928,7 @@ pub async fn run_agentz_turn(
     } else {
         workspace_root
     };
+    crate::tools::remote_fs::install_if_remote(&mut registry, &workspace_root);
 
     let display_for_db = display_prompt
         .filter(|s| !s.trim().is_empty())
@@ -1837,7 +1945,11 @@ pub async fn run_agentz_turn(
         guard.clone()
     };
     let with_terminal = expand_terminal_snippets(&with_browser, &snippets);
-    let mut llm_user_content = expand_file_refs(&with_terminal, &workspace_root);
+    let mut llm_user_content = if crate::remote::is_remote(&workspace_root) {
+        expand_file_refs_remote(&with_terminal, &workspace_root).await
+    } else {
+        expand_file_refs(&with_terminal, &workspace_root)
+    };
 
     let expected_source = request
         .channel
@@ -2074,7 +2186,22 @@ pub async fn run_agentz_turn(
             extra_sections.push(connectors);
         }
     }
-    if let Some(rules) = project_rules_context(&workspace_root) {
+    if let Some(parsed) = crate::remote::vfs::parse(&workspace_root) {
+        extra_sections.push(format!(
+            "## Remote workspace\n\nThe workspace lives on `{}` at `{}` (Linux/POSIX). \
+             file_* and shell tools execute on that machine: use POSIX shell syntax, \
+             forward-slash paths, and paths relative to the workspace root. \
+             Index tools (codebase_search, graph_*, symbol_search, impact) search a \
+             local mirror synced from the remote; their paths are workspace-relative.",
+            parsed.authority, parsed.path
+        ));
+    }
+    let rules = if crate::remote::is_remote(&workspace_root) {
+        project_rules_context_remote(&workspace_root).await
+    } else {
+        project_rules_context(&workspace_root)
+    };
+    if let Some(rules) = rules {
         extra_sections.push(rules);
     }
     if let Some(wiki) = wiki_agent_coding_context(&workspace_root, chat_mode) {

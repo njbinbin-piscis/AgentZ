@@ -6,6 +6,7 @@ import { ExtHostContext } from "./common/protocol";
 import { StdioTransport } from "./host/stdioTransport";
 import { Services } from "./host/services";
 import { ExtHostExtensionService } from "./host/extensionService";
+import { AgentzServer } from "./server/agentzServer";
 
 function log(msg: string): void {
   process.stderr.write(msg + "\n");
@@ -15,6 +16,12 @@ function main(): void {
   log("[host] AgentZ extension host starting");
 
   const transport = new StdioTransport(process.stdin, process.stdout);
+  const server = new AgentzServer((frame) => transport.writeFrame(frame));
+  transport.onControl((msg) => {
+    if (!AgentzServer.isControl(msg)) return false;
+    void server.handle(msg);
+    return true;
+  });
   const rpc = new RPCProtocol(transport);
 
   const services = new Services(rpc);

@@ -33,6 +33,7 @@ pub mod symbols;
 pub mod graph_agent;
 pub mod graph_db;
 pub mod graph_index;
+pub mod remote;
 pub mod repo_wiki;
 pub mod project_templates;
 pub mod seed;
