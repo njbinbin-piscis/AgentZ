@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-10-03
+
+### Changed
+
+- Tool calls between assistant text stay in one block: collapsed to the current call, and at most five lines when expanded (further calls scroll inside the block). The next assistant text leaves that block in place and starts a new one.
+
 ## [0.9.2] - 2026-10-03
 
 ### Fixed
