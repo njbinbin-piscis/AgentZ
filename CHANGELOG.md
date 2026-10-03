@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-10-03
+
+### Fixed
+
+- Progress spinners keep spinning on software-rendered machines. The reduced-graphics mode was stopping every infinite animation after one cycle, including the tool-call spinner and the spinner beside the send button. Decorative pulses still play once.
+- Assistant messages render as Markdown during a turn. CodeZ was showing the whole in-progress reply as raw source, and WorkZ did the same for the live tail. Text still arrives in 80 ms batches, so Markdown is not reparsed on every token.
+
+### Changed
+
+- README rewritten to describe the 0.9.x app: CodeZ, WorkZ, the extension host, and remote development.
+
 ## [0.9.4] - 2026-10-03
 
 ### Added
