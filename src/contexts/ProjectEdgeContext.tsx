@@ -18,6 +18,8 @@ export interface PendingReview {
 }
 
 type RefreshKind = "git" | "fileTree";
+/** May return a promise so the scheduler can avoid overlapping runs. */
+type RefreshHandler = () => void | Promise<unknown>;
 
 interface ProjectEdgeContextValue {
   gitChanges: GitFileStatus[];
@@ -25,7 +27,7 @@ interface ProjectEdgeContextValue {
   /** @deprecated Prefer scheduleWorkspaceRefresh({ git: true }) */
   refreshGitChanges: () => void;
   registerRefreshGitChanges: (fn: () => void) => () => void;
-  registerWorkspaceRefresh: (kind: RefreshKind, fn: () => void) => () => void;
+  registerWorkspaceRefresh: (kind: RefreshKind, fn: RefreshHandler) => () => void;
   scheduleWorkspaceRefresh: (opts?: {
     git?: boolean;
     fileTree?: boolean;
@@ -57,25 +59,29 @@ export function ProjectEdgeProvider({ children }: { children: ReactNode }) {
   const [selectHandler, setSelectHandler] = useState<((path: string) => void) | null>(null);
   const [agentTurnBusy, setAgentTurnBusy] = useState(false);
 
-  const refreshHandlers = useRef<Partial<Record<RefreshKind, () => void>>>({});
+  const refreshHandlers = useRef<Partial<Record<RefreshKind, RefreshHandler>>>({});
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRefresh = useRef<{ git: boolean; fileTree: boolean }>({ git: false, fileTree: false });
   const refreshInFlight = useRef(false);
 
   const flushWorkspaceRefresh = useCallback(() => {
+    refreshTimer.current = null;
+    // Requests arriving mid-flight stay pending and run once afterwards.
+    if (refreshInFlight.current) return;
     const { git, fileTree } = pendingRefresh.current;
     pendingRefresh.current = { git: false, fileTree: false };
-    refreshTimer.current = null;
     if (!git && !fileTree) return;
 
     perfCounters.recordWorkspaceRefreshFlushed();
     refreshInFlight.current = true;
-    try {
-      if (git) refreshHandlers.current.git?.();
-      if (fileTree) refreshHandlers.current.fileTree?.();
-    } finally {
+    const runs: Promise<unknown>[] = [];
+    if (git) runs.push(Promise.resolve(refreshHandlers.current.git?.()));
+    if (fileTree) runs.push(Promise.resolve(refreshHandlers.current.fileTree?.()));
+    void Promise.allSettled(runs).then(() => {
       refreshInFlight.current = false;
-    }
+      const next = pendingRefresh.current;
+      if ((next.git || next.fileTree) && !refreshTimer.current) flushWorkspaceRefresh();
+    });
   }, []);
 
   const scheduleWorkspaceRefresh = useCallback(
@@ -96,7 +102,7 @@ export function ProjectEdgeProvider({ children }: { children: ReactNode }) {
     [agentTurnBusy, flushWorkspaceRefresh],
   );
 
-  const registerWorkspaceRefresh = useCallback((kind: RefreshKind, fn: () => void) => {
+  const registerWorkspaceRefresh = useCallback((kind: RefreshKind, fn: RefreshHandler) => {
     refreshHandlers.current[kind] = fn;
     return () => {
       if (refreshHandlers.current[kind] === fn) {

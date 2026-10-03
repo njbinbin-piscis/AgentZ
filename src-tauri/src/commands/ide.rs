@@ -804,10 +804,38 @@ pub use git_workspace::GitRepoSnapshot;
 
 // ─── Git Operations ────────────────────────────────────────────────────────
 
+type GitStatusRun =
+    futures::future::Shared<futures::future::BoxFuture<'static, Result<std::sync::Arc<Vec<u8>>, String>>>;
+
+/// At most one `git status` per repo at a time; concurrent callers share its
+/// output. A refresh storm from the UI would otherwise pile up git processes.
+fn git_status_runs() -> &'static std::sync::Mutex<HashMap<PathBuf, GitStatusRun>> {
+    static RUNS: std::sync::OnceLock<std::sync::Mutex<HashMap<PathBuf, GitStatusRun>>> = std::sync::OnceLock::new();
+    RUNS.get_or_init(Default::default)
+}
+
 async fn git_status_at(repo: &Path, workspace: &Path) -> Result<Vec<GitFileStatus>, String> {
-    let output = run_git_cmd_bytes(repo, &["status", "--porcelain=v1", "-z", "-uall"])
-        .await
-        .map_err(|e| format!("git status failed: {}", e))?;
+    use futures::FutureExt;
+    let key = repo.to_path_buf();
+    let run = {
+        let mut runs = git_status_runs().lock().unwrap();
+        runs.entry(key.clone())
+            .or_insert_with(|| {
+                let repo = key.clone();
+                async move {
+                    let out = run_git_cmd_bytes(&repo, &["status", "--porcelain=v1", "-z", "-uall"])
+                        .await
+                        .map(std::sync::Arc::new)
+                        .map_err(|e| format!("git status failed: {}", e));
+                    git_status_runs().lock().unwrap().remove(&repo);
+                    out
+                }
+                .boxed()
+                .shared()
+            })
+            .clone()
+    };
+    let output = run.await?;
     let rel = git_workspace::repo_root_rel(workspace, repo);
     Ok(git_workspace::parse_git_status_output(&output, &rel))
 }
@@ -1174,6 +1202,8 @@ pub struct TerminalSession {
     pub child: Box<dyn portable_pty::Child + Send>,
     pub writer: Option<Box<dyn StdWrite + Send>>,
     pub output: Arc<std::sync::Mutex<TerminalOutputLog>>,
+    /// Kept for resizing; dropping it closes the PTY.
+    pub master: Box<dyn portable_pty::MasterPty + Send>,
 }
 
 impl TerminalRegistry {
@@ -1259,9 +1289,6 @@ pub async fn ide_terminal_create(
         .take_writer()
         .map_err(|e| format!("Failed to take PTY writer: {}", e))?;
 
-    // Store the master pty handle for resize support
-    let master_pty = pair.master;
-
     let output_log = Arc::new(std::sync::Mutex::new(TerminalOutputLog::default()));
 
     // Register the session
@@ -1273,6 +1300,7 @@ pub async fn ide_terminal_create(
                 child,
                 writer: Some(writer),
                 output: output_log.clone(),
+                master: pair.master,
             },
         );
     }
@@ -1299,8 +1327,6 @@ pub async fn ide_terminal_create(
                 Err(_) => break,
             }
         }
-        // Drop master_pty to close the PTY when reader ends
-        drop(master_pty);
     });
 
     Ok(())
@@ -1334,14 +1360,21 @@ pub async fn ide_terminal_write(
 pub async fn ide_terminal_resize(
     state: State<'_, AppState>,
     terminal_id: String,
-    _cols: u16,
-    _rows: u16,
+    cols: u16,
+    rows: u16,
 ) -> Result<(), String> {
-    // PTY resize requires holding the MasterPty handle.
-    // Since we currently don't store it in the session, this is a no-op.
-    // The frontend xterm.js handles visual reflow on its own.
-    let _ = (state, terminal_id, _cols, _rows);
-    Ok(())
+    if cols == 0 || rows == 0 {
+        return Ok(());
+    }
+    let registry = state.terminals.lock().await;
+    let session = registry
+        .sessions
+        .get(&terminal_id)
+        .ok_or_else(|| format!("Terminal '{}' not found", terminal_id))?;
+    session
+        .master
+        .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+        .map_err(|e| format!("Resize failed: {}", e))
 }
 
 /// Destroy a terminal session.

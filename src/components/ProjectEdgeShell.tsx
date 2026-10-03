@@ -24,7 +24,7 @@ export default function ProjectEdgeShell({ projectDir }: ProjectEdgeShellProps) 
       setGitChanges([]);
       return;
     }
-    ideApi
+    return ideApi
       .gitStatus(projectDir)
       .then(setGitChanges)
       .catch(() => setGitChanges([]));
