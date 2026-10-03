@@ -280,10 +280,25 @@ const UI_TOOL_RESULT_MAX_CHARS: usize = 20_000;
 
 /// Build UI bubbles (with tool calls) from raw rows: tool-result rows are folded
 /// into the matching call, consecutive assistant rows of one turn are merged.
+/// Prompts the agent kernel writes into history as `user` rows to steer the
+/// model (plan-todo reminders, tool-args correction). They are for the LLM
+/// only and must not render as user bubbles.
+fn is_kernel_injected_prompt(content: &str) -> bool {
+    const PREFIXES: &[&str] = &[
+        "⚠️ 你的计划中还有未完成的步骤",
+        "系统提示：你上一次的工具调用参数",
+    ];
+    let t = content.trim_start();
+    PREFIXES.iter().any(|p| t.starts_with(p))
+}
+
 fn messages_rich(msgs: Vec<ChatMessage>) -> Vec<MessageDto> {
     let mut out: Vec<MessageDto> = Vec::new();
     for m in msgs {
         if m.role != "user" && m.role != "assistant" {
+            continue;
+        }
+        if m.role == "user" && is_kernel_injected_prompt(&m.content) {
             continue;
         }
         if m.role == "user" && m.content.trim().is_empty() {
@@ -548,7 +563,11 @@ pub async fn chat_get_messages_page(
             // picked up (whole) by the next page because `next_offset` excludes them.
             if let Some(k) = raw
                 .iter()
-                .position(|m| m.role == "user" && !m.content.trim().is_empty())
+                .position(|m| {
+                    m.role == "user"
+                        && !m.content.trim().is_empty()
+                        && !is_kernel_injected_prompt(&m.content)
+                })
             {
                 if k > 0 {
                     raw.drain(..k);
