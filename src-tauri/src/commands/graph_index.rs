@@ -212,6 +212,12 @@ fn worker_loop(key: String) {
             Step::Run(root) => {
                 {
                     let mut st = state().lock().unwrap_or_else(|e| e.into_inner());
+                    // This build covers everything queued so far; only requests
+                    // arriving while it runs should trigger another pass.
+                    if let Some(entry) = st.queues.get_mut(&key) {
+                        entry.rerun_after_current = false;
+                        entry.pending_files.clear();
+                    }
                     st.phases.insert(key.clone(), IndexPhase::Building);
                 }
 

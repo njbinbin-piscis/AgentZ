@@ -99,6 +99,25 @@ body {
   zoom: calc(1 / var(--ui-font-scale, 1));
 }
 
+/* ── Reduced graphics (software rendering / reduced motion) ──────────────
+   Blur and looping animations repaint every frame on the CPU under llvmpipe.
+   Looping animations play once and settle; one-shot transitions still run. */
+.agentz-low-gfx *,
+.agentz-low-gfx *::before,
+.agentz-low-gfx *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  animation-iteration-count: 1 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-iteration-count: 1 !important;
+  }
+}
+
 /* ── Monaco editor hover / tooltip — keep above side panels ───────────── */
 .monaco-editor .monaco-hover,
 .monaco-editor .hover-row,

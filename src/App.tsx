@@ -297,15 +297,14 @@ export default function App() {
         });
     };
     applyLanguage();
-    const offLang = onSettingsRefresh(applyLanguage);
-    const offToast = onSettingsRefresh(() => {
+    return onSettingsRefresh(applyLanguage);
+  }, []);
+
+  useEffect(() => {
+    return onSettingsRefresh(() => {
       setSettingsToast(t("settings.savedEffectHint"));
       window.setTimeout(() => setSettingsToast((cur) => (cur === t("settings.savedEffectHint") ? null : cur)), 3200);
     });
-    return () => {
-      offLang();
-      offToast();
-    };
   }, [t]);
 
   // Surface the assistant message panel button only once an IM channel is

@@ -46,7 +46,7 @@ import InteractiveCard from "../../components/chat/InteractiveCard";
 import { useInteractiveCards } from "../../hooks/useInteractiveCards";
 import PermissionCard, { type PermissionRequestCard } from "../../components/chat/PermissionCard";
 import AgentFilePreview from "./AgentFilePreview";
-import { useProjectEdge } from "../../contexts/ProjectEdgeContext";
+import { useProjectEdgeActions, useProjectEdgeState } from "../../contexts/ProjectEdgeContext";
 import CollabBoard from "./CollabBoard";
 import PoolActivityFeed from "./PoolActivityFeed";
 import WorkflowRunPanel from "./WorkflowRunPanel";
@@ -121,6 +121,7 @@ function readLastTask(projectDir: string): string | null {
 }
 
 const MAX_AUTO_RESUMES = 6;
+const STREAM_FLUSH_MS = 80;
 
 type WorkzScope = { kind: "free" } | { kind: "project"; dir: string };
 const SCOPE_KEY = "agentz-workz-scope";
@@ -166,8 +167,9 @@ export default function WorkZWorkspace({
   onOpenLibrary,
 }: WorkZWorkspaceProps) {
   const { t, i18n } = useTranslation();
-  const { setArtifacts, setPreviewPath, previewPath, refreshGitChanges, setPendingReview } =
-    useProjectEdge();
+  const { setArtifacts, setPreviewPath, refreshGitChanges, setPendingReview } =
+    useProjectEdgeActions();
+  const previewPath = useProjectEdgeState((s) => s.previewPath);
   const [tasks, setTasks] = useState<SessionMeta[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [steps, setSteps] = useState<AgentStep[]>([]);
@@ -331,6 +333,33 @@ export default function WorkZWorkspace({
   // brand-new task hasn't been assigned one yet). Background runs keep going
   // server-side under their own task key + cancel flag.
   const liveRef = useRef(false);
+  // Token deltas are coalesced so a streaming reply re-renders at most every
+  // STREAM_FLUSH_MS instead of once per token.
+  const streamPendingRef = useRef("");
+  const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushStreamDelta = useCallback(() => {
+    if (streamTimerRef.current) {
+      clearTimeout(streamTimerRef.current);
+      streamTimerRef.current = null;
+    }
+    const chunk = streamPendingRef.current;
+    streamPendingRef.current = "";
+    if (!chunk) return;
+    setSteps((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      if (last.role !== "assistant") return prev;
+      const copy = prev.slice();
+      copy[copy.length - 1] = { ...last, text: last.text + chunk };
+      return copy;
+    });
+  }, []);
+  const discardStreamDelta = useCallback(() => {
+    if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+    streamTimerRef.current = null;
+    streamPendingRef.current = "";
+  }, []);
+  useEffect(() => discardStreamDelta, [discardStreamDelta]);
   const foregroundSessionRef = useRef<string | null>(null);
   const foregroundTaskKeyRef = useRef<string | null>(null);
   const runningSessionsRef = useRef<Set<string>>(new Set());
@@ -426,12 +455,17 @@ export default function WorkZWorkspace({
   useEffect(() => {
     if (!workflowRunId) return;
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     subscribeWorkflowEvents((e) => {
       if (e.runId === workflowRunId) setWorkflowStatus(e.status);
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, [workflowRunId]);
 
   useEffect(() => {
@@ -457,6 +491,7 @@ export default function WorkZWorkspace({
     setWorktree(null);
     setReviewTask(null);
     liveRef.current = false;
+    discardStreamDelta();
     foregroundSessionRef.current = null;
     foregroundTaskKeyRef.current = null;
     restoredTaskForRef.current = null;
@@ -594,6 +629,9 @@ export default function WorkZWorkspace({
       // interactive event can race the initial state update, while a terminal
       // event can arrive just after the turn resolves. Keep those cards in sync
       // with their backend response channels in either case.
+      // Every other event may depend on the text so far (tool_start records the
+      // text offset it interleaves at), so buffered deltas land first.
+      if (evt.type !== "text_delta") flushStreamDelta();
       if (
         evt.type === "interactive_ui" ||
         evt.type === "interactive_ui_patch" ||
@@ -608,15 +646,10 @@ export default function WorkZWorkspace({
 
       switch (evt.type) {
         case "text_delta":
-          setSteps((prev) => {
-            if (prev.length === 0) return prev;
-            const copy = prev.slice();
-            const last = { ...copy[copy.length - 1] };
-            if (last.role !== "assistant") return prev;
-            last.text += evt.delta;
-            copy[copy.length - 1] = last;
-            return copy;
-          });
+          streamPendingRef.current += evt.delta;
+          if (!streamTimerRef.current) {
+            streamTimerRef.current = setTimeout(flushStreamDelta, STREAM_FLUSH_MS);
+          }
           break;
         case "tool_start":
           if (evt.name === "plan_todo") {
@@ -666,7 +699,7 @@ export default function WorkZWorkspace({
           break;
       }
     },
-    [handleAgentEvent, markRunning],
+    [handleAgentEvent, markRunning, flushStreamDelta],
   );
 
   useEffect(() => {
@@ -864,6 +897,7 @@ export default function WorkZWorkspace({
         markRunning(startSession, false);
       }
       if (isForeground()) {
+        flushStreamDelta();
         setBusy(false);
         liveRef.current = false;
         setSteps((s) =>
@@ -916,6 +950,7 @@ export default function WorkZWorkspace({
     // background and resurfaces in the task list when it finishes. Clearing
     // the session binding unlocks team / agent mode pickers for the next task.
     liveRef.current = false;
+    discardStreamDelta();
     foregroundSessionRef.current = null;
     foregroundTaskKeyRef.current = null;
     setBusy(false);
@@ -960,6 +995,7 @@ export default function WorkZWorkspace({
         // the opened task's persisted history; if it is itself running, its
         // results refresh on completion.
         liveRef.current = false;
+        discardStreamDelta();
         foregroundTaskKeyRef.current = null;
         foregroundSessionRef.current = id;
         sessionRef.current = id;
@@ -1474,11 +1510,15 @@ export default function WorkZWorkspace({
                       </div>
                       <div className="agentz-workz-msg-body">
                         {m.role === "assistant" && m.tools.length > 0 ? (
-                          interleaveTools(m.text, m.tools).map((seg, si) => (
+                          interleaveTools(m.text, m.tools).map((seg, si, all) => (
                             <div key={`seg-${si}`}>
                               {seg.text && (
                                 <div className="agentz-workz-msg-bubble">
-                                  <Markdown content={seg.text} />
+                                  {isStreamingLast && si === all.length - 1 ? (
+                                    <div className="agentz-workz-msg-text">{seg.text}</div>
+                                  ) : (
+                                    <Markdown content={seg.text} />
+                                  )}
                                 </div>
                               )}
                               {seg.tools.length > 0 && <ToolTrace items={seg.tools} />}
@@ -1486,7 +1526,7 @@ export default function WorkZWorkspace({
                           ))
                         ) : m.text ? (
                           <div className="agentz-workz-msg-bubble">
-                            {m.role === "assistant" ? (
+                            {m.role === "assistant" && !isStreamingLast ? (
                               <Markdown content={m.text} />
                             ) : (
                               <div className="agentz-workz-msg-text">{m.text}</div>

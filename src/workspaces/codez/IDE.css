@@ -62,6 +62,8 @@
   font-weight: 600;
 }
 .ide-status-remote.running { background: var(--accent); color: #fff; }
+.ide-status-remote-open { background: var(--accent); color: #fff; }
+.ide-status-remote-open:hover { background: var(--accent-hover); }
 .ide-status-error { color: var(--warning); }
 .ide-status-error:hover { background: rgba(251, 191, 36, 0.12); }
 
@@ -166,6 +168,16 @@
 
 .ide-open-folder-btn:hover {
   background: var(--accent-hover);
+}
+
+.ide-open-remote-btn {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.ide-open-remote-btn:hover {
+  background: var(--bg-hover);
 }
 
 .ide-open-folder-btn-lg {

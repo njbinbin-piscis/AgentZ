@@ -14,7 +14,10 @@ import SearchPanel from "./SearchPanel";
 import ExtensionsManager from "./ExtensionsManager";
 import BottomPanel, { type BottomTab } from "./BottomPanel";
 import IdeStatusBar from "./IdeStatusBar";
+import RemoteConnectDialog from "./RemoteConnectDialog";
+import * as monaco from "monaco-editor";
 import { ideApi, onFileChanged } from "../../services/tauri/ide";
+import { fileUriString } from "../../services/tauri/editorUri";
 import { revealInFolder } from "../../services/tauri";
 import BrowserPanel from "./BrowserPanel";
 import { BROWSER_TAB_PATH, isBrowserTab } from "./browserTab";
@@ -33,7 +36,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { FileNode, OpenTab, TabViewMode } from "./types";
 import type { EditorSnapshot, LayoutSnapshot } from "../../services/tauri/workspace";
 import { editorSnapshotFromTabs } from "../../services/tauri/workspace";
-import { useProjectEdge } from "../../contexts/ProjectEdgeContext";
+import { useProjectEdgeActions, useProjectEdgeState } from "../../contexts/ProjectEdgeContext";
 import { normalizeRelPath, shouldWatchPath } from "../../utils/pathFilter";
 import { perfCounters } from "../../utils/perfCounters";
 import "./IDE.css";
@@ -137,13 +140,10 @@ export default function CodeZWorkspace({
   const [fileLoading, setFileLoading] = useState<string | null>(null);
   const [fileLoadError, setFileLoadError] = useState<string | null>(null);
 
-  const {
-    registerOnSelectPath,
-    gitChanges,
-    scheduleWorkspaceRefresh,
-    registerWorkspaceRefresh,
-    agentTurnBusy,
-  } = useProjectEdge();
+  const { registerOnSelectPath, scheduleWorkspaceRefresh, registerWorkspaceRefresh } =
+    useProjectEdgeActions();
+  const gitChanges = useProjectEdgeState((s) => s.gitChanges);
+  const agentTurnBusy = useProjectEdgeState((s) => s.agentTurnBusy);
 
   const { gitModified, gitAdded } = useMemo(() => {
     const modified = new Set<string>();
@@ -276,6 +276,7 @@ export default function CodeZWorkspace({
   const [explorerExpanded, setExplorerExpanded] = useState<Set<string>>(new Set());
   const explorerExpandedInitRef = useRef(false);
   const [fileTreeContextMenu, setFileTreeContextMenu] = useState<FileTreeContextMenu | null>(null);
+  const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
   const fileTreeRef = useRef<(HTMLDivElement & FileTreeHandle) | null>(null);
 
   // Stable refs so keyboard shortcuts / beforeunload always read the latest
@@ -558,10 +559,16 @@ export default function CodeZWorkspace({
 
   useEffect(() => registerWorkspaceRefresh("fileTree", loadFileTree), [registerWorkspaceRefresh, loadFileTree]);
 
+  // The watcher re-walks the whole project on start, so its lifetime must follow
+  // `projectDir` only — read the latest callbacks through a ref.
+  const watcherCallbacksRef = useRef({ scheduleWorkspaceRefresh, scheduleTabReload });
+  watcherCallbacksRef.current = { scheduleWorkspaceRefresh, scheduleTabReload };
+
   useEffect(() => {
     if (!projectDir) return;
+    const callbacks = watcherCallbacksRef;
 
-    scheduleWorkspaceRefresh({ git: true, fileTree: true, force: true, delayMs: 0 });
+    callbacks.current.scheduleWorkspaceRefresh({ git: true, fileTree: true, force: true, delayMs: 0 });
 
     ideApi.startWatcher(projectDir).catch(() => {});
 
@@ -576,14 +583,14 @@ export default function CodeZWorkspace({
 
       if (!agentTurnBusyRef.current) {
         if (evt.kind === "created") {
-          scheduleWorkspaceRefresh({ fileTree: true });
+          callbacks.current.scheduleWorkspaceRefresh({ fileTree: true });
         } else {
-          scheduleWorkspaceRefresh({ git: true, fileTree: true });
+          callbacks.current.scheduleWorkspaceRefresh({ git: true, fileTree: true });
         }
       }
 
       if (evt.kind === "modified" || evt.kind === "deleted") {
-        scheduleTabReload(evtPath, evt.kind);
+        callbacks.current.scheduleTabReload(evtPath, evt.kind);
       }
     });
 
@@ -596,7 +603,7 @@ export default function CodeZWorkspace({
       unlistenPromise.then((fn) => fn());
       ideApi.stopWatcher(projectDir).catch(() => {});
     };
-  }, [projectDir, loadFileTree, scheduleWorkspaceRefresh, scheduleTabReload]);
+  }, [projectDir]);
 
   const openFile = useCallback(
     async (path: string, readOnly = false) => {
@@ -749,6 +756,24 @@ export default function CodeZWorkspace({
     },
     [scheduleWorkspaceRefresh],
   );
+
+  // The editor keeps each file's Monaco model alive across tab switches
+  // (`keepCurrentModel`), so models must be disposed once their tab is gone —
+  // whichever close path removed it.
+  const openModelUrisRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const current = new Set(
+      projectDir
+        ? tabs
+            .filter((tab) => !tab.isDiff && !isBrowserTab(tab.path))
+            .map((tab) => fileUriString(`${projectDir}/${tab.path}`))
+        : [],
+    );
+    for (const uri of openModelUrisRef.current) {
+      if (!current.has(uri)) monaco.editor.getModel(monaco.Uri.parse(uri))?.dispose();
+    }
+    openModelUrisRef.current = current;
+  }, [tabs, projectDir]);
 
   // ─── Close tab (no dirty prompt — used internally) ─────────────────
   const removeTab = useCallback(
@@ -1077,6 +1102,9 @@ export default function CodeZWorkspace({
               <button type="button" className="ide-open-folder-btn" onClick={onOpenFolder}>
                 {t("ide.openFolder") || "Open Folder"}
               </button>
+              <button type="button" className="ide-open-folder-btn ide-open-remote-btn" onClick={() => setRemoteDialogOpen(true)}>
+                {t("remote.dialog.open")}
+              </button>
               <p className="ide-sidebar-empty-hint">{t("ide.noProjectDirHint")}</p>
             </div>
           ) : (
@@ -1152,6 +1180,13 @@ export default function CodeZWorkspace({
               <div>{t("ide.noProjectDir") || "No folder open."}</div>
               <button type="button" className="ide-open-folder-btn ide-open-folder-btn-lg" onClick={onOpenFolder}>
                 {t("ide.openFolder") || "Open Folder"}
+              </button>
+              <button
+                type="button"
+                className="ide-open-folder-btn ide-open-folder-btn-lg ide-open-remote-btn"
+                onClick={() => setRemoteDialogOpen(true)}
+              >
+                {t("remote.dialog.open")}
               </button>
               <div style={{ fontSize: 12, opacity: 0.6 }}>{t("ide.noProjectDirHint")}</div>
             </div>
@@ -1230,7 +1265,9 @@ export default function CodeZWorkspace({
         projectDir={projectDir}
         onOpenPanel={openBottomPanel}
         onOpenExtensions={openExtensionsSidebar}
+        onOpenRemote={() => setRemoteDialogOpen(true)}
       />
+      {remoteDialogOpen && <RemoteConnectDialog projectDir={projectDir} onClose={() => setRemoteDialogOpen(false)} />}
 
       {/* File tree right-click context menu */}
       {fileTreeContextMenu && (

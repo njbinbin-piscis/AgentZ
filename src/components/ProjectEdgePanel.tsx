@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useProjectEdge } from "../contexts/ProjectEdgeContext";
+import { useProjectEdgeActions, useProjectEdgeState } from "../contexts/ProjectEdgeContext";
 import EdgeBookmarkDrawer from "./EdgeBookmarkDrawer";
 import "./ProjectEdgePanel.css";
 
@@ -26,15 +26,11 @@ export default function ProjectEdgePanel({
   undoing = false,
 }: ProjectEdgePanelProps) {
   const { t } = useTranslation();
-  const {
-    gitChanges,
-    artifacts,
-    pendingReview,
-    previewPath,
-    onSelectPath,
-    setPendingReview,
-    setPreviewPath,
-  } = useProjectEdge();
+  const { onSelectPath, setPendingReview, setPreviewPath } = useProjectEdgeActions();
+  const gitChanges = useProjectEdgeState((s) => s.gitChanges);
+  const artifacts = useProjectEdgeState((s) => s.artifacts);
+  const pendingReview = useProjectEdgeState((s) => s.pendingReview);
+  const previewPath = useProjectEdgeState((s) => s.previewPath);
 
   const [activeTab, setActiveTab] = useState<EdgeTabId>("changes");
   const [forceDismissed, setForceDismissed] = useState(false);

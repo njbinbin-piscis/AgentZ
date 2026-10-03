@@ -85,14 +85,17 @@ export default function PoolActivityFeed({ projectDir, poolId, filter = "all" }:
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     let timer: number | undefined;
     onPoolEvent(() => {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => void refresh(), 250);
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
     return () => {
+      disposed = true;
       unlisten?.();
       if (timer) window.clearTimeout(timer);
     };

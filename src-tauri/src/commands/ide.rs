@@ -111,11 +111,15 @@ pub async fn ide_list_files(
         return Err(format!("Directory not found: {}", project_dir));
     }
     let max_depth = depth.unwrap_or(10);
-    let ignore_patterns = load_gitignore_patterns(&root);
-    let mut nodes = build_file_tree(&root, &root, 0, max_depth, &ignore_patterns)
-        .map_err(|e| format!("Failed to list files: {}", e))?;
-    sort_file_nodes(&mut nodes);
-    Ok(nodes)
+    tokio::task::spawn_blocking(move || {
+        let ignore_patterns = load_gitignore_patterns(&root);
+        let mut nodes = build_file_tree(&root, &root, 0, max_depth, &ignore_patterns)
+            .map_err(|e| format!("Failed to list files: {}", e))?;
+        sort_file_nodes(&mut nodes);
+        Ok(nodes)
+    })
+    .await
+    .map_err(|e| format!("File listing task failed: {e}"))?
 }
 
 fn load_gitignore_patterns(root: &Path) -> Vec<String> {
@@ -861,7 +865,7 @@ pub async fn ide_git_workspace_status(project_dir: String) -> Result<Vec<GitRepo
         crate::remote::refresh_git_repos(&project_dir).await?;
     }
     let workspace = PathBuf::from(&project_dir);
-    let repos = git_workspace::discover_git_repos(&workspace);
+    let repos = git_workspace::discover_git_repos_async(workspace.clone()).await;
     let mut snapshots = Vec::new();
     for repo in repos {
         let rel = git_workspace::repo_root_rel(&workspace, &repo);
@@ -885,7 +889,7 @@ pub async fn ide_git_status(project_dir: String) -> Result<Vec<GitFileStatus>, S
         crate::remote::refresh_git_repos(&project_dir).await?;
     }
     let workspace = PathBuf::from(&project_dir);
-    let repos = git_workspace::discover_git_repos(&workspace);
+    let repos = git_workspace::discover_git_repos_async(workspace.clone()).await;
     let mut all = Vec::new();
     for repo in repos {
         all.extend(git_status_at(&repo, &workspace).await?);

@@ -68,7 +68,7 @@ import {
   composerDbgMark,
   promptPreview,
 } from "../../utils/composerDebug";
-import { useProjectEdge } from "../../contexts/ProjectEdgeContext";
+import { useProjectEdgeActions } from "../../contexts/ProjectEdgeContext";
 import { collectArtifactsFromToolSteps, pathFromToolEvent } from "../workz/agentArtifacts";
 import "./AssistantPanel.css";
 
@@ -206,7 +206,7 @@ export default function AssistantPanel({
     onSelectPath,
     setAgentTurnBusy,
     scheduleWorkspaceRefresh,
-  } = useProjectEdge();
+  } = useProjectEdgeActions();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [turnDiffsByTurnId, setTurnDiffsByTurnId] = useState<Record<string, JournalFileDiff[]>>({});
   const [input, setInput] = useState("");

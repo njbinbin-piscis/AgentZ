@@ -24,7 +24,9 @@ void i18n.use(initReactI18next).init({
 
 /** Switch UI language and persist locally. */
 export function setLanguage(lang: "zh" | "en") {
-  void i18n.changeLanguage(lang);
+  // i18next emits `languageChanged` even for the current language, which hands
+  // every `useTranslation` consumer a fresh `t` and re-runs all `[t]` effects.
+  if (i18n.language !== lang) void i18n.changeLanguage(lang);
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
 }
 

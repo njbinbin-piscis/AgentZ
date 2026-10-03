@@ -85,6 +85,7 @@ export default function WorkflowRunPanel({ runId, onClose, onRerun }: Props) {
   // channel keyed by `{run_id}::{node_id}`).
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     const prefix = `${runId}::`;
     onChatEvent((env: ChatEventEnvelope) => {
       if (!env.sessionId || !env.sessionId.startsWith(prefix)) return;
@@ -95,9 +96,13 @@ export default function WorkflowRunPanel({ runId, onClose, onRerun }: Props) {
         setLiveText((prev) => ({ ...prev, [nodeId]: (prev[nodeId] ?? "") + evt.delta }));
       }
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, [runId]);
 
   const submitHuman = useCallback(async () => {

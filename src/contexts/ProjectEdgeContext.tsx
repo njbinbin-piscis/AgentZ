@@ -4,7 +4,7 @@ import {
   useContext,
   useMemo,
   useRef,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { GitFileStatus } from "../workspaces/codez/types";
@@ -21,8 +21,16 @@ type RefreshKind = "git" | "fileTree";
 /** May return a promise so the scheduler can avoid overlapping runs. */
 type RefreshHandler = () => void | Promise<unknown>;
 
-interface ProjectEdgeContextValue {
+export interface ProjectEdgeState {
   gitChanges: GitFileStatus[];
+  artifacts: string[];
+  pendingReview: PendingReview | null;
+  previewPath: string | null;
+  agentTurnBusy: boolean;
+}
+
+/** Stable callbacks — identities never change for the provider's lifetime. */
+export interface ProjectEdgeActions {
   setGitChanges: (changes: GitFileStatus[]) => void;
   /** @deprecated Prefer scheduleWorkspaceRefresh({ git: true }) */
   refreshGitChanges: () => void;
@@ -35,34 +43,69 @@ interface ProjectEdgeContextValue {
     /** Bypass agent-turn pause (e.g. turn finished). */
     force?: boolean;
   }) => void;
-  agentTurnBusy: boolean;
   setAgentTurnBusy: (busy: boolean) => void;
-  artifacts: string[];
   setArtifacts: (paths: string[]) => void;
-  pendingReview: PendingReview | null;
   setPendingReview: (review: PendingReview | null) => void;
-  previewPath: string | null;
   setPreviewPath: (path: string | null) => void;
   onSelectPath: (path: string) => void;
   registerOnSelectPath: (fn: (path: string) => void) => () => void;
 }
 
-const ProjectEdgeContext = createContext<ProjectEdgeContextValue | null>(null);
+interface ProjectEdgeStore {
+  getState: () => ProjectEdgeState;
+  subscribe: (listener: () => void) => () => void;
+}
+
+const ProjectEdgeStoreContext = createContext<ProjectEdgeStore | null>(null);
+const ProjectEdgeActionsContext = createContext<ProjectEdgeActions | null>(null);
 
 const DEFAULT_REFRESH_DELAY_MS = 250;
 
+function sameStrings(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+function sameGitChanges(a: GitFileStatus[], b: GitFileStatus[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((v, i) => v.path === b[i].path && v.status === b[i].status && v.staged === b[i].staged)
+  );
+}
+
 export function ProjectEdgeProvider({ children }: { children: ReactNode }) {
-  const [gitChanges, setGitChanges] = useState<GitFileStatus[]>([]);
-  const [artifacts, setArtifacts] = useState<string[]>([]);
-  const [pendingReview, setPendingReview] = useState<PendingReview | null>(null);
-  const [previewPath, setPreviewPath] = useState<string | null>(null);
-  const [selectHandler, setSelectHandler] = useState<((path: string) => void) | null>(null);
-  const [agentTurnBusy, setAgentTurnBusy] = useState(false);
+  const stateRef = useRef<ProjectEdgeState>({
+    gitChanges: [],
+    artifacts: [],
+    pendingReview: null,
+    previewPath: null,
+    agentTurnBusy: false,
+  });
+  const listeners = useRef(new Set<() => void>());
+
+  const store = useMemo<ProjectEdgeStore>(
+    () => ({
+      getState: () => stateRef.current,
+      subscribe: (listener) => {
+        listeners.current.add(listener);
+        return () => listeners.current.delete(listener);
+      },
+    }),
+    [],
+  );
+
+  const update = useCallback((patch: Partial<ProjectEdgeState>) => {
+    stateRef.current = { ...stateRef.current, ...patch };
+    for (const listener of listeners.current) listener();
+  }, []);
 
   const refreshHandlers = useRef<Partial<Record<RefreshKind, RefreshHandler>>>({});
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingRefresh = useRef<{ git: boolean; fileTree: boolean }>({ git: false, fileTree: false });
+  const pendingRefresh = useRef<{ git: boolean; fileTree: boolean }>({
+    git: false,
+    fileTree: false,
+  });
   const refreshInFlight = useRef(false);
+  const selectHandler = useRef<((path: string) => void) | null>(null);
 
   const flushWorkspaceRefresh = useCallback(() => {
     refreshTimer.current = null;
@@ -84,9 +127,17 @@ export function ProjectEdgeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const scheduleWorkspaceRefresh = useCallback(
-    (opts?: { git?: boolean; fileTree?: boolean; delayMs?: number; force?: boolean }) => {
-      if (agentTurnBusy && !opts?.force) return;
+  const actions = useMemo<ProjectEdgeActions>(() => {
+    const registerWorkspaceRefresh = (kind: RefreshKind, fn: RefreshHandler) => {
+      refreshHandlers.current[kind] = fn;
+      return () => {
+        if (refreshHandlers.current[kind] === fn) {
+          delete refreshHandlers.current[kind];
+        }
+      };
+    };
+    const scheduleWorkspaceRefresh: ProjectEdgeActions["scheduleWorkspaceRefresh"] = (opts) => {
+      if (stateRef.current.agentTurnBusy && !opts?.force) return;
       perfCounters.recordWorkspaceRefreshScheduled();
       if (opts?.git) pendingRefresh.current.git = true;
       if (opts?.fileTree) pendingRefresh.current.fileTree = true;
@@ -98,81 +149,58 @@ export function ProjectEdgeProvider({ children }: { children: ReactNode }) {
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
       const delay = opts?.delayMs ?? DEFAULT_REFRESH_DELAY_MS;
       refreshTimer.current = setTimeout(flushWorkspaceRefresh, delay);
-    },
-    [agentTurnBusy, flushWorkspaceRefresh],
-  );
-
-  const registerWorkspaceRefresh = useCallback((kind: RefreshKind, fn: RefreshHandler) => {
-    refreshHandlers.current[kind] = fn;
-    return () => {
-      if (refreshHandlers.current[kind] === fn) {
-        delete refreshHandlers.current[kind];
-      }
     };
-  }, []);
-
-  const registerRefreshGitChanges = useCallback(
-    (fn: () => void) => registerWorkspaceRefresh("git", fn),
-    [registerWorkspaceRefresh],
-  );
-
-  const refreshGitChanges = useCallback(() => {
-    scheduleWorkspaceRefresh({ git: true, delayMs: 0, force: true });
-  }, [scheduleWorkspaceRefresh]);
-
-  const registerOnSelectPath = useCallback((fn: (path: string) => void) => {
-    setSelectHandler(() => fn);
-    return () =>
-      setSelectHandler((cur: ((path: string) => void) | null) => (cur === fn ? null : cur));
-  }, []);
-
-  const onSelectPath = useCallback(
-    (path: string) => {
-      setPreviewPath(path);
-      selectHandler?.(path);
-    },
-    [selectHandler],
-  );
-
-  const value = useMemo(
-    () => ({
-      gitChanges,
-      setGitChanges,
-      refreshGitChanges,
-      registerRefreshGitChanges,
+    const setPreviewPath = (path: string | null) => {
+      if (stateRef.current.previewPath !== path) update({ previewPath: path });
+    };
+    return {
+      setGitChanges: (changes) => {
+        if (!sameGitChanges(stateRef.current.gitChanges, changes)) update({ gitChanges: changes });
+      },
+      refreshGitChanges: () => scheduleWorkspaceRefresh({ git: true, delayMs: 0, force: true }),
+      registerRefreshGitChanges: (fn) => registerWorkspaceRefresh("git", fn),
       registerWorkspaceRefresh,
       scheduleWorkspaceRefresh,
-      agentTurnBusy,
-      setAgentTurnBusy,
-      artifacts,
-      setArtifacts,
-      pendingReview,
-      setPendingReview,
-      previewPath,
+      setAgentTurnBusy: (busy) => {
+        if (stateRef.current.agentTurnBusy !== busy) update({ agentTurnBusy: busy });
+      },
+      setArtifacts: (paths) => {
+        if (!sameStrings(stateRef.current.artifacts, paths)) update({ artifacts: paths });
+      },
+      setPendingReview: (review) => {
+        if (stateRef.current.pendingReview !== review) update({ pendingReview: review });
+      },
       setPreviewPath,
-      onSelectPath,
-      registerOnSelectPath,
-    }),
-    [
-      gitChanges,
-      artifacts,
-      pendingReview,
-      previewPath,
-      onSelectPath,
-      registerOnSelectPath,
-      refreshGitChanges,
-      registerRefreshGitChanges,
-      registerWorkspaceRefresh,
-      scheduleWorkspaceRefresh,
-      agentTurnBusy,
-    ],
-  );
+      onSelectPath: (path) => {
+        setPreviewPath(path);
+        selectHandler.current?.(path);
+      },
+      registerOnSelectPath: (fn) => {
+        selectHandler.current = fn;
+        return () => {
+          if (selectHandler.current === fn) selectHandler.current = null;
+        };
+      },
+    };
+  }, [flushWorkspaceRefresh, update]);
 
-  return <ProjectEdgeContext.Provider value={value}>{children}</ProjectEdgeContext.Provider>;
+  return (
+    <ProjectEdgeActionsContext.Provider value={actions}>
+      <ProjectEdgeStoreContext.Provider value={store}>{children}</ProjectEdgeStoreContext.Provider>
+    </ProjectEdgeActionsContext.Provider>
+  );
 }
 
-export function useProjectEdge(): ProjectEdgeContextValue {
-  const ctx = useContext(ProjectEdgeContext);
-  if (!ctx) throw new Error("useProjectEdge must be used within ProjectEdgeProvider");
+/** Stable actions; never causes a re-render on its own. */
+export function useProjectEdgeActions(): ProjectEdgeActions {
+  const ctx = useContext(ProjectEdgeActionsContext);
+  if (!ctx) throw new Error("useProjectEdgeActions must be used within ProjectEdgeProvider");
   return ctx;
+}
+
+/** Subscribe to one slice of edge state; re-renders only when that slice changes. */
+export function useProjectEdgeState<T>(selector: (state: ProjectEdgeState) => T): T {
+  const store = useContext(ProjectEdgeStoreContext);
+  if (!store) throw new Error("useProjectEdgeState must be used within ProjectEdgeProvider");
+  return useSyncExternalStore(store.subscribe, () => selector(store.getState()));
 }

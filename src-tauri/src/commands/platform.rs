@@ -73,6 +73,46 @@ pub async fn reveal_in_folder(path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether the webview is likely software-rendered (no usable GPU). WebKit masks
+/// the WebGL renderer string, so this is decided from the host side instead.
+#[tauri::command]
+pub fn platform_software_rendering() -> bool {
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if std::env::var("LIBGL_ALWAYS_SOFTWARE").is_ok_and(|v| v != "0") {
+            return true;
+        }
+        // Virtual / framebuffer-only DRM drivers: 3D is absent or emulated.
+        const SOFT_DRIVERS: &[&str] = &[
+            "vmwgfx",
+            "qxl",
+            "bochs-drm",
+            "bochs",
+            "cirrus",
+            "simpledrm",
+            "vboxvideo",
+            "hyperv_drm",
+        ];
+        let drivers: Vec<String> = std::fs::read_dir("/sys/class/drm")
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|e| {
+                let name = e.file_name();
+                let name = name.to_string_lossy();
+                name.starts_with("card") && !name.contains('-')
+            })
+            .filter_map(|e| std::fs::read_link(e.path().join("device/driver")).ok())
+            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .collect();
+        drivers.is_empty() || drivers.iter().all(|d| SOFT_DRIVERS.contains(&d.as_str()))
+    }
+    #[cfg(not(all(unix, not(target_os = "macos"))))]
+    {
+        false
+    }
+}
+
 /// Append a frontend composer-debug line to `{config_dir}/logs/composer.log`.
 /// Survives UI freezes — read the file after force-quitting the app.
 #[tauri::command]

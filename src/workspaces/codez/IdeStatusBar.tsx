@@ -11,13 +11,15 @@ interface IdeStatusBarProps {
   onOpenPanel: (tab: BottomTab) => void;
   /** Open the Extensions sidebar (marketplace + enable/disable). */
   onOpenExtensions: () => void;
+  /** Open the remote connection dialog. */
+  onOpenRemote: () => void;
 }
 
 /**
  * Full-width application status bar. Extension indicator opens the marketplace
  * when the host is off, or extension output when running.
  */
-export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions }: IdeStatusBarProps) {
+export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions, onOpenRemote }: IdeStatusBarProps) {
   const { t } = useTranslation();
   const { statusBar, running, scm, hostError } = useExtensionUi();
   const left = statusBar.filter((s) => s.alignment === 1);
@@ -55,16 +57,20 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
 
   return (
     <div className="ide-status-bar">
-      {remoteLabel && (
+      {remoteLabel ? (
         <button
           className={`ide-status-item ide-status-remote ${running ? "running" : ""}`}
           title={running ? t("remote.statusConnected") : t("remote.statusReconnect")}
           onClick={() => {
             if (!running && projectDir) void extensionService.start(projectDir, { force: true }).catch(() => undefined);
-            else onOpenExtensions();
+            else onOpenRemote();
           }}
         >
           {running ? "⇄" : "⚠"} {remoteLabel}
+        </button>
+      ) : (
+        <button className="ide-status-item ide-status-remote-open" title={t("remote.dialog.open")} onClick={onOpenRemote}>
+          ⇄ {t("remote.dialog.statusLabel")}
         </button>
       )}
       {forwards.length > 0 && (

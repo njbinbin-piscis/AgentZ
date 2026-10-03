@@ -38,10 +38,15 @@ export default function WorkflowRunsList({ teamId, onSelect, onClose }: Props) {
   // should refresh its status without a manual reload.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     subscribeWorkflowEvents(() => void refresh()).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, [refresh]);
 
   const removeRun = useCallback(

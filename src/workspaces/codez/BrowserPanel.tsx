@@ -19,6 +19,9 @@ import {
 } from "../../services/tauri/browser";
 import "./BrowserPanel.css";
 
+const SHOT_POLL_MIN_MS = 1200;
+const SHOT_POLL_MAX_MS = 6000;
+
 const EMPTY_SCROLL: ScrollInfo = {
   scroll_x: 0,
   scroll_y: 0,
@@ -85,7 +88,7 @@ export default function BrowserPanel({
   const viewRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inspectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewportReady = useRef(false);
@@ -96,13 +99,19 @@ export default function BrowserPanel({
   const wheelAccum = useRef({ dx: 0, dy: 0 });
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const refreshShot = useCallback(async () => {
+  const lastShotRef = useRef<string | null>(null);
+  /** Resolves `true` when the page image changed since the previous capture. */
+  const refreshShot = useCallback(async (): Promise<boolean> => {
     try {
       const b64 = await browserScreenshot();
-      setShot(b64);
       setError(null);
+      if (b64 === lastShotRef.current) return false;
+      lastShotRef.current = b64;
+      setShot(b64);
+      return true;
     } catch {
       // Browser not launched yet — ignore until first navigate.
+      return false;
     }
   }, []);
 
@@ -182,14 +191,17 @@ export default function BrowserPanel({
   useEffect(() => {
     void syncAddressFromBackend();
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     void onBrowserChanged(() => {
       void refreshShot();
       void syncAddressFromBackend();
       void refreshScrollInfo();
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, [refreshShot, refreshScrollInfo, syncAddressFromBackend]);
@@ -228,18 +240,29 @@ export default function BrowserPanel({
     };
     window.addEventListener("agentz-font-scale", onFontScale);
 
-    pollRef.current = setInterval(() => {
-      if (viewportReady.current && !syncingViewportRef.current) void refreshShot();
-    }, 1200);
+    // Catch page changes that emit no browser event (JS, animations). Back off
+    // while the image is static and skip while the panel is not on screen.
+    let pollDelay = SHOT_POLL_MIN_MS;
+    let pollDisposed = false;
+    const pollShot = async () => {
+      const visible = !document.hidden && !!canvas && canvas.clientWidth > 0;
+      if (visible && viewportReady.current && !syncingViewportRef.current) {
+        const changed = await refreshShot();
+        pollDelay = changed ? SHOT_POLL_MIN_MS : Math.min(pollDelay * 2, SHOT_POLL_MAX_MS);
+      }
+      if (!pollDisposed) pollRef.current = setTimeout(() => void pollShot(), pollDelay);
+    };
+    pollRef.current = setTimeout(() => void pollShot(), pollDelay);
 
     return () => {
+      pollDisposed = true;
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
       ro.disconnect();
       window.removeEventListener("resize", onResize);
       window.removeEventListener("agentz-font-scale", onFontScale);
       if (resizeTimer.current) clearTimeout(resizeTimer.current);
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current) clearTimeout(pollRef.current);
       pollRef.current = null;
       if (wheelTimer.current) clearTimeout(wheelTimer.current);
       wheelTimer.current = null;

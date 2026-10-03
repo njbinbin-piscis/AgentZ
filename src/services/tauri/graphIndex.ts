@@ -38,6 +38,17 @@ export function graphIndexVisualState(st: IndexBuildStatus): GraphIndexVisualSta
   return "none";
 }
 
+function sameStatus(a: IndexBuildStatus, b: IndexBuildStatus): boolean {
+  return (
+    a.phase === b.phase &&
+    a.pending_files === b.pending_files &&
+    a.last_built_at === b.last_built_at &&
+    a.last_error === b.last_error &&
+    a.nodes === b.nodes &&
+    a.edges === b.edges
+  );
+}
+
 /** Poll graph index worker + graph.db stats for title-bar status coloring. */
 export function useGraphIndexStatus(
   projectDir: string | null,
@@ -53,22 +64,38 @@ export function useGraphIndexStatus(
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastPhase: IndexPhase | null = null;
+
+    const schedule = (intervalMs: number) => {
+      if (!cancelled) timer = setTimeout(() => void poll(), intervalMs);
+    };
 
     const poll = async () => {
+      timer = undefined;
+      // An idle index only needs a heartbeat while the window is on screen.
+      if (lastPhase === "idle" && document.hidden) return;
       try {
         const st = await getGraphIndexStatus(projectDir);
         if (cancelled) return;
-        setStatus(st);
-        const intervalMs = st.phase === "idle" ? 5000 : 800;
-        timer = setTimeout(() => void poll(), intervalMs);
+        lastPhase = st.phase;
+        // Skip identical snapshots: this hook lives in App, so every update
+        // re-renders the whole tree.
+        setStatus((prev) => (prev && sameStatus(prev, st) ? prev : st));
+        schedule(st.phase === "idle" ? 5000 : 800);
       } catch {
-        if (!cancelled) timer = setTimeout(() => void poll(), 5000);
+        schedule(5000);
       }
     };
+
+    const onVisibility = () => {
+      if (!document.hidden && timer === undefined) void poll();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     void poll();
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
       if (timer !== undefined) clearTimeout(timer);
     };
   }, [projectDir, refreshNonce]);

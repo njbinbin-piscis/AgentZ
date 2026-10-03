@@ -134,11 +134,13 @@ impl RemoteTarget {
                     "-o",
                     "StrictHostKeyChecking=accept-new",
                     "-o",
+                    "ConnectTimeout=15",
+                    "-o",
                     "ServerAliveInterval=15",
                 ])
-                    .args(ssh_mux_args())
-                    .arg(host)
-                    .arg(format!("sh -c {}", shell_quote(script)));
+                .args(ssh_mux_args())
+                .arg(host)
+                .arg(format!("sh -c {}", shell_quote(script)));
                 c
             }
             RemoteTarget::Docker { container, user } => {
@@ -461,6 +463,53 @@ pub fn ssh_config_hosts() -> Vec<String> {
         }
     }
     hosts
+}
+
+/// Ensure `~/.ssh/config` has an alias for `user@hostname:port`; returns it.
+pub fn ssh_add_host(hostname: &str, user: Option<&str>, port: u16) -> Result<String, String> {
+    let hostname = hostname.trim();
+    let user = user.map(str::trim).filter(|u| !u.is_empty());
+    if hostname.is_empty() || hostname.contains(char::is_whitespace) {
+        return Err("invalid host name".into());
+    }
+    if user.is_some_and(|u| u.contains(char::is_whitespace)) {
+        return Err("invalid user name".into());
+    }
+    let alias = match user {
+        Some(u) => format!("{u}-{hostname}-{port}"),
+        None => format!("{hostname}-{port}"),
+    };
+    if ssh_config_hosts().iter().any(|h| h == &alias) {
+        return Ok(alias);
+    }
+    let dir = dirs_home()
+        .ok_or("cannot locate home directory")?
+        .join(".ssh");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("config");
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut entry = String::new();
+    if !existing.is_empty() && !existing.ends_with('\n') {
+        entry.push('\n');
+    }
+    entry.push_str(&format!(
+        "\n# Added by AgentZ\nHost {alias}\n  HostName {hostname}\n  Port {port}\n"
+    ));
+    if let Some(u) = user {
+        entry.push_str(&format!("  User {u}\n"));
+    }
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("open {}: {e}", path.display()))?;
+    std::io::Write::write_all(&mut f, entry.as_bytes()).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(alias)
 }
 
 fn dirs_home() -> Option<PathBuf> {

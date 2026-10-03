@@ -878,6 +878,30 @@ const en = {
     statusConnected: "Remote workspace connected",
     statusReconnect: "Remote disconnected — click to reconnect",
     devcontainerLocalOnly: "Open the local project folder first to reopen it in a container",
+    dialog: {
+      open: "Connect to Remote Host…",
+      statusLabel: "Remote",
+      title: "Remote Development",
+      targetSub:
+        "Pick a machine to connect to. agentz-server is deployed automatically; extensions, terminals and agents run remotely.",
+      authSub: "{{host}} requires a login",
+      authHint:
+        "Key login didn't work. Enter the SSH password once and AgentZ installs your public key on the host so later connections are password-free. The password is not stored.",
+      folderSub: "Choose a folder to open on {{target}}",
+      sshHint:
+        "Enter user@host or a Host alias from ~/.ssh/config. A non-22 port adds an alias to ~/.ssh/config.",
+      portHint: "SSH port (default 22)",
+      badPort: "Invalid port",
+      devcontainerHint: "Build and enter a container from the current local project's .devcontainer configuration.",
+      recent: "Recent",
+      next: "Connect",
+      back: "Back",
+      installKey: "Install key and continue",
+      go: "Go",
+      loadingDir: "Reading folder…",
+      noDirs: "No sub-folders",
+      openHere: "Open this folder",
+    },
   },
   workz: {
     projects: "Projects",

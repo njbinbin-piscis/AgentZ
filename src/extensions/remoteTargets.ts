@@ -59,8 +59,28 @@ function load(): Record<string, RemoteTarget> {
 export function rememberTarget(target: RemoteTarget): void {
   if (target.kind === "local") return;
   const all = load();
-  all[authorityOf(target)] = target;
+  const key = authorityOf(target);
+  delete all[key];
+  all[key] = target;
   localStorage.setItem(STORE_KEY, JSON.stringify(all));
+}
+
+/** Remembered targets, most recently used first. */
+export function recentTargets(): RemoteTarget[] {
+  return Object.values(load()).reverse();
+}
+
+export function describeTarget(target: RemoteTarget): string {
+  switch (target.kind) {
+    case "ssh":
+      return `SSH: ${target.host}`;
+    case "docker":
+      return `Container: ${target.container.slice(0, 12)}`;
+    case "wsl":
+      return `WSL: ${target.distro}`;
+    default:
+      return "local";
+  }
 }
 
 export function targetForAuthority(authority: string): RemoteTarget | null {

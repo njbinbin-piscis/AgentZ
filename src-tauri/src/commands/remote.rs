@@ -39,6 +39,54 @@ pub async fn remote_probe(target: RemoteTarget) -> Result<String, String> {
     target.run("uname -sm && echo \"$HOME\"").await
 }
 
+#[derive(Debug, Serialize)]
+pub struct RemoteDirListing {
+    /// Absolute path that was listed (`~` / empty resolve to `$HOME`).
+    pub path: String,
+    pub dirs: Vec<String>,
+}
+
+/// Sub-directories of `path` on a target, over the plain transport — usable
+/// before agentz-server is deployed (folder picker in the connect dialog).
+#[tauri::command]
+pub async fn remote_list_dirs(
+    target: RemoteTarget,
+    path: Option<String>,
+) -> Result<RemoteDirListing, String> {
+    if target.is_local() {
+        return Err("local targets use the native folder dialog".into());
+    }
+    let path = path.unwrap_or_default();
+    let cd = match path.trim() {
+        "" | "~" => "cd".to_string(),
+        p => format!("cd -- {}", remote::shell_quote(p)),
+    };
+    let out = target
+        .run(&format!("{cd} && pwd && ls -1Ap 2>/dev/null"))
+        .await?;
+    let mut lines = out.lines();
+    let path = lines.next().unwrap_or("/").trim().to_string();
+    let mut dirs: Vec<String> = lines
+        .filter_map(|l| l.strip_suffix('/'))
+        .filter(|d| !d.is_empty())
+        .map(str::to_string)
+        .collect();
+    dirs.sort_by_key(|d| (d.starts_with('.'), d.to_lowercase()));
+    Ok(RemoteDirListing { path, dirs })
+}
+
+/// Append a `Host` alias to `~/.ssh/config` (for non-default ports, which the
+/// `ssh-remote+<host>` authority cannot carry). Returns the alias; an existing
+/// alias is reused untouched.
+#[tauri::command]
+pub async fn remote_ssh_add_host(
+    hostname: String,
+    user: Option<String>,
+    port: u16,
+) -> Result<String, String> {
+    remote::ssh_add_host(&hostname, user.as_deref(), port)
+}
+
 /// Password-once setup of key authentication for an SSH host.
 #[tauri::command]
 pub async fn remote_ssh_setup_key(host: String, password: String) -> Result<String, String> {

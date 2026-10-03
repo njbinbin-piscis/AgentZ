@@ -55,6 +55,14 @@ pub fn discover_git_repos(workspace: &Path) -> Vec<PathBuf> {
     repos
 }
 
+/// [`discover_git_repos`] off the async runtime — the nested scan walks the disk.
+pub async fn discover_git_repos_async(workspace: PathBuf) -> Vec<PathBuf> {
+    let fallback = vec![workspace.clone()];
+    tokio::task::spawn_blocking(move || discover_git_repos(&workspace))
+        .await
+        .unwrap_or(fallback)
+}
+
 fn collect_nested_git_repos(dir: &Path, depth: usize, max_depth: usize, out: &mut Vec<PathBuf>) {
     if depth > max_depth {
         return;

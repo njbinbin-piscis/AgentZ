@@ -144,6 +144,7 @@ pub fn run() {
             commands::platform::open_path,
             commands::platform::reveal_in_folder,
             commands::platform::composer_debug_log,
+            commands::platform::platform_software_rendering,
             // AI chat (agent turn on the piscis-engine kernel)
             commands::chat::chat_send,
             commands::chat::chat_cancel,
@@ -213,6 +214,8 @@ pub fn run() {
             commands::remote::remote_list_targets,
             commands::remote::remote_probe,
             commands::remote::remote_ssh_setup_key,
+            commands::remote::remote_list_dirs,
+            commands::remote::remote_ssh_add_host,
             commands::remote::remote_ports_detect,
             commands::remote::remote_forward_start,
             commands::remote::remote_forward_stop,

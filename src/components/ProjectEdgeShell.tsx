@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useProjectEdge } from "../contexts/ProjectEdgeContext";
+import { useProjectEdgeActions, useProjectEdgeState } from "../contexts/ProjectEdgeContext";
 import { ideApi } from "../services/tauri/ide";
 import { journalUndoTurn } from "../services/tauri/chat";
 import ProjectEdgePanel from "./ProjectEdgePanel";
@@ -10,13 +10,9 @@ interface ProjectEdgeShellProps {
 
 /** Global git changes + journal review drawer; shared by CodeZ and WorkZ. */
 export default function ProjectEdgeShell({ projectDir }: ProjectEdgeShellProps) {
-  const {
-    setGitChanges,
-    registerWorkspaceRefresh,
-    scheduleWorkspaceRefresh,
-    pendingReview,
-    setPendingReview,
-  } = useProjectEdge();
+  const { setGitChanges, registerWorkspaceRefresh, scheduleWorkspaceRefresh, setPendingReview } =
+    useProjectEdgeActions();
+  const pendingReview = useProjectEdgeState((s) => s.pendingReview);
   const [undoing, setUndoing] = useState(false);
 
   const refreshGit = useCallback(() => {

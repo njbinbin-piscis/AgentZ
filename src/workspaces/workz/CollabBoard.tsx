@@ -84,15 +84,18 @@ export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoard
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     let timer: number | undefined;
     onPoolEvent(() => {
       // Debounce bursts of events into a single refresh.
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => void refresh(), 250);
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
     return () => {
+      disposed = true;
       unlisten?.();
       if (timer) window.clearTimeout(timer);
     };
