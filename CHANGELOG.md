@@ -5,6 +5,22 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2026-10-03
+
+### Added
+
+- Status-bar remote entry: a ⇄ Remote button (also shown when no folder is open) opens a dialog to pick an SSH, Dev Container, Docker or WSL target, install an SSH public key with a one-time password, browse the remote folder and open it. Non-default SSH ports are saved as a `~/.ssh/config` alias.
+
+### Fixed
+
+- Idle CPU: an unchanged language switch no longer re-fired every listener and rebuilt file watchers until the web process was killed. Tauri event subscriptions are dropped if the component unmounts first, WorkZ streaming flushes in batches and renders plain text until the turn ends, closed editor tabs release their Monaco models, and graph-index and browser-screenshot polling back off while idle or hidden.
+- File listing and git-repo discovery run off the async runtime, and project-edge updates re-render only the components that read the changed field.
+- SSH probes time out after 15 seconds instead of hanging on an unreachable host.
+
+### Changed
+
+- On software-rendered machines (virtual GPUs such as vmwgfx), backdrop blur is removed and infinite animations play once. Override with localStorage `agentz-graphics` set to `low` or `full`.
+
 ## [0.9.3] - 2026-10-03
 
 ### Changed
