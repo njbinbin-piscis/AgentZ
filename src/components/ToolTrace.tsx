@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toolIcon, toolSummary } from "./toolDisplay";
 import "./ToolTrace.css";
@@ -78,7 +78,27 @@ export function upsertToolStep(
 
 const RESULT_PREVIEW_CHARS = 400;
 
-function ToolTraceRow({ item }: { item: ToolTraceItem }) {
+/** Latest in-flight call, otherwise the last one in this batch. */
+function currentTool(items: ToolTraceItem[]): ToolTraceItem {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i].status === "running") return items[i];
+  }
+  return items[items.length - 1];
+}
+
+function ToolTraceRow({
+  item,
+  onOpenGroup,
+  onCollapseGroup,
+  badge,
+}: {
+  item: ToolTraceItem;
+  /** Collapsed batch: the whole row opens the scroll list. */
+  onOpenGroup?: () => void;
+  /** Expanded batch: the chevron folds the list back to one line. */
+  onCollapseGroup?: () => void;
+  badge?: string;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [showFull, setShowFull] = useState(false);
@@ -92,8 +112,11 @@ function ToolTraceRow({ item }: { item: ToolTraceItem }) {
       <button
         type="button"
         className="agentz-tool-trace-head"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
+        onClick={() => {
+          if (onOpenGroup) onOpenGroup();
+          else setExpanded((v) => !v);
+        }}
+        aria-expanded={onOpenGroup ? false : expanded}
         title={hint}
       >
         <span className="agentz-tool-trace-status">
@@ -110,16 +133,23 @@ function ToolTraceRow({ item }: { item: ToolTraceItem }) {
         </span>
         <span className="agentz-tool-trace-name">{item.name}</span>
         <span className="agentz-tool-trace-hint">{hint}</span>
-        <span className="agentz-tool-trace-chevron" aria-hidden>
-          {expanded ? "▾" : "▸"}
+        {badge && <span className="agentz-tool-trace-badge">{badge}</span>}
+        <span
+          className="agentz-tool-trace-chevron"
+          aria-hidden
+          onClick={
+            onCollapseGroup
+              ? (e) => {
+                  e.stopPropagation();
+                  onCollapseGroup();
+                }
+              : undefined
+          }
+        >
+          {onOpenGroup ? "▸" : "▾"}
         </span>
       </button>
-      {!expanded && item.status !== "running" && result && (
-        <div className={`agentz-tool-trace-preview${item.status === "error" ? " is-error" : ""}`}>
-          {result.replace(/\s+/g, " ").trim().slice(0, 160)}
-        </div>
-      )}
-      {expanded && (
+      {!onOpenGroup && expanded && (
         <div className="agentz-tool-trace-body">
           <div className="agentz-tool-trace-section">
             <span className="agentz-tool-trace-label">{t("chat.toolStepInput")}</span>
@@ -157,16 +187,41 @@ function ToolTraceRow({ item }: { item: ToolTraceItem }) {
 }
 
 /**
- * Inline, default-collapsed trace of the tool calls for one assistant turn.
- * Each row expands individually; the active call leads with a spinner.
+ * One batch of tool calls that happened before the next assistant text.
+ * Collapsed to the current call; expanded into a 5-line scroller. The next
+ * text segment leaves this block in place and starts a new one.
  */
 export default function ToolTrace({ items }: { items: ToolTraceItem[] }) {
+  const [open, setOpen] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+  const lastId = items[items.length - 1]?.id;
+  const lastStatus = items[items.length - 1]?.status;
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [open, items.length, lastId, lastStatus]);
+
   if (items.length === 0) return null;
+  if (!open) {
+    return (
+      <div className="agentz-tool-trace">
+        <ToolTraceRow
+          item={currentTool(items)}
+          onOpenGroup={() => setOpen(true)}
+          badge={items.length > 1 ? String(items.length) : undefined}
+        />
+      </div>
+    );
+  }
   return (
-    <div className="agentz-tool-trace">
-      {items.map((item) => (
-        <ToolTraceRow key={item.id} item={item} />
-      ))}
+    <div className="agentz-tool-trace is-open">
+      <div className="agentz-tool-trace-scroll" ref={scroller}>
+        {items.map((item) => (
+          <ToolTraceRow key={item.id} item={item} onCollapseGroup={() => setOpen(false)} />
+        ))}
+      </div>
     </div>
   );
 }

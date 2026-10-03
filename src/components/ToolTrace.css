@@ -95,6 +95,24 @@
   opacity: 0.55;
 }
 
+.agentz-tool-trace-badge {
+  flex-shrink: 0;
+  min-width: 1.2em;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* Expanded batch: at most five tool lines, then scroll inside the block. */
+.agentz-tool-trace-scroll {
+  max-height: calc(5 * 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .agentz-tool-trace-body {
   display: flex;
   flex-direction: column;
@@ -155,20 +173,4 @@
 
 .agentz-tool-trace-more:hover {
   text-decoration: underline;
-}
-
-.agentz-tool-trace-preview {
-  margin: 0 0 2px 27px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--mono, ui-monospace, Consolas, monospace);
-  font-size: 11px;
-  color: var(--text-dim, #9a9ab0);
-  opacity: 0.6;
-}
-
-.agentz-tool-trace-preview.is-error {
-  color: #fca5a5;
-  opacity: 0.85;
 }
