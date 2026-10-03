@@ -1,7 +1,8 @@
 /**
  * Reduced-graphics mode for software-rendered webviews (VMs, no GPU). Under
- * llvmpipe every frame of a blur or an infinite animation is painted on the
- * CPU, so the `agentz-low-gfx` root class turns those off (see index.css).
+ * llvmpipe every frame of a blur or a decorative infinite animation is painted
+ * on the CPU, so the `agentz-low-gfx` root class turns those off (see index.css).
+ * Progress spinners keep spinning.
  *
  * Override with localStorage `agentz-graphics` = "low" | "full" (default auto).
  * WebKit masks the WebGL renderer string, so auto-detection asks the backend.

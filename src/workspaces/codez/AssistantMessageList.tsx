@@ -174,13 +174,7 @@ function AssistantMessageList({
             {msgTools.length > 0 ? (
               interleaveTools(m.text, msgTools).map((seg, si, all) => (
                 <div key={`seg-${si}`} className="agentz-msg-seg">
-                  {seg.text ? (
-                    isStreamingLast ? (
-                      <pre className="agentz-msg-text agentz-streaming">{seg.text}</pre>
-                    ) : (
-                      <Markdown content={seg.text} />
-                    )
-                  ) : null}
+                  {seg.text ? <Markdown content={seg.text} /> : null}
                   {seg.tools.length > 0 && <ToolTrace items={seg.tools} />}
                   {isStreamingLast && si === all.length - 1 && !seg.text && seg.tools.length === 0 && (
                     <div className="agentz-msg-text agentz-thinking">{t("chat.thinking")}</div>
@@ -188,11 +182,7 @@ function AssistantMessageList({
                 </div>
               ))
             ) : m.text ? (
-              isStreamingLast ? (
-                <pre className="agentz-msg-text agentz-streaming">{m.text}</pre>
-              ) : (
-                <Markdown content={m.text} />
-              )
+              <Markdown content={m.text} />
             ) : isStreamingLast ? (
               <div className="agentz-msg-text agentz-thinking">{t("chat.thinking")}</div>
             ) : null}

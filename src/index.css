@@ -100,14 +100,23 @@ body {
 }
 
 /* ── Reduced graphics (software rendering / reduced motion) ──────────────
-   Blur and looping animations repaint every frame on the CPU under llvmpipe.
-   Looping animations play once and settle; one-shot transitions still run. */
+   Blur and decorative looping animations repaint every frame on the CPU under
+   llvmpipe, so those play once and settle. Progress spinners stay infinite:
+   they are a few pixels, and they are how a running turn is visible. */
 .agentz-low-gfx *,
 .agentz-low-gfx *::before,
 .agentz-low-gfx *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   animation-iteration-count: 1 !important;
+}
+
+.agentz-low-gfx .agentz-tool-trace-spinner,
+.agentz-low-gfx .agentz-composer-spinner,
+.agentz-low-gfx .agentz-step-spinner,
+.agentz-low-gfx .agentz-workz-tools-spinner,
+.agentz-low-gfx .ide-file-loading-spinner {
+  animation-iteration-count: infinite !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

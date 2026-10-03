@@ -566,14 +566,3 @@
   box-shadow: 0 8px 24px color-mix(in srgb, var(--text, #e8e8f0) 12%, transparent);
   pointer-events: none;
 }
-
-.agentz-streaming {
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 1.55;
-  background: transparent;
-  border: none;
-}

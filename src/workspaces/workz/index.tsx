@@ -1510,15 +1510,11 @@ export default function WorkZWorkspace({
                       </div>
                       <div className="agentz-workz-msg-body">
                         {m.role === "assistant" && m.tools.length > 0 ? (
-                          interleaveTools(m.text, m.tools).map((seg, si, all) => (
+                          interleaveTools(m.text, m.tools).map((seg, si) => (
                             <div key={`seg-${si}`}>
                               {seg.text && (
                                 <div className="agentz-workz-msg-bubble">
-                                  {isStreamingLast && si === all.length - 1 ? (
-                                    <div className="agentz-workz-msg-text">{seg.text}</div>
-                                  ) : (
-                                    <Markdown content={seg.text} />
-                                  )}
+                                  <Markdown content={seg.text} />
                                 </div>
                               )}
                               {seg.tools.length > 0 && <ToolTrace items={seg.tools} />}
@@ -1526,7 +1522,7 @@ export default function WorkZWorkspace({
                           ))
                         ) : m.text ? (
                           <div className="agentz-workz-msg-bubble">
-                            {m.role === "assistant" && !isStreamingLast ? (
+                            {m.role === "assistant" ? (
                               <Markdown content={m.text} />
                             ) : (
                               <div className="agentz-workz-msg-text">{m.text}</div>
