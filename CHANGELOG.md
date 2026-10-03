@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-10-03
+
+### Fixed
+
+- Git status no longer piles up one process per refresh: concurrent requests for the same repo share a single run, and the UI coalesces refreshes that arrive while one is in flight. A refresh storm was pinning the CPU and making the terminal unresponsive.
+- Terminal resize now changes the PTY size. The previous command was a no-op and its argument names did not match the frontend.
+
 ## [0.9.1] - 2026-10-02
 
 ### Fixed
