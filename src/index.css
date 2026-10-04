@@ -113,6 +113,7 @@ body {
 
 .agentz-low-gfx .agentz-tool-trace-spinner,
 .agentz-low-gfx .agentz-composer-spinner,
+.agentz-low-gfx .agentz-composer-stop-wrap::before,
 .agentz-low-gfx .agentz-step-spinner,
 .agentz-low-gfx .agentz-workz-tools-spinner,
 .agentz-low-gfx .ide-file-loading-spinner {
