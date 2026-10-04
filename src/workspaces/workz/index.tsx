@@ -1393,7 +1393,8 @@ export default function WorkZWorkspace({
   const showModelSelector = !activeTeam && !activeAgentId;
   const showGenericComposerTools = showModelSelector;
   const composerModeNotice = useMemo(() => {
-    if (taskBound) return t("agent.modeLocked");
+    // Lock reason lives on the disabled team/agent/isolate controls (title tooltip).
+    if (taskBound) return null;
     if (activeTeam) {
       return isWorkflowTeam ? t("agent.modelWorkflowTeam") : t("agent.modelSwarmTeam");
     }

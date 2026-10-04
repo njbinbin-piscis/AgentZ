@@ -256,15 +256,6 @@
   cursor: default;
 }
 
-.agentz-composer-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(124, 106, 247, 0.2);
-  border-top-color: var(--accent, #7c6af7);
-  border-radius: 50%;
-  animation: agentz-composer-spin 0.7s linear infinite;
-}
-
 .agentz-composer-stop-icon,
 .agentz-composer-send-icon {
   display: inline-flex;
@@ -278,14 +269,47 @@
   flex-shrink: 0;
 }
 
+.agentz-composer-stop-wrap {
+  position: relative;
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+/* Comet arc behind the stop control. The opaque button covers the disc center,
+   leaving a ring that vanishes when iteration stops and the send button returns. */
+.agentz-composer-stop-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -3.5px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 214deg,
+    rgba(124, 106, 247, 0.08) 250deg,
+    rgba(167, 139, 250, 0.95) 318deg,
+    #f5f3ff 346deg,
+    rgba(124, 106, 247, 0.45) 360deg
+  );
+  filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.75));
+  animation: agentz-composer-spin 1.15s linear infinite;
+  pointer-events: none;
+}
+
 .agentz-composer-stop-icon {
-  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+  z-index: 1;
+  background: color-mix(in srgb, var(--text, #e8e8f0) 8%, var(--bg-elev-2, #1b1b26));
   color: var(--text, #e8e8f0);
+  box-shadow: 0 0 0 1px rgba(124, 106, 247, 0.28);
 }
 
 .agentz-composer-stop-icon:hover {
-  background: rgba(248, 113, 113, 0.15);
+  background: color-mix(in srgb, #f87171 18%, var(--bg-elev-2, #1b1b26));
   color: #f87171;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.35);
 }
 
 .agentz-composer-send-icon {
