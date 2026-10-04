@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.6] - 2026-10-04
+
+### Changed
+
+- WorkZ no longer shows the locked-mode banner above the composer. Hover the locked isolate, team, or agent control for the same explanation.
+- While a task is running, the composer stop button carries a rotating light ring instead of a spinner beside it. The ring goes out when the run stops, and it keeps spinning in reduced-graphics mode.
+
 ## [0.9.5] - 2026-10-03
 
 ### Fixed
