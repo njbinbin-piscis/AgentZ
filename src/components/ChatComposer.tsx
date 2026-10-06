@@ -397,6 +397,7 @@ export default function ChatComposer({
           <div className="agentz-composer-footer-right">
             {busy ? (
               <span className="agentz-composer-stop-wrap">
+                <span className="agentz-composer-stop-ring" aria-hidden />
                 <button type="button" className="agentz-composer-stop-icon" onClick={onStop} title={stopTitle}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                     <rect x="6" y="6" width="12" height="12" rx="1" />

@@ -277,24 +277,16 @@
   flex-shrink: 0;
 }
 
-/* Comet arc behind the stop control. The opaque button covers the disc center,
-   leaving a ring that vanishes when iteration stops and the send button returns. */
-.agentz-composer-stop-wrap::before {
-  content: "";
+/* Arc around the stop control. A real element with a border, same as the other
+   spinners: a filtered ::before comet does not repaint under software WebKit. */
+.agentz-composer-stop-ring {
   position: absolute;
-  inset: -3.5px;
+  inset: -3px;
   border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg,
-    transparent 214deg,
-    rgba(124, 106, 247, 0.08) 250deg,
-    rgba(167, 139, 250, 0.95) 318deg,
-    #f5f3ff 346deg,
-    rgba(124, 106, 247, 0.45) 360deg
-  );
-  filter: drop-shadow(0 0 3px rgba(167, 139, 250, 0.75));
-  animation: agentz-composer-spin 1.15s linear infinite;
+  border: 2px solid rgba(124, 106, 247, 0.2);
+  border-top-color: #f5f3ff;
+  border-right-color: rgba(167, 139, 250, 0.95);
+  animation: agentz-composer-spin 0.9s linear infinite;
   pointer-events: none;
 }
 
