@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.9] - 2026-10-17
+
+### Fixed
+
+- Linux and macOS release builds compile again. The shell tool imports in the vendored `piscis-kernel` are now compiled only on Windows, where they are used. The 0.9.8 release had Windows installers only.
+
+### Known limits
+
+- The Linux and macOS compile fix is verified by the release pipeline, not by a local build.
+- Other limits listed under 0.9.8 still apply.
+
 ## [0.9.8] - 2026-10-17
 
 ### Added
