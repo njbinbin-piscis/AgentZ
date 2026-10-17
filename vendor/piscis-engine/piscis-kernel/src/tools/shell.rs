@@ -1,3 +1,6 @@
+// Only the Windows shell path uses these; gate them so Linux/macOS release builds (which
+// treat warnings as errors) do not fail on unused imports.
+#[cfg(windows)]
 use super::output::{
     collapse_repeated_lines, extract_error_lines, smart_truncate, TruncateStrategy,
 };

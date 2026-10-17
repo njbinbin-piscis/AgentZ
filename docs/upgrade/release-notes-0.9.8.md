@@ -16,11 +16,22 @@
 - 首次使用清单在设置面板关闭后重新读取配置状态。
 - 备份校验对不支持的 schema 版本给出明确拒绝原因。
 
+## 本次发布包含的安装包
+
+- Windows x64（NSIS，未签名）：`AgentZ_0.9.8_x64-setup.exe`
+- Windows arm64（NSIS，未签名）：`AgentZ_0.9.8_arm64-setup.exe`
+
+## 本次未发布的平台
+
+- Linux x86_64 与 aarch64（.deb / AppImage）、macOS Universal 与 aarch64（.dmg）在本版本的发布流水线中**构建失败**。
+- 原因：vendor 中的 `piscis-kernel` 在非 Windows 平台上对 `tools/shell.rs` 的 4 个 Windows 专属导入产生未使用告警，发布构建把告警当作错误。
+- 修复已提交到 `main`：这些导入改为仅在 Windows 下编译。Linux 与 macOS 的编译尚未在本机验证，需等待下一次发布流水线确认。
+
 ## 已知限制
 
 - 上述共享、快捷键、OAuth 三项的原生桌面旅程没有人工跑过，仅有自动化测试覆盖。
 - OAuth 只针对本地假 token 端点测试，未对接真实提供商。
-- Windows 安装包未签名。macOS 与 Linux 安装包未在真实机器上验证。
+- Windows 安装包未签名，未在干净机器上做安装、启动、卸载验收。
 
 ## 验证记录（2026-10-17 本地）
 
