@@ -1,17 +1,16 @@
 # AgentZ 0.9.9 发布说明
 
-发布日期：2026-10-17。版本号与 `CHANGELOG.md` 的 0.9.9 条目一致。
+发布日期：2026-10-17。
 
-## 修复
+## 已发布的安装包
 
-- Linux 与 macOS 的发布构建恢复可编译。vendor 中 `piscis-kernel` 的 shell 工具导入只在 Windows 下编译，与其使用处一致。0.9.8 只发布了 Windows 安装包。
+- Windows x64 与 arm64（NSIS，未签名）。
+
+## 未发布的平台
+
+- Linux 与 macOS 的发布构建失败，因此本版本没有这些平台的安装包。
+- 0.9.9 只修复了 vendor 中 `piscis-kernel` 的 shell 导入，桌面端仍有非 Windows 的未使用项。这些问题在 0.9.10 中修复，请使用 0.9.10 获取 Linux 与 macOS 安装包。
 
 ## 功能
 
-与 0.9.8 相同，见 `release-notes-0.9.8.md`：CodeZ/WorkZ 会话共享、模式切换快捷键、连接器 OAuth2 授权、诊断关联、备份版本校验。
-
-## 已知限制
-
-- Linux 与 macOS 的编译修复只由发布流水线验证，本机未构建。
-- Windows 安装包未签名，未在干净机器上做安装、启动、卸载验收。
-- 上述新功能的原生桌面旅程没有人工跑过，仅有自动化测试覆盖。
+与 0.9.8 相同，见 `release-notes-0.9.8.md`。
