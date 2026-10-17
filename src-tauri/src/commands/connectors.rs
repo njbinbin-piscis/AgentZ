@@ -209,11 +209,9 @@ fn credentials_path(dir: &Path, id: &str) -> PathBuf {
 }
 
 fn load_credentials(dir: &Path, id: &str) -> HashMap<String, String> {
-    let path = credentials_path(dir, id);
-    std::fs::read_to_string(&path)
-        .ok()
-        .and_then(|t| serde_json::from_str::<HashMap<String, String>>(&t).ok())
-        .unwrap_or_default()
+    // An unreadable or unsealable credential file yields no credentials, so the connector
+    // is treated as unauthorized rather than used with a partial value.
+    load_credentials_for_update(dir, id).unwrap_or_default()
 }
 
 // Mutations must not treat an unreadable or corrupt credential file as an empty one:
@@ -225,7 +223,82 @@ fn load_credentials_for_update(dir: &Path, id: &str) -> Result<HashMap<String, S
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(HashMap::new()),
         Err(_) => return Err("stored connector credentials could not be read".into()),
     };
-    serde_json::from_str(&text).map_err(|_| "stored connector credentials are invalid".into())
+    let raw: HashMap<String, String> = serde_json::from_str(&text)
+        .map_err(|_| "stored connector credentials are invalid".to_string())?;
+    unseal_credentials(dir, raw)
+}
+
+// ─── Credential at-rest protection ───────────────────────────────────────────
+//
+// OAuth tokens are stored sealed in `credentials.json`. The sealing key is the app's
+// `SecretStore` master key, which the kernel protects with the operating system: DPAPI on
+// Windows, Keychain on macOS, Secret Service on Linux. A sealed value carries `SEALED_PREFIX`.
+// A value without the prefix is legacy plaintext: it is read as-is and sealed on the next write.
+// Other connector fields (API keys set by the user) are not changed by this.
+
+const SEALED_PREFIX: &str = "sealed:";
+const SEALED_KEYS: [&str; 2] = ["access_token", "refresh_token"];
+
+fn secret_store(dir: &Path) -> Result<piscis_kernel::security::secrets::SecretStore, String> {
+    piscis_kernel::security::secrets::SecretStore::new(dir)
+        .map_err(|_| "OS-protected credential store is unavailable".to_string())
+}
+
+/// Open sealed values in a credential map. Fails closed: a sealed value that cannot be opened
+/// is an error, never a silently dropped field.
+pub(crate) fn unseal_credentials(
+    dir: &Path,
+    mut creds: HashMap<String, String>,
+) -> Result<HashMap<String, String>, String> {
+    if !creds.values().any(|v| v.starts_with(SEALED_PREFIX)) {
+        return Ok(creds);
+    }
+    let store = secret_store(dir)?;
+    for value in creds.values_mut() {
+        if let Some(hex) = value.strip_prefix(SEALED_PREFIX) {
+            let plain = store
+                .decrypt_hex(hex)
+                .map_err(|_| "stored connector credentials could not be unsealed".to_string())?;
+            *value = plain;
+        }
+    }
+    Ok(creds)
+}
+
+/// Seal the token fields of a credential map before it is written. Other fields are kept as-is.
+fn seal_credentials(
+    dir: &Path,
+    creds: &HashMap<String, String>,
+) -> Result<HashMap<String, String>, String> {
+    let needs_seal = creds
+        .iter()
+        .any(|(k, v)| SEALED_KEYS.contains(&k.as_str()) && !v.is_empty());
+    let store = if needs_seal {
+        Some(secret_store(dir)?)
+    } else {
+        None
+    };
+    let mut out = HashMap::with_capacity(creds.len());
+    for (key, value) in creds {
+        let stored = match &store {
+            Some(store) if SEALED_KEYS.contains(&key.as_str()) && !value.is_empty() => {
+                let hex = store
+                    .encrypt_hex(value)
+                    .map_err(|_| "connector credential could not be sealed".to_string())?;
+                format!("{SEALED_PREFIX}{hex}")
+            }
+            _ => value.clone(),
+        };
+        out.insert(key.clone(), stored);
+    }
+    Ok(out)
+}
+
+/// Write a connector's credential map with its token fields sealed.
+fn write_credentials(dir: &Path, id: &str, creds: &HashMap<String, String>) -> Result<(), String> {
+    let sealed = seal_credentials(dir, creds)?;
+    let text = serde_json::to_string_pretty(&sealed).map_err(|e| e.to_string())?;
+    std::fs::write(credentials_path(dir, id), text).map_err(|e| e.to_string())
 }
 
 fn is_authorized(manifest: &ConnectorManifest, creds: &HashMap<String, String>) -> bool {
@@ -362,8 +435,7 @@ pub(crate) fn store_oauth_tokens(
             creds.remove("expires_at");
         }
     }
-    let text = serde_json::to_string_pretty(&creds).map_err(|e| e.to_string())?;
-    std::fs::write(credentials_path(dir, id), text).map_err(|e| e.to_string())
+    write_credentials(dir, id, &creds)
 }
 
 /// Remove OAuth tokens so a disabled connector cannot be used until it is authorized again.
@@ -376,8 +448,7 @@ fn clear_oauth_tokens(dir: &Path, id: &str) -> Result<(), String> {
     for key in ["access_token", "refresh_token", "expires_at"] {
         creds.remove(key);
     }
-    let text = serde_json::to_string_pretty(&creds).map_err(|e| e.to_string())?;
-    std::fs::write(path, text).map_err(|e| e.to_string())
+    write_credentials(dir, id, &creds)
 }
 
 // ─── OAuth authorization code flow (AZ-051) ──────────────────────────────────
@@ -548,7 +619,10 @@ fn loopback_redirect(redirect: &str) -> Result<(String, String, String), String>
 }
 
 /// Parse `GET <path>?query HTTP/1.1` into query parameters. Other methods and paths are refused.
-fn parse_callback_request(request: &str, expected_path: &str) -> Result<HashMap<String, String>, String> {
+fn parse_callback_request(
+    request: &str,
+    expected_path: &str,
+) -> Result<HashMap<String, String>, String> {
     let line = request.lines().next().unwrap_or_default();
     let mut parts = line.split_whitespace();
     if parts.next() != Some("GET") {
@@ -566,9 +640,8 @@ fn parse_callback_request(request: &str, expected_path: &str) -> Result<HashMap<
 }
 
 async fn write_callback_page(socket: &mut TcpStream, status: &str, message: &'static str) {
-    let body = format!(
-        "<!doctype html><meta charset=\"utf-8\"><title>AgentZ</title><p>{message}</p>"
-    );
+    let body =
+        format!("<!doctype html><meta charset=\"utf-8\"><title>AgentZ</title><p>{message}</p>");
     let head = format!(
         "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
@@ -911,7 +984,9 @@ mod oauth_exchange_tests {
         });
         let mut client = TcpStream::connect(addr).await.unwrap();
         client
-            .write_all(b"GET /callback?code=code-1&state=state-ok HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+            .write_all(
+                b"GET /callback?code=code-1&state=state-ok HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+            )
             .await
             .unwrap();
         let mut page = String::new();
@@ -942,7 +1017,9 @@ mod oauth_exchange_tests {
         });
         let mut client = TcpStream::connect(addr).await.unwrap();
         client
-            .write_all(b"GET /callback?code=code-1&state=attacker HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+            .write_all(
+                b"GET /callback?code=code-1&state=attacker HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+            )
             .await
             .unwrap();
         let mut page = String::new();
@@ -1080,6 +1157,10 @@ mod oauth_flow_tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(any(windows, target_os = "macos")),
+        ignore = "needs the OS-protected credential store; Linux CI has no Secret Service"
+    )]
     fn store_and_clear_tokens_keep_unrelated_fields() {
         let dir = std::env::temp_dir().join(format!("agentz-oauth-{}", uuid::Uuid::new_v4()));
         let id = "demo";
@@ -1117,6 +1198,73 @@ mod oauth_flow_tests {
         assert!(store_oauth_tokens(&dir, id, "tok", None, None, 0).is_err());
         assert!(clear_oauth_tokens(&dir, id).is_err());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "{broken");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn legacy_plaintext_tokens_remain_readable() {
+        let dir = std::env::temp_dir().join(format!("agentz-oauth-{}", uuid::Uuid::new_v4()));
+        let id = "demo";
+        std::fs::create_dir_all(dir.join(id)).unwrap();
+        std::fs::write(
+            credentials_path(&dir, id),
+            r#"{"access_token":"legacy-tok","unrelated":"kept"}"#,
+        )
+        .unwrap();
+
+        let stored = load_credentials_for_update(&dir, id).unwrap();
+        assert_eq!(stored["access_token"], "legacy-tok");
+        assert_eq!(stored["unrelated"], "kept");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    #[cfg_attr(
+        not(any(windows, target_os = "macos")),
+        ignore = "needs the OS-protected credential store; Linux CI has no Secret Service"
+    )]
+    fn oauth_tokens_are_sealed_on_disk_and_open_on_read() {
+        let dir = std::env::temp_dir().join(format!("agentz-oauth-{}", uuid::Uuid::new_v4()));
+        let id = "demo";
+        std::fs::create_dir_all(dir.join(id)).unwrap();
+        store_oauth_tokens(
+            &dir,
+            id,
+            "tok-secret",
+            Some("ref-secret"),
+            Some(3600),
+            1_000,
+        )
+        .unwrap();
+
+        let on_disk = std::fs::read_to_string(credentials_path(&dir, id)).unwrap();
+        assert!(on_disk.contains("sealed:"));
+        assert!(!on_disk.contains("tok-secret"));
+        assert!(!on_disk.contains("ref-secret"));
+
+        let stored = load_credentials(&dir, id);
+        assert_eq!(stored["access_token"], "tok-secret");
+        assert_eq!(stored["refresh_token"], "ref-secret");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn unopenable_sealed_token_fails_closed() {
+        let dir = std::env::temp_dir().join(format!("agentz-oauth-{}", uuid::Uuid::new_v4()));
+        let id = "demo";
+        std::fs::create_dir_all(dir.join(id)).unwrap();
+        let original = r#"{"access_token":"sealed:not-valid-hex","unrelated":"kept"}"#;
+        std::fs::write(credentials_path(&dir, id), original).unwrap();
+
+        // Reads yield no credentials rather than a partial or ciphertext value.
+        assert!(load_credentials_for_update(&dir, id).is_err());
+        assert!(load_credentials(&dir, id).is_empty());
+        // Updates refuse to rewrite the file, so the unrelated field is not lost.
+        assert!(store_oauth_tokens(&dir, id, "tok", None, None, 0).is_err());
+        assert_eq!(
+            std::fs::read_to_string(credentials_path(&dir, id)).unwrap(),
+            original
+        );
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
@@ -1660,8 +1808,7 @@ pub async fn connectors_save_credentials(
         }
         existing.insert(k, v);
     }
-    let text = serde_json::to_string_pretty(&existing).map_err(|e| e.to_string())?;
-    std::fs::write(credentials_path(&dir, &id), text).map_err(|e| e.to_string())?;
+    write_credentials(&dir, &id, &existing)?;
     Ok(())
 }
 

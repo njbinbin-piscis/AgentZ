@@ -5,6 +5,21 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.11] - 2026-10-17
+
+### Security
+
+- OAuth connector tokens (`access_token`, `refresh_token`) are stored sealed in `credentials.json` instead of as plaintext. The sealing key is the app's master key, which the operating system protects: DPAPI on Windows, Keychain on macOS, Secret Service on Linux.
+- Legacy plaintext tokens written by 0.9.8 to 0.9.10 are still readable. They are rewritten sealed the next time the connector's tokens are updated, cleared, or saved.
+- Diagnostics export redacts the plaintext of sealed tokens.
+- Fails closed: if the OS credential store is unavailable, OAuth token storage returns an error and the file is left unchanged. API key connectors are not affected.
+
+### Known limits
+
+- API key connectors (`api_key`) are still stored as plaintext in `credentials.json`.
+- On Linux, OAuth token storage needs a running Secret Service (for example GNOME Keyring or KWallet). This is verified by CI only, not on a real Linux desktop.
+- Other limits listed under 0.9.8 and 0.9.10 still apply.
+
 ## [0.9.10] - 2026-10-17
 
 ### Fixed

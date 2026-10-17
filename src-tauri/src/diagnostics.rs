@@ -103,7 +103,7 @@ fn normalize_secrets(out: &mut Vec<String>) {
     out.sort();
     out.dedup();
     // Longest first, so a secret that contains another is replaced whole.
-    out.sort_by(|a, b| b.len().cmp(&a.len()));
+    out.sort_by_key(|s| std::cmp::Reverse(s.len()));
 }
 
 /// Read current connector credentials at export time, including rotated tokens.
@@ -149,6 +149,16 @@ fn export_secret_values(config_dir: &Path, settings: &Value) -> Result<Vec<Strin
             serde_json::from_str(&raw).map_err(|e| format!("parse connector credential: {e}"))?;
         if !value.is_object() {
             return Err("connector credential is not an object".into());
+        }
+        // OAuth tokens are stored sealed; redact their plaintext, not only the ciphertext.
+        if let Some(map) = value.as_object() {
+            let text_fields: std::collections::HashMap<String, String> = map
+                .iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect();
+            let opened = crate::commands::connectors::unseal_credentials(&connectors, text_fields)
+                .map_err(|e| format!("unseal connector credential: {e}"))?;
+            secrets.extend(opened.into_values());
         }
         collect_all_strings(&value, &mut secrets);
     }
@@ -577,6 +587,32 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&out).unwrap(), body);
         assert_eq!(std::fs::read_dir(dir.join("exports")).unwrap().count(), 2);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    #[cfg_attr(
+        not(any(windows, target_os = "macos")),
+        ignore = "needs the OS-protected credential store; Linux CI has no Secret Service"
+    )]
+    fn export_secret_values_opens_sealed_oauth_tokens() {
+        let config = std::env::temp_dir().join(format!("agentz-diag-{}", uuid::Uuid::new_v4()));
+        let connectors = config.join("connectors");
+        std::fs::create_dir_all(connectors.join("demo")).unwrap();
+        crate::commands::connectors::store_oauth_tokens(
+            &connectors,
+            "demo",
+            "tok-diag-secret",
+            Some("ref-diag-secret"),
+            None,
+            0,
+        )
+        .unwrap();
+
+        // Redaction must see the plaintext tokens, not only their sealed form.
+        let secrets = export_secret_values(&config, &serde_json::json!({})).unwrap();
+        assert!(secrets.iter().any(|s| s == "tok-diag-secret"));
+        assert!(secrets.iter().any(|s| s == "ref-diag-secret"));
+        std::fs::remove_dir_all(config).unwrap();
     }
 
     #[test]
