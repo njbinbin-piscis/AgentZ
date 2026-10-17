@@ -5,6 +5,26 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.8] - 2026-10-17
+
+### Added
+
+- CodeZ and WorkZ share project sessions. Opening the same project in both shows the same sessions. Team sessions stay read-only in CodeZ.
+- Mode-switch shortcuts: Ctrl/Cmd+Shift+N switches to CodeZ and Ctrl/Cmd+Alt+N switches to WorkZ.
+- Connector OAuth2 authorization. The connector row has Authorize and Refresh buttons. Authorization uses PKCE, checks `state` on the loopback callback, and stores tokens in the connector's credential file.
+
+### Changed
+
+- Failing agent turns record `task_id` and `environment_id` in diagnostic logs, so an export can locate the failing task.
+- The first-run checklist re-reads configuration when the settings panel closes.
+- Backup verification refuses unsupported schema versions with explicit reasons.
+
+### Known limits
+
+- Desktop journeys for the new sharing, shortcut, and OAuth flows have not been run by hand. Automated tests cover them.
+- The OAuth flow has been tested only against a local fake token endpoint, not against real providers.
+- The Windows installer is unsigned. macOS and Linux bundles have not been verified on real machines.
+
 ## [0.9.7] - 2026-10-06
 
 ### Fixed
