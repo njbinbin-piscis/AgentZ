@@ -2054,7 +2054,10 @@ pub struct TerminalResourceSnapshot {
 }
 
 fn terminal_resource_snapshot(registry: &TerminalRegistry) -> TerminalResourceSnapshot {
+    // Only the Windows branch mutates these; other platforms keep the zero defaults.
+    #[cfg_attr(not(windows), allow(unused_mut))]
     let mut active_processes = 0u64;
+    #[cfg_attr(not(windows), allow(unused_mut))]
     let mut query_failures = 0usize;
     #[cfg(windows)]
     for session in registry.sessions.values() {

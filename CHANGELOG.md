@@ -5,16 +5,22 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.10] - 2026-10-17
+
+### Fixed
+
+- Linux and macOS release builds compile again. Windows-only code paths in the desktop crate (`task_view_read` and the terminal resource snapshot in `ide`) no longer leave unused items on other platforms. The vendored `piscis-kernel` fix from 0.9.9 is included.
+
+### Known limits
+
+- The Linux and macOS compile fixes are verified by the release pipeline, not by a local build.
+- Other limits listed under 0.9.8 still apply.
+
 ## [0.9.9] - 2026-10-17
 
 ### Fixed
 
-- Linux and macOS release builds compile again. The shell tool imports in the vendored `piscis-kernel` are now compiled only on Windows, where they are used. The 0.9.8 release had Windows installers only.
-
-### Known limits
-
-- The Linux and macOS compile fix is verified by the release pipeline, not by a local build.
-- Other limits listed under 0.9.8 still apply.
+- Attempted Linux and macOS release builds. The vendored `piscis-kernel` shell imports are compiled only on Windows. The release still failed on other platforms because of unused items in the desktop crate, so 0.9.9 shipped Windows installers only.
 
 ## [0.9.8] - 2026-10-17
 
