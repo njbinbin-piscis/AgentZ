@@ -1,0 +1,21 @@
+[
+  {
+    "id": "AZ-036",
+    "verified_state": "read_only_codez_route_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "WorkZ can open selected task files in CodeZ through an authority-project/session route and the existing host-validated read-only viewer. IDE editor, terminal, debug and preview actions remain project-bound.",
+    "conclusion_proposal": "Keep preparing; this is a bounded read-only route, not full task-environment operation binding.",
+    "next_action": "Implement task-bound host authorization for CodeZ editor, terminal, debug and preview operations and same-source session continuation; then perform unified native handoff acceptance.",
+    "remaining_work": [
+      "Authorize all four CodeZ operation classes against current task/environment identity",
+      "Preserve WorkZ session/source identity in CodeZ continuation",
+      "Independent source review and native dirty-buffer/active-process handoff"
+    ],
+    "verification_gaps": [
+      "No writable CodeZ task environment route in this batch",
+      "No native desktop or cross-platform handoff run",
+      "No independent review after the current route edit"
+    ],
+    "evidence": ["docs/upgrade/evidence/AZ-036-2026-10-14/read-only-route.md"]
+  }
+]

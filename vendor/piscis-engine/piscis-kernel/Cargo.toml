@@ -1,0 +1,90 @@
+[package]
+workspace = ".."
+name = "piscis-kernel"
+version = "0.8.63"
+edition = "2021"
+description = "OpenPiscis agent runtime kernel - OS/UI-neutral agent loop, LLM, storage, memory and platform-neutral tools."
+
+[features]
+default = []
+email-imap = ["dep:imap", "dep:native-tls", "dep:mailparse"]
+
+[dependencies]
+piscis-core = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+# Storage - SQLite bundled to avoid external DLL dependency.
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# HTTP client used by LLM adapters.
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls", "multipart", "gzip", "deflate", "brotli"], default-features = false }
+
+# LLM streaming primitives.
+futures = "0.3"
+
+# Policy / security.
+regex = "1"
+once_cell = "1"
+chacha20poly1305 = "0.10"
+hex = "0.4"
+tempfile = "3"
+getrandom = "0.2"
+base64 = "0.22"
+
+# Scheduler.
+tokio-cron-scheduler = "0.13"
+
+# Utilities.
+uuid = { version = "1", features = ["v4"] }
+tracing = "0.1"
+dirs = "5"
+urlencoding = "2"
+
+# Neutral tools.
+scraper = "0.25.0"
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "hostname", "pool", "tokio1-rustls-tls"] }
+imap = { version = "2.4.1", optional = true }
+native-tls = { version = "0.2", optional = true }
+mailparse = { version = "0.15", optional = true }
+russh = { version = "0.57", default-features = false, features = ["ring"] }
+lopdf = { version = "0.34", features = ["nom_parser"] }
+pdf-extract = "0.7"
+encoding_rs = "0.8.35"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
+# Windows-only utilities used by the `elevate` helper (UAC relaunch).
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Security_Cryptography",
+    "Win32_Security_Isolation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Threading",
+    "Win32_System_JobObjects",
+    "Win32_System_Pipes",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+windows-sys = { version = "0.59", features = [
+    "Wdk_Foundation",
+    "Wdk_Storage_FileSystem",
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+] }
+
+# The kernel intentionally does NOT depend on tauri or any GUI crate.
+
+[target.'cfg(target_os = "linux")'.dependencies]
+secret-service = { path = "../../secret-service", version = "=5.1.0", default-features = false, features = ["rt-async-io-crypto-rust", "agentz-no-prompts"] }
+
+[lints]
+workspace = true

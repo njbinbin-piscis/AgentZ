@@ -200,6 +200,8 @@ export interface WebviewOptionsDto {
 
 export interface WebviewPanelDto {
   handle: string;
+  resourceToken: string;
+  resourceRoots: string[];
   viewType: string;
   title: string;
   viewColumn?: number;

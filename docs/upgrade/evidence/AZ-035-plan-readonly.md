@@ -1,0 +1,7 @@
+# AZ-035 passive plan-reader prerequisite
+
+PlanStore::open_existing_readonly(project) now opens an existing canonical-root plans.db using SQLITE_OPEN_READ_ONLY, without CREATE, initialization, schema repair or migration. Missing path and try_exists I/O errors return errors; the host maps missing explicitly. Schema version must be exactly1. A read transaction validates exact ordered columns, SQLite declared types, NOTNULL and PK positions for plans/plan_heads. It reuses existing binding/current/record validation; normal open and write behavior are unchanged. This is not an exhaustive FK/index/check-constraint schema audit, cross-store atomic snapshot, or substitute for fresh host scope/environment lease.
+
+Four real SQLite fixtures were added: missing database creates no directory; v0/future/partial/wrong-PK schemas reject with unchanged bytes; full Cancelled plan reads retain items/revision and readonly replace fails with unchanged bytes/no environment registration database created; damaged record rejects without repair. Only rustfmt was executed here; parent owns unique Cargo execution and independent review. No GUI/model/IPC acceptance claim. Existing AZ020 review source manifest must be refreshed by parent after review because shared plan.rs changed; no ledger was edited here.
+
+主线程67342实际plan16项全部通过，0 failed/ignored，0.32秒；strict all-targets Clippy成功8.04秒。仅领域SQLite验证，非host/GUI验收。

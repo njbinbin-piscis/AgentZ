@@ -1,0 +1,9 @@
+# Source closure inventory follow-up
+
+2026-10-07. Inventory tooling only; no product source, build, staging, commit, push or installer change. Existing 0.9.7 before/after-build snapshots were preserved.
+
+`upgrade-source-snapshot.mjs` now includes `.tmpl` sources and traverses literal local Cargo dependency paths recursively, including platform-conditioned dependencies. It restricts paths to approved workspace source roots, checks manifest size/regular-file/realpath boundaries before reading, deduplicates roots and limits traversal to128 roots. Credential/runtime exclusions remain. Only dependency-table path entries are followed, so `[[bin]]` / `[lib]` source paths are not mistaken for crate roots.
+
+Actual execution: Node syntax check and two summary runs exited0. A separate full JSON inventory was saved without overwrite to `RC-source-closure-snapshot-2026-10-07.json`, captured10:52:26.718 UTC, stable=true, HEAD `a787b6dafba84489670d944e8339611ff0fcd563`, version0.9.7,269 source entries and7 required roots. File SHA256: `1B545EFA635641E94410869287884A07887C19054B572BBE7D1B2A98BE3E784C`. The template is present exactly once; vendor/secret-service is now a required root with18 untracked allowlisted source paths. No closure declarations were rejected in this capture.
+
+The previous four-root122 count becomes123 after adding the kernel template; including secret-service gives141 untracked source inputs across these five roots. This is an inventory count, not source ownership or upstream provenance approval. Licenses, upstream baseline/patch descriptions and excluded resources still need separate review. The parser supports literal double-quoted path declarations in dependency tables; it is not a TOML/Cargo resolver and does not establish complete feature/resource closure. Hashes do not preserve dirty source bytes or retrospectively establish the source provenance of the built0.9.7 package.

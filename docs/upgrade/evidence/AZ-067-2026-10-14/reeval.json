@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-067",
+    "verified_state": "local_version_and_documentation_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "README and 0.9.7 candidate notes distinguish source version from release acceptance. The local/CI consistency check covers the product package and lockfile, Cargo, Tauri, README and candidate docs, and independently checks extension-host's package/lockfile version. The local check passed; CI was not dispatched.",
+    "conclusion_proposal": "Keep pending until extension/platform support evidence and unified documentation review are complete.",
+    "next_action": "Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.",
+    "remaining_work": ["Extension compatibility evidence", "macOS/Linux support evidence", "Unified documentation review"],
+    "verification_gaps": ["CI workflow not dispatched", "No installation, signature or cross-platform acceptance"],
+    "evidence": ["docs/upgrade/evidence/AZ-067-2026-10-14/implementation.md"]
+  }
+]

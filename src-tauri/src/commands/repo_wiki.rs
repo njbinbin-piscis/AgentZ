@@ -68,13 +68,7 @@ fn mermaid_module_deps(doc: &GraphDoc) -> Option<String> {
 
 fn mermaid_id(name: &str) -> String {
     name.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() {
-                c
-            } else {
-                '_'
-            }
-        })
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect()
 }
 

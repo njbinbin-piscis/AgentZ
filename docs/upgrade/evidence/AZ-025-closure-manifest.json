@@ -1,0 +1,27 @@
+{
+    "task":  "AZ-025",
+    "revision":  "closure-r1",
+    "note":  "Closure sources at current bytes. external_action.rs, lib.rs, events.rs and approval.rs match the AZ-025 ledger review (2026-10-10). run.rs now has sha256 b68c... because AZ-019 added active_runs after the AZ-025 review recorded ea4b...; the current run.rs bytes are covered only by the closure review recorded with this manifest, not by the earlier AZ-025 review.",
+    "files":  [
+                  {
+                      "path":  "crates/agentz-task-state/src/external_action.rs",
+                      "sha256":  "2f078b14d753304d08dc2b200ca3d131382d96a64f56a255fd728e0d83ce3a16"
+                  },
+                  {
+                      "path":  "crates/agentz-task-state/src/lib.rs",
+                      "sha256":  "ba73a74324b07960b853780e797af76d34929047c03f9008505385e0fb2acc73"
+                  },
+                  {
+                      "path":  "crates/agentz-task-state/src/run.rs",
+                      "sha256":  "b68c1cddcc413633e6de4e7bb0b38df4c12f31e54d9f4eb9e0df3d65b2e327e6"
+                  },
+                  {
+                      "path":  "crates/agentz-task-state/src/events.rs",
+                      "sha256":  "7fcfa29dc35ab483caa641d86a6b702de09b155fcebd01b6c68f4e7db7c5fe98"
+                  },
+                  {
+                      "path":  "crates/agentz-task-state/src/approval.rs",
+                      "sha256":  "61cc69ba37a802e0ba278533aaef4bfc0cd655b750287f62b15089cef2a523c4"
+                  }
+              ]
+}

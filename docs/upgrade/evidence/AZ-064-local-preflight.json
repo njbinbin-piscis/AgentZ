@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "purpose": "offline candidate source/resources inspection",
+  "platform": "windows",
+  "arch": "x64",
+  "channel": "candidate",
+  "artifact_directory": "C:\\Projects\\AgentZ\\target\\release\\bundle\\nsis",
+  "status": "missing",
+  "candidate_inputs_ready": false,
+  "release_ready": false,
+  "checks": [
+    {
+      "id": "platform-overlay",
+      "status": "verified",
+      "path": "src-tauri/tauri.windows.conf.json"
+    },
+    {
+      "id": "version",
+      "status": "verified",
+      "versions": {
+        "package": "0.9.6",
+        "cargo": "0.9.6",
+        "tauri": "0.9.6"
+      }
+    },
+    {
+      "id": "identity",
+      "status": "verified",
+      "package_name": "agentz",
+      "cargo_name": "agentz-desktop",
+      "binary": "agentz-desktop",
+      "identifier": "com.agentz.desktop",
+      "product_name": "AgentZ"
+    },
+    {
+      "id": "bundle-targets",
+      "status": "verified",
+      "configured": [
+        "nsis"
+      ],
+      "targets": [
+        "nsis"
+      ]
+    },
+    {
+      "id": "resource-mapping",
+      "status": "verified",
+      "scope": "configured destinations only; installed contents unverified"
+    },
+    {
+      "id": "resource:../extension-host/dist/host.js",
+      "status": "verified",
+      "files": 1,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:../extension-host/dist/host.js.map",
+      "status": "verified",
+      "files": 1,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:resources/node/",
+      "status": "verified",
+      "files": 3,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:../bundled/preinstall/",
+      "status": "verified",
+      "files": 1821,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:../bundled/codebuddy/exclude.json",
+      "status": "verified",
+      "files": 1,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:../bundled/codebuddy/manifest.json",
+      "status": "verified",
+      "files": 1,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:icons/32x32.png",
+      "status": "verified",
+      "files": 1,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:icons/128x128.png",
+      "status": "verified",
+      "files": 1,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:icons/128x128@2x.png",
+      "status": "verified",
+      "files": 1,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:icons/icon.icns",
+      "status": "verified",
+      "files": 1,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "resource:icons/icon.ico",
+      "status": "verified",
+      "files": 1,
+      "scope": "source files exist; packaged copy and content semantics unverified"
+    },
+    {
+      "id": "runtime:x64",
+      "status": "verified",
+      "path": "src-tauri/resources/node/win32-x64/node.exe",
+      "expected": "x64",
+      "header": {
+        "status": "verified",
+        "format": "PE",
+        "architectures": [
+          "x64"
+        ],
+        "scope": "header architecture only; execution, provenance and signature unverified"
+      }
+    },
+    {
+      "id": "artifact-directory",
+      "status": "missing",
+      "reason": "ENOENT: no such file or directory, stat 'C:\\Projects\\AgentZ\\target\\release\\bundle\\nsis'"
+    }
+  ],
+  "artifacts": [],
+  "signature": {
+    "status": "unverified",
+    "executed": false
+  },
+  "notarization": {
+    "status": "unverified",
+    "executed": false
+  },
+  "installation": {
+    "status": "unverified",
+    "executed": false
+  },
+  "limits": [
+    "No build, network, signing, installation or publishing performed",
+    "Source-resource presence and runtime headers do not prove packaged contents or runtime execution",
+    "SHA256 measures inspected bytes; no trusted expected digest or signature comparison"
+  ]
+}

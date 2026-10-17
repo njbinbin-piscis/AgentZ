@@ -1,7 +1,6 @@
 //! ClawHub marketplace — search and install SKILL.md packages (from openpiscis).
 
 use std::io::Read;
-use std::path::Path;
 
 use serde::Serialize;
 use tauri::AppHandle;
@@ -11,6 +10,7 @@ use crate::commands::chat::resolve_config_dir;
 
 const CLAWHUB_API: &str = "https://clawhub.ai";
 const SKILLHUB_API: &str = "https://api.skillhub.cn";
+const MAX_SKILL_MD_BYTES: u64 = 1_048_576;
 
 fn resolve_registry(registry: Option<String>) -> Result<&'static str, String> {
     match registry
@@ -122,48 +122,22 @@ fn extract_skill_md_from_zip(zip_bytes: &[u8]) -> Result<String, String> {
     let cursor = std::io::Cursor::new(zip_bytes);
     let mut archive = zip::ZipArchive::new(cursor).map_err(|e| e.to_string())?;
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+        let file = archive.by_index(i).map_err(|e| e.to_string())?;
         let name = file.name().to_lowercase();
         if name == "skill.md" || name.ends_with("/skill.md") {
-            let mut content = String::new();
-            file.read_to_string(&mut content)
+            let mut bytes = Vec::new();
+            file.take(MAX_SKILL_MD_BYTES + 1)
+                .read_to_end(&mut bytes)
                 .map_err(|e| e.to_string())?;
+            if bytes.len() as u64 > MAX_SKILL_MD_BYTES {
+                return Err("SKILL.md exceeds the 1 MiB install limit".into());
+            }
+            let content =
+                String::from_utf8(bytes).map_err(|e| format!("SKILL.md is not UTF-8: {e}"))?;
             return Ok(content);
         }
     }
     Err("SKILL.md not found in zip archive".to_string())
-}
-
-fn extract_zip_to_dir(zip_bytes: &[u8], dest: &Path) -> Result<String, String> {
-    std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
-    let cursor = std::io::Cursor::new(zip_bytes);
-    let mut archive = zip::ZipArchive::new(cursor).map_err(|e| e.to_string())?;
-    let mut skill_md = String::new();
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-        let raw_name = file.name().to_string();
-        let rel = raw_name.trim_start_matches("./");
-        if rel.is_empty() || rel.ends_with('/') {
-            continue;
-        }
-        let out_path = dest.join(rel);
-        if let Some(parent) = out_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf).map_err(|e| e.to_string())?;
-        std::fs::write(&out_path, &buf).map_err(|e| e.to_string())?;
-        if rel.eq_ignore_ascii_case("SKILL.md") {
-            skill_md = String::from_utf8_lossy(&buf).into_owned();
-        }
-    }
-    if skill_md.is_empty() {
-        skill_md = std::fs::read_to_string(dest.join("SKILL.md")).unwrap_or_default();
-    }
-    if skill_md.is_empty() {
-        return Err("SKILL.md not found after zip extract".to_string());
-    }
-    Ok(skill_md)
 }
 
 fn parse_search_hit(r: &serde_json::Value) -> Option<ClawHubSkill> {
@@ -229,10 +203,7 @@ pub async fn clawhub_search(
     let is_skillhub = api_base == SKILLHUB_API;
     let (url, use_search) = if q.is_empty() {
         if is_skillhub {
-            (
-                format!("{api_base}/api/v1/search?q=&limit={limit}"),
-                true,
-            )
+            (format!("{api_base}/api/v1/search?q=&limit={limit}"), true)
         } else {
             (
                 format!("{api_base}/api/v1/skills?sort=stars&limit={limit}"),
@@ -298,8 +269,6 @@ pub async fn clawhub_install(
     let config_dir = resolve_config_dir(&app)?;
     let skills_root = crate::skills::service::skills_root_from_config_dir(&config_dir);
     crate::skills::provenance::ensure_evolution_dirs(&skills_root).map_err(|e| e.to_string())?;
-    let skill_dir = crate::skills::provenance::installed_dir(&skills_root).join(&slug);
-
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .user_agent("AgentZ-Desktop/1.0")
@@ -319,7 +288,11 @@ pub async fn clawhub_install(
 
     let resp = clawhub_get_with_retry(&client, &file_url, 3).await?;
     let content = if resp.status().is_success() {
-        resp.text().await.map_err(|e| e.to_string())?
+        let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+        if bytes.len() as u64 > MAX_SKILL_MD_BYTES {
+            return Err("SKILL.md exceeds the 1 MiB install limit".into());
+        }
+        String::from_utf8(bytes.to_vec()).map_err(|e| format!("SKILL.md is not UTF-8: {e}"))?
     } else {
         let zip_url = if let Some(v) = ver {
             format!("{api_base}/api/v1/download?slug={slug}&version={v}")
@@ -334,14 +307,13 @@ pub async fn clawhub_install(
             ));
         }
         let bytes = zip_resp.bytes().await.map_err(|e| e.to_string())?;
-        if extract_zip_to_dir(&bytes, &skill_dir).is_ok() {
-            std::fs::read_to_string(skill_dir.join("SKILL.md")).unwrap_or_default()
-        } else {
-            extract_skill_md_from_zip(&bytes)?
+        if bytes.len() > 8 * 1_048_576 {
+            return Err("skill archive exceeds the 8 MiB install limit".into());
         }
+        extract_skill_md_from_zip(&bytes)?
     };
 
-    let source_url = ver.map(|v| format!("{slug}@{v}"));
+    let source_url = Some(format!("{api_base}/api/v1/skills/{slug}/file"));
     let (global_db, _) =
         crate::commands::data_scope::open_global_kernel_state(&app).map_err(|e| e.to_string())?;
     let db = global_db.lock().await;
@@ -351,6 +323,7 @@ pub async fn clawhub_install(
         &content,
         source,
         source_url,
+        ver.map(str::to_string),
         None,
     )
     .map_err(|e| e.to_string())?;
@@ -361,4 +334,45 @@ pub async fn clawhub_install(
         slug: installed_id,
         skill_dir: final_dir.display().to_string(),
     })
+}
+
+#[cfg(test)]
+mod install_archive_tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn archive_install_reads_only_bounded_skill_markdown_without_extracting_files() {
+        let cursor = std::io::Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(cursor);
+        zip.start_file("../outside.txt", zip::write::SimpleFileOptions::default())
+            .expect("start outside entry");
+        zip.write_all(b"must never be written to disk")
+            .expect("write outside entry");
+        zip.start_file("package/SKILL.md", zip::write::SimpleFileOptions::default())
+            .expect("start skill entry");
+        zip.write_all(b"---\nname: Example\n---\nSafe.")
+            .expect("write skill entry");
+        let archive = zip.finish().expect("finish archive").into_inner();
+
+        assert_eq!(
+            extract_skill_md_from_zip(&archive).expect("read only skill file"),
+            "---\nname: Example\n---\nSafe."
+        );
+    }
+
+    #[test]
+    fn archive_install_rejects_oversized_skill_markdown() {
+        let cursor = std::io::Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(cursor);
+        zip.start_file("SKILL.md", zip::write::SimpleFileOptions::default())
+            .expect("start skill entry");
+        zip.write_all(&vec![b'a'; MAX_SKILL_MD_BYTES as usize + 1])
+            .expect("write oversized skill");
+        let archive = zip.finish().expect("finish archive").into_inner();
+
+        assert!(extract_skill_md_from_zip(&archive)
+            .expect_err("oversize must fail closed")
+            .contains("1 MiB"));
+    }
 }

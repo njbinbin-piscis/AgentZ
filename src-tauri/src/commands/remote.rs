@@ -22,7 +22,8 @@ pub struct RemoteTargets {
 
 #[tauri::command]
 pub async fn remote_list_targets() -> Result<RemoteTargets, String> {
-    let (wsl_distros, containers) = tokio::join!(remote::wsl_distros(), remote::docker_containers());
+    let (wsl_distros, containers) =
+        tokio::join!(remote::wsl_distros(), remote::docker_containers());
     Ok(RemoteTargets {
         ssh_hosts: remote::ssh_config_hosts(),
         wsl_distros,
@@ -105,7 +106,11 @@ pub async fn remote_forward_start(
     remote_port: u16,
     local_port: Option<u16>,
 ) -> Result<remote::forward::Forward, String> {
-    let target = state.ext_host.target().await.ok_or("no remote connection")?;
+    let target = state
+        .ext_host
+        .target()
+        .await
+        .ok_or("no remote connection")?;
     remote::forward::start(&target, remote_port, local_port).await
 }
 
@@ -133,11 +138,14 @@ pub async fn remote_sync_extensions(
     extensions: Vec<LocalExtension>,
 ) -> Result<HashMap<String, String>, String> {
     let mgr = state.ext_host.clone();
-    let target = mgr.target().await.ok_or("extension host is not running")?;
+    let (target, server) = mgr.deployment_snapshot().await?;
     if target.is_local() {
-        return Ok(extensions.into_iter().map(|e| (e.id, e.extension_path)).collect());
+        return Ok(extensions
+            .into_iter()
+            .map(|e| (e.id, e.extension_path))
+            .collect());
     }
-    let server = mgr.server().await.ok_or("remote server not deployed")?;
+    let server = server.ok_or("remote server not deployed")?;
     let workspace_side: Vec<LocalExtension> = extensions
         .into_iter()
         .filter(|e| {
@@ -167,8 +175,14 @@ pub async fn resolve_remote(_state: &AppState, uri: &str) -> Result<Option<Strin
 }
 
 pub async fn read_remote_text(state: &AppState, path: &str) -> Result<(Vec<u8>, u64), String> {
-    let v = state.ext_host.request("fs.readFile", json!({ "path": path })).await?;
-    let b64 = v.get("base64").and_then(|b| b.as_str()).ok_or("bad fs.readFile reply")?;
+    let v = state
+        .ext_host
+        .request("fs.readFile", json!({ "path": path }))
+        .await?;
+    let b64 = v
+        .get("base64")
+        .and_then(|b| b.as_str())
+        .ok_or("bad fs.readFile reply")?;
     let bytes = STANDARD.decode(b64).map_err(|e| e.to_string())?;
     let len = bytes.len() as u64;
     Ok((bytes, len))
@@ -177,7 +191,10 @@ pub async fn read_remote_text(state: &AppState, path: &str) -> Result<(Vec<u8>, 
 pub async fn write_remote(state: &AppState, path: &str, content: &[u8]) -> Result<(), String> {
     state
         .ext_host
-        .request("fs.writeFile", json!({ "path": path, "base64": STANDARD.encode(content) }))
+        .request(
+            "fs.writeFile",
+            json!({ "path": path, "base64": STANDARD.encode(content) }),
+        )
         .await
         .map(|_| ())
 }
@@ -190,10 +207,13 @@ pub struct RemoteDirEntry {
 }
 
 #[tauri::command]
-pub async fn remote_fs_list(state: State<'_, AppState>, uri: String) -> Result<Vec<RemoteDirEntry>, String> {
-    let parsed = vfs::parse(&uri).ok_or("not an agentz-remote URI")?;
-    let path = resolve_remote(&state, &uri).await?.unwrap_or_default();
-    let v = state.ext_host.request("fs.readDir", json!({ "path": path })).await?;
+pub async fn remote_fs_list(
+    _state: State<'_, AppState>,
+    uri: String,
+) -> Result<Vec<RemoteDirEntry>, String> {
+    let session = remote::bind(&uri).await?;
+    let path = &session.path;
+    let v = session.call("fs.readDir", json!({ "path": path })).await?;
     let base = path.trim_end_matches('/');
     let mut out: Vec<RemoteDirEntry> = v
         .as_array()
@@ -202,34 +222,98 @@ pub async fn remote_fs_list(state: State<'_, AppState>, uri: String) -> Result<V
         .filter_map(|e| {
             let name = e.get("name")?.as_str()?.to_string();
             Some(RemoteDirEntry {
-                uri: vfs::format(&parsed.authority, &format!("{base}/{name}")),
-                is_dir: e.get("isDirectory").and_then(|d| d.as_bool()).unwrap_or(false),
+                uri: vfs::format(&session.authority, &format!("{base}/{name}")),
+                is_dir: e
+                    .get("isDirectory")
+                    .and_then(|d| d.as_bool())
+                    .unwrap_or(false),
                 name,
             })
         })
         .collect();
-    out.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    out.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
     Ok(out)
 }
 
 #[tauri::command]
 pub async fn remote_fs_action(
-    state: State<'_, AppState>,
+    _state: State<'_, AppState>,
     action: String,
     uri: String,
     to: Option<String>,
 ) -> Result<(), String> {
-    let path = resolve_remote(&state, &uri).await?.ok_or("not an agentz-remote URI")?;
+    let session = remote::bind(&uri).await?;
+    let path = &session.path;
     let (method, params) = match action.as_str() {
         "create_file" => ("fs.writeFile", json!({ "path": path, "text": "" })),
         "create_dir" => ("fs.mkdir", json!({ "path": path })),
         "delete" => ("fs.delete", json!({ "path": path, "recursive": true })),
         "rename" => {
             let to = to.ok_or("rename requires `to`")?;
-            let to_path = resolve_remote(&state, &to).await?.unwrap_or(to);
+            let to_path = rename_destination(&session.authority, &to)?;
             ("fs.rename", json!({ "from": path, "to": to_path }))
         }
         other => return Err(format!("unknown action: {other}")),
     };
-    state.ext_host.request(method, params).await.map(|_| ())
+    session.call(method, params).await.map(|_| ())
+}
+
+fn rename_destination(authority: &str, destination: &str) -> Result<String, String> {
+    if !vfs::has_scheme(destination) {
+        // Plain paths already refer to the bound server; keep this protocol.
+        return Ok(destination.to_string());
+    }
+    let uri = vfs::parse(destination).ok_or("invalid remote rename destination URI")?;
+    if !uri.authority.eq_ignore_ascii_case(authority) {
+        return Err("remote rename destination belongs to another authority".into());
+    }
+    Ok(uri.path)
+}
+
+#[cfg(test)]
+mod file_command_binding_tests {
+    use super::*;
+
+    #[test]
+    fn rename_destination_accepts_bound_authority_and_plain_paths() {
+        assert_eq!(
+            rename_destination(
+                "ssh-remote+box",
+                "agentz-remote://SSH-REMOTE%2BBox/work/new"
+            )
+            .unwrap(),
+            "/work/new"
+        );
+        assert_eq!(
+            rename_destination("ssh-remote+box", "/work/new").unwrap(),
+            "/work/new"
+        );
+        assert_eq!(rename_destination("ssh-remote+box", "new").unwrap(), "new");
+    }
+
+    #[test]
+    fn rename_destination_rejects_another_authority() {
+        let error = rename_destination(
+            "ssh-remote+box",
+            "agentz-remote://ssh-remote+other/work/new",
+        )
+        .unwrap_err();
+        assert!(error.contains("another authority"));
+    }
+
+    #[test]
+    fn rename_destination_rejects_malformed_remote_uris() {
+        for uri in [
+            "agentz-remote:/work/new",
+            "agentz-remote:///work/new",
+            "agentz-remote://bad%2Fhost/work/new",
+            "agentz-remote://box/work/%00new",
+        ] {
+            assert!(rename_destination("box", uri).is_err(), "accepted {uri}");
+        }
+    }
 }

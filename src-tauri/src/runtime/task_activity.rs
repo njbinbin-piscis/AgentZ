@@ -1,0 +1,65 @@
+//! Single-host task exclusion; environment read leases do not serialize a task.
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::{Arc, Mutex as MapMutex, Weak},
+};
+use tokio::sync::{Mutex, OwnedMutexGuard};
+type Key = (String, String);
+type Entries = HashMap<Key, Weak<Mutex<()>>>;
+#[derive(Clone, Default)]
+pub struct TaskActivity(Arc<MapMutex<Entries>>);
+impl TaskActivity {
+    pub fn try_enter(&self, project: &Path, task: &str) -> Result<OwnedMutexGuard<()>, String> {
+        if task.trim().is_empty() {
+            return Err("task activity requires a task identity".into());
+        }
+        let key = (agentz_task_state::canonical_root(project)?, task.to_owned());
+        let lock = {
+            let mut entries = self.0.lock().map_err(|_| "task activity map unavailable")?;
+            entries.retain(|_, weak| weak.strong_count() > 0);
+            if let Some(lock) = entries.get(&key).and_then(Weak::upgrade) {
+                lock
+            } else {
+                let lock = Arc::new(Mutex::new(()));
+                entries.insert(key, Arc::downgrade(&lock));
+                lock
+            }
+        };
+        lock.try_lock_owned()
+            .map_err(|_| "task queued/running or goal mutation active".into())
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn same_task_excludes_queue_and_mutation_different_keys_run_and_drop_releases() {
+        let root = std::env::temp_dir().join(format!("agentz-task-gate-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("other")).unwrap();
+        let gate = TaskActivity::default();
+        let queued = gate.try_enter(&root, "task").unwrap();
+        assert!(gate.try_enter(&root.join("."), "task").is_err());
+        let other_task = gate.try_enter(&root, "other").unwrap();
+        let other_project = gate.try_enter(&root.join("other"), "task").unwrap();
+        let slots = Arc::new(tokio::sync::Semaphore::new(0));
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(10), slots.acquire())
+                .await
+                .is_err()
+        );
+        assert!(gate.try_enter(&root, "task").is_err());
+        drop(queued);
+        let replacement = gate.try_enter(&root, "task").unwrap();
+        drop(replacement);
+        drop(other_task);
+        drop(other_project);
+        for id in 0..50 {
+            drop(gate.try_enter(&root, &format!("temporary-{id}")).unwrap());
+        }
+        assert_eq!(gate.0.lock().unwrap().len(), 1);
+        assert!(gate.try_enter(&root, " ").is_err());
+        assert!(root.starts_with(std::env::temp_dir()));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}

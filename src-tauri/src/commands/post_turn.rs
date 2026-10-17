@@ -15,6 +15,7 @@ pub async fn run_post_turn_hooks(
     base_url: Option<String>,
     model: String,
     max_tokens: u32,
+    budget: crate::runtime::task_budget::BudgetScope,
 ) {
     if messages.is_empty() {
         return;
@@ -22,7 +23,12 @@ pub async fn run_post_turn_hooks(
     let Ok(global_ctx) = crate::commands::skill_evolution_ctx::SkillEvolutionCtx::open(app) else {
         return;
     };
-    let mem_client = llm::build_client_with_timeout(&provider, &api_key, base_url.as_deref(), 90);
+    let mem_client = budget.guard(llm::build_client_with_timeout(
+        &provider,
+        &api_key,
+        base_url.as_deref(),
+        90,
+    ));
     crate::commands::memory_extract::auto_extract_memories(
         project_db.clone(),
         session_id.clone(),
@@ -44,6 +50,7 @@ pub async fn run_post_turn_hooks(
         model,
         max_tokens,
         "piscis".to_string(),
+        budget,
     )
     .await;
 }

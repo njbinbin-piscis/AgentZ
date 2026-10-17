@@ -1,0 +1,29 @@
+{
+  "captured_at": "2026-10-10T15:06:54.743Z",
+  "files": [
+    {
+      "path": "crates/agentz-task-state/src/plan.rs",
+      "sha256": "2ffe34629d8af12a05df3a527e599b38389fb780bd28b9d5bf00ce99156c334e"
+    },
+    {
+      "path": "crates/agentz-task-state/src/lib.rs",
+      "sha256": "ba73a74324b07960b853780e797af76d34929047c03f9008505385e0fb2acc73"
+    },
+    {
+      "path": "crates/agentz-task-state/src/approval.rs",
+      "sha256": "61cc69ba37a802e0ba278533aaef4bfc0cd655b750287f62b15089cef2a523c4"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_plan.rs",
+      "sha256": "5177480c08b2f7f58dfa858432a9e2d15fd7e6ba6de9e13a36ca00432b45245a"
+    },
+    {
+      "path": "src-tauri/src/runtime/plan_intent.rs",
+      "sha256": "6c1bf00ae2dbab5e58ca397f24040f6d15731de290148d85eac36819e788614e"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_plan.rs",
+      "sha256": "2392747b2def2b915e115159629cda076b8865ee62abcc90271a62cc5348f4a5"
+    }
+  ]
+}

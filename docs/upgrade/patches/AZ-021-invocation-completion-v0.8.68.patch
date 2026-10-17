@@ -1,0 +1,118 @@
+--- a/piscis-kernel/src/agent/loop_.rs
++++ b/piscis-kernel/src/agent/loop_.rs
+@@ -29,6 +29,22 @@
+ };
+ use tokio::sync::{mpsc, Mutex};
+ use tracing::{debug, info, warn};
++
++/// Invocation completion is separate from owned subprocess cleanup. A normally
++/// returned error ends the invocation; dropped/aborted futures remain unconfirmed.
++async fn call_with_completion(
++    tool: &dyn super::tool::Tool,
++    input: serde_json::Value,
++    ctx: &ToolContext,
++) -> Result<super::tool::ToolResult> {
++    let receipt = ctx
++        .owned_completion()
++        .register()
++        .map_err(anyhow::Error::msg)?;
++    let result = tool.call(input, ctx).await;
++    receipt.complete(Ok(()));
++    result
++}
+ 
+ const DEFAULT_MAX_ITERATIONS: usize = 50;
+ const TOOL_TIMEOUT_SECS: u64 = 120;
+@@ -2378,7 +2394,7 @@
+                         biased;
+                         res = tokio::time::timeout(
+                             std::time::Duration::from_secs(TOOL_TIMEOUT_SECS),
+-                            tool.call(input.clone(), &tool_ctx),
++                            call_with_completion(tool, input.clone(), &tool_ctx),
+                         ) => {
+                             match res {
+                                 Ok(Ok(r)) => r,
+@@ -4750,6 +4766,83 @@
+ 
+     struct SchemaTool;
+ 
++    struct CompletionFixtureTool {
++        started: Arc<tokio::sync::Notify>,
++        pending: bool,
++    }
++    #[async_trait]
++    impl Tool for CompletionFixtureTool {
++        fn name(&self) -> &str {
++            "completion_fixture"
++        }
++        fn description(&self) -> &str {
++            "controlled completion fixture"
++        }
++        fn input_schema(&self) -> Value {
++            json!({"type":"object"})
++        }
++        async fn call(&self, _: Value, _: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
++            self.started.notify_one();
++            if self.pending {
++                std::future::pending::<()>().await;
++            }
++            Err(anyhow::anyhow!("normal tool failure"))
++        }
++    }
++    #[tokio::test]
++    async fn dropped_generic_invocation_is_unconfirmed_even_without_process_worker() {
++        let ctx = tier_tool_context("completion".into());
++        let registry = ctx.owned_completion();
++        let started = Arc::new(tokio::sync::Notify::new());
++        let tool = CompletionFixtureTool {
++            started: started.clone(),
++            pending: true,
++        };
++        let mut call = Box::pin(super::call_with_completion(&tool, json!({}), &ctx));
++        tokio::select! { result = &mut call => panic!("pending tool unexpectedly returned: {result:?}"), _ = started.notified() => {} }
++        ctx.cancel.store(true, Ordering::SeqCst);
++        drop(call);
++        assert_eq!(
++            registry.drain(std::time::Duration::ZERO).await,
++            crate::agent::tool_completion::DrainOutcome::Failed {
++                active: 0,
++                failures: 1
++            }
++        );
++    }
++    #[tokio::test]
++    async fn normal_tool_error_completes_invocation_and_cancelled_context_never_calls() {
++        let ctx = tier_tool_context("completion".into());
++        let registry = ctx.owned_completion();
++        let tool = CompletionFixtureTool {
++            started: Arc::new(tokio::sync::Notify::new()),
++            pending: false,
++        };
++        assert!(super::call_with_completion(&tool, json!({}), &ctx)
++            .await
++            .is_err());
++        assert_eq!(
++            registry.drain(std::time::Duration::ZERO).await,
++            crate::agent::tool_completion::DrainOutcome::Complete
++        );
++        let other = tier_tool_context("cancelled".into());
++        other.cancel.store(true, Ordering::SeqCst);
++        let pending = CompletionFixtureTool {
++            started: Arc::new(tokio::sync::Notify::new()),
++            pending: true,
++        };
++        assert!(super::call_with_completion(&pending, json!({}), &other)
++            .await
++            .is_err());
++        assert_eq!(
++            other
++                .owned_completion()
++                .drain(std::time::Duration::ZERO)
++                .await,
++            crate::agent::tool_completion::DrainOutcome::Complete
++        );
++    }
++
+     #[async_trait]
+     impl Tool for SchemaTool {
+         fn name(&self) -> &str {

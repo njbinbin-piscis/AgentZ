@@ -1,0 +1,47 @@
+{
+    "task": "AZ-024",
+    "revision": "closure-r7",
+    "note": "Current bytes: task-bound auxiliary calls (auto-title, post-turn memory extraction, background skill review) charged to the parent task scope; IM gateway passes an unbound scope (residual).",
+    "files": [
+        {
+            "path": "crates/agentz-task-state/src/budget.rs",
+            "sha256": "cf57287228792b20ec22454c6a7c966377c13e493687cec8089b079f3040be7d"
+        },
+        {
+            "path": "crates/agentz-task-state/src/budget_reservation.rs",
+            "sha256": "b241617756967c81b8d4ba10c3413c5e36bdf9de8c6e83ac3684a3a5c027d1e9"
+        },
+        {
+            "path": "src-tauri/src/runtime/task_budget.rs",
+            "sha256": "54d005223efa8afde6522f21c3c0aacb41d935c6c6e229918a62a2755e86f747"
+        },
+        {
+            "path": "src-tauri/src/runtime/mod.rs",
+            "sha256": "600b2f79d8b94e4ca5a8c3499d41a0a35fa587b44c95d766f81fa4fbc6097dbe"
+        },
+        {
+            "path": "src-tauri/src/commands/chat_turn.rs",
+            "sha256": "42effb39337c317c325b0516c57a51733451388d488ab14e5932de69de7ed2a2"
+        },
+        {
+            "path": "src-tauri/src/tools/delegate.rs",
+            "sha256": "50909c463b4205a31d43c715a1bb322c774ffbf2e51f2f23050edcdf3034a4b5"
+        },
+        {
+            "path": "src-tauri/src/tools/call_fish.rs",
+            "sha256": "2d88a4c42b94bd089d51750240f6da91460f088f593f97d90943cb644945dd1a"
+        },
+        {
+            "path": "src-tauri/src/commands/post_turn.rs",
+            "sha256": "62e88f0472878178fa6aad4307268350bf6c45be1532c2edba8b12379d67285a"
+        },
+        {
+            "path": "src-tauri/src/commands/skill_review.rs",
+            "sha256": "c9f89c3d4404ae048c053d0e22ae8f8680eba41749c1f88efa09f40a389c6cd1"
+        },
+        {
+            "path": "src-tauri/src/commands/gateway.rs",
+            "sha256": "951ab1da7d848f8c70d7ad14a6a9b10b76123c3d81fff0daab8c0617d648dc0e"
+        }
+    ]
+}

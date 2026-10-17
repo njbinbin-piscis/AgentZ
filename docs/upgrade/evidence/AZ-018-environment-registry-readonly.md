@@ -1,0 +1,9 @@
+# AZ-018 环境登记读取全链路只读
+
+仅修改task-state/lib.rs与本证据；load签名不变，委托新增public load_existing_readonly，workspace/approval/plan/event调用无需各自双API。register的写opener和注册语义未改变。
+
+读opener以try_exists检查，missing返回None且不创建目录/库；检查错误明确Err。SQLite以READ_ONLY打开，无create/schema初始化/修复。已有user_version必须1，version0明确要求恢复而不偷偷建表，future拒绝。检查task_id/environment_id/record为原schema要求的TEXT NOTNULL及task主键；SELECT列键与反序列化record.task_id/env_id必须一致，原record.schema/project检查保留。
+
+新增3真实SQLite夹具未运行：missing不建.agentz，register合法v1后重开load/alias/missingtask读取bytes不变；version0和future拒绝bytes不变；env列与record不一致、破损JSON、缺表拒绝bytes不变。原未来schema测试仅检查is_err，未依赖旧错误字符串。版本0既有数据库兼容策略改为显式恢复，此候选不执行恢复。
+
+实际rustfmt --config skip_children=true及限定diff-check exit0，避免递归修改run/events等其它模块。本代理未Cargo；root统一最新crate/host回归。非registered项目missing登记仍可正常走host direct binding，但readonly查询不创建登记库。不称GUI/model或损坏数据恢复验收。

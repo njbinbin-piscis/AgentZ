@@ -1,0 +1,26 @@
+{
+  "captured_at": "2026-10-10T03:59:21.340Z",
+  "scope": "Local editor identity and retained recovery draft only; no host checked-write or native GUI acceptance",
+  "files": [
+    {
+      "path": "src/workspaces/codez/editorConflict.ts",
+      "sha256": "18913faf070f34c48c1ffef4496aed0cba018f1f2b34400a7f0143e6beadf8a0"
+    },
+    {
+      "path": "src/workspaces/codez/editorConflict.test.ts",
+      "sha256": "1a186cb366b939c12b7dc9ac7434ffcb1d44515092aa2fcc8a714b104d913695"
+    },
+    {
+      "path": "src/workspaces/codez/editorRecovery.ts",
+      "sha256": "25ff29527254b07dd159f2952902557ac56c0d645a43beae8bf3f7cb030d7968"
+    },
+    {
+      "path": "src/workspaces/codez/editorRecovery.integration.test.ts",
+      "sha256": "b252966ab7da5f4367501cd14e3123be65653709c54ca86d9a30f2b86be92446"
+    },
+    {
+      "path": "src/workspaces/codez/index.tsx",
+      "sha256": "4885b81cc033d4a9499f41088255f58524a74aec719fd2f1eea85b7792e96785"
+    }
+  ]
+}

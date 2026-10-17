@@ -1,0 +1,58 @@
+{
+  "at": "2026-10-04T05:31:11.113Z",
+  "baseline": "a787b6dafba84489670d944e8339611ff0fcd563",
+  "version": "0.9.6",
+  "fixture": "C:\\Users\\zzz\\AppData\\Local\\Temp\\agentz-baseline-FpwDAB",
+  "method": "Private Git fixtures plus separately classified source traces; not a desktop E2E or model benchmark",
+  "results": [
+    {
+      "id": "F02",
+      "kind": "git_reproduction",
+      "result": "reproduced",
+      "expected": "review shows both pending files",
+      "actual": {
+        "branch_diff": "",
+        "working_status": "M tracked.txt\n?? new.txt"
+      }
+    },
+    {
+      "id": "F05-staging",
+      "kind": "git_reproduction",
+      "result": "reproduced",
+      "expected": "creating isolation does not commit user staging",
+      "actual": {
+        "initial_commit_files": "user-staged.txt"
+      }
+    },
+    {
+      "id": "F05-local-start",
+      "kind": "git_reproduction",
+      "result": "reproduced",
+      "expected": "chosen starting-state semantics are explicit",
+      "actual": {
+        "main_content": "local unsaved-to-git edit\n",
+        "worktree_content": "committed\r\n"
+      }
+    },
+    {
+      "id": "F01",
+      "kind": "source_trace",
+      "result": "confirmed_in_source_not_desktop_reproduced",
+      "files": [
+        "src/workspaces/workz/index.tsx: worktree state/ref, runRef and openTask"
+      ],
+      "note": "openTask does not restore task worktree; runRef takes current shared worktreeRef"
+    },
+    {
+      "id": "F03",
+      "kind": "source_trace",
+      "result": "confirmed_in_source_not_desktop_reproduced",
+      "files": [
+        "src-tauri/src/commands/chat.rs: journal uses agent_workspace",
+        "src/workspaces/workz/index.tsx: journalListChanges uses projectDir",
+        "src-tauri/src/commands/journal.rs: opens journal in supplied project"
+      ],
+      "note": "isolated run journal write root differs from review read root"
+    }
+  ]
+}

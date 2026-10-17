@@ -42,6 +42,18 @@ pub struct FileContent {
     /// When set, the frontend should render a media preview (`data:` URL).
     #[serde(default)]
     pub preview_data: Option<String>,
+    /// sha256 (hex) of the exact bytes on disk that `content` was decoded from.
+    /// The editor sends it back on save so a write can detect external changes.
+    #[serde(default)]
+    pub sha256: Option<String>,
+}
+
+/// Prefix of the error returned when a save would overwrite a file changed on disk.
+pub const WRITE_CONFLICT_PREFIX: &str = "conflict:";
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(bytes))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,12 +108,14 @@ pub async fn ide_list_files(
     project_dir: String,
     depth: Option<usize>,
 ) -> Result<Vec<FileNode>, String> {
-    if let Some(remote_root) = crate::remote::resolve(&project_dir).await? {
-        let v = crate::remote::call(
-            "fs.tree",
-            serde_json::json!({ "path": remote_root, "depth": depth.unwrap_or(10) }),
-        )
-        .await?;
+    if crate::remote::is_remote(&project_dir) {
+        let session = crate::remote::bind(&project_dir).await?;
+        let v = session
+            .call(
+                "fs.tree",
+                serde_json::json!({ "path": session.path, "depth": depth.unwrap_or(10) }),
+            )
+            .await?;
         let mut nodes: Vec<FileNode> = serde_json::from_value(v).map_err(|e| e.to_string())?;
         sort_file_nodes(&mut nodes);
         return Ok(nodes);
@@ -232,13 +246,22 @@ fn sort_file_nodes(nodes: &mut [FileNode]) {
 /// Read a file's content with encoding detection.
 #[tauri::command]
 pub async fn ide_read_file(
-    state: tauri::State<'_, crate::state::AppState>,
+    _state: tauri::State<'_, crate::state::AppState>,
     path: String,
 ) -> Result<FileContent, String> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
 
-    if let Some(remote_path) = super::remote::resolve_remote(&state, &path).await? {
-        let (raw, size) = super::remote::read_remote_text(&state, &remote_path).await?;
+    if crate::remote::is_remote(&path) {
+        let session = crate::remote::bind(&path).await?;
+        let value = session
+            .call("fs.readFile", serde_json::json!({ "path": session.path }))
+            .await?;
+        let encoded = value
+            .get("base64")
+            .and_then(|v| v.as_str())
+            .ok_or("bad fs.readFile reply")?;
+        let raw = STANDARD.decode(encoded).map_err(|e| e.to_string())?;
+        let size = raw.len() as u64;
         let (content, is_binary) = match String::from_utf8(raw) {
             Ok(text) => (text, false),
             Err(_) => (String::new(), true),
@@ -251,6 +274,7 @@ pub async fn ide_read_file(
             size,
             language: None,
             preview_data: None,
+            sha256: None,
         });
     }
 
@@ -281,6 +305,7 @@ pub async fn ide_read_file(
                     size,
                     language: None,
                     preview_data: Some(format!("data:image/svg+xml;base64,{encoded}")),
+                    sha256: None,
                 });
             }
         } else {
@@ -293,6 +318,7 @@ pub async fn ide_read_file(
                 size,
                 language: None,
                 preview_data: Some(format!("data:{mime};base64,{encoded}")),
+                sha256: None,
             });
         }
     }
@@ -309,6 +335,7 @@ pub async fn ide_read_file(
             size,
             language: None,
             preview_data: None,
+            sha256: None,
         });
     }
 
@@ -325,6 +352,7 @@ pub async fn ide_read_file(
         size,
         language,
         preview_data: None,
+        sha256: Some(sha256_hex(&raw)),
     })
 }
 
@@ -417,21 +445,158 @@ fn detect_language(path: &Path) -> Option<String> {
 }
 
 /// Write content to a file. Creates parent directories if needed.
+///
+/// `expected_sha256` is the digest of the bytes the caller last read. When given, the write
+/// is refused with a `conflict:` error if the file on disk no longer matches, so an external
+/// change is never overwritten silently. Local writes go through a temporary file and an
+/// atomic rename. Returns the digest of the bytes written; remote files return `None`
+/// and do not check the expectation.
 #[tauri::command]
 pub async fn ide_write_file(
-    state: tauri::State<'_, crate::state::AppState>,
+    _state: tauri::State<'_, crate::state::AppState>,
     path: String,
     content: String,
-) -> Result<(), String> {
-    if let Some(remote_path) = super::remote::resolve_remote(&state, &path).await? {
-        return super::remote::write_remote(&state, &remote_path, content.as_bytes()).await;
+    expected_sha256: Option<String>,
+) -> Result<Option<String>, String> {
+    if crate::remote::is_remote(&path) {
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        let session = crate::remote::bind(&path).await?;
+        session
+            .call("fs.writeFile", serde_json::json!({ "path": session.path, "base64": STANDARD.encode(content.as_bytes()) }))
+            .await?;
+        return Ok(None);
     }
     let file_path = PathBuf::from(&path);
+    if let Some(expected) = expected_sha256.as_deref() {
+        ensure_unchanged_since(&file_path, expected)?;
+    }
     if let Some(parent) = file_path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create directories: {}", e))?;
     }
-    std::fs::write(&file_path, content.as_bytes()).map_err(|e| format!("Failed to write: {}", e))
+    write_atomically(&file_path, content.as_bytes())
+        .map(|digest| Some(digest))
+        .map_err(|e| format!("Failed to write: {e}"))
+}
+
+/// Refuse a save when the file no longer has the digest the editor last read.
+fn ensure_unchanged_since(file_path: &Path, expected: &str) -> Result<(), String> {
+    let shown = file_path.display();
+    match std::fs::read(file_path) {
+        Ok(current) if sha256_hex(&current) == expected => Ok(()),
+        Ok(_) => Err(format!(
+            "{WRITE_CONFLICT_PREFIX} \"{shown}\" changed on disk since it was opened; reload it before saving"
+        )),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(format!(
+            "{WRITE_CONFLICT_PREFIX} \"{shown}\" was deleted on disk since it was opened"
+        )),
+        Err(e) => Err(format!("Failed to read current file: {e}")),
+    }
+}
+
+/// Write `bytes` to a sibling temporary file, flush it, then rename it over `target`.
+/// A reader sees either the old or the new complete file, never a partial write.
+fn write_atomically(target: &Path, bytes: &[u8]) -> std::io::Result<String> {
+    use std::io::Write;
+    let name = target
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "file".to_string());
+    let temp = target.with_file_name(format!(".{name}.{}.agentz-tmp", uuid::Uuid::new_v4()));
+    let result = (|| {
+        let mut file = std::fs::File::create(&temp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temp, target)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    result.map(|_| sha256_hex(bytes))
+}
+
+#[cfg(test)]
+mod write_conflict_tests {
+    use super::{ensure_unchanged_since, sha256_hex, write_atomically, WRITE_CONFLICT_PREFIX};
+
+    fn fixture(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("agentz-ide-write-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).expect("create fixture dir");
+        dir.join(name)
+    }
+
+    #[test]
+    fn save_is_refused_when_disk_changed_since_read() {
+        let file = fixture("a.txt");
+        std::fs::write(&file, b"original").unwrap();
+        let read_digest = sha256_hex(b"original");
+
+        std::fs::write(&file, b"changed by agent").unwrap();
+        let err = ensure_unchanged_since(&file, &read_digest).unwrap_err();
+        assert!(err.starts_with(WRITE_CONFLICT_PREFIX), "{err}");
+        assert_eq!(std::fs::read(&file).unwrap(), b"changed by agent");
+    }
+
+    #[test]
+    fn save_is_allowed_when_digest_matches() {
+        let file = fixture("b.txt");
+        std::fs::write(&file, b"same").unwrap();
+        assert!(ensure_unchanged_since(&file, &sha256_hex(b"same")).is_ok());
+    }
+
+    #[test]
+    fn save_is_refused_when_file_was_deleted() {
+        let file = fixture("c.txt");
+        let err = ensure_unchanged_since(&file, &sha256_hex(b"x")).unwrap_err();
+        assert!(
+            err.starts_with(WRITE_CONFLICT_PREFIX) && err.contains("deleted"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn atomic_write_replaces_content_and_leaves_no_temp_file() {
+        let file = fixture("d.txt");
+        std::fs::write(&file, b"old").unwrap();
+        let digest = write_atomically(&file, b"new content").unwrap();
+        assert_eq!(digest, sha256_hex(b"new content"));
+        assert_eq!(std::fs::read(&file).unwrap(), b"new content");
+        let leftovers: Vec<_> = std::fs::read_dir(file.parent().unwrap())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".agentz-tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "{leftovers:?}");
+    }
+}
+
+fn remote_rename_target(authority: &str, target: &str) -> Result<String, String> {
+    if !crate::remote::is_remote(target) {
+        return Ok(target.to_string());
+    }
+    let uri = crate::remote::vfs::parse(target).ok_or("invalid remote rename target URI")?;
+    if !uri.authority.eq_ignore_ascii_case(authority) {
+        return Err("remote rename target belongs to a different authority".into());
+    }
+    Ok(uri.path)
+}
+
+#[cfg(test)]
+mod remote_file_binding_tests {
+    use super::remote_rename_target;
+
+    #[test]
+    fn rename_rejects_other_authority_and_malformed_remote_uri() {
+        assert!(remote_rename_target("host-a", "agentz-remote://host-b/file").is_err());
+        assert!(remote_rename_target("host-a", "agentz-remote:///file").is_err());
+        assert_eq!(
+            remote_rename_target("host-a", "agentz-remote://HOST-A/file").unwrap(),
+            "/file"
+        );
+        assert_eq!(remote_rename_target("host-a", "/file").unwrap(), "/file");
+    }
 }
 
 /// Perform file actions: create_file, create_dir, delete, rename.
@@ -441,19 +606,30 @@ pub async fn ide_file_action(
     action: String,
     new_path: Option<String>,
 ) -> Result<(), String> {
-    if let Some(remote_path) = crate::remote::resolve(&path).await? {
+    if crate::remote::is_remote(&path) {
+        let session = crate::remote::bind(&path).await?;
+        let remote_path = &session.path;
         let (method, params) = match action.as_str() {
-            "create_file" => ("fs.writeFile", serde_json::json!({ "path": remote_path, "text": "" })),
+            "create_file" => (
+                "fs.writeFile",
+                serde_json::json!({ "path": remote_path, "text": "" }),
+            ),
             "create_dir" => ("fs.mkdir", serde_json::json!({ "path": remote_path })),
-            "delete" => ("fs.delete", serde_json::json!({ "path": remote_path, "recursive": true })),
+            "delete" => (
+                "fs.delete",
+                serde_json::json!({ "path": remote_path, "recursive": true }),
+            ),
             "rename" => {
                 let target = new_path.ok_or("rename requires 'new_path' parameter")?;
-                let to = crate::remote::resolve(&target).await?.unwrap_or(target);
-                ("fs.rename", serde_json::json!({ "from": remote_path, "to": to }))
+                let to = remote_rename_target(&session.authority, &target)?;
+                (
+                    "fs.rename",
+                    serde_json::json!({ "from": remote_path, "to": to }),
+                )
             }
             _ => return Err(format!("Unknown action: {}", action)),
         };
-        return crate::remote::call(method, params).await.map(|_| ());
+        return session.call(method, params).await.map(|_| ());
     }
     let file_path = PathBuf::from(&path);
 
@@ -505,21 +681,23 @@ pub async fn ide_search_files(
     if query.trim().is_empty() {
         return Ok(vec![]);
     }
-    if let Some(remote_root) = crate::remote::resolve(&project_dir).await? {
-        let v = crate::remote::call(
-            "search",
-            serde_json::json!({
-                "root": remote_root,
-                "query": query,
-                "filePattern": file_pattern,
-                "excludePattern": exclude_pattern,
-                "caseSensitive": case_sensitive.unwrap_or(false),
-                "wholeWord": whole_word.unwrap_or(false),
-                "useRegex": use_regex.unwrap_or(false),
-                "maxResults": 1000,
-            }),
-        )
-        .await?;
+    if crate::remote::is_remote(&project_dir) {
+        let session = crate::remote::bind(&project_dir).await?;
+        let v = session
+            .call(
+                "search",
+                serde_json::json!({
+                    "root": session.path,
+                    "query": query,
+                    "filePattern": file_pattern,
+                    "excludePattern": exclude_pattern,
+                    "caseSensitive": case_sensitive.unwrap_or(false),
+                    "wholeWord": whole_word.unwrap_or(false),
+                    "useRegex": use_regex.unwrap_or(false),
+                    "maxResults": 1000,
+                }),
+            )
+            .await?;
         return serde_json::from_value(v).map_err(|e| e.to_string());
     }
     let root = PathBuf::from(&project_dir);
@@ -808,13 +986,15 @@ pub use git_workspace::GitRepoSnapshot;
 
 // ─── Git Operations ────────────────────────────────────────────────────────
 
-type GitStatusRun =
-    futures::future::Shared<futures::future::BoxFuture<'static, Result<std::sync::Arc<Vec<u8>>, String>>>;
+type GitStatusRun = futures::future::Shared<
+    futures::future::BoxFuture<'static, Result<std::sync::Arc<Vec<u8>>, String>>,
+>;
 
 /// At most one `git status` per repo at a time; concurrent callers share its
 /// output. A refresh storm from the UI would otherwise pile up git processes.
 fn git_status_runs() -> &'static std::sync::Mutex<HashMap<PathBuf, GitStatusRun>> {
-    static RUNS: std::sync::OnceLock<std::sync::Mutex<HashMap<PathBuf, GitStatusRun>>> = std::sync::OnceLock::new();
+    static RUNS: std::sync::OnceLock<std::sync::Mutex<HashMap<PathBuf, GitStatusRun>>> =
+        std::sync::OnceLock::new();
     RUNS.get_or_init(Default::default)
 }
 
@@ -827,10 +1007,11 @@ async fn git_status_at(repo: &Path, workspace: &Path) -> Result<Vec<GitFileStatu
             .or_insert_with(|| {
                 let repo = key.clone();
                 async move {
-                    let out = run_git_cmd_bytes(&repo, &["status", "--porcelain=v1", "-z", "-uall"])
-                        .await
-                        .map(std::sync::Arc::new)
-                        .map_err(|e| format!("git status failed: {}", e));
+                    let out =
+                        run_git_cmd_bytes(&repo, &["status", "--porcelain=v1", "-z", "-uall"])
+                            .await
+                            .map(std::sync::Arc::new)
+                            .map_err(|e| format!("git status failed: {}", e));
                     git_status_runs().lock().unwrap().remove(&repo);
                     out
                 }
@@ -885,7 +1066,9 @@ pub async fn ide_git_workspace_status(project_dir: String) -> Result<Vec<GitRepo
 /// Get git status for all files in the project directory (flattened across repos).
 #[tauri::command]
 pub async fn ide_git_status(project_dir: String) -> Result<Vec<GitFileStatus>, String> {
-    if crate::remote::is_remote(&project_dir) && crate::remote::cached_git_repos(&project_dir).is_none() {
+    if crate::remote::is_remote(&project_dir)
+        && crate::remote::cached_git_repos(&project_dir).is_none()
+    {
         crate::remote::refresh_git_repos(&project_dir).await?;
     }
     let workspace = PathBuf::from(&project_dir);
@@ -905,32 +1088,66 @@ pub async fn ide_git_diff(
     base: Option<String>,
     git_root: Option<String>,
 ) -> Result<DiffResult, String> {
+    if crate::remote::is_remote(&project_dir) {
+        let session = crate::remote::bind(&project_dir).await?;
+        return crate::remote::with_session(
+            session,
+            ide_git_diff_bound(project_dir, path, base, git_root),
+        )
+        .await;
+    }
+    ide_git_diff_bound(project_dir, path, base, git_root).await
+}
+
+async fn ide_git_diff_bound(
+    project_dir: String,
+    path: String,
+    base: Option<String>,
+    git_root: Option<String>,
+) -> Result<DiffResult, String> {
+    let remote = crate::remote::is_remote(&project_dir);
     let workspace = PathBuf::from(&project_dir);
-    let (root, path_in_repo) = git_workspace::resolve_git_context_for_root(
-        &workspace,
-        &path,
-        git_root.as_deref(),
-    )?;
+    let (root, path_in_repo) =
+        git_workspace::resolve_git_context_for_root(&workspace, &path, git_root.as_deref())?;
 
     // Get original content (from HEAD or specified base)
     let base_ref = base.as_deref().unwrap_or("HEAD");
-    let original = run_git_cmd(&root, &["show", &format!("{}:{}", base_ref, path_in_repo)])
-        .await
-        .unwrap_or_default();
+    let original = if remote {
+        // A missing base entry is legitimate for an added file. Distinguish it
+        // from a failed Git read using a successful tree listing first.
+        let entries = run_git_cmd_bytes(
+            &root,
+            &[
+                "--literal-pathspecs",
+                "ls-tree",
+                "-z",
+                "--name-only",
+                base_ref,
+                "--",
+                &path_in_repo,
+            ],
+        )
+        .await?;
+        if tracked_listing_contains(&entries, &path_in_repo)? {
+            run_git_cmd(&root, &["show", &format!("{}:{}", base_ref, path_in_repo)]).await?
+        } else {
+            String::new()
+        }
+    } else {
+        run_git_cmd(&root, &["show", &format!("{}:{}", base_ref, path_in_repo)])
+            .await
+            .unwrap_or_default()
+    };
 
     // Get current content
     let full_path = root.join(&path_in_repo);
-    let modified = if let Some(remote_path) = crate::remote::resolve(&full_path.to_string_lossy()).await? {
-        crate::remote::call("fs.readFile", serde_json::json!({ "path": remote_path }))
-            .await
-            .ok()
-            .and_then(|v| v.get("base64").and_then(|b| b.as_str()).map(str::to_string))
-            .and_then(|b| {
-                use base64::Engine as _;
-                base64::engine::general_purpose::STANDARD.decode(b).ok()
-            })
-            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
-            .unwrap_or_default()
+    let modified = if crate::remote::is_remote(&full_path.to_string_lossy()) {
+        let remote_path = crate::remote::resolve(&full_path.to_string_lossy())
+            .await?
+            .ok_or("remote diff file path is not remote")?;
+        let reply =
+            crate::remote::call("fs.readFile", serde_json::json!({ "path": remote_path })).await?;
+        decode_remote_diff_text(&reply)?
     } else if full_path.exists() {
         std::fs::read_to_string(&full_path).unwrap_or_default()
     } else {
@@ -943,7 +1160,11 @@ pub async fn ide_git_diff(
     } else {
         vec!["diff", "HEAD", "--", &path_in_repo]
     };
-    let diff_output = run_git_cmd(&root, &diff_args).await.unwrap_or_default();
+    let diff_output = if remote {
+        run_git_cmd(&root, &diff_args).await?
+    } else {
+        run_git_cmd(&root, &diff_args).await.unwrap_or_default()
+    };
 
     let hunks = parse_diff_hunks(&diff_output);
 
@@ -953,6 +1174,40 @@ pub async fn ide_git_diff(
         modified,
         hunks,
     })
+}
+
+fn decode_remote_diff_text(reply: &serde_json::Value) -> Result<String, String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    let encoded = reply
+        .get("base64")
+        .and_then(|v| v.as_str())
+        .ok_or("bad remote diff file reply: missing base64")?;
+    let bytes = STANDARD
+        .decode(encoded)
+        .map_err(|e| format!("bad remote diff file reply: {e}"))?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+#[cfg(test)]
+mod remote_diff_reply_tests {
+    use super::decode_remote_diff_text;
+    use serde_json::json;
+
+    #[test]
+    fn missing_or_corrupt_content_is_not_an_empty_success() {
+        assert!(decode_remote_diff_text(&json!({})).is_err());
+        assert!(decode_remote_diff_text(&json!({"base64": null})).is_err());
+        assert!(decode_remote_diff_text(&json!({"base64": "%%%"})).is_err());
+        assert_eq!(decode_remote_diff_text(&json!({"base64": ""})).unwrap(), "");
+    }
+
+    #[test]
+    fn valid_remote_text_is_decoded() {
+        assert_eq!(
+            decode_remote_diff_text(&json!({"base64": "aGVsbG8="})).unwrap(),
+            "hello"
+        );
+    }
 }
 
 fn parse_diff_hunks(diff: &str) -> Vec<DiffHunk> {
@@ -1046,6 +1301,7 @@ pub async fn ide_git_file_at_ref(
         size: 0,
         language,
         preview_data: None,
+        sha256: None,
     })
 }
 
@@ -1075,15 +1331,35 @@ pub async fn ide_git_discard(
     path: String,
     git_root: Option<String>,
 ) -> Result<(), String> {
+    if crate::remote::is_remote(&project_dir) {
+        let session = crate::remote::bind(&project_dir).await?;
+        return crate::remote::with_session(
+            session,
+            ide_git_discard_bound(project_dir, path, git_root),
+        )
+        .await;
+    }
+    ide_git_discard_bound(project_dir, path, git_root).await
+}
+
+async fn ide_git_discard_bound(
+    project_dir: String,
+    path: String,
+    git_root: Option<String>,
+) -> Result<(), String> {
     let workspace = PathBuf::from(&project_dir);
     let (root, path_in_repo) =
         git_workspace::resolve_git_context_for_root(&workspace, &path, git_root.as_deref())?;
 
-    // Is the path tracked? `git ls-files --error-unmatch` exits non-zero for
-    // untracked paths (run_git_cmd returns Err in that case).
-    let tracked = run_git_cmd(&root, &["ls-files", "--error-unmatch", "--", &path_in_repo])
-        .await
-        .is_ok();
+    // Only a successful, NUL-delimited listing can establish that a path is
+    // untracked. Permission, transport and repository failures must not delete.
+    let tracked_paths = run_git_cmd_bytes(
+        &root,
+        &["--literal-pathspecs", "ls-files", "-z", "--", &path_in_repo],
+    )
+    .await
+    .map_err(|e| format!("git discard tracking check failed: {e}"))?;
+    let tracked = tracked_listing_contains(&tracked_paths, &path_in_repo)?;
 
     if tracked {
         run_git_cmd(&root, &["checkout", "HEAD", "--", &path_in_repo])
@@ -1092,9 +1368,18 @@ pub async fn ide_git_discard(
     } else {
         // Untracked — delete the file (or directory) from the working tree.
         let abs = root.join(&path_in_repo);
-        if let Some(remote_path) = crate::remote::resolve(&abs.to_string_lossy()).await? {
-            crate::remote::call("fs.delete", serde_json::json!({ "path": remote_path, "recursive": true }))
-                .await?;
+        if crate::remote::is_remote(&abs.to_string_lossy()) {
+            // Resolve and call inside the command's original session scope.
+            // A reconnect must not turn a failed tracked-file probe into a
+            // deletion on the replacement connection.
+            let remote_path = crate::remote::resolve(&abs.to_string_lossy())
+                .await?
+                .ok_or("remote discard path is not remote")?;
+            crate::remote::call(
+                "fs.delete",
+                serde_json::json!({ "path": remote_path, "recursive": true }),
+            )
+            .await?;
         } else if abs.is_dir() {
             std::fs::remove_dir_all(&abs).map_err(|e| format!("remove dir failed: {}", e))?;
         } else if abs.exists() {
@@ -1102,6 +1387,51 @@ pub async fn ide_git_discard(
         }
     }
     Ok(())
+}
+
+fn tracked_listing_contains(output: &[u8], path: &str) -> Result<bool, String> {
+    if output.is_empty() {
+        return Ok(false);
+    }
+    if output.last() != Some(&0) {
+        return Err("git discard tracking reply is not NUL-terminated".into());
+    }
+    let exact = path.as_bytes();
+    let directory = format!("{}/", path.trim_end_matches('/'));
+    let records: Vec<&[u8]> = output[..output.len() - 1].split(|b| *b == 0).collect();
+    if records.iter().any(|record| record.is_empty()) {
+        return Err("git discard tracking reply contains an empty path".into());
+    }
+    if records
+        .iter()
+        .any(|record| *record != exact && !record.starts_with(directory.as_bytes()))
+    {
+        return Err("git discard tracking reply contains an unrelated path".into());
+    }
+    Ok(true)
+}
+
+#[cfg(test)]
+mod discard_tracking_tests {
+    use super::tracked_listing_contains;
+
+    #[test]
+    fn nul_listing_preserves_unicode_newlines_and_literal_names() {
+        assert!(
+            tracked_listing_contains("目录/换\n行[1].rs\0".as_bytes(), "目录/换\n行[1].rs")
+                .unwrap()
+        );
+        assert!(tracked_listing_contains(b"src/file.rs\0", "src").unwrap());
+        assert!(tracked_listing_contains(b"other.rs\0", "file.rs").is_err());
+        assert!(!tracked_listing_contains(b"", "file.rs").unwrap());
+    }
+
+    #[test]
+    fn malformed_listing_cannot_authorize_deletion() {
+        assert!(tracked_listing_contains(b"file.rs", "file.rs").is_err());
+        assert!(tracked_listing_contains(b"\0", "file.rs").is_err());
+        assert!(tracked_listing_contains(b"file.rs\0\0", "file.rs").is_err());
+    }
 }
 
 /// Unstage files (`git reset HEAD -- <path>`).
@@ -1208,6 +1538,8 @@ pub struct TerminalSession {
     pub output: Arc<std::sync::Mutex<TerminalOutputLog>>,
     /// Kept for resizing; dropping it closes the PTY.
     pub master: Box<dyn portable_pty::MasterPty + Send>,
+    /// Contains the shell and its descendants; terminating it kills the whole tree.
+    pub job: TerminalJob,
 }
 
 impl TerminalRegistry {
@@ -1224,6 +1556,19 @@ impl Default for TerminalRegistry {
     }
 }
 
+/// A racing create must never replace an owned PTY without its teardown path.
+fn register_terminal_session(
+    registry: &mut TerminalRegistry,
+    terminal_id: String,
+    session: TerminalSession,
+) -> Result<(), TerminalSession> {
+    if registry.sessions.contains_key(&terminal_id) {
+        return Err(session);
+    }
+    registry.sessions.insert(terminal_id, session);
+    Ok(())
+}
+
 /// Create a new PTY terminal session with the given working directory.
 /// Output is streamed via `ide-terminal-output` Tauri events.
 #[tauri::command]
@@ -1235,13 +1580,24 @@ pub async fn ide_terminal_create(
     cols: Option<u16>,
     rows: Option<u16>,
 ) -> Result<(), String> {
-    let remote_cwd = crate::remote::resolve(&project_dir).await?;
-    let remote_target = match &remote_cwd {
-        Some(_) => Some(state.ext_host.target().await.ok_or("remote is not connected")?),
-        None => None,
+    // A duplicate id must never replace a live session: replacing drops its
+    // PTY handles without running the normal teardown path.
+    if state
+        .terminals
+        .lock()
+        .await
+        .sessions
+        .contains_key(&terminal_id)
+    {
+        return Err(format!("Terminal '{terminal_id}' already exists"));
+    }
+    let remote_session = if crate::remote::is_remote(&project_dir) {
+        Some(crate::remote::bind(&project_dir).await?)
+    } else {
+        None
     };
     let root = PathBuf::from(&project_dir);
-    if remote_cwd.is_none() && !root.exists() {
+    if remote_session.is_none() && !root.exists() {
         return Err(format!("Directory not found: {}", project_dir));
     }
 
@@ -1262,14 +1618,16 @@ pub async fn ide_terminal_create(
     let shell = "powershell.exe".to_string();
     #[cfg(not(windows))]
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_string());
-    let mut cmd = match (&remote_target, &remote_cwd) {
-        (Some(target), Some(cwd)) => {
-            let argv = target.interactive_shell_argv(cwd);
+    let mut cmd = match &remote_session {
+        Some(session) => {
+            // The target was captured with the URI's authority and generation.
+            // Never consult a replacement connection for this terminal's argv.
+            let argv = session.target.interactive_shell_argv(&session.path);
             let mut c = CommandBuilder::new(&argv[0]);
             c.args(&argv[1..]);
             c
         }
-        _ => {
+        None => {
             let mut c = CommandBuilder::new(shell);
             c.cwd(&root);
             c
@@ -1278,35 +1636,48 @@ pub async fn ide_terminal_create(
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
 
-    let child = pair
+    let mut child = pair
         .slave
         .spawn_command(cmd)
         .map_err(|e| format!("Failed to spawn shell: {}", e))?;
+    // Contain the shell right after spawn. If containment fails, the tree could not be
+    // torn down later, so kill the shell now and report the error.
+    let job = match contain_shell(&*child) {
+        Ok(job) => job,
+        Err(e) => {
+            return Err(match child.kill() {
+                Ok(()) => {
+                    let _ = child.wait();
+                    format!("Failed to contain shell process: {e}")
+                }
+                Err(kill_error) => format!(
+                    "Failed to contain shell process: {e}; failed to kill uncontained shell: {kill_error}"
+                ),
+            });
+        }
+    };
 
-    let reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|e| format!("Failed to clone PTY reader: {}", e))?;
-
-    let writer = pair
-        .master
-        .take_writer()
-        .map_err(|e| format!("Failed to take PTY writer: {}", e))?;
+    let (reader, writer) = acquire_terminal_io(pair.master.as_ref(), child.as_mut(), &job, None)?;
 
     let output_log = Arc::new(std::sync::Mutex::new(TerminalOutputLog::default()));
 
-    // Register the session
-    {
+    let session = TerminalSession {
+        child,
+        writer: Some(writer),
+        output: output_log.clone(),
+        master: pair.master,
+        job,
+    };
+    let duplicate = {
         let mut registry = state.terminals.lock().await;
-        registry.sessions.insert(
-            terminal_id.clone(),
-            TerminalSession {
-                child,
-                writer: Some(writer),
-                output: output_log.clone(),
-                master: pair.master,
-            },
-        );
+        register_terminal_session(&mut registry, terminal_id.clone(), session).err()
+    };
+    if let Some(mut duplicate) = duplicate {
+        return Err(terminate_failed_terminal_setup(
+            duplicate.child.as_mut(),
+            &duplicate.job,
+            format!("Terminal '{terminal_id}' already exists"),
+        ));
     }
 
     // Spawn output reader task
@@ -1377,26 +1748,293 @@ pub async fn ide_terminal_resize(
         .ok_or_else(|| format!("Terminal '{}' not found", terminal_id))?;
     session
         .master
-        .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+        .resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|e| format!("Resize failed: {}", e))
 }
 
-/// Destroy a terminal session.
+/// Process containment for a terminal's shell. On Windows this is a Job Object with
+/// kill-on-close: the shell and every process it spawned belong to the job, so
+/// terminating the job reaches the whole tree even after the shell has exited.
+/// Teardown needs no pid, which may already be dead or reused by then.
+#[cfg(windows)]
+pub struct TerminalJob(windows_sys::Win32::Foundation::HANDLE);
+
+// SAFETY: a job handle is a kernel object reference usable from any thread. The
+// wrapper owns the handle and closes it exactly once, in Drop.
+#[cfg(windows)]
+unsafe impl Send for TerminalJob {}
+#[cfg(windows)]
+unsafe impl Sync for TerminalJob {}
+
+#[cfg(windows)]
+impl TerminalJob {
+    /// Create a kill-on-close job and assign the process with `pid` to it.
+    fn adopt(pid: u32) -> Result<Self, String> {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        use windows_sys::Win32::System::JobObjects::{
+            AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+            SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        };
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
+        };
+
+        // SAFETY: each handle is checked before use. The job is wrapped as soon as it is
+        // created, so every later error path closes it through Drop.
+        unsafe {
+            let handle = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            if handle.is_null() {
+                return Err(format!(
+                    "CreateJobObjectW failed: {}",
+                    std::io::Error::last_os_error()
+                ));
+            }
+            let job = TerminalJob(handle);
+
+            let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            let configured = SetInformationJobObject(
+                job.0,
+                JobObjectExtendedLimitInformation,
+                &info as *const _ as *const std::ffi::c_void,
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            );
+            if configured == 0 {
+                return Err(format!(
+                    "SetInformationJobObject failed: {}",
+                    std::io::Error::last_os_error()
+                ));
+            }
+
+            let process = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, pid);
+            if process.is_null() {
+                return Err(format!(
+                    "OpenProcess({pid}) failed: {}",
+                    std::io::Error::last_os_error()
+                ));
+            }
+            let assigned = AssignProcessToJobObject(job.0, process);
+            let assign_error = std::io::Error::last_os_error();
+            CloseHandle(process);
+            if assigned == 0 {
+                return Err(format!("AssignProcessToJobObject failed: {assign_error}"));
+            }
+            Ok(job)
+        }
+    }
+
+    /// Terminate every process in the job, including the shell. An empty job succeeds.
+    fn terminate(&self) -> Result<(), String> {
+        use windows_sys::Win32::System::JobObjects::TerminateJobObject;
+
+        // SAFETY: `self.0` is a valid job handle owned by `self`.
+        if unsafe { TerminateJobObject(self.0, 1) } == 0 {
+            return Err(format!(
+                "TerminateJobObject failed: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        Ok(())
+    }
+
+    /// Number of processes still alive in the job (descendants included).
+    fn active_processes(&self) -> Result<u32, String> {
+        use windows_sys::Win32::System::JobObjects::{
+            JobObjectBasicAccountingInformation, QueryInformationJobObject,
+            JOBOBJECT_BASIC_ACCOUNTING_INFORMATION,
+        };
+
+        // SAFETY: `info` is a plain-old-data struct sized for the requested class, and
+        // `self.0` is a valid job handle owned by `self`.
+        unsafe {
+            let mut info: JOBOBJECT_BASIC_ACCOUNTING_INFORMATION = std::mem::zeroed();
+            let mut returned: u32 = 0;
+            if QueryInformationJobObject(
+                self.0,
+                JobObjectBasicAccountingInformation,
+                &mut info as *mut _ as *mut std::ffi::c_void,
+                std::mem::size_of::<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>() as u32,
+                &mut returned,
+            ) == 0
+            {
+                return Err(format!(
+                    "QueryInformationJobObject failed: {}",
+                    std::io::Error::last_os_error()
+                ));
+            }
+            Ok(info.ActiveProcesses)
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for TerminalJob {
+    fn drop(&mut self) {
+        // SAFETY: the handle is owned by this wrapper and closed only here.
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.0);
+        }
+    }
+}
+
+/// Non-Windows shells are torn down through their PTY child; there is no job object.
+#[cfg(not(windows))]
+pub struct TerminalJob;
+
+#[cfg(not(windows))]
+impl TerminalJob {
+    fn terminate(&self) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn active_processes(&self) -> Result<u32, String> {
+        Ok(0)
+    }
+}
+
+/// Put a freshly spawned shell under process containment. A failure means the tree
+/// cannot be torn down reliably, so the caller must kill the shell and report the error.
+///
+/// Known limit: assignment happens just after spawn. A process the shell starts before
+/// assignment (for example from a profile script) is outside the job and is not reached
+/// by `TerminateJobObject`. The window is milliseconds and the shell is idle at spawn.
+/// Processes that break away from the job (`CREATE_BREAKAWAY_FROM_JOB`) are not covered.
+#[cfg(windows)]
+fn contain_shell(child: &dyn portable_pty::Child) -> Result<TerminalJob, String> {
+    let pid = child
+        .process_id()
+        .ok_or_else(|| "shell has no process id".to_string())?;
+    TerminalJob::adopt(pid)
+}
+
+#[cfg(not(windows))]
+fn contain_shell(_child: &dyn portable_pty::Child) -> Result<TerminalJob, String> {
+    Ok(TerminalJob)
+}
+
+/// Terminate a PTY session's shell and every process it spawned (dev servers,
+/// watchers, ...). Idempotent. Returns `Err` when the tree may still be running, and the
+/// caller keeps the session so the close can be retried. The job reaches descendants even
+/// after the shell has exited, so a retry never depends on a stale pid.
+fn terminate_terminal_tree(
+    child: &mut dyn portable_pty::Child,
+    job: &TerminalJob,
+) -> Result<(), String> {
+    const TEARDOWN_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+    job.terminate()?;
+    if wait_for_tree_exit(child, job, TEARDOWN_WAIT)? {
+        return Ok(());
+    }
+
+    // The job did not empty in time: kill the shell root directly and wait once more.
+    if let Err(e) = child.kill() {
+        if !matches!(child.try_wait(), Ok(Some(_))) {
+            return Err(format!("failed to kill terminal shell: {e}"));
+        }
+    }
+    if wait_for_tree_exit(child, job, TEARDOWN_WAIT)? {
+        return Ok(());
+    }
+    Err(format!(
+        "terminal process tree still running after {}s",
+        TEARDOWN_WAIT.as_secs()
+    ))
+}
+
+/// Preserve teardown failures on all post-spawn setup paths. Otherwise a failed
+/// reader/writer acquisition or a racing duplicate can leave a shell running
+/// while reporting only the original setup error.
+fn terminate_failed_terminal_setup(
+    child: &mut dyn portable_pty::Child,
+    job: &TerminalJob,
+    cause: String,
+) -> String {
+    match terminate_terminal_tree(child, job) {
+        Ok(()) => cause,
+        Err(teardown_error) => format!("{cause}; terminal cleanup failed: {teardown_error}"),
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TerminalIoFault {
+    Reader,
+    Writer,
+}
+
+type TerminalReader = Box<dyn std::io::Read + Send>;
+type TerminalWriter = Box<dyn std::io::Write + Send>;
+
+/// Keep both post-spawn acquisition failures on the same cleanup path.
+/// Fault injection exercises the exact branch with a live contained PTY.
+fn acquire_terminal_io(
+    master: &dyn portable_pty::MasterPty,
+    child: &mut dyn portable_pty::Child,
+    job: &TerminalJob,
+    fault: Option<TerminalIoFault>,
+) -> Result<(TerminalReader, TerminalWriter), String> {
+    let reader = if fault == Some(TerminalIoFault::Reader) {
+        Err("injected reader failure".to_string())
+    } else {
+        master.try_clone_reader().map_err(|e| e.to_string())
+    };
+    let reader = reader.map_err(|e| {
+        terminate_failed_terminal_setup(child, job, format!("Failed to clone PTY reader: {e}"))
+    })?;
+    let writer = if fault == Some(TerminalIoFault::Writer) {
+        Err("injected writer failure".to_string())
+    } else {
+        master.take_writer().map_err(|e| e.to_string())
+    };
+    let writer = writer.map_err(|e| {
+        terminate_failed_terminal_setup(child, job, format!("Failed to take PTY writer: {e}"))
+    })?;
+    Ok((reader, writer))
+}
+
+/// Poll until the shell has exited and the job holds no live process, or `timeout` passes.
+/// Returns `Ok(true)` when the tree is gone.
+fn wait_for_tree_exit(
+    child: &mut dyn portable_pty::Child,
+    job: &TerminalJob,
+    timeout: std::time::Duration,
+) -> Result<bool, String> {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        let shell_exited = matches!(child.try_wait(), Ok(Some(_)));
+        if shell_exited && job.active_processes()? == 0 {
+            return Ok(true);
+        }
+        if std::time::Instant::now() >= deadline {
+            return Ok(false);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+}
+
+/// Destroy a terminal session. Idempotent: a missing session is already gone.
+/// If the process tree cannot be terminated the session stays registered so
+/// the close can be retried, and the error is returned to the caller.
 #[tauri::command]
 pub async fn ide_terminal_destroy(
     state: State<'_, AppState>,
     terminal_id: String,
 ) -> Result<(), String> {
     let mut registry = state.terminals.lock().await;
-    if let Some(mut session) = registry.sessions.remove(&terminal_id) {
-        // Drop writer to signal EOF
-        session.writer.take();
-        // Kill the process
-        let _ = session.child.kill();
-        Ok(())
-    } else {
-        Err(format!("Terminal '{}' not found", terminal_id))
-    }
+    let Some(session) = registry.sessions.get_mut(&terminal_id) else {
+        return Ok(());
+    };
+    // Drop writer to signal EOF
+    session.writer.take();
+    terminate_terminal_tree(session.child.as_mut(), &session.job)?;
+    registry.sessions.remove(&terminal_id);
+    Ok(())
 }
 
 /// Number of live PTY terminal sessions.
@@ -1406,15 +2044,68 @@ pub async fn ide_terminal_count(state: State<'_, AppState>) -> Result<usize, Str
     Ok(registry.sessions.len())
 }
 
+/// Aggregate owned PTY resources without exposing terminal IDs or shell output.
+/// An unavailable job census is explicit; it must not be mistaken for zero.
+#[derive(Debug, Serialize)]
+pub struct TerminalResourceSnapshot {
+    pub registered_sessions: usize,
+    pub active_processes: Option<u64>,
+    pub query_failures: usize,
+}
+
+fn terminal_resource_snapshot(registry: &TerminalRegistry) -> TerminalResourceSnapshot {
+    let mut active_processes = 0u64;
+    let mut query_failures = 0usize;
+    #[cfg(windows)]
+    for session in registry.sessions.values() {
+        match session.job.active_processes() {
+            Ok(count) => active_processes += u64::from(count),
+            Err(_) => query_failures += 1,
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = registry;
+    TerminalResourceSnapshot {
+        registered_sessions: registry.sessions.len(),
+        active_processes: if cfg!(windows) && query_failures == 0 {
+            Some(active_processes)
+        } else {
+            None
+        },
+        query_failures,
+    }
+}
+
+#[tauri::command]
+pub async fn ide_terminal_resource_snapshot(
+    state: State<'_, AppState>,
+) -> Result<TerminalResourceSnapshot, String> {
+    let registry = state.terminals.lock().await;
+    Ok(terminal_resource_snapshot(&registry))
+}
+
 /// Terminate every terminal session (e.g. when closing the project).
+/// Sessions whose process tree could not be terminated stay registered and
+/// their failures are returned to the caller.
 #[tauri::command]
 pub async fn ide_terminal_destroy_all(state: State<'_, AppState>) -> Result<(), String> {
     let mut registry = state.terminals.lock().await;
-    for (_, mut session) in registry.sessions.drain() {
+    let mut failures = Vec::new();
+    registry.sessions.retain(|id, session| {
         session.writer.take();
-        let _ = session.child.kill();
+        match terminate_terminal_tree(session.child.as_mut(), &session.job) {
+            Ok(()) => false,
+            Err(e) => {
+                failures.push(format!("terminal '{id}': {e}"));
+                true
+            }
+        }
+    });
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(failures.join("; "))
     }
-    Ok(())
 }
 
 /// Whether the PTY shell process for a session is still running.
@@ -1498,6 +2189,351 @@ pub async fn terminal_snippet_put(
     Ok(id)
 }
 
+#[cfg(test)]
+mod terminal_tree_tests {
+    use super::{
+        acquire_terminal_io, contain_shell, register_terminal_session, terminal_resource_snapshot,
+        terminate_failed_terminal_setup, terminate_terminal_tree, TerminalIoFault, TerminalJob,
+        TerminalOutputLog, TerminalRegistry, TerminalSession,
+    };
+    use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+    use std::time::{Duration, Instant};
+
+    /// Open a real PTY and spawn `cmd` in it. The master must stay alive for
+    /// as long as the session is used, exactly as `ide_terminal_create` does.
+    fn spawn_pty(
+        cmd: CommandBuilder,
+    ) -> (
+        Box<dyn portable_pty::Child + Send>,
+        Box<dyn portable_pty::MasterPty + Send>,
+    ) {
+        let pair = native_pty_system()
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .expect("open pty");
+        let child = pair.slave.spawn_command(cmd).expect("spawn pty child");
+        (child, pair.master)
+    }
+
+    /// Spawn a shell and contain it, as `ide_terminal_create` does.
+    fn spawn_contained(
+        cmd: CommandBuilder,
+    ) -> (
+        Box<dyn portable_pty::Child + Send>,
+        Box<dyn portable_pty::MasterPty + Send>,
+        TerminalJob,
+    ) {
+        let (child, master) = spawn_pty(cmd);
+        let job = contain_shell(&*child).expect("contain shell");
+        (child, master, job)
+    }
+
+    fn sleeping_session() -> TerminalSession {
+        #[cfg(windows)]
+        let mut cmd = CommandBuilder::new("powershell.exe");
+        #[cfg(windows)]
+        cmd.args(["-NoProfile", "-Command", "Start-Sleep -Seconds 30"]);
+        #[cfg(not(windows))]
+        let mut cmd = CommandBuilder::new("sh");
+        #[cfg(not(windows))]
+        cmd.args(["-c", "sleep 30"]);
+        let (mut child, master, job) = spawn_contained(cmd);
+        let (_reader, writer) =
+            acquire_terminal_io(master.as_ref(), child.as_mut(), &job, None).unwrap();
+        TerminalSession {
+            child,
+            writer: Some(writer),
+            output: std::sync::Arc::new(std::sync::Mutex::new(TerminalOutputLog::default())),
+            master,
+            job,
+        }
+    }
+
+    #[test]
+    fn setup_failure_terminates_spawned_shell() {
+        #[cfg(windows)]
+        let mut cmd = CommandBuilder::new("powershell.exe");
+        #[cfg(windows)]
+        cmd.args(["-NoProfile", "-Command", "Start-Sleep -Seconds 30"]);
+        #[cfg(not(windows))]
+        let mut cmd = CommandBuilder::new("sh");
+        #[cfg(not(windows))]
+        cmd.args(["-c", "sleep 30"]);
+        let (mut child, _master, job) = spawn_contained(cmd);
+        let error =
+            terminate_failed_terminal_setup(child.as_mut(), &job, "injected writer failure".into());
+        assert_eq!(error, "injected writer failure");
+        assert!(child.try_wait().expect("query shell exit").is_some());
+        assert_eq!(job.active_processes().expect("query job"), 0);
+    }
+
+    #[test]
+    fn reader_and_writer_acquisition_failures_reap_the_shell() {
+        for fault in [TerminalIoFault::Reader, TerminalIoFault::Writer] {
+            #[cfg(windows)]
+            let mut cmd = CommandBuilder::new("powershell.exe");
+            #[cfg(windows)]
+            cmd.args(["-NoProfile", "-Command", "Start-Sleep -Seconds 30"]);
+            #[cfg(not(windows))]
+            let mut cmd = CommandBuilder::new("sh");
+            #[cfg(not(windows))]
+            cmd.args(["-c", "sleep 30"]);
+            let (mut child, master, job) = spawn_contained(cmd);
+            let error =
+                match acquire_terminal_io(master.as_ref(), child.as_mut(), &job, Some(fault)) {
+                    Err(error) => error,
+                    Ok(_) => panic!("injected fault should fail"),
+                };
+            assert!(error.contains("injected"), "{error}");
+            assert!(child.try_wait().expect("query shell exit").is_some());
+            assert_eq!(job.active_processes().expect("query job"), 0);
+        }
+    }
+
+    #[test]
+    fn duplicate_registration_preserves_first_shell_and_reaps_second() {
+        let mut registry = TerminalRegistry::new();
+        register_terminal_session(&mut registry, "same-id".into(), sleeping_session())
+            .unwrap_or_else(|_| panic!("first registration failed"));
+        let live = terminal_resource_snapshot(&registry);
+        assert_eq!(live.registered_sessions, 1);
+        #[cfg(windows)]
+        assert_eq!(live.active_processes, Some(1));
+        let mut rejected =
+            match register_terminal_session(&mut registry, "same-id".into(), sleeping_session()) {
+                Err(rejected) => rejected,
+                Ok(()) => panic!("duplicate replaced the first session"),
+            };
+        let error = terminate_failed_terminal_setup(
+            rejected.child.as_mut(),
+            &rejected.job,
+            "Terminal 'same-id' already exists".into(),
+        );
+        assert!(error.contains("already exists"), "{error}");
+        assert!(rejected
+            .child
+            .try_wait()
+            .expect("query rejected shell")
+            .is_some());
+        assert_eq!(
+            rejected.job.active_processes().expect("query rejected job"),
+            0
+        );
+        assert_eq!(registry.sessions.len(), 1);
+        let after_rejection = terminal_resource_snapshot(&registry);
+        assert_eq!(after_rejection.registered_sessions, 1);
+        #[cfg(windows)]
+        assert_eq!(after_rejection.active_processes, Some(1));
+        let first = registry.sessions.get_mut("same-id").unwrap();
+        assert!(first.child.try_wait().expect("query first shell").is_none());
+        terminate_terminal_tree(first.child.as_mut(), &first.job).expect("reap first shell");
+        registry.sessions.remove("same-id");
+        let closed = terminal_resource_snapshot(&registry);
+        assert_eq!(closed.registered_sessions, 0);
+        #[cfg(windows)]
+        assert_eq!(closed.active_processes, Some(0));
+    }
+
+    #[test]
+    fn simultaneous_terminal_registrations_keep_one_owned_shell() {
+        use std::sync::{Arc, Barrier};
+
+        let registry = Arc::new(tokio::sync::Mutex::new(TerminalRegistry::new()));
+        let barrier = Arc::new(Barrier::new(2));
+        let contenders: Vec<_> = (0..2)
+            .map(|_| {
+                let registry = Arc::clone(&registry);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    let session = sleeping_session();
+                    barrier.wait();
+                    let mut guard = registry.blocking_lock();
+                    let registered =
+                        register_terminal_session(&mut guard, "race-id".into(), session);
+                    drop(guard);
+                    match registered {
+                        Ok(()) => true,
+                        Err(mut rejected) => {
+                            terminate_failed_terminal_setup(
+                                rejected.child.as_mut(),
+                                &rejected.job,
+                                "duplicate race".into(),
+                            );
+                            assert_eq!(rejected.job.active_processes().unwrap(), 0);
+                            false
+                        }
+                    }
+                })
+            })
+            .collect();
+        let successes: usize = contenders
+            .into_iter()
+            .map(|handle| usize::from(handle.join().unwrap()))
+            .sum();
+        assert_eq!(successes, 1);
+        let mut guard = registry.blocking_lock();
+        let live = terminal_resource_snapshot(&guard);
+        assert_eq!(live.registered_sessions, 1);
+        #[cfg(windows)]
+        assert_eq!(live.active_processes, Some(1));
+        let mut winner = guard.sessions.remove("race-id").unwrap();
+        terminate_terminal_tree(winner.child.as_mut(), &winner.job).unwrap();
+        assert_eq!(winner.job.active_processes().unwrap(), 0);
+        assert_eq!(terminal_resource_snapshot(&guard).registered_sessions, 0);
+    }
+
+    #[test]
+    fn terminate_is_idempotent_for_exited_shell() {
+        #[cfg(windows)]
+        let cmd = {
+            let mut c = CommandBuilder::new("cmd.exe");
+            c.args(["/C", "exit 0"]);
+            c
+        };
+        #[cfg(not(windows))]
+        let cmd = {
+            let mut c = CommandBuilder::new("sh");
+            c.args(["-c", "exit 0"]);
+            c
+        };
+        let (mut child, _master, job) = spawn_contained(cmd);
+        child.wait().expect("wait for shell exit");
+        assert!(terminate_terminal_tree(child.as_mut(), &job).is_ok());
+        assert!(terminate_terminal_tree(child.as_mut(), &job).is_ok());
+    }
+
+    #[cfg(windows)]
+    fn pid_alive(pid: u32) -> bool {
+        let filter = format!("PID eq {pid}");
+        let out = piscis_kernel::proc::std_command("tasklist")
+            .args(["/FI", filter.as_str(), "/FO", "CSV", "/NH"])
+            .output()
+            .expect("run tasklist");
+        // A matching row is CSV with the PID quoted; the "no tasks" INFO line is not.
+        String::from_utf8_lossy(&out.stdout).contains(&format!(",\"{pid}\""))
+    }
+
+    /// Real process-tree case on Windows: the PTY shell starts a grandchild
+    /// (`ping`), we close the terminal and assert the grandchild is gone too.
+    #[cfg(windows)]
+    #[test]
+    fn terminate_kills_descendant_processes_on_windows() {
+        let pid_file =
+            std::env::temp_dir().join(format!("agentz-term-{}.pid", uuid::Uuid::new_v4()));
+        let script = format!(
+            "$p = Start-Process -PassThru ping -ArgumentList '-n','300','127.0.0.1'; \
+             Set-Content -LiteralPath '{}' -Value $p.Id; Start-Sleep -Seconds 300",
+            pid_file.display()
+        );
+        let mut cmd = CommandBuilder::new("powershell.exe");
+        cmd.args(["-NoProfile", "-NonInteractive", "-Command", script.as_str()]);
+        let (mut child, _master, job) = spawn_contained(cmd);
+
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let descendant = loop {
+            if let Some(pid) = std::fs::read_to_string(&pid_file)
+                .ok()
+                .and_then(|t| t.trim().parse::<u32>().ok())
+            {
+                break pid;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "shell never published a descendant pid"
+            );
+            std::thread::sleep(Duration::from_millis(200));
+        };
+        let _ = std::fs::remove_file(&pid_file);
+        assert!(pid_alive(descendant), "descendant should run before close");
+
+        let result = terminate_terminal_tree(child.as_mut(), &job);
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while pid_alive(descendant) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let survived = pid_alive(descendant);
+        if survived {
+            // Best-effort cleanup so a failing run does not leave `ping` behind.
+            let pid = descendant.to_string();
+            let _ = piscis_kernel::proc::std_command("taskkill")
+                .args(["/F", "/PID", pid.as_str()])
+                .output();
+        }
+        assert!(result.is_ok(), "terminate failed: {result:?}");
+        assert!(
+            matches!(child.try_wait(), Ok(Some(_))),
+            "shell should have exited"
+        );
+        assert!(!survived, "descendant {descendant} survived terminal close");
+    }
+
+    /// Regression for the failed-close retry: the shell is gone (root killed, as after a
+    /// partial taskkill) but a descendant survives. The job must still reach it, with
+    /// no pid lookup involved.
+    #[cfg(windows)]
+    #[test]
+    fn terminate_reaches_descendants_after_shell_exits() {
+        let pid_file =
+            std::env::temp_dir().join(format!("agentz-term-{}.pid", uuid::Uuid::new_v4()));
+        let script = format!(
+            "$p = Start-Process -PassThru ping -ArgumentList '-n','300','127.0.0.1'; \
+             Set-Content -LiteralPath '{}' -Value $p.Id; Start-Sleep -Seconds 300",
+            pid_file.display()
+        );
+        let mut cmd = CommandBuilder::new("powershell.exe");
+        cmd.args(["-NoProfile", "-NonInteractive", "-Command", script.as_str()]);
+        let (mut child, _master, job) = spawn_contained(cmd);
+
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let descendant = loop {
+            if let Some(pid) = std::fs::read_to_string(&pid_file)
+                .ok()
+                .and_then(|t| t.trim().parse::<u32>().ok())
+            {
+                break pid;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "shell never published a descendant pid"
+            );
+            std::thread::sleep(Duration::from_millis(200));
+        };
+        let _ = std::fs::remove_file(&pid_file);
+
+        // Kill only the shell, leaving the descendant running.
+        child.kill().expect("kill shell root");
+        child.wait().expect("reap shell root");
+        assert!(
+            pid_alive(descendant),
+            "descendant should outlive the shell root"
+        );
+
+        let result = terminate_terminal_tree(child.as_mut(), &job);
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while pid_alive(descendant) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let survived = pid_alive(descendant);
+        if survived {
+            let pid = descendant.to_string();
+            let _ = piscis_kernel::proc::std_command("taskkill")
+                .args(["/F", "/PID", pid.as_str()])
+                .output();
+        }
+        assert!(result.is_ok(), "terminate failed: {result:?}");
+        assert!(
+            !survived,
+            "descendant {descendant} survived terminal close after shell exit"
+        );
+    }
+}
+
 // ─── File Watcher (Event Bridge) ───────────────────────────────────────────
 
 /// Start watching a project directory for file changes.
@@ -1510,10 +2546,15 @@ pub async fn ide_start_watcher(
     project_dir: String,
 ) -> Result<(), String> {
     use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     // Remote: the server watches on its side; no local index/graph workers.
-    if let Some(remote_root) = crate::remote::resolve(&project_dir).await? {
-        return state.ext_host.watch_remote(&project_dir, &remote_root).await;
+    if crate::remote::is_remote(&project_dir) {
+        let session = crate::remote::bind(&project_dir).await?;
+        return session
+            .manager
+            .watch_remote(&project_dir, &session.path)
+            .await;
     }
 
     let root = PathBuf::from(&project_dir);
@@ -1521,34 +2562,53 @@ pub async fn ide_start_watcher(
         return Err(format!("Directory not found: {}", project_dir));
     }
 
-    // Serialize start/stop so concurrent mounts cannot create duplicate workers.
+    // Serialize start/stop so concurrent mounts share one watcher and worker.
     let mut watchers = state.file_watchers.lock().await;
-    if watchers.contains_key(&project_dir) {
-        return Ok(());
+    if let Some(watcher) = watchers.get_mut(&project_dir) {
+        return watcher.retain();
     }
 
+    let active = Arc::new(AtomicBool::new(true));
+    let worker_active = Arc::clone(&active);
     let index_root = root.clone();
     let index_worker = crate::index_worker::IndexWorker::start(move |batch| {
+        if !worker_active.load(Ordering::Acquire) {
+            return;
+        }
         if batch.rebuild {
             if let Err(error) = crate::commands::codebase::build_index(&index_root) {
                 tracing::warn!(%error, "Codebase rebuild failed");
             }
-            crate::commands::graph_index::request_rebuild(index_root.clone());
+            crate::commands::graph_index::request_rebuild_if_active(
+                index_root.clone(),
+                &worker_active,
+            );
         } else {
             for rel in batch.paths {
+                if !worker_active.load(Ordering::Acquire) {
+                    break;
+                }
                 if let Err(error) = crate::commands::codebase::index_file(&index_root, &rel) {
                     tracing::warn!(%error, path = %rel, "Incremental index failed");
                 }
-                crate::commands::graph::schedule_patch(index_root.clone(), rel);
+                crate::commands::graph::schedule_patch_if_active(
+                    index_root.clone(),
+                    rel,
+                    &worker_active,
+                );
             }
         }
     })
     .map_err(|e| format!("Failed to start index worker: {e}"))?;
     let app_clone = app.clone();
     let dir = project_dir.clone();
+    let callback_active = Arc::clone(&active);
 
     let mut watcher = RecommendedWatcher::new(
         move |res: Result<Event, notify::Error>| {
+            if !callback_active.load(Ordering::Acquire) {
+                return;
+            }
             if let Ok(event) = res {
                 // Filter to relevant events
                 match event.kind {
@@ -1604,16 +2664,25 @@ pub async fn ide_start_watcher(
         },
         Config::default(),
     )
-    .map_err(|e| format!("Failed to create watcher: {}", e))?;
+    .map_err(|e| {
+        active.store(false, Ordering::Release);
+        format!("Failed to create watcher: {}", e)
+    })?;
 
     watcher
         .watch(&root, RecursiveMode::Recursive)
-        .map_err(|e| format!("Failed to watch: {}", e))?;
+        .map_err(|e| {
+            active.store(false, Ordering::Release);
+            format!("Failed to watch: {}", e)
+        })?;
 
     crate::commands::graph_index::ensure_started(&root);
 
     // Store the watcher to keep it alive
-    watchers.insert(project_dir, watcher);
+    watchers.insert(
+        project_dir,
+        crate::state::OwnedFileWatcher::new(watcher, active),
+    );
 
     Ok(())
 }
@@ -1625,12 +2694,25 @@ pub async fn ide_stop_watcher(
     project_dir: String,
 ) -> Result<(), String> {
     if crate::remote::is_remote(&project_dir) {
+        crate::remote::vfs::parse(&project_dir).ok_or("invalid remote workspace URI")?;
+        // The broker uses the registration's authority/generation; stopping an
+        // old watcher must not unwatch a replacement host's token.
         state.ext_host.unwatch_remote(&project_dir).await;
         return Ok(());
     }
     let mut watchers = state.file_watchers.lock().await;
-    watchers.remove(&project_dir);
+    let removed = crate::state::release_file_watcher(&mut watchers, &project_dir);
+    drop(watchers);
+    if removed {
+        crate::commands::graph_index::forget_project(Path::new(&project_dir));
+    }
     Ok(())
+}
+
+/// Count host-owned local filesystem watchers without exposing project paths.
+#[tauri::command]
+pub async fn ide_watcher_count(state: State<'_, AppState>) -> Result<usize, String> {
+    Ok(state.file_watchers.lock().await.len())
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -1648,8 +2730,18 @@ async fn run_git_cmd(dir: &Path, args: &[&str]) -> Result<String, String> {
 }
 
 async fn run_git_cmd_bytes(dir: &Path, args: &[&str]) -> Result<Vec<u8>, String> {
-    if let Some(remote_dir) = crate::remote::resolve(&dir.to_string_lossy()).await? {
-        let v = crate::remote::call(
+    if crate::remote::is_remote(&dir.to_string_lossy()) {
+        let (session, remote_dir) = if let Some(session) = crate::remote::bound_session() {
+            let path = crate::remote::resolve(&dir.to_string_lossy())
+                .await?
+                .ok_or("remote git working directory is not remote")?;
+            (session, path)
+        } else {
+            let session = crate::remote::bind(&dir.to_string_lossy()).await?;
+            let path = session.path.clone();
+            (session, path)
+        };
+        let v = session.call(
             "exec",
             serde_json::json!({ "command": "git", "args": args, "cwd": remote_dir, "timeoutMs": 30_000 }),
         )
@@ -1661,7 +2753,7 @@ async fn run_git_cmd_bytes(dir: &Path, args: &[&str]) -> Result<Vec<u8>, String>
         return Ok(v
             .get("stdout")
             .and_then(|s| s.as_str())
-            .unwrap_or_default()
+            .ok_or("bad remote git stdout reply")?
             .as_bytes()
             .to_vec());
     }
@@ -1720,7 +2812,8 @@ pub async fn ide_lsp_start(
     project_dir: String,
     language: String,
 ) -> Result<u16, String> {
-    if let Some(uri) = crate::remote::vfs::parse(&project_dir) {
+    if crate::remote::is_remote(&project_dir) {
+        let uri = crate::remote::vfs::parse(&project_dir).ok_or("invalid remote workspace URI")?;
         let mgr = crate::remote::manager().ok_or("remote broker unavailable")?;
         let target = mgr.wait_for_authority(&uri.authority).await?;
         return crate::remote::lsp::start(target, &project_dir, &language).await;

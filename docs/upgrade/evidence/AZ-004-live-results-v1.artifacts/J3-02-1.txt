@@ -1,0 +1,6 @@
+# Local report
+
+- **Scope:** synthetic
+- **Cost:** unknown
+
+> Note: cost is explicitly unknown — it is not zero and must not be reported as zero.

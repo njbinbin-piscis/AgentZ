@@ -1,0 +1,9 @@
+HUMAN NOTE: preserve this line.
+Draft: add a Risks section.
+
+## Risks
+
+- **Scope creep** — the draft may expand beyond the original intent.
+- **Unverified claims** — statements in the draft are not yet backed by sources.
+- **Loss of context** — edits could drop the human note or original wording.
+- **Formatting drift** — Markdown structure may not render as intended.

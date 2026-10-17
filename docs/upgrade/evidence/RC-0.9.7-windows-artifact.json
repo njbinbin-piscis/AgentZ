@@ -1,0 +1,11 @@
+{
+  "version": "0.9.7",
+  "build_exit": 0,
+  "preflight_exit": 0,
+  "path": "C:\\Projects\\AgentZ\\target\\release\\candidate-0.9.7\\AgentZ_0.9.7_x64-setup.exe",
+  "bytes": 98532688,
+  "sha256": "08996DF2301583765443465B3FE4B40339B16F497CB59810DA94F4725CD951B5",
+  "authenticode": "NotSigned",
+  "installed": false,
+  "published": false
+}

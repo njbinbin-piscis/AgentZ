@@ -4,8 +4,8 @@
 
 use tauri::State;
 
-use crate::browser::{BrowserState, PickedElement, ScrollInfo};
 use crate::browser::activity::BrowserCloseGuard;
+use crate::browser::{BrowserState, PickedElement, ScrollInfo};
 use crate::state::AppState;
 
 #[tauri::command]

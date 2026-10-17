@@ -1,0 +1,48 @@
+{
+  "task": "AZ-023",
+  "generated": "2026-10-11T17:14:15.980Z",
+  "revision": "r3",
+  "supersedes": "docs/upgrade/evidence/AZ-023-implementation-manifest-r2.json",
+  "note": "Working-tree fingerprints. loop_.rs is the current file: AZ-023 state (state_az023_loop sha256 2F213963...) plus two AZ-021 patches (invocation-completion, then cancel-grace). Reverse-applying cancel-grace (with --directory=piscis-kernel) then invocation-completion to the current file yields state_az023_loop; forward re-application reproduces the current file. AZ-023-loop-v0.8.68.patch and AZ-023-http-fixture-v0.8.68.patch were regenerated in r3 to include the elapsed-time assertions for cancelled backoff.",
+  "state_az023_loop": {
+    "sha256": "2F213963BF306E829DDDE87FCFE6E5020FCB163AD8B90971EC92F320EDE1E31E",
+    "pre_az023_loop_sha256": "DAF4E104C71119A236D626139914B587A0D4CE81D4B07ADE5FCED0EB7A5B0F7E",
+    "superseded_az023_loop_sha256": "846AE9D3198C2C6BAC80611A530998EE8872FABB80154E08A2921066EA795781"
+  },
+  "candidate": {
+    "script": "scripts/upgrade-kernel-candidate.mjs",
+    "revision": "527e55496caf4437e4265e02869f0a8c764549f6",
+    "archive_sha256": "1ab4e3b3dfaba2b64308bf17f1f60b1ab516a66df36d301b0e4cc855f1726a4e",
+    "note": "node scripts/upgrade-kernel-candidate.mjs ran successfully: all eight patches pass apply --check, apply and reverse --check on the pinned baseline archive."
+  },
+  "files": [
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/llm/error_class.rs",
+      "sha256": "2517c81c22e7bdf3a65590e83cb3bf9cb5d9f5e5a5021c15f000599cb8c43621"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs",
+      "sha256": "1ca6f09e620c5e1d15797e6a598a25c29a5f50004a62d8d6c527c0f53c5339c6"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/tests/az023_retry_http.rs",
+      "sha256": "be8c5ef0ae0e1772c2c4eb0dcab52a5de629d2524793c98c6d801bc2ad82f4ad"
+    },
+    {
+      "path": "scripts/upgrade-kernel-candidate.mjs",
+      "sha256": "eb98aad1a0730a5a510eb5cbcfdca15ce836e317e51dc645a77ef64386d70699"
+    },
+    {
+      "path": "docs/upgrade/patches/AZ-023-error-class-v0.8.68.patch",
+      "sha256": "4d4ecc3ca917391901d357f7c77922f572fcb25272dd2b6dd1a064a2f554cf22"
+    },
+    {
+      "path": "docs/upgrade/patches/AZ-023-loop-v0.8.68.patch",
+      "sha256": "b45aedebcb4a257612d3e33651580480a15079c2a2df5f13f5a69580d550d7b2"
+    },
+    {
+      "path": "docs/upgrade/patches/AZ-023-http-fixture-v0.8.68.patch",
+      "sha256": "f009e1fb5f94bc94e7d1d7bc00ac79b26092d3ff03657380017ababbe13006b7"
+    }
+  ]
+}

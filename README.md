@@ -1,6 +1,6 @@
 # AgentZ
 
-AgentZ 是一个桌面 AI IDE（当前版本 **0.9.4**）。它把编辑器和自治智能体放在同一个应用里，共用一套 agent 内核：人可以在编辑器里逐处改代码，也可以把一个目标交给智能体，在隔离的 git worktree 里做完再评审。
+AgentZ 是一个桌面 AI IDE（当前源码版本 **0.9.7**；安装与发布验收尚未完成）。它把编辑器和自治智能体放在同一个应用里，共用一套 agent 内核：人可以在编辑器里逐处改代码，也可以把一个目标交给智能体，在隔离的 git worktree 里做完再评审。
 
 界面有两种一等模式，顶栏切换：
 
@@ -124,7 +124,7 @@ npm run tauri build
 # 产物在 src-tauri/target/release/bundle/
 ```
 
-发布用标签触发。`.github/workflows/release.yml` 在推送 `v*` 时为 Linux（x86_64 / aarch64 的 `.deb` 与 AppImage）、Windows（x86_64 / aarch64 的 `.msi` 与 NSIS）和 macOS（Apple Silicon 与 Universal 的 `.dmg`）构建并挂到 GitHub Release。版本号必须同时改这三处：`package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`，并更新 [CHANGELOG.md](CHANGELOG.md)。
+发布用标签触发。`.github/workflows/release.yml` 在推送 `v*` 时为 Linux（x86_64 / aarch64 的 `.deb` 与 AppImage）、Windows（x86_64 / aarch64 的 NSIS `.exe`）和 macOS（Apple Silicon 与 Universal 的 `.dmg`）构建并挂到 GitHub Release。Windows 的验证目标是 NSIS `.exe`：工作流只上传 `bundle/nsis/*.exe` 作为产物。`tauri.conf.json` 的 `targets: "all"` 也会生成 `.msi`，但该产物未在工作流中单独上传或验证，暂不作为支持的安装包。Windows 安装包的支持范围见 [AZ-005 支持矩阵](docs/upgrade/evidence/AZ-005-support-matrix.md)，已知问题见 [docs/known-issues.md](docs/known-issues.md)。版本号必须同时改这三处：`package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`，并更新 [CHANGELOG.md](CHANGELOG.md)。
 
 和内核一起改时，把 `Cargo.toml` 里注释掉的 `[patch]` 指到本地的 `piscis-engine` 检出。
 

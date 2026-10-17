@@ -1,0 +1,26 @@
+[
+  {
+    "id": "AZ-031",
+    "verified_state": "model_mcp_batched_reference_and_v2_persistence_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "Host settings responses omit global/named-provider API-key values and MCP command/URL/argument/environment/header values. Model keys and MCP command/URL/args/env/header entries have reference/existence DTOs and separate query/replace/delete host commands. The form sends metadata, deletions and replacements in one host batch; an invalid later operation leaves the existing settings file unchanged, and successful batches persist encrypted secrets with metadata in one file replacement. Settings IPC writes, app_control settings/instruction writes and settings rollback share an in-process mutex across load-modify-save. The host rejects inline secret submission. Source-level env/header editors retain partial input. Kernel settings format v2 encrypts MCP values on save; a v1 plaintext fixture migrates on next save and rejects corrupted v2 ciphertext. New app_control rollback snapshots encrypt their before-image and bind a change ID; historical plaintext snapshots remain readable. A filesystem fixture restored a historical plaintext MCP snapshot into encrypted format-v2 settings and rejected malformed rollback input without a file write. Kernel settings tests 11/11, desktop secret tests 7/7, app_changes tests 4/4, app_control projection test 1/1, frontend typecheck and focused Vitest passed on Windows. Cross-process writes, existing v1 files/backups and old plaintext snapshots, native UI/rollback confirmation and complete outlet scan remain open. Connector credential mutations now reject unreadable or malformed existing credential files instead of overwriting them; a corruption fixture passed 1/1 on Windows. Plaintext storage, tolerant read paths and native recovery remain open. Connector credential read/enable paths now surface malformed storage errors; credential DTO projection always masks OAuth access/refresh tokens even when not declared as manifest secret fields. A synthetic token marker test passed 1/1 on Windows. Full credential-key and outlet inventory remains open. Connector credential projection now defaults to masking undeclared fields, reveals only declared nonsecret fields and expiry metadata, and overrides incorrect public declarations for OAuth tokens. Focused synthetic fixture passed 1/1 on Windows. IM settings DTO now masks Slack, Discord, Teams and outbound webhook URLs, and save retains old values on masked placeholders; synthetic marker projection fixture passed 1/1 on Windows. Explicit deletion and native behavior remain open. Connector credential editor now surfaces host read/decode errors rather than silently showing an empty form; frontend typecheck passed on Windows. Diagnostic export now redacts four token-bearing webhook URL settings, aligned with IM DTO masking; synthetic fixture passed 1/1 on Windows. Full outlet and native verification remain open. Diagnostic redaction also covers settings URL fields generically, including custom model base URL; revised focused fixture passed 1/1. Form display contract is unchanged.",
+    "conclusion_proposal": "Keep blocked until reference DTO, replace/delete/exists operations, all-outlet scan and platform credential adapters are accepted.",
+    "next_action": "Review cross-process settings writes, historical plaintext snapshots and real v1 migration/rollback, then scan remaining outlets and confirm per-key deletion in native UI.",
+    "remaining_work": [
+      "Cross-process reference writes and native per-key deletion behavior",
+      "Existing v1 files, backups and plaintext snapshots; real rollback migration",
+      "All declared outlet scan",
+      "Native UI and AZ-077/AZ-078 platform credential acceptance"
+    ],
+    "verification_gaps": [
+      "Settings response tests cover model API keys and MCP command/URL/argument/env/header values, not native UI",
+      "No complete outlet scan; rollback snapshot intentionally retains original configuration and old audit files were not rewritten",
+      "macOS/Linux adapters not accepted",
+      "Connector mutation corruption fixture is source-level only; full credential encryption and recovery are unverified"
+    ],
+    "evidence": [
+      "docs/upgrade/evidence/AZ-031-2026-10-14/implementation.md",
+      "docs/upgrade/evidence/AZ-061-2026-10-14/implementation.md"
+    ]
+  }
+]

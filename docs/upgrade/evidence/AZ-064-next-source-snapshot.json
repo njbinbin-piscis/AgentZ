@@ -1,0 +1,2606 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-09T07:50:10.857Z",
+  "head": "a787b6dafba84489670d944e8339611ff0fcd563",
+  "package_version": "0.9.7",
+  "read_only": true,
+  "git_optional_locks_disabled": true,
+  "stable_during_capture": true,
+  "reproducibility": "not-established-dirty-source-is-not-head",
+  "verifies_existing_installer_source": false,
+  "git_status_entry_count": 586,
+  "included_source_count": 314,
+  "excluded_counts": {
+    "outside-build-source-allowlist": 41,
+    "generated-or-runtime-directory": 231
+  },
+  "excluded_paths_disclosed": false,
+  "entries": [
+    {
+      "path": ".github/workflows/candidate.yml",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "4ad3653e81f11dd14e576bfdbab6a2378bb2dce6f8cfc97cecdb6e25820d3b7a",
+      "bytes": 2449,
+      "state": "present"
+    },
+    {
+      "path": "Cargo.lock",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "ac85bb2b047b7949feed9aedc632ab476af7670f079d733f409d68c0404d3098",
+      "bytes": 207886,
+      "state": "present"
+    },
+    {
+      "path": "Cargo.toml",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "0849722f98bcd1e96a264197f3aed86bbb67ea5bef2fac055065830464b1d852",
+      "bytes": 1380,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/Cargo.toml",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e4b2b4872492fc14f0ac1eaf9e2d5335ccdb4cdb3e0c9a817a96e3e82a4aec9a",
+      "bytes": 450,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/access.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "9ae913f150894072742d3b0b4064f87cd0ab88f4d9735bff9f6d76257090c646",
+      "bytes": 3488,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/approval_broker.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "234095933e761d4005f0aaffb7e51a201400416cbbda6aba1a97ae4b18fe5b14",
+      "bytes": 14600,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/approval.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "61cc69ba37a802e0ba278533aaef4bfc0cd655b750287f62b15089cef2a523c4",
+      "bytes": 29312,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/archive.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "590ffa94d0603d5244583af297e5d1bc7759bc52e1c4c7c00e296677a51e604b",
+      "bytes": 23021,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/budget_reservation.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "85e8bf62eb22f9c382d7f30eff3b7db357c5333001fd730acb89e8b0ddc956bd",
+      "bytes": 47493,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/budget.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "4ce684ae5a01a9ab41d2003cc342eb4446b8e60a0e17749171dd09b89cf24178",
+      "bytes": 34467,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/changes.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b9ccc7cf0f4c2272def5e323ebb02327895c3e0b18f6faea88a5eb2b6467c52b",
+      "bytes": 17250,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/cleanup.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f2378e03fe716d3b6125fdb0ce0fdacd77e105d5db689b2dbb548e1bd3013192",
+      "bytes": 14024,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/events.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7fcfa29dc35ab483caa641d86a6b702de09b155fcebd01b6c68f4e7db7c5fe98",
+      "bytes": 25118,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/lib.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "a45481fc4e26e9394408b46a70d819a60707e6dc00919e9a79cf473670eb963b",
+      "bytes": 20486,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/merge.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5ef727429f7e6b60a004a8110d71c5dd4306eef066aefb30c13843caefa94fe0",
+      "bytes": 31444,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/plan.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "2ffe34629d8af12a05df3a527e599b38389fb780bd28b9d5bf00ce99156c334e",
+      "bytes": 31502,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/recovery.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c420a768911ee951076c656f0613cd841737b27d6df4e70977700287cca45c91",
+      "bytes": 13167,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/run.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "ea4b9f4e701e2d623c690d6356a43cb9d0c9b20d6a0daa9c9b91a3ae936c01d6",
+      "bytes": 71339,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/start.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f09d6f22e742adbe8ff3095dec12ede326872863be1727912b153b2d32b4695b",
+      "bytes": 12787,
+      "state": "present"
+    },
+    {
+      "path": "crates/agentz-task-state/src/task_details.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "d3b98918c3f49d7cfcb0a7568044d33ff3d13d1820f9a01d7743f02a294c3af6",
+      "bytes": 9686,
+      "state": "present"
+    },
+    {
+      "path": "docs/upgrade/contracts/signing-evidence.schema.json",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "34f4aa7cf708c86d64fa2a6bf272e83e80fb2ab48a14e199f7524e68f67f702d",
+      "bytes": 6313,
+      "state": "present"
+    },
+    {
+      "path": "docs/upgrade/fixtures/AZ-029-rollback/Cargo.lock",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "50788e0861c6b0b6b59239d50ed411f485d90704822a9c0e4572addae3b5db2b",
+      "bytes": 108872,
+      "state": "present"
+    },
+    {
+      "path": "docs/upgrade/fixtures/AZ-029-rollback/Cargo.toml",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "11ddd16bc1b66d87b061adeec2fa55f3c13374f53d00da1d151d930be2d525de",
+      "bytes": 349,
+      "state": "present"
+    },
+    {
+      "path": "extension-host/src/common/dto.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "d9cd2ade91f6eead1aa99af2a39f29642446ba0a3ca785293e6328e9c0ee45fd",
+      "bytes": 6858,
+      "state": "present"
+    },
+    {
+      "path": "extension-host/src/host/apiFactory.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "d800693597d4729f0e5acc492de2baa4d3dcd97de3fe282529842ee956cc2a15",
+      "bytes": 11500,
+      "state": "present"
+    },
+    {
+      "path": "extension-host/src/host/extHostWebviews.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "b1b9a2d10239fd7cbdc16b3965914388e3011e1bc31f28933e34acc3f01c09e5",
+      "bytes": 4594,
+      "state": "present"
+    },
+    {
+      "path": "extension-host/src/host/webviewResourceUri.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e59342445e23945541512e2e40478330b845d1f758849bbd919cb2bc0a59bca3",
+      "bytes": 1718,
+      "state": "present"
+    },
+    {
+      "path": "extension-host/src/host/webviewResourceUri.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "ce3fa6e7f4daaa9037b96434e30b8a761fe1b686ca27b98246d25d38dbb17c61",
+      "bytes": 1092,
+      "state": "present"
+    },
+    {
+      "path": "package-lock.json",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "2dcb2ec45c59cc9f133562c59efe8ec2d92e2acc988b46fb94ad81218b020dae",
+      "bytes": 275873,
+      "state": "present"
+    },
+    {
+      "path": "package.json",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "79cae4f6acc0b5fb953ae08e2c2c3da92e7437efacd7528f3a0c989e73d16aed",
+      "bytes": 2306,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-baseline.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "0b7b53e54af2e108bdc6d9c9f24056bc36ea117925163d3ce0580d18fc4ec65f",
+      "bytes": 4000,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-candidate-workflow.verify.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "eb417b3dfb9d2af02fb2ffc4e5b7302045ccdace6b18fe0a365e7b61c7d5a28b",
+      "bytes": 4997,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-kernel-candidate.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "eb98aad1a0730a5a510eb5cbcfdca15ce836e317e51dc645a77ef64386d70699",
+      "bytes": 3432,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-macos-keychain-check.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e2fd19cb1ecab2926f5ac396186009af7ff493119a01ce93a03919b5e9d3a12b",
+      "bytes": 2691,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-plan.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "45c7a6b3f1f413fb4f5add13841178939e5a5456440220c4dfa0ac083420ae5f",
+      "bytes": 22077,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-plan.verify.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "1945a9c83337cfc02ec7af60f72b84d79c9e09d28acaaa7472357fdc3b7fc96e",
+      "bytes": 9723,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-release-preflight.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "423ec3cb8694b7511c31835476deba8cee8e59233ceec98db5a5ea16a424b280",
+      "bytes": 13986,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-release-preflight.verify.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "8c4f636557607de9d20226c9e469bea21a0814575aef0872f33dbe375e4e0783",
+      "bytes": 8386,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-remote-candidate.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "505e87ab9e4d47025130e2789927798c62a19e38c247b9182218ffbce2626c85",
+      "bytes": 4804,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-signing-evidence.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f1f07f38ea2f01f8e31dc0bba2d69805c5cce86e3068620e58dca0ff0d83ae7b",
+      "bytes": 11608,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-signing-evidence.verify.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "3fae1c94585cefe91e4e914685c7db696fdffdb6e7ef42562e0c030609018631",
+      "bytes": 7369,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-source-snapshot.mjs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "6d942c19d5a5e7e54203b6b2d144dbe69459cf9167915a078261bb3b88b4a2b8",
+      "bytes": 10213,
+      "state": "present"
+    },
+    {
+      "path": "scripts/upgrade-ssh-fixture.ps1",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "30134c58291e9c0988b9eae03e89a0e090451b6e27e682a7b7e9a83bea05250f",
+      "bytes": 8410,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/Cargo.toml",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "e225c34ec4d218705620b9deb81eaf1646aea6d20e396268bda9fc1c45d8fcf6",
+      "bytes": 3288,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/browser/activity.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "9fe6c7a736d058830318a965b68ccdab0040d0c88f1fbb094d362c0c742feb6c",
+      "bytes": 1973,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/agent_task.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "98680d2dac8fda246e56a7b746ba3ef93e7ad084b7e8fe399eba620356dcc380",
+      "bytes": 24013,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/agents.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "659363d01a0ea34859ea508356a4b23cde226abb7b6d58bb01f7b37bcd0c97cc",
+      "bytes": 20715,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/app_changes.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "c979d4c5dd4dd809ec37264698fee8e5f2a48cf6c8b0bacb3c0c8d4e711a3482",
+      "bytes": 9405,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/browser.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "79db07e84c42199f64c8a264213fb43fc98fdfc77a2645275d5133b2bb2162a7",
+      "bytes": 3238,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_events.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c86837f4a6fbf45cc7ff7e632b01973e924f24feaa409f4215a66b1f3102c9a6",
+      "bytes": 3051,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_plan.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "85fee5505c3e7b27c20ac11855a07623001551a61773c9243bb5f46cf7130cab",
+      "bytes": 12094,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_turn.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "b6a9d13b7093af4645c3e7e049f3e4e9fd82e52784c7198381aae656d09a5851",
+      "bytes": 109996,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/chat.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "9ce9bde671207cac42a41be71cbeb439cc7d64bb2e23c034caddaf502820a16b",
+      "bytes": 15650,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/clawhub.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "0dc56234c8089f95ced2ed48f73d852d7dfaf715374d529e7d91faf87ed2d466",
+      "bytes": 12362,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/code_map.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "c198a2f1ac9956472cccc88da7e5c836bdd188abe23a0350f29ee99f4569f44b",
+      "bytes": 9950,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/codebase.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "33b03ffb0ad8956e438557c4b471e27dd557e8b749b03cbd141c345818e1a3b4",
+      "bytes": 17015,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/devenv.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "6e5294bd8c8d6083ea185219841ccc3b074db5eca30676f90f7ccf717ec4896e",
+      "bytes": 44809,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/ext_host.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "16af3a495e4f760b832cf1e9ad6cc35f5acf7f2045ea144b0ac06dea4d145ee0",
+      "bytes": 31770,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/fish.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "824a3fa1f201e42c272151f373313fb9b608bad174e22940aa6f3aed27fada57",
+      "bytes": 8837,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/gateway.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "6319d4896a2634fad13e29553b118ee72bbf2b835ff2b43d6462fe086ce2eeb8",
+      "bytes": 33306,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/git_workspace.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "5be5ae1721ab286c2d6303afc1f3c70094f8d59b00001498c9c1dc63211ddcb9",
+      "bytes": 12515,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/graph_agent.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "a87659e941b666cc944c8ac40f167b154634083ed0fff70415a173177651a087",
+      "bytes": 23505,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/graph_db.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "20da6971ee1b53e96aa7e054de5c408e230702fc3081c25c5f635315a4f96d5c",
+      "bytes": 23990,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/graph_index.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "de4cba77648f9717bdeffa99bf899fd0a410707049516d36917929a373acea03",
+      "bytes": 8743,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/graph.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "c66933e95e405868ae71cf836e9e986754bd1bdc49d2e655e001fe71143c1ed4",
+      "bytes": 25843,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/ide.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "b35482ec332f484342310f31a00c448e5f21a6524dcc946e874c85cad7906a2d",
+      "bytes": 66190,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/interactive.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "676cb187e8f5adc3752b1cbeb7829ea6e68805643da25327f41f05b99128b0b9",
+      "bytes": 2554,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/journal.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "cf78eebba27a60ce6fdb56bb266e79d46654335ae4a21a2128758a6d1e666bb0",
+      "bytes": 2581,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/marketplace.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "01a1f0c1f755fb4c49b2ff0f148f4b3378470868440e29fa877e208d24aab524",
+      "bytes": 25555,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/mod.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "87f248b3746890bfbb82b72b54cbff3174a6cb648f06e16de1d617df16411f11",
+      "bytes": 1193,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/project_scope.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7f59d63dca0390d4a24aa02b2850696ee05c667ae9e4d9adabe78651501932b4",
+      "bytes": 6645,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/project_templates.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "a847717611d9a9e0fdb9577d8baf014cea2f56f54e48aa13b1fb82fe45a7fc7c",
+      "bytes": 6412,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/projects.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "4c8bc890996ff7359ea135064c5b775e1beee88766a44295ec8fe6d92b89cc5e",
+      "bytes": 10105,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/remote.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "2b390a9e8b1f9966a2da491ea8a7d27d9a762500feed8105eb5bd4ee4ad7b309",
+      "bytes": 10178,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/repo_wiki.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "4fd25a13a98f35919107a067789b6963bd67ae190472a5ea9318b9f90708ed98",
+      "bytes": 10699,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/seed.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "679c9fc17b3531f3adee3946b2485f8cb674b4c27e1f903f0dd8d044f3faab0d",
+      "bytes": 19243,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/session_metadata.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "1d9adfbdc8263e12a37f1a58fa767e008b28a3f884cec200243c39de23e192c6",
+      "bytes": 8245,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/session.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "2a8c3cd078b046891337ac04546688e19bbd98b82c6c4d0ede1acfcc83064d73",
+      "bytes": 26067,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/slash_commands.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "19d28355ff3ce74afcb2c482b12bdd435c35b491a4edb25551a3f1c5940d070a",
+      "bytes": 9369,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/symbols.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "371732ed3d0add4b932df3e24d10a76850772bbfa5d8fcb321679b66efb61a36",
+      "bytes": 31653,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/webview_resources.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5c93b559f316e2cd8c5c7233b321228dbd3a476f24c1d6347133ce05e57878a1",
+      "bytes": 9083,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/workbench.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "7d01ffe4c4bdb8619185cba91ad9430cd4345efda7b018bad960aed7811921a9",
+      "bytes": 16063,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/commands/workflow.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "721d0a04eadba3780a0a955183c14342ddc3296cc81eee162eff8fb1ba377d25",
+      "bytes": 23589,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "71041e664f8a41abb265c9d80a29e1ae3a691198abbc75300484b8c6cde80ae3",
+      "bytes": 20127,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/remote/forward.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "4eba84ca86eb610d496dd224928f659bc494d166ca7b3fc5e3197a803c0e43cd",
+      "bytes": 37985,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/remote/live_tests.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "547080ae74f48689c8fab70bc70ce4e6449da8270eefa59df6cfc32ff52caa39",
+      "bytes": 18134,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/remote/lsp.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "4050823fddd2caf844b33928669f2d4dbe24719110308fbe85f75ad58fd5a139",
+      "bytes": 15106,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/remote/mirror.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "f45082acb12069252027efff1ff12e41f86557f8c6517ea8006b0e32eceb364a",
+      "bytes": 14655,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/remote/mod.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "6fa3f504ac3558e4df423f841b5a70ccde33b510526a03ced8baca0b427d60ac",
+      "bytes": 26833,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/remote/ssh_setup.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "27583334f27da0e3a723bcc6d01138fdc98a9dd9e25af0165f3da0da4a8cb4f6",
+      "bytes": 5839,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/remote/vfs.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "b798547d696d3ee86188d99d28dc1f36ec612c3de4150de9191f05ace58126b8",
+      "bytes": 3603,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/approval.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "99776b3feeb3344e2b5acdb04657f277bb78b6ced22f2fa612216781799c718a",
+      "bytes": 35095,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/cancel_completion.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "07ae936228a26f207c732a0a6034dc1beeeafd522fe97c7ee575f61136231127",
+      "bytes": 7579,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/chat_cancel.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b472bedf141fd25faa3b96332b74c3d5dd19dc0e62621c7921dd7f68ddaab995",
+      "bytes": 5697,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_plan.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5177480c08b2f7f58dfa858432a9e2d15fd7e6ba6de9e13a36ca00432b45245a",
+      "bytes": 15081,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_run.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "746de6430baac1becb12c581d8c9e6277bb3fb66af4dd29941c5808aec068611",
+      "bytes": 10179,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_stream.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "07299c200f118046f39e3b22a0844479f854f58f8ee89e180b5c41cb4b8f362c",
+      "bytes": 13570,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/event_replay.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "706f3c6944751fd07508fa787c6f133b50c91ae5423667facbebeb6f16889219",
+      "bytes": 12981,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/heartbeat.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "fbb2a618eef0002c700bac4df3160a0f8b7a15e6f510d910d63ab142afcf8f26",
+      "bytes": 10351,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/koi.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "ca7167383257b300fed8c8658924bdb6717e3428ab41d9d78594f65a0b9f65b0",
+      "bytes": 18195,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/mod.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "0d23952e65855dbdadb1bb33cced46774786b8c1251a7ade0c736fdc06d6d10e",
+      "bytes": 745,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/plan_intent.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "6c1bf00ae2dbab5e58ca397f24040f6d15731de290148d85eac36819e788614e",
+      "bytes": 15976,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/project_scope.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "3bbf91b8af83010753cc720c8b61a8dd252465dcb49ec4842237c4de1394cba0",
+      "bytes": 9838,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/task_activity.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "1b45b66071f3f8820d98429864a5f4470bd91598a19697c02ba302a5ec6c85fe",
+      "bytes": 2683,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/runtime/task_details.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f1dd7e7c84f2dbda08276278628a5a25ce8f88e89269c9e303e2f483b4a22c42",
+      "bytes": 8305,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/skills/provenance.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "1136531bdde539c7b4abd8ef972f82d4b3d9780358a294407376e4baeee51a83",
+      "bytes": 14779,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/skills/service.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "61af296900a4c8a26a7b9ebee77af48298910e288f51756d4c908c065a869601",
+      "bytes": 17727,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/state.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "a4807688db349867b5b3b791a52e44e87a76cf318299e01b5f0c78e7ed648f22",
+      "bytes": 6595,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/task_environment.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b8c032375dbfbddea2e696cb842783c1a785e8738eb29b363887666836f3b064",
+      "bytes": 101,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/tools/app_control.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "47bdbfa84536db7f8b630b3d6c7ca7d9b3601569cee2119aa785dfb9079c509f",
+      "bytes": 22609,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/tools/codebase_search.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "bbe4a3d99576f34771e48c351d6a39c375c840ad8c0e5c0ff68425331b955bc5",
+      "bytes": 4840,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/tools/devenv.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "f024800146f4beba5faff26371e0ceb51debe0b50089a1a03bd596c5a3d09ce9",
+      "bytes": 10401,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/tools/durable_plan_todo.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c622df9bac349c3e7d1ab87bb5cc22fbb9a6d81f2e75129388c6a7f5351bf52d",
+      "bytes": 17986,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/tools/mod.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "babcf336285199c80841089344e568170d2757cf56bbfc6284eb824193f75230",
+      "bytes": 535,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/tools/remote_fs.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "7264caa606127497c55e26c303b47bd12a114374989fa89b1adf1110607c8946",
+      "bytes": 23112,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/tools/settings_catalog.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "9724bb399964a090f7a6fb19043ead79375a280c852613d2ae4d72a928de4c87",
+      "bytes": 13750,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/src/tools/symbols.rs",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "d666970a1cd0709687847f9cdac3b4c16b994a7be145f7fbdce598c2719b51c5",
+      "bytes": 4128,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/tauri.conf.json",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "510c6b939a58f1fffea46fd02e0c6bc4fbe45409e0ca21b33c75973476471d78",
+      "bytes": 3006,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/tests/approval_execution.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7c36a06cfd93cfccb991cd90e4813924abcf8b72f9e4f04c4f22d4429464840c",
+      "bytes": 40749,
+      "state": "present"
+    },
+    {
+      "path": "src-tauri/tests/task_journal_routing.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "ee53802b7d04d3c912616d45f69244c813dd1cdea4887f0a9a4c8bf4afcc7eaf",
+      "bytes": 9151,
+      "state": "present"
+    },
+    {
+      "path": "src/App.tsx",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "604e5d6c97489fea16e55c3867cf3f9a56dfd475fcca2355acdd38f4ea80d5f7",
+      "bytes": 35393,
+      "state": "present"
+    },
+    {
+      "path": "src/components/chat/PermissionCard.test.tsx",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "578040fe5370b00dc04f621abddb02f7be703187d15a963f26b327ea50d0b6d1",
+      "bytes": 10100,
+      "state": "present"
+    },
+    {
+      "path": "src/components/chat/PermissionCard.tsx",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "49dafce5c17b0d3cfa32ae6be064334b03fbe4a82e6d0157c302eced3a5fc92b",
+      "bytes": 5776,
+      "state": "present"
+    },
+    {
+      "path": "src/extensions/common/dto.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "d9cd2ade91f6eead1aa99af2a39f29642446ba0a3ca785293e6328e9c0ee45fd",
+      "bytes": 6858,
+      "state": "present"
+    },
+    {
+      "path": "src/extensions/extensionUiStore.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "8e5252aff970f9837f3b289b53cb1a52db7cb02d0a0960240bca5d5f54c224a8",
+      "bytes": 10065,
+      "state": "present"
+    },
+    {
+      "path": "src/extensions/mainThreads.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "d4329a955d175dec38115f6d52d9c265fef9a31aedf051644737f74df1e2ba3f",
+      "bytes": 29102,
+      "state": "present"
+    },
+    {
+      "path": "src/extensions/ui/WebviewHost.tsx",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "08237e18b6acab0ccefde78b6068a0aeedd75d2e537736c4c30f21b270b4e4be",
+      "bytes": 2399,
+      "state": "present"
+    },
+    {
+      "path": "src/extensions/ui/webviewSecurity.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "9d509ab0281db6121a9d65e851ddec7f14a12ff05c2941a5cf11e28c1c4a373e",
+      "bytes": 6383,
+      "state": "present"
+    },
+    {
+      "path": "src/extensions/ui/webviewSecurity.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "8955a70c0ae2b15172bd98193166113504067afe03e689f71da0172456dcf274",
+      "bytes": 5900,
+      "state": "present"
+    },
+    {
+      "path": "src/i18n/en.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "f53e7269e65e1d54e3f0e0de25fd14aaaee14f301b61061a18771a5e8d6bae1b",
+      "bytes": 50892,
+      "state": "present"
+    },
+    {
+      "path": "src/i18n/zh.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "2b9f65e4f6911faa0ffaaac4dc2b8a21224af0f0b816ca3a1fdb02588971db11",
+      "bytes": 50934,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/agentTask.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "70c5ce1c54243b318d5c496f8f6675d96b05904fa56e121df9e001afa6e9426c",
+      "bytes": 4458,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/chat.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "1704ce1eb25e71005b1378e4fdd259d380163ba0003716e5e0e2cc3276a47f1d",
+      "bytes": 1517,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/chat.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "277a855ef34206777529a3413239930d2021c93db8f7bfa3c6bdb1d0223044ad",
+      "bytes": 10102,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/chatPlan.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "79d42f607dad82bb7b81bab4f7a1369130c10274c7f92aa5bb790f08393ea949",
+      "bytes": 1312,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/chatPlan.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "abad80ed0289e34fe221b70bfcb962d1f3ea4467d30bce4691d3ca072a123595",
+      "bytes": 1634,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/interactive.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "a566f63092a750b7512160d4a1bca60bf1a4bfc42d3e46964b923d78f8d360fc",
+      "bytes": 823,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/lsp.test.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "e2d0472cc786c8273ee03cef0008c6e1eab581f52cdd62c1a341d3a4ea4749d5",
+      "bytes": 18918,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/lsp.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "a9dbf9440d935c088300ee1ecdc176efef237fdaaf0ecea481adbf1f70fb74a2",
+      "bytes": 30286,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/lspSession.test.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "4b2e121059eb824d40381a8b16c685d9fc9c6ae356e2b02cfac3ea899ed0a112",
+      "bytes": 6582,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/lspSession.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "0ddc2f6f52fc0ecdab52343dbb678d2ec120303f3de0621b4a0820869a949909",
+      "bytes": 4283,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/projectScope.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "cca7bf3fe4c20b80b0257b70c596aace820af7d115c5edf6153be5e21065250d",
+      "bytes": 5382,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/projectScope.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "a30baadd0f77ce84fa0d8c026abae4e8c1a6a411edf7b69082a2f8559bf83e80",
+      "bytes": 3524,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/runDiscovery.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "bfc7635e45ffdf94dd31ffb68c6de16463f1f36eb27c8b5ff95a228b047eaaae",
+      "bytes": 3765,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/runDiscovery.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "16cb337bda7210ca2a670bc9f10525d839a3d3d16c3cf42793fef8b7a7b3a1eb",
+      "bytes": 2603,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/runEventNotice.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5884031d6215239f686bbc0462ad055d10d9cd00a68598394cac6c20486e4917",
+      "bytes": 4843,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/runEventNotice.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "a307512750024f37bf18487b67449533a379468372f0292b1785f87d48a0c139",
+      "bytes": 5029,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/runEventProjection.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "16cb3a981a65ae016a4f60c8552550b1a59d9918e472a654b89d58d004c6623e",
+      "bytes": 6509,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/runEventProjection.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "d87912ef77fef6af8d7b7e64cf04134a279fbd721c66bb1f944b20e89a6e45ab",
+      "bytes": 10153,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/runEvents.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "291d49e9bb242995f459d1a963b0b0d5219edd11811d9bd61cacbf51a5d8d6cf",
+      "bytes": 5740,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/runEvents.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "d8e2bf8b5a9f8ebcc4379ff66fb3131c6d82c4488eee5b0a7eccecc4b4537f40",
+      "bytes": 7280,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/taskDetails.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c7c0864121564f84d1731b43b5a70b2d7eb9fad581dbcbdc3f21602eadf7e259",
+      "bytes": 3866,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/taskDetails.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c3de3066755f8512d6b89c79eda751d79f06871ba8b070babfd617cb33f00824",
+      "bytes": 9341,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/taskEnvironment.test.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "4087fb8de6a3d14c6052183f1a9c0d51436cb34cc0cff9fd7df9c55f0af9fb63",
+      "bytes": 3138,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/taskEnvironment.ts",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "38e1848213df8bf444cae99c0a9ff482b9783ba07dcafc549985b311fa41b85a",
+      "bytes": 816,
+      "state": "present"
+    },
+    {
+      "path": "src/services/tauri/workbench.ts",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "faf0b4c7582643b6d3a328eebf08c1c9e315ed08b291fe3162f39bf62ac93c94",
+      "bytes": 3187,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/AssistantPanel.tsx",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "c7bf5d39b40db609c770ae5c49dddbaadf34a28857039e0dc035f02f3335ed34",
+      "bytes": 55044,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/CodeEditor.tsx",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "9fa1a9d633c495420cc5f6dfaabaa44b09ab115cca79928bfe11cad869d7bc40",
+      "bytes": 32167,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/DurablePlanActions.css",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c2ff3109ee7de5e3d3ca486f8462d2bc8fe1cf906703ab02d0c2fcbe65efb60b",
+      "bytes": 346,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/DurablePlanActions.tsx",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "9f676fb9948227f9271136b3b610aa7c82ead266c4b1759d65ca92c007da4105",
+      "bytes": 3392,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/InlineEdit.css",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "6b80d0bab98ad809a7f0ea5998091663a59d48ba50c9ab0e8c6497f1f69875bc",
+      "bytes": 2514,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/resources/SkillsInstalledView.tsx",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "ebf7c6820a635f5684ee8d4b75e747242d31c8c19f731c5bc02b82860dabd27c",
+      "bytes": 11463,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/RunHistoryPanel.css",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "1095b98826d92de65e20a63e64886529fa0e0705e1f1a9ddcf2d4a1cf75c451c",
+      "bytes": 1184,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/RunHistoryPanel.test.tsx",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "2b219ee02d55b39423d70fa50ea9cf979932caf78aee540da2329b6521518abf",
+      "bytes": 20084,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/RunHistoryPanel.tsx",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "94510d765fdd4dbd25fe33505e8678e2959b2f6a324162c34a97e0520d25c47e",
+      "bytes": 16076,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/TaskDetailsPanel.test.tsx",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e4369d130b6e59eab85dbfb640ed20c8453e1c3b8f44fe2ddab8b747de9ee423",
+      "bytes": 4323,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/codez/TaskDetailsPanel.tsx",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "0f58bcecda7a1f99e9d3d0e2fbc09be62722c70a9fb661772bc2822cc2bc09a6",
+      "bytes": 5157,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/workz/AgentTaskReview.css",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "9e7f8cb66f7998fb79997af702874bb34220583f342b91a757a60571af5857db",
+      "bytes": 4416,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/workz/AgentTaskReview.test.tsx",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f0bc1a1571abce7c0664889edd22b8113349382570d835c974a57b6c466c66aa",
+      "bytes": 12734,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/workz/AgentTaskReview.tsx",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "cd4a124ecb202626283418d72fece0162d417baf8e112a744bd7b63b2d3cb692",
+      "bytes": 12663,
+      "state": "present"
+    },
+    {
+      "path": "src/workspaces/workz/index.tsx",
+      "git_status": " M",
+      "tracked": true,
+      "sha256": "0e762cc3af16a3fe59793b201877f806497b8e73ba6c83dbafefe36249a7e9a5",
+      "bytes": 75048,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/Cargo.toml",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "06bc756a8b2e3f3c2ef8c07f3f07f91a4d1c565a89b0fb898dc887eed3f81ff9",
+      "bytes": 1406,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/Cargo.toml",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "ceeed8582ae58b4b375cdc2e7f84fad86277d8baf5ce4f74fd074335e9f23eaa",
+      "bytes": 1064,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/src/args.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "066dcc9bc203e9cd4b788ff8d836c2b6dcd1f37dc5dd5b903fa2867510e7b1e0",
+      "bytes": 11402,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/src/bin/openpiscis-headless.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "0c884f793550f127a53e679b881ea4368440c051cfcab500eb9c4a6d2830e06d",
+      "bytes": 6874,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/src/host.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "2de4c8b48c87431ae83c43708550953a6ee49c5b2009c5749ef56c614a22d222",
+      "bytes": 8114,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/src/interactive.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "97df85c03cbd73f84ab42c9afc98b0bc0ded5719dad0ff44bbb98690474032f0",
+      "bytes": 13908,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/src/lib.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "bd999bc89286f2b117e297a27dc159714cb9bce64bd46c0646fdb648453d9bc0",
+      "bytes": 732,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/src/rpc_server.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f0f0110129f4f8a9a21476931fe7738e9969f4b8e6b437c9a1208299a445eb34",
+      "bytes": 8571,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/src/runner.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "acb49de73c02cd67838805a853d0b905f2809b89865bf3d41a0c378974bd2415",
+      "bytes": 16820,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/tests/headless_cli.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "ec48393844acddad9d6765753e03310b83618216120d03784bea70dc8b9e3a9e",
+      "bytes": 15407,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-cli/tests/pool_tools_headless.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b193d05f374f7d713642bc1abd4437088902a1b57a438fe67735c48710d589ba",
+      "bytes": 4005,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/Cargo.toml",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "85925933d43e0dbaa7b819b222793c446ea4326d9dda832094eb1580b280233f",
+      "bytes": 298,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/src/heartbeat.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "fc4f4af7e8cb19ee813808348d214d1727292e30a684d2781d89a7448d45206e",
+      "bytes": 14395,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/src/host.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "29e4363efac5441e6f818ad62cf8448490f2cdc305197c4a928740823ff20219",
+      "bytes": 33497,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/src/integration.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e254193d1dc19baa1673d7f12c6e2312f6bb60193d72c2b07859afec74051be2",
+      "bytes": 5196,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/src/koi_prompt.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "0653bf8b9fad34effb0d9ff0069aa73537eb93e0d86ccd9e69b8e796634cb22e",
+      "bytes": 32722,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/src/lib.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "cb10ef0ba223442a8f5a7e3a2388423fa3888d527215982effafc980e9166c09",
+      "bytes": 620,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/src/models.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b4bc2cc86de89adcb52992789c88a6dd59bf5050245f479f0cd985163cca0cc0",
+      "bytes": 6338,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/src/project_state.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5c9558d127787d0c1211489bd49cfdb82d7341244f24abb92d6e9bd5a4a549dd",
+      "bytes": 23064,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/src/scene.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "63206cffcb16ccbab88304c97cfcdbe8709226ea798dc1001f3504879c54c4af",
+      "bytes": 13230,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/src/trial.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5adfdaf3a876cbccb6d458a2dc32944c684ad696afe7b22c736912d2b7c80df7",
+      "bytes": 170,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core/tests/collab_trial.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "48b3eec3f426ff4bcb1246485fb3330d47056fef3348023674e75c61e1d64cfb",
+      "bytes": 31699,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/Cargo.toml",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e952d8a58c25c10f3994990be8ace59660f7907abeedb35ed5bf2b16816a88c6",
+      "bytes": 658,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/lib.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "3400a842949bea1518f2d06ef879ccd5268f6d3a108b77f131e435af5cdb0524",
+      "bytes": 196,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/lsp/bridge.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b83651782c64bbb20f12f556fe2cba1ccebb400d97195fde1ee14fa0fa350703",
+      "bytes": 10723,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/lsp/client.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "88e3abc5e2df6509dc1bc482360cfbeff73242e932b44c0bf8418d2b1d04a5c4",
+      "bytes": 24157,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/lsp/manager.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f4c747a94eed47889039e867e97c0aa54402e9fa1e61a9b0727ea132fd78ae51",
+      "bytes": 19718,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/lsp/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "a9831590d3220217d8d2b197ba358ff9bdf75bf615e22008aa0c7baec849a960",
+      "bytes": 108,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/tools/lsp.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b6a7ed2f75c0871b4953546ee1e6979512c112016309064d5366bd20eb62539a",
+      "bytes": 28172,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/tools/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "8a8c30ae23e006d859c5a3bba250e84ceeec017b567e9ed090e218f34e7f3ad8",
+      "bytes": 35,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/tools/read_lints.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "50ec30a9ecf6c9a2bf16c278ef3724c3987d27600ad63778ed97096a56f0ad2c",
+      "bytes": 14304,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/tests/lsp_live.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "8784b920eee26cfefa53959fdce1b66f92227b11c1a44aa90e64ad1cbf219c25",
+      "bytes": 1546,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/Cargo.toml",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "6ea352f900da7e3a3e2a7202f1b1a27eb3b69d9a98ced8f5dad316a18bdc29d6",
+      "bytes": 2829,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/bench_compact.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "56b440d94d77d5271e0fc629648e7cbeebe7bba715ac7bd880818b40688a2527",
+      "bytes": 15881,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/compaction_eval.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "191dda57617518511946d46ada0924b26537e4553edcee74430d7baf80a6feb9",
+      "bytes": 26649,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/compaction_strategy.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "0b315bca2205bbcfe391031cec4d3316a332a1a7d60527d3af3a4ef91e0840ab",
+      "bytes": 4914,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/compaction.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5c2452cf97394f2534107807110622ae84da48696d4f83ec170a7e3b86ef8288",
+      "bytes": 2735,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/contrib.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e271c40497b06027d2866621bc69c1fa07efe3ae5e3d9c67cdbc02056ce72eab",
+      "bytes": 4692,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/file_journal.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "21760a63d436ba40ca6849ead944f912ac662976675455e9c8d16dd55132bfe3",
+      "bytes": 17105,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/harness/budget.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "a7128dac488d79bf37d03469204c5c19431c6c0337fe51363f8dd42dc6c88a0e",
+      "bytes": 7975,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/harness/config.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "58b030fea9609b28360841e2b7703d7feead261cabe0e2b12f556bd4b59e09e5",
+      "bytes": 39535,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/harness/context_builder.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "277dbd3e3c545bfa09b1c83e2e414a86ec7e763e8e04b0b003ab5d66a9c15e51",
+      "bytes": 36843,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/harness/layered_prompt.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "09902943246b5e3f42b9966f755705bdd78771e2891458a95f10c8cb0bb50cf4",
+      "bytes": 6488,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/harness/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "8f169641205c88d600216cbf3629b62a15275de1d587dd4065712f5c5b6f6685",
+      "bytes": 1344,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/harness/request_builder.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5875a51b01f99e45647bd31435b51c7859cc22cfc1da711622200af36096f711",
+      "bytes": 6850,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/harness/runner.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "41c63edfc6f68de53625681346313a1b218b573035ceeb873587a4114e2ad629",
+      "bytes": 6887,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/hooks.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f4b9266238f35a9acbc8539f03085f5ac37182a80b56b44987a30b031d6f6abb",
+      "bytes": 3538,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "32f68e24181f1f6b63f43af27485c56ff7a5be1d0c5bd6b12a3c3c68cdd17280",
+      "bytes": 294500,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/loop_strategy.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "77e9417f23e9b155d192be049d3c999118e9cb3e342c31380e10c2e584f709fa",
+      "bytes": 6095,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/message_utils.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "abf071beaf12c1f612c2bb40a77ce3d665795406dbcc4d457bd923e6351ec148",
+      "bytes": 20783,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/messages.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "92d07826fb3755ee27dc8feb7bbeef131064489ea233082ae9ad7c54cda47127",
+      "bytes": 6985,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "245e7169f40e7e77eade00d119f277e4532cbc275df77b246881856e6009204e",
+      "bytes": 735,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/plan_doc.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "ed7fd1567794e241d0ba1018a921f40240de9a73f7119645a82aec9ba3503f42",
+      "bytes": 6726,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/plan.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "258095157d2d0688e11442e44a7c7334a143688583cdaa8eb97a6fa7ac4e70c2",
+      "bytes": 4464,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/rule_preprocess.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "22f10460bbf32e950f9bcab5840b49f038af9460d748325f9db5d6f3cdd17ca9",
+      "bytes": 28380,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/state_frame.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e1e6d21a8a58ef23d2cfef8d0b91d6ce7b480e50a03cdad010748619f5e0e7d3",
+      "bytes": 14326,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/summary_worker.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "4675f5ab49d934cc75c843b53f200e4dca853820e77ae7e5f8564a87a70e7a55",
+      "bytes": 38479,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/tool_completion.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "410cf09ca388a927c7394aaf2192ffe7bf5df3c43dd51eec4ae95affeddd8622",
+      "bytes": 8284,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/tool_receipt.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "d432cb9de799c87e183a6402d334cff8d55dce790a8b62dca73aed253a24a92e",
+      "bytes": 25815,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/tool.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7a5ad41c1f1c47c31aefee00d00da9aceb95620b60b52da8cfee1723d9c6d4fa",
+      "bytes": 26008,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/vision.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "66a0f8202b9543626c749616d82cf8d2c57b263545ee3c6ec8cc0c966d100837",
+      "bytes": 8312,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/context/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "05e10c334fb5708e97437c05fb573308d9eb0e0fbfa689b602da597159382f26",
+      "bytes": 4585,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/headless/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5cc32dae2a8f6ed1d80e95923df2d31db43e1652a85c9d4db868ec657789790f",
+      "bytes": 18000,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/lib.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "6c9552ad88015f76d704f492e51abddbd609bd2152844352d68e81f5eee26c0f",
+      "bytes": 1059,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/llm/auto_select.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "237862dd2e5e4f7d3e2e90f4e004d59ac1d2751e284a02acf94a257a1c2d2d20",
+      "bytes": 14424,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/llm/claude.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "27ec784684631ae6a272585fc5d20327d41b730795223685c07e5331834633a4",
+      "bytes": 15353,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/llm/error_class.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "2517c81c22e7bdf3a65590e83cb3bf9cb5d9f5e5a5021c15f000599cb8c43621",
+      "bytes": 14867,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/llm/json_repair.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f6120e928cf83022514c3809b1e11e28a9498b2c99e66bf72402ea24529d9ca0",
+      "bytes": 6308,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/llm/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "1a6d45eb914ededa28b8e981c88ea8986ac556ead4e8e2cd1a5c8ae3a60196a8",
+      "bytes": 12865,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/llm/openai.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "68a843e5ac081cb08db63ce556e22b5d732d155ab627daf903c679c98e209cda",
+      "bytes": 65100,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/memory/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "4684fed761c2b2996cd87370307208715533fa092f6df5191df48bb3eb52bf29",
+      "bytes": 34,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/memory/plugin.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "69fdc5fd547a91dcebacdcc76103b7ca1996e3dfef2a29cb5022689a8cd86a1c",
+      "bytes": 10321,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/memory/vector.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "cfebd77a3c11e345097006cd7af933a8dbf380b764216209a8104a882e197c1f",
+      "bytes": 6426,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/notify.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "a9447afa8df99a5f0c73130c2fe25d263243ba3d349cf0300fe4c73d0ee0ab5c",
+      "bytes": 14137,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/policy/gate.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "2f8d89b53889b0edb91f44329b4fd8bd88cfec63b343827c3958bfb84ece8e66",
+      "bytes": 23154,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/policy/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "215112f4ce6856fd51409da00529648fbda6f4e3a1ff6e7c92a8e526060599de",
+      "bytes": 60,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/pool/coordinator.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "dd9556713ba927ebc36141fa7738a3da576e728c530148e4895e9d96e27a743d",
+      "bytes": 62143,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/pool/git.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7e3325680960ac668f1ea739218661794f14dfe81dee2f85bd9afa2f8a06bd59",
+      "bytes": 12104,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/pool/koi_execute_todo.tmpl",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "1ea56274fcf612744d7d78065c2d26385c392e293c6080d881541ad9cd3f695f",
+      "bytes": 3253,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/pool/metadata.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7624231553e11d71f37ca37561d75e26946f5d08224c1258c16e74aeaa355592",
+      "bytes": 1226,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/pool/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "2a146daa16dce585f72fb095800b94cb163afcaaf2681004529bdcf7595e204f",
+      "bytes": 4055,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/pool/model.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "a3fbbc97830e387fa2ee40a1f295d42d1d236cc331fff6de292aecbfa048cfb4",
+      "bytes": 4493,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/pool/services.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "76b44a8f594b126793a56e10c83369a348a73413ab5498d6c739986a2a4c60d1",
+      "bytes": 66382,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/pool/store.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "cd77923e38f30309696b60236e68b6e55512f5634b455ea3a9079d2fc202a63f",
+      "bytes": 1782,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/pool/subagent.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "84b33db27220a8df9f3adceb954cffd569c5d654640f66cba803c01a2b69a660",
+      "bytes": 31284,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/proc_windows_sandbox.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "0d1a0072f9ccfe40f019f86a22870fda4bba31855609b55dc5f17e671636cf1d",
+      "bytes": 79729,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/proc.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "dd8df6b7a5353daf3e4d0ac6b4e1737577e9d83f542594b6344e5bcfc1ea4819",
+      "bytes": 23045,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/project_context.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7e2ad96e7e88ac8bc782fa8c241afb6c195c491b4120ee4c9def21eb430cd3af",
+      "bytes": 6904,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/scheduler/cron.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f6f29899d91219dbf09ad90b322441f90cafbc053526969bb25055da185fb17e",
+      "bytes": 2077,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/scheduler/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "4759d888e76c22bcc4fa895f21c4017bd329b3199fe7e577fda49811be8cf2a1",
+      "bytes": 15,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/security/injection.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c3a4ed54d85e116815f28884a0328572c73557cf454eb240089b44891d19dd53",
+      "bytes": 7374,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/security/linux_keyring.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b81db6dde01397d72969d5e15c24c2e53cce86c9026c7f8e61c4d6d182b7791b",
+      "bytes": 7303,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/security/macos_keychain.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "8c56d9f9ca66cb664b207f6e89147f3602b97eff9b8c35003d227c9eedb9d3e1",
+      "bytes": 8419,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/security/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "407401256ba3db7484a460cc175e2df6e68fa708bd6316dfabaecc3b4e26ddfd",
+      "bytes": 131,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/security/secrets.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b6f1cdcff4398478ef7aa82f6c79ec08a0ef735b4d0869be065ac702103b8660",
+      "bytes": 16891,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/store/db.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e02c365feeeeca5f8ab01f39b0bed4805259ecd2b8c83cdbbf36a144d35a9295",
+      "bytes": 259405,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/store/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "792d90b0d54b38aaf1dc70511e53dc8838602caa080e4f9d9f268630841221e1",
+      "bytes": 434,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/store/settings.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "9984b99abb9cbdc91b2f0b4a903f9951d556d6ceb73c7af660b10a817177954f",
+      "bytes": 57357,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/code_run.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c1f8cfab14a367cf09e7c291768aee7f5df25b6346f62a4377ab463c73414178",
+      "bytes": 17392,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/elevate.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "cb3ca578cd08883e2fcbd7f1d1dd78841cd11b260cb8dded56eeb2adabc56124",
+      "bytes": 27179,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/email.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "11fff4680847c006f0be24f4718704221227c7e669eecbf0379fb55c329f57c1",
+      "bytes": 11215,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/file_diff.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "80fe39425fa81fbc4a3214f5a6a04dc9646f96625473e974d75412e2957d612c",
+      "bytes": 10981,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/file_list.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "d8c9c55e4cc7f614fb21008bd17793a5ecdef9095ff90a5432978fcf32c0f1f0",
+      "bytes": 8221,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/file_read.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "375747c2b7f729ee13086251ec3f53970273b028ec3316bd90d08f5eb82f07ec",
+      "bytes": 13765,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/file_search.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "450c9510e5cd2d43dc8403c3ee65230f499c19cd65f07c67bff337c3497ce059",
+      "bytes": 18311,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/file_write.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7cd735aa5f69880cebc0b891c425fe87d4961d6c48425c4718a27351bfbec21f",
+      "bytes": 22556,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/mcp.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "973a4d86fb80088530a970377d74fd0b6cc6d5a6d2478c37a8d3a694cb85335f",
+      "bytes": 22796,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/memory_tool.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5eacd349079e08c676a434d0749a04b9bb7cb47cce9e222c4e90a3e6344c2a04",
+      "bytes": 10025,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "9d15484a2dfe6807b609556754e5dd2854dfbc5eaa41f5c5730d594588f734db",
+      "bytes": 9715,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/output.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "4063be86b67d6bdf71b1432c67ae8da65e365ee6587481424d3e528b7250b97d",
+      "bytes": 10310,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/pdf.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "fd4f5fc76fc101669c76b2626e7c61b2ec007ce0074be0f6d4ee45d7920fe12a",
+      "bytes": 47813,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/plan_todo.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "80d74f0a25808b0e1c4fd6575cc7daf39054988a522a65ba0575aa446b4e4ef8",
+      "bytes": 5113,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/plan_write.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "addb8cbd9daaeb8df160ab94cfdd8cb053b8cc9d5e0933fca5de9808bb7d29c0",
+      "bytes": 4157,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/pool_chat.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "dc7f5dcd3fe63baa4b2a536b29d6b351b4e7b0ecbf881b6a6b48b82acfa5e2a1",
+      "bytes": 9569,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/pool_org.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "07bf549721284cf91b2023482cc8e29a05ad5693f0912a397bde02059fffa678",
+      "bytes": 42940,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/process_control.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f8f7c8b550771ebba86dcf5170041541baf7c40ab47d48f1c6fd2b1a044a9baf",
+      "bytes": 24116,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/recall_tool.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "4230255fa95e56446eda46ea8fed4f684e379d5aa8fb353403d118f968524a7c",
+      "bytes": 7049,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/shell.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c6e01b22b39bffd1fed6269760bb0a8ca20a8125aadcae2464ddb2725f21f552",
+      "bytes": 15508,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/ssh.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "6c6ca619d6c355aaea530b43a74873346416282a855cdc4d43cdfc5878c3fa66",
+      "bytes": 18400,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/user_tool.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7832b71296e031c6665b3bee059dd54cca747e6f5408df2fffa8e97894c113d2",
+      "bytes": 10930,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/vision_context.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "9ec11734476eeedb647d92bc68ff00cd978c41e4643c57a99f83c965ac8ffce2",
+      "bytes": 6049,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/web_fetch.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "afecf94e8510c90fa0405ae734686785d6cb8881bf2aacd5f309b113f3e7ece0",
+      "bytes": 9141,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/web_search.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "257bd818b11866bd31394fcfdcc6c31845cb0bb0110939f36c96550cb69884cc",
+      "bytes": 14402,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/tests/az023_retry_http.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "91d5ddf718857f11ca59c9fc149bfd3a18841b46e52f4551ea9d7ca9affd3e92",
+      "bytes": 8860,
+      "state": "present"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/tests/pool_services.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "8f04e0250cc0c66de59ed2d50a7ec01e4769129ad8fba813e5783806fef28925",
+      "bytes": 40916,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/.cargo_vcs_info.json",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "e087f3fcb6f9f6cb630c6fb8b554b02e31c8fc6ad5b2430f9681789f47d145f4",
+      "bytes": 94,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/Cargo.toml",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "d45fb3b746a587954875f95635cf455ec8f007d4e3a10beb510bf537466d9a99",
+      "bytes": 2540,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/examples/example.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "23774ae4c05951386dfeeb3742ee9356c066ba599284b85c615318750374d95c",
+      "bytes": 1800,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/blocking/collection.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "342c6bb81507de799209985c6eceacc73a7bb1314381054aab677dbff1d36a4b",
+      "bytes": 10633,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/blocking/item.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "d198c8e139845d3fef674913dc4da0945f4cb392f3e4c9eb3b8ca5165081a03e",
+      "bytes": 13510,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/blocking/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "b6381bc696f1d28ab4fff12920a228356ff3d763b74abc71775ab4acabcec9ae",
+      "bytes": 10549,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/collection.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "20e2eb5f798dbdc62827a70bed67a9bca4fc9ec411b527f64b94deb1504666a0",
+      "bytes": 10774,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/error.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "2ee0c2cc122002c3a5e42a72b0cb6b3fa606eb4654b8015585d80f9d3c46e59e",
+      "bytes": 2312,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/item.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "da626fa65e2864c643096c28f53bae301b891739c52f799647e8ddcd10621b50",
+      "bytes": 14437,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/lib.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "d09ba116fc0d3d0a26d42f10571cf06c39088f822e52c8564a860ca2d2643e8c",
+      "bytes": 15198,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/proxy/collection.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "75b90ac96601295cad733f56711e27ff4c41125a2687b391af014708ff037511",
+      "bytes": 1584,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/proxy/item.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "bf7eb831b3d5b64b4945ac8f531070bde0b051a787e4ee022f205af36c03aa73",
+      "bytes": 1239,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/proxy/mod.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "5c89709f27a218d936ec618dbae5215fe3b3daf9e7430132bef94f3b4e35d696",
+      "bytes": 371,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/proxy/prompt.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "f7c3745568065ba7f602c71884dcb92ec7303fa0376508d0305a9186c9722af4",
+      "bytes": 644,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/proxy/service.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "d46f02cfe2aaf9652c42c9f1f761379ebd4a5257ef143080f2bf75e74912533d",
+      "bytes": 2209,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/session.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "67d9e22c046102e7317418ce54c64d22787dcafa36aca0fc0b5f288c70f8f75e",
+      "bytes": 11037,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/ss.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "c2e6b0bbbe19657f745dc2f99d7da494519a436283166369edb23a2aa66b94c6",
+      "bytes": 528,
+      "state": "present"
+    },
+    {
+      "path": "vendor/secret-service/src/util.rs",
+      "git_status": "??",
+      "tracked": false,
+      "sha256": "7b5234e82413b3c6db2e02fa3dfbe33d128fc0d73dfb2bd46284c700e290ede7",
+      "bytes": 4511,
+      "state": "present"
+    }
+  ],
+  "required_roots": [
+    {
+      "path": "crates/agentz-host",
+      "cargo_manifest_exists": true,
+      "nonignored_source_paths": 2,
+      "changed_source_paths": 0,
+      "untracked_source_paths": 0,
+      "unchanged_tracked_paths_use_head": 2,
+      "covered": true
+    },
+    {
+      "path": "crates/agentz-task-state",
+      "cargo_manifest_exists": true,
+      "nonignored_source_paths": 17,
+      "changed_source_paths": 17,
+      "untracked_source_paths": 17,
+      "unchanged_tracked_paths_use_head": 0,
+      "covered": true
+    },
+    {
+      "path": "src-tauri",
+      "cargo_manifest_exists": true,
+      "nonignored_source_paths": 138,
+      "changed_source_paths": 77,
+      "untracked_source_paths": 20,
+      "unchanged_tracked_paths_use_head": 61,
+      "covered": true
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-core",
+      "cargo_manifest_exists": true,
+      "nonignored_source_paths": 11,
+      "changed_source_paths": 11,
+      "untracked_source_paths": 11,
+      "unchanged_tracked_paths_use_head": 0,
+      "covered": true
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel",
+      "cargo_manifest_exists": true,
+      "nonignored_source_paths": 93,
+      "changed_source_paths": 93,
+      "untracked_source_paths": 93,
+      "unchanged_tracked_paths_use_head": 0,
+      "covered": true
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools",
+      "cargo_manifest_exists": true,
+      "nonignored_source_paths": 10,
+      "changed_source_paths": 10,
+      "untracked_source_paths": 10,
+      "unchanged_tracked_paths_use_head": 0,
+      "covered": true
+    },
+    {
+      "path": "vendor/secret-service",
+      "cargo_manifest_exists": true,
+      "nonignored_source_paths": 18,
+      "changed_source_paths": 18,
+      "untracked_source_paths": 18,
+      "unchanged_tracked_paths_use_head": 0,
+      "covered": true
+    }
+  ],
+  "local_path_closure_rejected_counts": {},
+  "limits": [
+    "Git status is data, not ownership or approval. Changes may belong to the user or earlier tasks.",
+    "Records only dirty tracked and nonignored untracked allowlisted sources; HEAD identifies unchanged tracked content.",
+    "Hashes do not preserve source bytes or prove which snapshot produced an existing installer.",
+    "Ignored runtimes, binary build resources, upstream inputs and private/local data require separate review; not read here.",
+    "Source allowlist is not a secret scanner. Known private/runtime paths are excluded; source contents are never printed.",
+    "Cargo member/literal-path traversal is bounded and conservative, not full TOML/Cargo resolution or source provenance approval."
+  ]
+}

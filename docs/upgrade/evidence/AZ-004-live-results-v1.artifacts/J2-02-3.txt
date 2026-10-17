@@ -1,0 +1,10 @@
+Two-Setting Summary
+
+1. Retries
+   - Value: 3
+   - Source: policy.md
+
+2. Cache TTL
+   - Value: 60
+   - Unit: seconds
+   - Source: cache.md

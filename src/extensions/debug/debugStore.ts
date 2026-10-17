@@ -44,19 +44,24 @@ class DebugStore {
 
   private commit(next: Partial<DebugSnapshot>): void {
     this.state = { ...this.state, ...next };
-    this.snapshot = { ...this.state, frames: [...this.state.frames], variables: [...this.state.variables], output: [...this.state.output] };
+    this.snapshot = {
+      ...this.state,
+      frames: [...this.state.frames],
+      variables: [...this.state.variables],
+      output: [...this.state.output],
+    };
     for (const l of this.listeners) l();
   }
 
   start(): void {
-    this.state = { ...EMPTY, active: true, running: true };
+    this.state = { ...EMPTY, active: true, running: true, frames: [], variables: [], output: [] };
     this.commit({});
   }
   setRunning(running: boolean): void {
-    this.commit({ running });
+    this.commit(running ? { running, threadId: null, frames: [], variables: [] } : { running });
   }
   setStopped(threadId: number, frames: StackFrame[]): void {
-    this.commit({ running: false, threadId, frames });
+    this.commit({ running: false, threadId, frames, variables: [] });
   }
   setVariables(variables: Variable[]): void {
     this.commit({ variables });

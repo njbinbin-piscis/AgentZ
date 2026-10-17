@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-10-09T23:03:38.751Z",
+  "files": [
+    {
+      "path": "src/components/chat/InputContextSummary.tsx",
+      "sha256": "10ab6a5753f3874655cb2c9636c4b146afc0d8b63f68b3e024ab0f282e1c5847"
+    },
+    {
+      "path": "src/components/chat/InputContextSummary.test.tsx",
+      "sha256": "7ea7e7576651e4d05543e63bdf4780aac5a2553120853b6baf1617f1d47938fc"
+    },
+    {
+      "path": "src/workspaces/codez/BudgetObservation.tsx",
+      "sha256": "567d6defee4616872f05a7995420e52d0cafdddc0b0a8ec24db8ad001878fa7c"
+    },
+    {
+      "path": "src/workspaces/codez/BudgetObservation.test.tsx",
+      "sha256": "db01fad4a7d937dd0009db77a80a4499c501030b5112616e70c78ea20abcf22f"
+    },
+    {
+      "path": "src/workspaces/codez/TaskDetailsPanel.tsx",
+      "sha256": "8b925d75fb02697050ad3bc910999dfe5348cdf88a209bf3ee7b0f1bd9ad1a6d"
+    },
+    {
+      "path": "src/workspaces/codez/AssistantPanel.tsx",
+      "sha256": "ab469eb32e479f537b7819a2e95311821398f091c6243a8393a2dfc755874673"
+    },
+    {
+      "path": "src/workspaces/workz/index.tsx",
+      "sha256": "472d401fd2bf8b543162f2ffe30a00b4e7aab145fd94a81a224d9b68a20cb866"
+    }
+  ]
+}

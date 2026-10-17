@@ -143,9 +143,9 @@ pub fn resolve_command(
         return Ok(None);
     }
     let commands = list_commands_from_dir(config_dir);
-    let hit = commands
-        .iter()
-        .find(|c| c.slash_id.eq_ignore_ascii_case(cmd_token) || c.id.eq_ignore_ascii_case(cmd_token));
+    let hit = commands.iter().find(|c| {
+        c.slash_id.eq_ignore_ascii_case(cmd_token) || c.id.eq_ignore_ascii_case(cmd_token)
+    });
     let Some(info) = hit else {
         return Ok(None);
     };
@@ -181,7 +181,10 @@ pub fn slash_commands_list(app: AppHandle) -> Result<Vec<SlashCommandInfo>, Stri
 
 /// Install a slash command from a local `command.json` path or JSON string / HTTPS URL.
 #[tauri::command]
-pub async fn slash_commands_install(app: AppHandle, source: String) -> Result<SlashCommandInfo, String> {
+pub async fn slash_commands_install(
+    app: AppHandle,
+    source: String,
+) -> Result<SlashCommandInfo, String> {
     let config_dir = resolve_global_config_dir(&app)?;
     let manifest_text = if source.starts_with("http://") || source.starts_with("https://") {
         let client = reqwest::Client::builder()

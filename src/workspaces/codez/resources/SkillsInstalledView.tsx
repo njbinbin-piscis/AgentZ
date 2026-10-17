@@ -165,6 +165,21 @@ export default function SkillsInstalledView() {
                   <strong>{s.name}</strong>
                   <span className="agentz-wb-meta">{s.slug}</span>
                   {pickDesc(s) && <span className="agentz-wb-desc">{pickDesc(s)}</span>}
+                  <span className="agentz-wb-meta">
+                    {[s.source && `source: ${s.source}`, s.registry_version && `registry version: ${s.registry_version}`, s.version && `skill version: ${s.version}`]
+                      .filter(Boolean).join(" · ")}
+                    {s.content_sha256 ? ` · SHA-256: ${s.content_sha256.slice(0, 12)}… · ${s.content_hash_matches === true ? (i18n.language.startsWith("zh") ? "文件匹配" : "file matches") : s.content_hash_matches === false ? (i18n.language.startsWith("zh") ? "文件校验失败" : "file mismatch") : (i18n.language.startsWith("zh") ? "未验证" : "unverified")}` : " · legacy: no hash"}
+                  </span>
+                  {s.source_url && <span className="agentz-wb-meta">{s.source_url}</span>}
+                  {!!s.requested_tools?.length && (
+                    <span className="agentz-wb-desc">{i18n.language.startsWith("zh") ? "请求工具能力：" : "Requested tools: "}{s.requested_tools.join(", ")}</span>
+                  )}
+                  {(s.install_history?.length ?? 0) > 1 && (
+                    <span className="agentz-wb-meta">
+                      {i18n.language.startsWith("zh") ? "版本变更：" : "Version history: "}
+                      {s.install_history!.map((entry) => `${entry.registry_version ?? entry.version ?? "?"}${entry.added_tools.length ? ` (+${entry.added_tools.join(", ")})` : ""}${entry.removed_tools.length ? ` (-${entry.removed_tools.join(", ")})` : ""}`).join(" → ")}
+                    </span>
+                  )}
                   {agent && (
                     <span className="agentz-wb-desc">{t("skills.linkedAnonymousAgent", { agent })}</span>
                   )}

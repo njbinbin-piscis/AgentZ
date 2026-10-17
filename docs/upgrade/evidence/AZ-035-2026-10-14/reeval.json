@@ -1,0 +1,20 @@
+[
+  {
+    "id": "AZ-035",
+    "verified_state": "implementation_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "Task-detail host now reads bounded scoped artifact references and the current Attempt event cursor; client parses versioned stale/unavailable source statuses.",
+    "conclusion_proposal": "Keep preparing until independent review and unified cross-view/desktop acceptance.",
+    "next_action": "Independently review exact source content; run cross-view task/environment navigation and desktop read acceptance in the unified validation phase.",
+    "remaining_work": [
+      "Pin a current source manifest and independent implementation review",
+      "Exercise cross-view navigation under the same task/environment binding",
+      "Run native desktop read with an environment lease and assess non-atomic revisions"
+    ],
+    "verification_gaps": [
+      "No native desktop GUI run in this batch",
+      "No independent source review after the current edits"
+    ],
+    "evidence": ["docs/upgrade/evidence/AZ-035-2026-10-14/implementation.md"]
+  }
+]

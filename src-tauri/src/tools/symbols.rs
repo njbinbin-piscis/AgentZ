@@ -40,9 +40,20 @@ impl Tool for SymbolSearchTool {
     }
 
     async fn call(&self, input: Value, ctx: &ToolContext) -> anyhow::Result<ToolResult> {
-        let query = input.get("query").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let kind = input.get("kind").and_then(|v| v.as_str()).map(str::to_string);
-        let limit = input.get("limit").and_then(|v| v.as_u64()).unwrap_or(20).clamp(1, 100) as usize;
+        let query = input
+            .get("query")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let kind = input
+            .get("kind")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+        let limit = input
+            .get("limit")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(20)
+            .clamp(1, 100) as usize;
         let root = ctx.workspace_root.clone();
         match tokio::task::spawn_blocking(move || {
             let idx = index_for(&root);
@@ -86,12 +97,25 @@ impl Tool for ImpactTool {
     }
 
     async fn call(&self, input: Value, ctx: &ToolContext) -> anyhow::Result<ToolResult> {
-        let symbol = input.get("symbol").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+        let symbol = input
+            .get("symbol")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
         if symbol.is_empty() {
             return Ok(ToolResult::err("impact: 'symbol' is required"));
         }
-        let depth = input.get("depth").and_then(|v| v.as_u64()).unwrap_or(2).clamp(1, 5) as usize;
-        let limit = input.get("limit").and_then(|v| v.as_u64()).unwrap_or(40).clamp(5, 200) as usize;
+        let depth = input
+            .get("depth")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(2)
+            .clamp(1, 5) as usize;
+        let limit = input
+            .get("limit")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(40)
+            .clamp(5, 200) as usize;
         let root = ctx.workspace_root.clone();
         match tokio::task::spawn_blocking(move || {
             let idx = index_for(&root);

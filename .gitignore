@@ -18,3 +18,5 @@ dist
 # Local dev caches (not shipped)
 .cache/
 .codegraph/
+
+docs/upgrade/.plan.lock

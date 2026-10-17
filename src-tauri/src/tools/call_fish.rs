@@ -26,6 +26,8 @@ pub struct CallFishTool {
     pub plan_store: PlanStore,
     pub lsp_manager: Arc<LspManager>,
     pub app: tauri::AppHandle,
+    /// The parent task's budget, so Fish model calls count against the same total.
+    pub budget: crate::runtime::task_budget::BudgetScope,
 }
 
 #[async_trait]
@@ -141,6 +143,7 @@ impl Tool for CallFishTool {
             system_prompt,
             task,
             ctx.cancel.clone(),
+            self.budget.clone(),
         )
         .await;
 

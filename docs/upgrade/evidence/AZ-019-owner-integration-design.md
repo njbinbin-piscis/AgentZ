@@ -1,0 +1,7 @@
+# AZ-019 宿主归属接线前置
+
+当前Run/Attempt没有持久boot或OS进程归属，TaskActivity只在本进程内存互斥。应用重启、running状态、旧事件时间或PID数字不能单独证明其他执行进程失活。
+
+本轮先交付带可信失活证明的领域对账API；Alive与Unknown保留状态，同事务CAS将确证失活原Attempt标Interrupted并提交生命周期事件，不重跑工具或模型。此API不是完整启动自动恢复。
+
+后续宿主接线应采用持久归属记录与跨进程排他执行锁：Run创建时保存随机boot及原Attempt，在执行生命周期持有OS锁；对账必须同时核scope、原Run/Attempt快照及已取得独占锁，旧记录缺归属明确Unverifiable。锁只证明合作宿主进程协议，不能证明独立工具子进程已退出；子进程归属另核，未知时保留。发布前先以受控双进程/杀进程fixture验证，不能用clock或TTL自动释放未知预算或重执行副作用。

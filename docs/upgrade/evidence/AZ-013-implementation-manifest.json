@@ -1,0 +1,21 @@
+{
+  "captured_at": "2026-10-09T22:31:09.117Z",
+  "files": [
+    {
+      "path": "src/workspaces/workz/AgentTaskReview.tsx",
+      "sha256": "cd4a124ecb202626283418d72fece0162d417baf8e112a744bd7b63b2d3cb692"
+    },
+    {
+      "path": "src/workspaces/workz/AgentTaskReview.test.tsx",
+      "sha256": "f0bc1a1571abce7c0664889edd22b8113349382570d835c974a57b6c466c66aa"
+    },
+    {
+      "path": "src/workspaces/workz/AgentTaskReview.css",
+      "sha256": "9e7f8cb66f7998fb79997af702874bb34220583f342b91a757a60571af5857db"
+    },
+    {
+      "path": "src/services/tauri/agentTask.ts",
+      "sha256": "70c5ce1c54243b318d5c496f8f6675d96b05904fa56e121df9e001afa6e9426c"
+    }
+  ]
+}

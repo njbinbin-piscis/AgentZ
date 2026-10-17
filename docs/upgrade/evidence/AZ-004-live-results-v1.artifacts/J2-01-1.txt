@@ -1,0 +1,15 @@
+Research: Module Entry Points
+
+Findings
+--------
+Two module entry points were identified in the source fixture:
+
+1. module-a.ts — entry point is `start`
+2. module-b.ts — entry point is `finish`
+
+Both exact file names are cited above: module-a.ts and module-b.ts.
+
+Summary
+-------
+- module-a.ts exposes its entry at `start`.
+- module-b.ts exposes its entry at `finish`.

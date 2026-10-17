@@ -1,0 +1,377 @@
+diff --git a/piscis-kernel/Cargo.toml b/piscis-kernel/Cargo.toml
+index 87d29fb..0e04d7a 100644
+--- a/piscis-kernel/Cargo.toml
++++ b/piscis-kernel/Cargo.toml
+@@ -32,6 +32,7 @@ regex = "1"
+ once_cell = "1"
+ chacha20poly1305 = "0.10"
+ hex = "0.4"
++tempfile = "3"
+ getrandom = "0.2"
+ base64 = "0.22"
+ 
+diff --git a/piscis-kernel/src/security/secrets.rs b/piscis-kernel/src/security/secrets.rs
+index 241f8d6..bcc9c97 100644
+--- a/piscis-kernel/src/security/secrets.rs
++++ b/piscis-kernel/src/security/secrets.rs
+@@ -13,6 +13,13 @@ pub struct SecretStore {
+ 
+ impl SecretStore {
+     pub fn new(app_dir: &Path) -> Result<Self> {
++        Self::new_with_random(app_dir, random_bytes)
++    }
++
++    fn new_with_random(
++        app_dir: &Path,
++        random: impl FnOnce(&mut [u8]) -> Result<()>,
++    ) -> Result<Self> {
+         let key_path = app_dir.join(KEY_FILE);
+         let key = if key_path.exists() {
+             let data = std::fs::read(&key_path)?;
+@@ -25,26 +32,40 @@ impl SecretStore {
+         } else {
+             use std::io::Write;
+             let mut key = [0u8; 32];
+-            getrandom::getrandom(&mut key)
+-                .map_err(|e| anyhow::anyhow!("Failed to generate random key: {}", e))?;
++            random(&mut key)?;
+             if let Some(parent) = key_path.parent() {
+                 std::fs::create_dir_all(parent)?;
+             }
+-            let mut f = std::fs::File::create(&key_path)?;
+-            f.write_all(&key)?;
+-            key
++            // Publish only a complete key, never overwrite another writer's key.
++            let mut file = tempfile::NamedTempFile::new_in(app_dir)?;
++            file.write_all(&key)?;
++            file.as_file().sync_all()?;
++            match file.persist_noclobber(&key_path) {
++                Ok(_) => key,
++                Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
++                    return Self::new(app_dir);
++                }
++                Err(error) => return Err(error.error.into()),
++            }
+         };
+         Ok(Self { key })
+     }
+ 
+     pub fn encrypt(&self, plaintext: &str) -> Result<Vec<u8>> {
++        self.encrypt_with_random(plaintext, random_bytes)
++    }
++
++    fn encrypt_with_random(
++        &self,
++        plaintext: &str,
++        random: impl FnOnce(&mut [u8]) -> Result<()>,
++    ) -> Result<Vec<u8>> {
+         if plaintext.is_empty() {
+             return Ok(Vec::new());
+         }
+         let cipher = ChaCha20Poly1305::new((&self.key).into());
+         let mut nonce_bytes = [0u8; 12];
+-        getrandom::getrandom(&mut nonce_bytes)
+-            .map_err(|e| anyhow::anyhow!("Failed to generate nonce: {}", e))?;
++        random(&mut nonce_bytes)?;
+         let nonce = Nonce::from_slice(&nonce_bytes);
+         let ciphertext = cipher
+             .encrypt(nonce, plaintext.as_bytes())
+@@ -85,3 +106,44 @@ impl SecretStore {
+         self.decrypt(&bytes)
+     }
+ }
++
++fn random_bytes(bytes: &mut [u8]) -> Result<()> {
++    getrandom::getrandom(bytes)
++        .map_err(|error| anyhow::anyhow!("Secure random source failed: {}", error))
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn secrets_random_failure_publishes_neither_key_nor_ciphertext() {
++        let directory = tempfile::tempdir().unwrap();
++        assert!(SecretStore::new_with_random(directory.path(), |_| {
++            anyhow::bail!("Injected key random-source failure")
++        })
++        .is_err());
++        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
++        let store = SecretStore::new(directory.path()).unwrap();
++        assert!(store
++            .encrypt_with_random("fixture-secret", |_| {
++                anyhow::bail!("Injected nonce random-source failure")
++            })
++            .is_err());
++    }
++
++    #[test]
++    fn secrets_existing_key_is_never_replaced() {
++        let directory = tempfile::tempdir().unwrap();
++        let store = SecretStore::new(directory.path()).unwrap();
++        let key = std::fs::read(directory.path().join(KEY_FILE)).unwrap();
++        let other = SecretStore::new(directory.path()).unwrap();
++        assert_eq!(std::fs::read(directory.path().join(KEY_FILE)).unwrap(), key);
++        assert_eq!(
++            other
++                .decrypt(&store.encrypt("fixture-secret").unwrap())
++                .unwrap(),
++            "fixture-secret"
++        );
++    }
++}
+diff --git a/piscis-kernel/src/store/settings.rs b/piscis-kernel/src/store/settings.rs
+index 56f90aa..7b8e779 100644
+--- a/piscis-kernel/src/store/settings.rs
++++ b/piscis-kernel/src/store/settings.rs
+@@ -933,6 +933,7 @@ impl Settings {
+             Self::try_decrypt_field(&store, &mut settings.wechat_gateway_token);
+             Self::try_decrypt_field(&store, &mut settings.wechat_bot_token);
+             Self::try_decrypt_field(&store, &mut settings.smtp_password);
++            Self::try_decrypt_field(&store, &mut settings.vision_api_key);
+             // Decrypt SSH server credentials
+             for srv in &mut settings.ssh_servers {
+                 Self::try_decrypt_field(&store, &mut srv.password);
+@@ -947,41 +948,61 @@ impl Settings {
+     }
+ 
+     pub fn save(&self) -> Result<()> {
++        self.save_with_encryptor(|store, value| store.encrypt_hex(value))
++    }
++
++    fn save_with_encryptor(
++        &self,
++        mut encrypt: impl FnMut(&crate::security::secrets::SecretStore, &str) -> Result<String>,
++    ) -> Result<()> {
+         if let Some(parent) = self.config_path.parent() {
+             std::fs::create_dir_all(parent)?;
+         }
+         let mut clone = self.clone();
+         // Encrypt secret fields before writing to disk
+-        if let Some(store) = Self::secret_store(&self.config_path) {
+-            Self::encrypt_field(&store, &mut clone.anthropic_api_key);
+-            Self::encrypt_field(&store, &mut clone.openai_api_key);
+-            Self::encrypt_field(&store, &mut clone.deepseek_api_key);
+-            Self::encrypt_field(&store, &mut clone.qwen_api_key);
+-            Self::encrypt_field(&store, &mut clone.minimax_api_key);
+-            Self::encrypt_field(&store, &mut clone.zhipu_api_key);
+-            Self::encrypt_field(&store, &mut clone.kimi_api_key);
+-            Self::encrypt_field(&store, &mut clone.feishu_app_secret);
+-            Self::encrypt_field(&store, &mut clone.wecom_bot_secret);
+-            Self::encrypt_field(&store, &mut clone.dingtalk_app_secret);
+-            Self::encrypt_field(&store, &mut clone.dingtalk_robot_code);
+-            Self::encrypt_field(&store, &mut clone.telegram_bot_token);
+-            Self::encrypt_field(&store, &mut clone.matrix_access_token);
+-            Self::encrypt_field(&store, &mut clone.webhook_auth_token);
+-            Self::encrypt_field(&store, &mut clone.wechat_gateway_token);
+-            Self::encrypt_field(&store, &mut clone.wechat_bot_token);
+-            Self::encrypt_field(&store, &mut clone.smtp_password);
++        let directory = self
++            .config_path
++            .parent()
++            .filter(|p| !p.as_os_str().is_empty())
++            .ok_or_else(|| anyhow::anyhow!("Settings require an explicit parent directory"))?;
++        let store = crate::security::secrets::SecretStore::new(directory)?;
++        {
++            Self::encrypt_field(&store, &mut clone.anthropic_api_key, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.openai_api_key, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.deepseek_api_key, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.qwen_api_key, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.minimax_api_key, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.zhipu_api_key, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.kimi_api_key, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.feishu_app_secret, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.wecom_bot_secret, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.dingtalk_app_secret, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.dingtalk_robot_code, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.telegram_bot_token, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.matrix_access_token, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.webhook_auth_token, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.wechat_gateway_token, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.wechat_bot_token, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.smtp_password, &mut encrypt)?;
++            Self::encrypt_field(&store, &mut clone.vision_api_key, &mut encrypt)?;
+             // Encrypt SSH server credentials
+             for srv in &mut clone.ssh_servers {
+-                Self::encrypt_field(&store, &mut srv.password);
+-                Self::encrypt_field(&store, &mut srv.private_key);
++                Self::encrypt_field(&store, &mut srv.password, &mut encrypt)?;
++                Self::encrypt_field(&store, &mut srv.private_key, &mut encrypt)?;
+             }
+             // Encrypt named LLM provider API keys
+             for p in &mut clone.llm_providers {
+-                Self::encrypt_field(&store, &mut p.api_key);
++                Self::encrypt_field(&store, &mut p.api_key, &mut encrypt)?;
+             }
+         }
+         let json = serde_json::to_string_pretty(&clone)?;
+-        std::fs::write(&self.config_path, json)?;
++        // Same-directory atomic replacement: failure leaves the old config intact.
++        use std::io::Write;
++        let mut file = tempfile::NamedTempFile::new_in(directory)?;
++        file.write_all(json.as_bytes())?;
++        file.as_file().sync_all()?;
++        file.persist(&self.config_path)
++            .map_err(|error| error.error)?;
+         Ok(())
+     }
+ 
+@@ -991,13 +1012,15 @@ impl Settings {
+             .and_then(|dir| crate::security::secrets::SecretStore::new(dir).ok())
+     }
+ 
+-    fn encrypt_field(store: &crate::security::secrets::SecretStore, field: &mut String) {
+-        if field.is_empty() {
+-            return;
+-        }
+-        if let Ok(encrypted) = store.encrypt_hex(field) {
+-            *field = encrypted;
++    fn encrypt_field(
++        store: &crate::security::secrets::SecretStore,
++        field: &mut String,
++        encrypt: &mut impl FnMut(&crate::security::secrets::SecretStore, &str) -> Result<String>,
++    ) -> Result<()> {
++        if !field.is_empty() {
++            *field = encrypt(store, field)?;
+         }
++        Ok(())
+     }
+ 
+     fn try_decrypt_field(store: &crate::security::secrets::SecretStore, field: &mut String) {
+@@ -1100,4 +1123,135 @@ mod tests {
+         assert_eq!(profile.max_output_tokens, 16_384);
+         assert_eq!(profile.supported_endpoint_types, ["chat", "image"]);
+     }
++    fn fixture() -> (tempfile::TempDir, Settings) {
++        let directory = tempfile::tempdir().unwrap();
++        let settings = Settings {
++            config_path: directory.path().join("config.json"),
++            openai_api_key: "fixture-secret-never-plaintext".into(),
++            vision_api_key: "fixture-vision-secret".into(),
++            ..Settings::default()
++        };
++        (directory, settings)
++    }
++
++    #[test]
++    fn secrets_save_roundtrips_and_atomically_replaces_existing_config() {
++        let (directory, mut settings) = fixture();
++        settings.save().unwrap();
++        settings.openai_api_key = "replacement-fixture-secret".into();
++        settings.save().unwrap();
++        let raw = std::fs::read_to_string(&settings.config_path).unwrap();
++        assert!(!raw.contains("replacement-fixture-secret"));
++        assert!(!raw.contains("fixture-vision-secret"));
++        let loaded = Settings::load(&settings.config_path).unwrap();
++        assert_eq!(loaded.openai_api_key, settings.openai_api_key);
++        assert_eq!(loaded.vision_api_key, settings.vision_api_key);
++        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
++    }
++
++    #[test]
++    fn secrets_corrupted_key_preserves_old_config() {
++        let (directory, settings) = fixture();
++        settings.save().unwrap();
++        let original = std::fs::read(&settings.config_path).unwrap();
++        std::fs::write(directory.path().join(".secret_key"), b"damaged").unwrap();
++        assert!(settings.save().is_err());
++        assert_eq!(std::fs::read(&settings.config_path).unwrap(), original);
++        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
++    }
++
++    #[test]
++    fn secrets_encryption_failure_after_first_field_preserves_old_config() {
++        let (directory, settings) = fixture();
++        settings.save().unwrap();
++        let original = std::fs::read(&settings.config_path).unwrap();
++        let mut calls = 0;
++        let result = settings.save_with_encryptor(|store, value| {
++            calls += 1;
++            if calls == 2 {
++                anyhow::bail!("Injected nonce/random-source failure");
++            }
++            store.encrypt_hex(value)
++        });
++        assert!(result.is_err());
++        assert_eq!(calls, 2);
++        assert_eq!(std::fs::read(&settings.config_path).unwrap(), original);
++        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
++    }
++
++    #[cfg(windows)]
++    #[test]
++    fn secrets_locked_config_preserves_old_bytes_and_cleans_temp_file() {
++        use std::os::windows::fs::OpenOptionsExt;
++        let (directory, settings) = fixture();
++        settings.save().unwrap();
++        let original = std::fs::read(&settings.config_path).unwrap();
++        let locked = std::fs::OpenOptions::new()
++            .read(true)
++            .share_mode(1)
++            .open(&settings.config_path)
++            .unwrap();
++        assert!(settings.save().is_err());
++        assert_eq!(std::fs::read(&settings.config_path).unwrap(), original);
++        drop(locked);
++        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
++    }
++    #[test]
++    fn secrets_unreadable_key_path_preserves_old_config() {
++        let (directory, settings) = fixture();
++        std::fs::write(&settings.config_path, b"previous-config-bytes").unwrap();
++        std::fs::create_dir(directory.path().join(".secret_key")).unwrap();
++        assert!(settings.save().is_err());
++        assert_eq!(
++            std::fs::read(&settings.config_path).unwrap(),
++            b"previous-config-bytes"
++        );
++        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
++    }
++    #[test]
++    fn secrets_nested_credentials_are_encrypted_and_failure_does_not_partially_save() {
++        let (directory, mut settings) = fixture();
++        settings.ssh_servers.push(SshServerConfig {
++            password: "fixture-ssh-password".into(),
++            private_key: "fixture-ssh-private-key".into(),
++            ..SshServerConfig::default()
++        });
++        settings.llm_providers.push(LlmProviderConfig {
++            api_key: "fixture-provider-api-key".into(),
++            ..LlmProviderConfig::default()
++        });
++        settings.save().unwrap();
++        let original = std::fs::read(&settings.config_path).unwrap();
++        let raw = String::from_utf8(original.clone()).unwrap();
++        for secret in [
++            "fixture-ssh-password",
++            "fixture-ssh-private-key",
++            "fixture-provider-api-key",
++        ] {
++            assert!(!raw.contains(secret));
++        }
++        let loaded = Settings::load(&settings.config_path).unwrap();
++        assert_eq!(
++            loaded.ssh_servers[0].password,
++            settings.ssh_servers[0].password
++        );
++        assert_eq!(
++            loaded.ssh_servers[0].private_key,
++            settings.ssh_servers[0].private_key
++        );
++        assert_eq!(
++            loaded.llm_providers[0].api_key,
++            settings.llm_providers[0].api_key
++        );
++        assert!(settings
++            .save_with_encryptor(|store, value| {
++                if value == "fixture-provider-api-key" {
++                    anyhow::bail!("Injected final nested credential failure");
++                }
++                store.encrypt_hex(value)
++            })
++            .is_err());
++        assert_eq!(std::fs::read(&settings.config_path).unwrap(), original);
++        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
++    }
+ }

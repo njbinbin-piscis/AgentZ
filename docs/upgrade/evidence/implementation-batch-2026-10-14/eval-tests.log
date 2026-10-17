@@ -1,0 +1,10 @@
+ok - validateSummary rejects missing hashes and bad counts
+ok - checkConsistency accepts one spec and one fixture hash
+ok - checkConsistency refuses mixed spec hashes and names the offenders
+ok - checkConsistency refuses mixed fixture hashes
+ok - buildTrend groups by model and endpoint, keeps run order, computes ratios
+ok - renderMarkdown prints one table per group with the shared hashes
+ok - Wilson interval handles empty and full populations
+ok - gate rejects regression, missing samples and unknown host faults without mixing scope
+ok - loadSummaries reports unreadable and invalid files without throwing
+all 9 checks passed

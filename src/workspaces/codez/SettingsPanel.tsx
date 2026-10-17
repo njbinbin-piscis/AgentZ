@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   getSettings,
-  saveSettings,
+  saveSettingsWithSecrets,
   getFlashProvider,
   setFlashProvider,
   type LlmProviderConfig,
@@ -12,6 +12,7 @@ import {
   type SettingsResponse,
 } from "../../services/tauri/settings";
 import { setLanguage } from "../../i18n";
+import { splitSettingsSecretUpdates } from "../../services/tauri/settingsSecrets";
 import { notifySettingsRefresh } from "../../services/settingsRefresh";
 import ExtensionsManager from "./ExtensionsManager";
 import AssistantsTab from "./settings/AssistantsTab";
@@ -20,6 +21,7 @@ import HooksTab from "./settings/HooksTab";
 import WorkzDirSection from "./settings/WorkzDirSection";
 import AppChangesSection from "./settings/AppChangesSection";
 import RemoteSection from "./settings/RemoteSection";
+import DiagnosticsSection from "./settings/DiagnosticsSection";
 import DropdownSelect from "../../components/DropdownSelect";
 import "./SettingsPanel.css";
 
@@ -225,7 +227,7 @@ const EMPTY_LLM_PROVIDER: LlmProviderConfig = {
 };
 
 function parseEnv(text: string): Record<string, string> {
-  const env: Record<string, string> = {};
+  const env: Record<string, string> = Object.create(null);
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -234,6 +236,19 @@ function parseEnv(text: string): Record<string, string> {
     env[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
   }
   return env;
+}
+
+function McpMapEditor({ value, onChange, placeholder }: {
+  value: Record<string, string>;
+  onChange: (next: Record<string, string>) => void;
+  placeholder: string;
+}) {
+  const [draft, setDraft] = useState(() => Object.entries(value).map(([key, entry]) => `${key}=${entry}`).join("\n"));
+  return <textarea rows={2} value={draft} onChange={(event) => {
+    const next = event.target.value;
+    setDraft(next);
+    onChange(parseEnv(next));
+  }} placeholder={placeholder} />;
 }
 
 function toForm(data: SettingsResponse): LlmSettings {
@@ -271,10 +286,14 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
   const [error, setError] = useState<string | null>(null);
   const [configDir, setConfigDir] = useState("");
   const [configured, setConfigured] = useState(false);
+  const [secretPresence, setSecretPresence] = useState<Record<string, boolean>>({});
+  const [initialMcpMaps, setInitialMcpMaps] = useState<Record<string, { env: string[]; headers: string[] }>>({});
+  const [pendingSecretDeletes, setPendingSecretDeletes] = useState<string[]>([]);
   const [form, setForm] = useState<LlmSettings>(DEFAULT_FORM);
   const [showKey, setShowKey] = useState(false);
   const [llmEditIdx, setLlmEditIdx] = useState<number | null>(null);
   const [llmEditForm, setLlmEditForm] = useState<LlmProviderConfig>(EMPTY_LLM_PROVIDER);
+  const [llmEditDeleteKey, setLlmEditDeleteKey] = useState(false);
   const [llmShowKey, setLlmShowKey] = useState(false);
   // Global flash model used by delegated sub-agents.
   const [flashProviderId, setFlashProviderId] = useState<string | null>(null);
@@ -287,6 +306,10 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
         if (cancelled) return;
         setConfigDir(data.config_dir);
         setConfigured(data.is_configured);
+        setSecretPresence(Object.fromEntries(data.secret_references.map(({ reference, exists }) => [reference, exists])));
+        setInitialMcpMaps(Object.fromEntries(data.mcp_servers.map((server) => [server.name, {
+          env: Object.keys(server.env), headers: Object.keys(server.headers ?? {}),
+        }])));
         const next = toForm(data);
         setForm(next);
         if (next.language === "zh" || next.language === "en") {
@@ -334,12 +357,41 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
     }));
   }, []);
 
+  const stageMcpDelete = useCallback((idx: number, field: "command" | "url" | "args") => {
+    const server = form.mcp_servers[idx];
+    if (!server?.name) return;
+    const reference = `mcp:${server.name}:${field}`;
+    updateMcp(idx, field === "args" ? { args: [] } : { [field]: "" });
+    setPendingSecretDeletes((previous) => previous.includes(reference) ? previous : [...previous, reference]);
+  }, [form.mcp_servers, updateMcp]);
+
   const handleSave = useCallback(async () => {
     setError(null);
     setBusy(true);
     try {
-      const result = await saveSettings(form);
+      // Host applies metadata and reference operations to one settings snapshot.
+      const { updates, replacements } = splitSettingsSecretUpdates(form);
+      const mapDeletions = form.mcp_servers.flatMap((server) => {
+        const initial = initialMcpMaps[server.name];
+        if (!initial) return [];
+        return [
+          ...initial.env.filter((key) => !Object.prototype.hasOwnProperty.call(server.env, key)).map((key) => `mcp-env:${JSON.stringify([server.name, key])}`),
+          ...initial.headers.filter((key) => !Object.prototype.hasOwnProperty.call(server.headers ?? {}, key)).map((key) => `mcp-header:${JSON.stringify([server.name, key])}`),
+        ];
+      });
+      const deletions = [...pendingSecretDeletes, ...mapDeletions].filter((reference) => {
+        const validProvider = !reference.startsWith("provider:") || form.llm_providers.some((p) => `provider:${p.id}` === reference);
+        const validMcp = !reference.startsWith("mcp:") || form.mcp_servers.some((server) =>
+          (["command", "url", "args"] as const).some((field) => `mcp:${server.name}:${field}` === reference));
+        return validProvider && validMcp;
+      });
+      const result = await saveSettingsWithSecrets(updates, deletions, replacements);
+      setPendingSecretDeletes([]);
       setConfigured(result.is_configured);
+      setSecretPresence(Object.fromEntries(result.secret_references.map(({ reference, exists }) => [reference, exists])));
+      setInitialMcpMaps(Object.fromEntries(result.mcp_servers.map((server) => [server.name, {
+        env: Object.keys(server.env), headers: Object.keys(server.headers ?? {}),
+      }])));
       setForm(toForm(result));
       if (result.language === "zh" || result.language === "en") {
         setLanguage(result.language);
@@ -361,11 +413,12 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
     } finally {
       setBusy(false);
     }
-  }, [form, onClose, flashProviderId]);
+  }, [form, onClose, flashProviderId, pendingSecretDeletes, initialMcpMaps]);
 
   const provider = form.provider || "anthropic";
   const apiKeyField = KEY_FIELDS[provider] ?? "anthropic_api_key";
   const apiKeyValue = form[apiKeyField] as string;
+  const apiKeyReference = `model:${String(apiKeyField).replace(/_api_key$/, "")}`;
 
   const providerLabel = (p: string) => {
     const map: Record<string, string> = {
@@ -530,7 +583,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                       value={apiKeyValue}
                       onChange={(e) => update(apiKeyField, e.target.value)}
                       placeholder={
-                        configured ? t("settings.apiKeyKeep") : t("settings.apiKeyNew")
+                        secretPresence[apiKeyReference] && !pendingSecretDeletes.includes(apiKeyReference) ? t("settings.apiKeyKeep") : t("settings.apiKeyNew")
                       }
                     />
                     <button
@@ -540,6 +593,12 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     >
                       {showKey ? t("common.hide") : t("common.show")}
                     </button>
+                    {secretPresence[apiKeyReference] && !pendingSecretDeletes.includes(apiKeyReference) && (
+                      <button type="button" className="agentz-settings-key-toggle" onClick={() => {
+                        update(apiKeyField, "");
+                        setPendingSecretDeletes((previous) => [...previous, apiKeyReference]);
+                      }}>{t("settings.deleteApiKey")}</button>
+                    )}
                   </div>
                   <p className="agentz-settings-hint">{t("settings.apiKeyHint")}</p>
                 </div>
@@ -661,6 +720,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                             onClick={() => {
                               setLlmEditIdx(idx);
                               setLlmEditForm({ ...p, api_key: "" });
+                              setLlmEditDeleteKey(false);
                               setLlmShowKey(false);
                             }}
                           >
@@ -735,11 +795,17 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                             type={llmShowKey ? "text" : "password"}
                             value={llmEditForm.api_key}
                             onChange={(e) => setLlmEditForm((f) => ({ ...f, api_key: e.target.value }))}
-                            placeholder={llmEditIdx !== -1 ? t("settings.apiKeyKeep") : t("settings.apiKeyNew")}
+                            placeholder={llmEditIdx !== -1 && secretPresence[`provider:${llmEditForm.id}`] && !llmEditDeleteKey ? t("settings.apiKeyKeep") : t("settings.apiKeyNew")}
                           />
                           <button type="button" className="agentz-settings-key-toggle" onClick={() => setLlmShowKey((v) => !v)}>
                             {llmShowKey ? t("common.hide") : t("common.show")}
                           </button>
+                          {llmEditIdx !== -1 && secretPresence[`provider:${llmEditForm.id}`] && !llmEditDeleteKey && (
+                            <button type="button" className="agentz-settings-key-toggle" onClick={() => {
+                              setLlmEditForm((previous) => ({ ...previous, api_key: "" }));
+                              setLlmEditDeleteKey(true);
+                            }}>{t("settings.deleteApiKey")}</button>
+                          )}
                         </div>
                       </div>
                       {BASE_URL_PROVIDERS.includes(llmEditForm.provider) && (
@@ -778,6 +844,9 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                           const id = llmEditForm.id.trim();
                           const model = llmEditForm.model.trim();
                           if (!id || !model) return;
+                          if (llmEditDeleteKey && llmEditIdx !== -1 && form.llm_providers[llmEditIdx]?.id === id) {
+                            setPendingSecretDeletes((previous) => [...previous, `provider:${id}`]);
+                          }
                           if (llmEditIdx === -1) {
                             if (form.llm_providers.some((p) => p.id === id)) return;
                             update("llm_providers", [...form.llm_providers, { ...llmEditForm, id, model }]);
@@ -790,11 +859,12 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                             );
                           }
                           setLlmEditIdx(null);
+                          setLlmEditDeleteKey(false);
                         }}
                       >
                         {t("common.save")}
                       </button>
-                      <button type="button" className="agentz-settings-cancel" onClick={() => setLlmEditIdx(null)}>
+                      <button type="button" className="agentz-settings-cancel" onClick={() => { setLlmEditIdx(null); setLlmEditDeleteKey(false); }}>
                         {t("common.cancel")}
                       </button>
                     </div>
@@ -805,6 +875,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     className="agentz-llm-add"
                     onClick={() => {
                       setLlmEditIdx(-1);
+                      setLlmEditDeleteKey(false);
                       setLlmEditForm(EMPTY_LLM_PROVIDER);
                       setLlmShowKey(false);
                     }}
@@ -860,24 +931,35 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     {srv.transport === "sse" ? (
                       <div className="agentz-settings-field">
                         <label>{t("settings.mcpUrl")}</label>
+                        <div className="agentz-settings-key-row">
                         <input
                           value={srv.url}
                           onChange={(e) => updateMcp(idx, { url: e.target.value })}
-                          placeholder="http://localhost:3000"
+                          placeholder={srv.url_configured && !pendingSecretDeletes.includes(`mcp:${srv.name}:url`) ? t("settings.mcpHiddenValue") : "http://localhost:3000"}
                         />
+                        {srv.url_configured && !pendingSecretDeletes.includes(`mcp:${srv.name}:url`) && (
+                          <button type="button" className="agentz-settings-key-toggle" onClick={() => stageMcpDelete(idx, "url")}>{t("settings.deleteMcpValue")}</button>
+                        )}
+                        </div>
                       </div>
                     ) : (
                       <>
                         <div className="agentz-settings-field">
                           <label>{t("settings.mcpCommand")}</label>
+                          <div className="agentz-settings-key-row">
                           <input
                             value={srv.command}
                             onChange={(e) => updateMcp(idx, { command: e.target.value })}
-                            placeholder="npx"
+                            placeholder={srv.command_configured && !pendingSecretDeletes.includes(`mcp:${srv.name}:command`) ? t("settings.mcpHiddenValue") : "npx"}
                           />
+                          {srv.command_configured && !pendingSecretDeletes.includes(`mcp:${srv.name}:command`) && (
+                            <button type="button" className="agentz-settings-key-toggle" onClick={() => stageMcpDelete(idx, "command")}>{t("settings.deleteMcpValue")}</button>
+                          )}
+                          </div>
                         </div>
                         <div className="agentz-settings-field">
                           <label>{t("settings.mcpArgs")}</label>
+                          <div className="agentz-settings-key-row">
                           <input
                             value={srv.args.join(" ")}
                             onChange={(e) =>
@@ -885,21 +967,24 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                                 args: e.target.value.split(/\s+/).filter(Boolean),
                               })
                             }
-                            placeholder="-y @modelcontextprotocol/server-filesystem /path"
+                            placeholder={srv.args_configured && !pendingSecretDeletes.includes(`mcp:${srv.name}:args`) ? t("settings.mcpHiddenValue") : "-y @modelcontextprotocol/server-filesystem /path"}
                           />
+                          {srv.args_configured && !pendingSecretDeletes.includes(`mcp:${srv.name}:args`) && (
+                            <button type="button" className="agentz-settings-key-toggle" onClick={() => stageMcpDelete(idx, "args")}>{t("settings.deleteMcpValue")}</button>
+                          )}
+                          </div>
                         </div>
                       </>
                     )}
                     <div className="agentz-settings-field">
                       <label>{t("settings.mcpEnv")}</label>
-                      <textarea
-                        rows={2}
-                        value={Object.entries(srv.env)
-                          .map(([k, v]) => `${k}=${v}`)
-                          .join("\n")}
-                        onChange={(e) => updateMcp(idx, { env: parseEnv(e.target.value) })}
-                        placeholder={"KEY=value\nOTHER=value"}
-                      />
+                      <McpMapEditor value={srv.env} onChange={(env) => updateMcp(idx, { env })}
+                        placeholder={"KEY=value\nOTHER=value"} />
+                    </div>
+                    <div className="agentz-settings-field">
+                      <label>{t("settings.mcpHeaders")}</label>
+                      <McpMapEditor value={srv.headers ?? {}} onChange={(headers) => updateMcp(idx, { headers })}
+                        placeholder={"Authorization=Bearer …"} />
                     </div>
                   </div>
                 ))}
@@ -914,6 +999,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
               </section>
             </div>
 
+            <DiagnosticsSection />
             <div className="agentz-settings-footer">
               <button type="button" className="agentz-settings-cancel" onClick={onClose}>
                 {t("common.cancel")}

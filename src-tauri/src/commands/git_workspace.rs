@@ -41,7 +41,13 @@ pub fn discover_git_repos(workspace: &Path) -> Vec<PathBuf> {
         return match crate::remote::cached_git_repos(&ws) {
             Some(rels) => rels
                 .iter()
-                .map(|r| if r.is_empty() { workspace.to_path_buf() } else { PathBuf::from(format!("{}/{}", ws.trim_end_matches('/'), r)) })
+                .map(|r| {
+                    if r.is_empty() {
+                        workspace.to_path_buf()
+                    } else {
+                        PathBuf::from(format!("{}/{}", ws.trim_end_matches('/'), r))
+                    }
+                })
                 .collect(),
             None => vec![workspace.to_path_buf()],
         };
@@ -201,7 +207,12 @@ pub fn normalize_workspace_rel_path(path: &str) -> Result<String, String> {
     let candidate = Path::new(&normalized);
     if candidate.is_absolute()
         || candidate.components().any(|component| {
-            matches!(component, std::path::Component::ParentDir | std::path::Component::RootDir | std::path::Component::Prefix(_))
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
         })
     {
         return Err(format!("path must stay within workspace: {path}"));
@@ -346,6 +357,9 @@ mod tests {
     fn rejects_workspace_path_traversal() {
         assert!(normalize_workspace_rel_path("../outside.txt").is_err());
         assert!(normalize_workspace_rel_path("/outside.txt").is_err());
-        assert_eq!(normalize_workspace_rel_path("nested/file.txt").unwrap(), "nested/file.txt");
+        assert_eq!(
+            normalize_workspace_rel_path("nested/file.txt").unwrap(),
+            "nested/file.txt"
+        );
     }
 }

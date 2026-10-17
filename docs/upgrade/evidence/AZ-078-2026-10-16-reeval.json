@@ -1,0 +1,21 @@
+[
+  {
+    "id": "AZ-078",
+    "verified_state": "linux_secret_service_cleanup_retry_fixture_cross_target_checked_native_unverified",
+    "severity": "P1",
+    "finding": "The Linux Secret Service temporary-credential fixture now requires repeated removal of the same reference to be idempotent. The existing remove path accepts zero or one matching item. Isolated x86_64-unknown-linux-gnu adapter and test typechecking passed with Rust 1.98.1; no native Linux test ran. D-Bus wait bounds and controlled lost-response create retries remain open.",
+    "conclusion_proposal": "Keep blocked for native Linux acceptance; typechecking is not runtime evidence.",
+    "next_action": "Add a bounded service boundary and controlled key-create retry with fault fixtures; then run the ignored temporary-item test and unavailable-bus, lock, prompt, corruption, revoke and migration cases in a real Linux user session.",
+    "remaining_work": [
+      "Bounded D-Bus service boundary and controlled create retry",
+      "Native Linux Secret Service read/write, lock, prompt, corruption, revoke and migration receipts",
+      "Independent unified review and rollback compatibility"
+    ],
+    "verification_gaps": [
+      "No native Linux service run or cleanup receipt",
+      "Ignored temporary-credential test only typechecked",
+      "D-Bus waiting and lost-response create behavior remain unbounded"
+    ],
+    "evidence": ["docs/upgrade/evidence/AZ-078-secret-service-adapter.md"]
+  }
+]

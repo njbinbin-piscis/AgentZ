@@ -18,6 +18,9 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   build: {
+    // Keep the production bundle compressed; the current chunk graph passes
+    // Vite import analysis with esbuild minification enabled.
+    minify: "esbuild",
     rollupOptions: {
       output: {
         manualChunks: {

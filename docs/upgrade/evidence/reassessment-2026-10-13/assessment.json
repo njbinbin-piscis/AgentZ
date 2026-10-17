@@ -1,0 +1,196 @@
+{
+  "date": "2026-10-13",
+  "report": "docs/upgrade/reassessment-2026-10-13.md",
+  "source_manifest": "docs/upgrade/evidence/reassessment-2026-10-13/source-manifest.json",
+  "checks": [
+    {
+      "label": "TypeScript 类型检查",
+      "command": "npx tsc --noEmit",
+      "status": "pass",
+      "result": "exit 0",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/typecheck.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "Vitest 默认并发",
+      "command": "npx vitest run",
+      "status": "fail",
+      "result": "44 files / 299 tests passed; worker unexpectedly exited",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/frontend-tests.log",
+      "sha256": "87861a96dce1d461e60ea210ce1d17ef6462c221188d8f84d109dbab3aa53a8e"
+    },
+    {
+      "label": "Vitest 有界并发",
+      "command": "npx vitest run --maxWorkers 2 --minWorkers 1",
+      "status": "pass",
+      "result": "45 files / 310 tests passed",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/frontend-tests-bounded.log",
+      "sha256": "b7d27e61bb3a8ef167d995ad0029d8aabec42a7f2b1f08df7abd044b49cd632d"
+    },
+    {
+      "label": "任务状态 Rust 测试",
+      "command": "cargo test -p agentz-task-state --offline --locked",
+      "status": "pass",
+      "result": "152 unit + 2 integration tests passed",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/domain-tests.log",
+      "sha256": "e01cc6e6c8fbb32e1d4ca713825c1ecb8819c4990c002fb28ed532108892d1de"
+    },
+    {
+      "label": "桌面宿主编译",
+      "command": "cargo check -p agentz-desktop --offline --locked",
+      "status": "fail",
+      "result": "7 dead_code errors in OAuth helper functions",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/host-check.log",
+      "sha256": "38937d7888b959680639ad478ae28d868c851eef3c3231a7232b4481d24edb06"
+    },
+    {
+      "label": "前端生产构建",
+      "command": "npx vite build --outDir target/reassessment-2026-10-13/web-dist",
+      "status": "fail",
+      "result": "vite:build-import-analysis parse error assets/index-BZKq-Gj5.js",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/web-build.log",
+      "sha256": "ff9b8bf9d7954bb7c030d90a18e45eb4e131f51028b8d5631397528d997e49d7"
+    },
+    {
+      "label": "台账回归夹具",
+      "command": "node scripts/upgrade-plan.verify.mjs",
+      "status": "pass",
+      "result": "isolated fixture passed after fixture aligned with warning policy",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/ledger-tests-repaired.log",
+      "sha256": "b140e76001dd74e2898583e571289dabb0c24113bd34b124a693e88e4243fcb0"
+    },
+    {
+      "label": "桌面宿主修复后编译",
+      "command": "cargo check -p agentz-desktop --offline --locked",
+      "status": "pass",
+      "result": "exit 0",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/host-check-current.log",
+      "sha256": "b4723a294a96830cdfdee1fc2c6459f0895a72f0595539e1f253c0a6e4b61628"
+    },
+    {
+      "label": "生产前端关闭压缩后构建",
+      "command": "npx vite build --outDir target/reassessment-2026-10-13/web-current",
+      "status": "pass",
+      "result": "built in 6m 7s; unminified main chunk 5.95MB",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/web-build-current.log",
+      "sha256": "cc26c0861d5d1f3dd52a9895a0e745f3562d716d4a7d71683bc0a23430b3b55b"
+    },
+    {
+      "label": "预算定向测试",
+      "command": "cargo test -p agentz-desktop --lib runtime::task_budget --offline --locked",
+      "status": "pass",
+      "result": "10 tests passed before lost-store case was added",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/task-budget-tests.log",
+      "sha256": "7116ed64b194d7d1fb5816f75626b4651ab2c0330861fe9b9faff626c5408c94"
+    },
+    {
+      "label": "预算库丢失回归",
+      "command": "cargo test -p agentz-desktop --lib lost_reservation_store_stops_bound_model_call --offline --locked",
+      "status": "pass",
+      "result": "1 test passed",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/lost-budget-store-test.log",
+      "sha256": "169f61a1233fc535dc45722ec49f83304b040bfe54831fb9c20d28eb6c2364cb"
+    },
+    {
+      "label": "无仓库目录丢库回归",
+      "command": "cargo test -p agentz-desktop projectless_directory_lookup_is_none_until_a_store_exists_and_refuses_lost_bindings --offline --locked",
+      "status": "pass",
+      "result": "1 test passed",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/projectless-regression.log",
+      "sha256": "f7df56eb37ed9e503daa887f27d215b302cf50c59f71fde228bd1a6ec7db5838"
+    },
+    {
+      "label": "仓库 Rust 格式检查",
+      "command": "cargo fmt --all -- --check",
+      "status": "fail",
+      "result": "existing differences across multiple files; no whole-repo formatting applied",
+      "log": "docs/upgrade/evidence/reassessment-2026-10-13/rustfmt-check.log",
+      "sha256": "7ee0bdc64462731f2ab37da47b5c2bfd5145fc315eb97f7a886d7e92aebcd283"
+    }
+  ],
+  "execution_batches": [
+    {
+      "title": "恢复可构建基线与资源预算边界",
+      "task_ids": [
+        "AZ-024",
+        "AZ-051",
+        "AZ-059"
+      ],
+      "exit_criteria": "桌面宿主和生产前端构建通过；预算故障注入证明已配置上限时停止执行；OAuth仅按已实现范围声明。"
+    },
+    {
+      "title": "补齐已实现候选的源码评审与依赖固定",
+      "task_ids": [
+        "AZ-026",
+        "AZ-032",
+        "AZ-035",
+        "AZ-038",
+        "AZ-041",
+        "AZ-043",
+        "AZ-044",
+        "AZ-047",
+        "AZ-048",
+        "AZ-053"
+      ],
+      "exit_criteria": "逐项重新对照当前源码/证据指纹，补缺失测试、依赖固定和独立验收；历史完成记录不作自动追认。"
+    },
+    {
+      "title": "打通任务交接和无仓库旅程",
+      "task_ids": [
+        "AZ-036",
+        "AZ-037",
+        "AZ-039",
+        "AZ-040",
+        "AZ-049",
+        "AZ-050",
+        "AZ-056"
+      ],
+      "exit_criteria": "任务环境、接手、产物与两类非代码旅程使用同一身份和可复现本地E2E，原生GUI单列实测。"
+    },
+    {
+      "title": "稳定版工程验证与迁移回退",
+      "task_ids": [
+        "AZ-057",
+        "AZ-060",
+        "AZ-061",
+        "AZ-062",
+        "AZ-063",
+        "AZ-065",
+        "AZ-066",
+        "AZ-067"
+      ],
+      "exit_criteria": "冻结构建做故障/长时/迁移回退验证，评测与诊断证据能够复现；未运行项目不记通过。"
+    },
+    {
+      "title": "外部条件验收与发行决策",
+      "task_ids": [
+        "AZ-031",
+        "AZ-045",
+        "AZ-052",
+        "AZ-054",
+        "AZ-058",
+        "AZ-064",
+        "AZ-068",
+        "AZ-069",
+        "AZ-077",
+        "AZ-078"
+      ],
+      "exit_criteria": "取得实际平台/账号/证书/用户环境后实测并记录支持范围，再作发行决定。"
+    },
+    {
+      "title": "后续团队自动化",
+      "task_ids": [
+        "AZ-070",
+        "AZ-071",
+        "AZ-072",
+        "AZ-073",
+        "AZ-074",
+        "AZ-075",
+        "AZ-076"
+      ],
+      "exit_criteria": "核心任务与资源边界稳定后，再验证团队与自动化收益。"
+    }
+  ],
+  "summary_path": "docs/upgrade/evidence/reassessment-2026-10-13/summary.json",
+  "assessment_scope": "Current source/evidence and local checks; historical decisions preserved"
+}

@@ -66,6 +66,7 @@ pub fn install_to_installed(
     content: &str,
     source: &str,
     source_url: Option<String>,
+    registry_version: Option<String>,
     session_id: Option<String>,
 ) -> Result<(String, String)> {
     provenance::ensure_evolution_dirs(root)?;
@@ -77,7 +78,56 @@ pub fn install_to_installed(
         anyhow::bail!("SKILL.md must declare a name");
     }
     let skill_id = sanitize_skill_id(&skill.name);
-    let meta = SkillConfigMeta::installed(source, source_url, session_id);
+    let requested_tools: Vec<String> = skill
+        .tools
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let previous = db
+        .get_skill(&skill_id)?
+        .map(|existing| SkillConfigMeta::from_json(&existing.config));
+    let previous_tools = previous
+        .as_ref()
+        .map(|metadata| metadata.requested_tools.clone())
+        .unwrap_or_default();
+    let added = provenance::added_tools(&previous_tools, &requested_tools);
+    if previous.is_some() {
+        if !added.is_empty() {
+            anyhow::bail!(
+                "skill update '{}' requests additional tools: {}. Review these capabilities and uninstall the existing skill before installing the update.",
+                skill.name,
+                added.join(", ")
+            );
+        }
+    }
+
+    let mut meta = SkillConfigMeta::installed(source, source_url, session_id);
+    meta.version = Some(skill.version.clone());
+    meta.registry_version = registry_version;
+    meta.content_sha256 = Some(provenance::content_sha256(content));
+    meta.requested_tools = requested_tools;
+    meta.install_history = previous
+        .as_ref()
+        .map(|metadata| metadata.install_history.clone())
+        .unwrap_or_default();
+    meta.install_history.push(provenance::SkillInstallRecord {
+        action: if previous.is_some() {
+            "updated".into()
+        } else {
+            "installed".into()
+        },
+        at: chrono::Utc::now().to_rfc3339(),
+        source: source.into(),
+        source_url: meta.source_url.clone(),
+        version: meta.version.clone(),
+        registry_version: meta.registry_version.clone(),
+        content_sha256: meta.content_sha256.clone().unwrap_or_default(),
+        added_tools: added,
+        removed_tools: provenance::removed_tools(&previous_tools, &meta.requested_tools),
+        requested_tools: meta.requested_tools.clone(),
+    });
     register_skill_db(
         db,
         &skill_id,
@@ -95,6 +145,134 @@ pub fn install_to_installed(
         let _ = provenance::add_hub_lock(root, &skill_id);
     }
     Ok((skill_id, skill.name))
+}
+
+pub fn uninstall_installed(db: &Database, root: &Path, skill_id: &str) -> Result<()> {
+    let meta = load_meta(db, skill_id);
+    provenance::record_skill_revocation_intent(root, skill_id, &meta)
+        .context("record skill capability revocation")?;
+    let path = provenance::find_skill_md(root, skill_id)
+        .ok_or_else(|| anyhow::anyhow!("skill not found: {skill_id}"))?;
+    let dir = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("skill directory is unavailable: {skill_id}"))?;
+    std::fs::remove_dir_all(dir).context("remove installed skill files")?;
+    db.delete_skill(skill_id)
+        .context("remove installed skill metadata")?;
+    provenance::remove_hub_lock(root, skill_id).context("remove skill registry lock")?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod install_tests {
+    use super::*;
+    use piscis_kernel::store::db::Database;
+
+    #[test]
+    fn install_records_provenance_and_refuses_unreviewed_tool_expansion() {
+        let root = std::env::temp_dir().join(format!(
+            "agentz-skill-install-test-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        std::fs::create_dir_all(&root).expect("create fixture");
+        let db_dir = root.join("db");
+        std::fs::create_dir_all(&db_dir).expect("create db fixture");
+        let db = Database::open(&db_dir.join("skills.db")).expect("open db");
+        let skills_root = root.join("skills");
+        let original = "---\nname: Review Skill\nversion: 1.2.3\ntools:\n  - read_file\n---\nReview files safely.";
+        let candidate = "---\nname: Review Skill\nversion: 2.0.0\ntools:\n  - read_file\n  - write_file\n---\nReview and edit files.";
+
+        let (skill_id, _) = install_to_installed(
+            &db,
+            &skills_root,
+            original,
+            "clawhub",
+            Some("https://clawhub.ai/api/v1/skills/review-skill/file".into()),
+            Some("1.2.3".into()),
+            None,
+        )
+        .expect("initial install");
+        let stored = db
+            .get_skill(&skill_id)
+            .expect("read skill")
+            .expect("installed");
+        let metadata = SkillConfigMeta::from_json(&stored.config);
+        assert_eq!(metadata.source.as_deref(), Some("clawhub"));
+        assert_eq!(metadata.version.as_deref(), Some("1.2.3"));
+        assert_eq!(
+            metadata.content_sha256.as_deref(),
+            Some(provenance::content_sha256(original).as_str())
+        );
+        assert_eq!(metadata.requested_tools, vec!["read_file"]);
+
+        let update_without_new_tools =
+            "---\nname: Review Skill\nversion: 1.3.0\ntools:\n  - read_file\n---\nReview files carefully.";
+        install_to_installed(
+            &db,
+            &skills_root,
+            update_without_new_tools,
+            "clawhub",
+            Some("https://clawhub.ai/api/v1/skills/review-skill/file".into()),
+            Some("1.3.0".into()),
+            None,
+        )
+        .expect("compatible update");
+        let updated = db
+            .get_skill(&skill_id)
+            .expect("read update")
+            .expect("installed");
+        let updated_metadata = SkillConfigMeta::from_json(&updated.config);
+        assert_eq!(updated_metadata.install_history.len(), 2);
+        assert_eq!(updated_metadata.install_history[0].action, "installed");
+        assert_eq!(updated_metadata.install_history[1].action, "updated");
+        assert_eq!(
+            updated_metadata.install_history[1]
+                .registry_version
+                .as_deref(),
+            Some("1.3.0")
+        );
+        assert_eq!(
+            updated_metadata.install_history[0].added_tools,
+            vec!["read_file"]
+        );
+        assert!(updated_metadata.install_history[1].added_tools.is_empty());
+
+        let error = install_to_installed(
+            &db,
+            &skills_root,
+            candidate,
+            "clawhub",
+            Some("https://clawhub.ai/api/v1/skills/review-skill/file".into()),
+            Some("2.0.0".into()),
+            None,
+        )
+        .expect_err("new tool capability must be reviewed");
+        assert!(error.to_string().contains("write_file"));
+        assert_eq!(
+            std::fs::read_to_string(skills_root.join("installed/review_skill/SKILL.md"))
+                .expect("original remains"),
+            update_without_new_tools
+        );
+        uninstall_installed(&db, &skills_root, &skill_id).expect("uninstall and revoke");
+        assert!(db
+            .get_skill(&skill_id)
+            .expect("read deleted skill")
+            .is_none());
+        assert!(!skills_root.join("installed/review_skill").exists());
+        assert!(!provenance::hub_lock_path(&skills_root).exists());
+        let events = std::fs::read_to_string(
+            skills_root
+                .join(provenance::SUBDIR_HUB)
+                .join("authorization-events.jsonl"),
+        )
+        .expect("read revocation event");
+        let event: serde_json::Value =
+            serde_json::from_str(events.trim()).expect("valid audit event");
+        assert_eq!(event["action"], "revocation_requested");
+        assert_eq!(event["requested_tools"][0], "read_file");
+        let _ = std::fs::remove_dir_all(root);
+    }
 }
 
 pub fn create_draft(

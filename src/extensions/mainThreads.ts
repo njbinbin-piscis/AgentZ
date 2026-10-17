@@ -44,6 +44,8 @@ import type {
 } from "./common/dto";
 import * as conv from "./typeConverters";
 import { uriToIdePath } from "../services/tauri/editorUri";
+import { ideApi } from "../services/tauri/ide";
+import { diskStamps } from "../services/diskStamps";
 import { extensionUiStore } from "./extensionUiStore";
 
 export interface MainThreadContext {
@@ -404,8 +406,13 @@ export class MainThreadDocuments {
   async $trySaveDocument(uri: UriComponents): Promise<boolean> {
     const model = monaco.editor.getModel(conv.dtoToUri(uri));
     if (!model) return false;
+    // Same contract as CodeZ's saveFile: send the digest of the bytes last read so the backend
+    // refuses to overwrite a file that changed on disk, then record the new digest.
+    const fullPath = uriToIdePath(conv.dtoToUri(uri));
     try {
-      await invoke<void>("ide_write_file", { path: uriToIdePath(conv.dtoToUri(uri)), content: model.getValue() });
+      const digest = await ideApi.writeFile(fullPath, model.getValue(), diskStamps.get(fullPath));
+      if (digest) diskStamps.set(fullPath, digest);
+      else diskStamps.delete(fullPath);
       return true;
     } catch {
       return false;
@@ -470,11 +477,32 @@ export class MainThreadTreeViews implements MainThreadTreeViewsShape {
 
 export class MainThreadWebviews implements MainThreadWebviewsShape {
   private readonly extHost;
+  private readonly disposedHandles = new Set<string>();
   constructor(rpc: IRPCProtocol) {
     this.extHost = rpc.getProxy(ExtHostContext.ExtHostWebviews);
   }
   $createWebviewPanel(panel: WebviewPanelDto): void {
-    extensionUiStore.setWebview({ handle: panel.handle, viewType: panel.viewType, title: panel.title, html: "" });
+    this.disposedHandles.delete(panel.handle);
+    void invoke<void>("webview_resources_register", {
+      token: panel.resourceToken,
+      roots: panel.resourceRoots,
+    })
+      .catch((error) => console.error("Failed to register extension webview resources:", error))
+      .finally(() => {
+        if (this.disposedHandles.has(panel.handle)) {
+          void invoke<void>("webview_resources_unregister", { token: panel.resourceToken })
+            .catch((error) => console.error("Failed to revoke extension webview resources:", error));
+          return;
+        }
+        extensionUiStore.setWebview({
+          handle: panel.handle,
+          resourceToken: panel.resourceToken,
+          viewType: panel.viewType,
+          title: panel.title,
+          html: "",
+          enableScripts: panel.options?.enableScripts === true,
+        });
+      });
   }
   $setHtml(handle: string, html: string): void {
     extensionUiStore.setWebviewHtml(handle, html);
@@ -485,7 +513,12 @@ export class MainThreadWebviews implements MainThreadWebviewsShape {
     return true;
   }
   $dispose(handle: string): void {
-    extensionUiStore.removeWebview(handle);
+    this.disposedHandles.add(handle);
+    const removed = extensionUiStore.removeWebview(handle);
+    if (removed?.resourceToken) {
+      void invoke<void>("webview_resources_unregister", { token: removed.resourceToken })
+        .catch((error) => console.error("Failed to revoke extension webview resources:", error));
+    }
     this.extHost.$onDidDispose(handle);
   }
   /** Called by the WebviewHost component when the iframe posts to the extension. */
@@ -512,7 +545,13 @@ export class MainThreadTerminal implements MainThreadTerminalShape {
     window.dispatchEvent(new CustomEvent("agentz-show-terminal"));
   }
   $dispose(id: string): void {
-    void invoke("ide_terminal_destroy", { terminalId: id });
+    invoke("ide_terminal_destroy", { terminalId: id }).catch((err: unknown) => {
+      // A session that is already gone counts as closed.
+      const message = String(err);
+      if (!/not found/i.test(message)) {
+        console.warn("terminal dispose failed", id, message);
+      }
+    });
   }
 }
 

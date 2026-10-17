@@ -17,6 +17,8 @@ import IdeStatusBar from "./IdeStatusBar";
 import RemoteConnectDialog from "./RemoteConnectDialog";
 import * as monaco from "monaco-editor";
 import { ideApi, onFileChanged } from "../../services/tauri/ide";
+import { extHostResourceSnapshot } from "../../services/tauri/extHostResource";
+import { graphIndexResourceSnapshot } from "../../services/tauri/graphIndexResource";
 import { fileUriString } from "../../services/tauri/editorUri";
 import { revealInFolder } from "../../services/tauri";
 import BrowserPanel from "./BrowserPanel";
@@ -39,6 +41,11 @@ import { editorSnapshotFromTabs } from "../../services/tauri/workspace";
 import { useProjectEdgeActions, useProjectEdgeState } from "../../contexts/ProjectEdgeContext";
 import { normalizeRelPath, shouldWatchPath } from "../../utils/pathFilter";
 import { perfCounters } from "../../utils/perfCounters";
+import { startOwnedWatcher } from "./watcherLifecycle";
+import { EditorConflictTracker, type CapturedOperation } from "./editorConflict";
+import { isRecoveryPath, recoveryOriginalPath, mergeRestoredTabs, restoreRecoveryTab } from "./editorRecovery";
+import { saveBlockReason } from "./saveBlock";
+import { diskStamps as diskStampsStore } from "../../services/diskStamps";
 import "./IDE.css";
 
 type SidebarTab = "explorer" | "search" | "git" | "extensions";
@@ -69,6 +76,8 @@ interface IDEProps {
   onScreenshotToChat?: (base64: string) => void;
   /** One-shot editor restore after app startup (hot exit). */
   workspaceRestore?: { key: number; editor: EditorSnapshot; layout: LayoutSnapshot } | null;
+  /** Register a synchronous live snapshot getter for navigation preflight. */
+  onRegisterNavigationSnapshot?: (read: (() => EditorSnapshot) | null) => void;
   /** Debounced editor + IDE layout patch for workspace persistence. */
   onWorkspacePatch?: (patch: {
     editor: EditorSnapshot;
@@ -119,6 +128,7 @@ export default function CodeZWorkspace({
   onScreenshotToChat,
   workspaceRestore = null,
   onWorkspacePatch,
+  onRegisterNavigationSnapshot,
 }: IDEProps) {
   const { t } = useTranslation();
 
@@ -126,7 +136,7 @@ export default function CodeZWorkspace({
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
 
   // Open tabs
-  const [tabs, setTabs] = useState<OpenTab[]>([]);
+  const [tabs, setTabsState] = useState<OpenTab[]>([]);
   const [activeTabPath, setActiveTabPath] = useState<string | null>(null);
 
   // Pending cursor reveal (search "go to result" / navigation). Applied to the
@@ -242,7 +252,8 @@ export default function CodeZWorkspace({
         setBrowserRefreshSignal((n) => n + 1);
         setAgentBrowserAction(null);
       }
-    }).then((fn) => {
+    }).then((raw) => {
+      const fn = perfCounters.trackListener(raw);
       if (disposed) fn();
       else unlistenChat = fn;
     });
@@ -258,7 +269,8 @@ export default function CodeZWorkspace({
     let disposed = false;
     void onBrowserChanged(() => {
       setBrowserRefreshSignal((n) => n + 1);
-    }).then((fn) => {
+    }).then((raw) => {
+      const fn = perfCounters.trackListener(raw);
       if (disposed) fn();
       else unlistenChanged = fn;
     });
@@ -282,9 +294,44 @@ export default function CodeZWorkspace({
   // Stable refs so keyboard shortcuts / beforeunload always read the latest
   // state without re-registering listeners on every render.
   const tabsRef = useRef<OpenTab[]>(tabs);
-  tabsRef.current = tabs;
+  const conflicts = useRef(new EditorConflictTracker());
+  // Digest of the disk bytes each open file was last loaded from or saved as. Saves send it back
+  // so the backend refuses to overwrite a file that changed on disk in the meantime.
+  const diskStamps = useRef(diskStampsStore);
+  const editorGeneration = useRef(0);
+  const tabMutation = useRef(0);
+  const openRequests = useRef(new Map<string, number>());
+  const openSequence = useRef(0);
+  const liveProject = useRef<{ value: string | null } | null>(null);
+  if (!liveProject.current || liveProject.current.value !== projectDir) {
+    liveProject.current = { value: projectDir };
+    editorGeneration.current += 1;
+    conflicts.current.setScope(projectDir);
+    tabsRef.current = [];
+    openRequests.current.clear();
+  }
+  const setTabs = useCallback((update: OpenTab[] | ((previous: OpenTab[]) => OpenTab[])) => {
+    const previous = tabsRef.current;
+    const next = typeof update === "function" ? update(previous) : update;
+    for (const tab of previous) if (!next.some(row => row.path === tab.path)) {
+      conflicts.current.close(tab.path);
+      openRequests.current.delete(tab.path);
+    }
+    if (liveProject.current?.value) for (const tab of next) {
+      const captured = conflicts.current.snapshot(tab.path);
+      if (!captured) conflicts.current.open(tab.path, tab.content, tab.isDirty);
+      else if (captured.content !== tab.content || (tab.isDirty && !captured.isDirty)) conflicts.current.edit(tab.path, tab.content);
+    }
+    tabMutation.current += 1;
+    tabsRef.current = next;
+    setTabsState(next);
+  }, []);
   const activeTabPathRef = useRef<string | null>(activeTabPath);
   activeTabPathRef.current = activeTabPath;
+  useEffect(() => {
+    onRegisterNavigationSnapshot?.(() => editorSnapshotFromTabs(tabsRef.current, activeTabPathRef.current));
+    return () => onRegisterNavigationSnapshot?.(null);
+  }, [onRegisterNavigationSnapshot]);
   const projectDirRef = useRef<string | null>(projectDir);
   projectDirRef.current = projectDir;
   const handledOpenPathNonce = useRef(0);
@@ -300,6 +347,7 @@ export default function CodeZWorkspace({
   // Reset editor state when switching projects or closing the folder.
   useEffect(() => {
     handledOpenPathNonce.current = 0;
+    setFileLoading(null);
     if (!projectDir) {
       prevProjectDirRef.current = null;
       setTabs([]);
@@ -315,8 +363,9 @@ export default function CodeZWorkspace({
       return;
     }
     const prev = prevProjectDirRef.current;
-    const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
-    if (prev && norm(prev) !== norm(projectDir)) {
+    // Match the exact scope identity used by the operation tracker, including
+    // path spelling changes. Do not retain rendered tabs with an invalidated ref.
+    if (prev && prev !== projectDir) {
       setTabs([]);
       setActiveTabPath(null);
       setFileLoadError(null);
@@ -328,7 +377,7 @@ export default function CodeZWorkspace({
       setBottomTab("terminal");
     }
     prevProjectDirRef.current = projectDir;
-  }, [projectDir]);
+  }, [projectDir, setTabs]);
 
   // Hot-exit restore: reopen tabs and reapply unsaved buffers.
   useEffect(() => {
@@ -337,6 +386,8 @@ export default function CodeZWorkspace({
     handledRestoreKeyRef.current = workspaceRestore.key;
 
     const { editor, layout } = workspaceRestore;
+    const capturedGeneration = editorGeneration.current;
+    const capturedMutation = tabMutation.current;
     if (layout.sidebar_tab === "explorer" || layout.sidebar_tab === "search" || layout.sidebar_tab === "git" || layout.sidebar_tab === "extensions") {
       setSidebarTab(layout.sidebar_tab);
     }
@@ -355,12 +406,25 @@ export default function CodeZWorkspace({
 
     void (async () => {
       const restored: OpenTab[] = [];
+      let restoreFailed = false;
       for (const path of editor.open_paths) {
         const fullPath = `${projectDir}/${path}`;
         const dirty = editor.dirty_buffers[path];
+        if (isRecoveryPath(path)) {
+          const backup = restoreRecoveryTab(path, dirty);
+          if (backup) restored.push(backup);
+          else restoreFailed = true;
+          continue;
+        }
         try {
           const fc = await ideApi.readFile(fullPath);
-          if (fc.is_binary) continue;
+          if (fc.sha256) diskStamps.current.set(fullPath, fc.sha256);
+          if (fc.is_binary) {
+            restoreFailed = true;
+            if (dirty !== undefined) restored.push({ path, name: path.split("/").pop() || path,
+              language: null, content: dirty, isDirty: true, isReadOnly: false, viewMode: "editor" });
+            continue;
+          }
           restored.push({
             path,
             name: path.split("/").pop() || path,
@@ -372,6 +436,7 @@ export default function CodeZWorkspace({
             fileSize: fc.size,
           });
         } catch {
+          restoreFailed = true;
           if (dirty !== undefined) {
             restored.push({
               path,
@@ -385,20 +450,28 @@ export default function CodeZWorkspace({
           }
         }
       }
+      if (capturedGeneration !== editorGeneration.current) return;
+      if (capturedMutation !== tabMutation.current) {
+        // Preserve newer intent and retain older drafts as separate recovery tabs.
+        setTabs(prev => mergeRestoredTabs(prev, restored));
+        if (restoreFailed) setFileLoadError("Some restored files could not be read. Available unsaved buffers have been retained.");
+        return;
+      }
       setTabs(restored);
+      if (restoreFailed) setFileLoadError("Some restored files could not be read. Available unsaved buffers have been retained.");
       const active =
         editor.active_path && restored.some((t) => t.path === editor.active_path)
           ? editor.active_path
           : restored[0]?.path ?? null;
       setActiveTabPath(active);
     })();
-  }, [projectDir, workspaceRestore]);
+  }, [projectDir, workspaceRestore, setTabs]);
 
   const activeTab = tabs.find((t) => t.path === activeTabPath) || null;
 
   const fileTreeFocusPath = useMemo(() => {
     if (fileTreeSelection.size > 0) return [...fileTreeSelection][0];
-    return activeTabPath;
+    return activeTabPath && !isRecoveryPath(activeTabPath) ? activeTabPath : null;
   }, [fileTreeSelection, activeTabPath]);
 
   const switchSidebarTab = useCallback((tab: SidebarTab) => {
@@ -479,12 +552,19 @@ export default function CodeZWorkspace({
 
   // Debounced reload for open tabs whose backing files changed externally.
   const tabReloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingTabPaths = useRef<Set<string>>(new Set());
+  const pendingTabPaths = useRef<Map<string, CapturedOperation>>(new Map());
 
   const scheduleTabReload = useCallback((evtPath: string, kind: "modified" | "deleted") => {
-    if (!projectDirRef.current) return;
+    if (!projectDirRef.current || isRecoveryPath(evtPath)) return;
 
     if (kind === "deleted") {
+      const tab = tabsRef.current.find(row => row.path === evtPath);
+      if (tab?.isDirty) {
+        const captured = conflicts.current.beginRead(evtPath);
+        if (captured) conflicts.current.settleRead(captured, { kind: "deleted" });
+        setFileLoadError(`"${evtPath}" was deleted on disk. Unsaved editor content has been retained.`);
+        return;
+      }
       setTabs((p) => p.filter((t) => t.path !== evtPath));
       setActiveTabPath((cur) => {
         if (cur !== evtPath) return cur;
@@ -504,37 +584,46 @@ export default function CodeZWorkspace({
           `"${name}" changed on disk but you have unsaved edits. Reload from disk and discard local changes?`,
       );
       if (!ok) return;
-      setTabs((p) => p.map((row) => (row.path === evtPath ? { ...row, isDirty: false } : row)));
     }
 
-    pendingTabPaths.current.add(evtPath);
+    const captured = conflicts.current.beginRead(evtPath, { allowDiscard: tab.isDirty });
+    if (!captured) return;
+    pendingTabPaths.current.set(evtPath, captured);
     perfCounters.recordTabReloadScheduled();
     if (tabReloadTimer.current) clearTimeout(tabReloadTimer.current);
     tabReloadTimer.current = setTimeout(() => {
       tabReloadTimer.current = null;
-      const dir = projectDirRef.current;
-      if (!dir) return;
-      const paths = [...pendingTabPaths.current];
+      const paths = [...pendingTabPaths.current.entries()];
       pendingTabPaths.current.clear();
-      for (const path of paths) {
-        const fullPath = `${dir}/${path}`;
+      for (const [path, capture] of paths) {
+        if (!conflicts.current.snapshot(path) || capture.project !== projectDirRef.current) continue;
+        const fullPath = `${capture.project}/${path}`;
         void ideApi.readFile(fullPath).then((fc) => {
+          if (fc.is_binary) throw new Error("Changed file is binary; the editor buffer was retained.");
+          const settled = conflicts.current.settleRead(capture, { kind: "content", content: fc.content });
+          if (settled.status === "conflict") setFileLoadError(`"${path}" changed on disk. Unsaved editor content has been retained.`);
+          if (settled.status !== "applied") return;
+          if (fc.sha256) diskStamps.current.set(fullPath, fc.sha256);
           setTabs((p) =>
             p.map((row) =>
               row.path === path ? { ...row, content: fc.content, isDirty: false } : row,
             ),
           );
-        }).catch(() => {});
+        }).catch(() => {
+          if (conflicts.current.settleRead(capture, { kind: "error" }).status !== "stale")
+            setFileLoadError(`Could not reload "${path}". The editor buffer and unsaved state were retained.`);
+        });
       }
     }, 250);
-  }, [t]);
+  }, [t, setTabs]);
 
   const reloadTabFromDisk = useCallback(
     async (path: string) => {
       const dir = projectDirRef.current;
-      if (!dir || isBrowserTab(path)) return;
+      if (!dir || isBrowserTab(path) || isRecoveryPath(path)) return;
       const tab = tabsRef.current.find((t) => t.path === path);
       if (!tab) return;
+      let allowDiscard = false;
       if (tab.isDirty) {
         const name = path.split("/").pop() || path;
         const ok = window.confirm(
@@ -542,19 +631,30 @@ export default function CodeZWorkspace({
             `"${name}" changed on disk but you have unsaved edits. Reload from disk and discard local changes?`,
         );
         if (!ok) return;
+        allowDiscard = true;
       }
+      const captured = conflicts.current.beginRead(path, { allowDiscard });
+      if (!captured) return;
       try {
         const fc = await ideApi.readFile(`${dir}/${path}`);
+        if (fc.is_binary) {
+          if (conflicts.current.settleRead(captured, { kind: "error" }).status !== "stale")
+            setFileLoadError(`Cannot reload binary file "${path}". The editor buffer was retained.`);
+          return;
+        }
+        if (conflicts.current.settleRead(captured, { kind: "content", content: fc.content }).status !== "applied") return;
+        if (fc.sha256) diskStamps.current.set(`${dir}/${path}`, fc.sha256);
         setTabs((p) =>
           p.map((row) =>
             row.path === path ? { ...row, content: fc.content, isDirty: false } : row,
           ),
         );
       } catch {
-        /* ignore read errors */
+        if (conflicts.current.settleRead(captured, { kind: "error" }).status !== "stale")
+          setFileLoadError(`Could not reload "${path}". The editor buffer and unsaved state were retained.`);
       }
     },
-    [t],
+    [t, setTabs],
   );
 
   useEffect(() => registerWorkspaceRefresh("fileTree", loadFileTree), [registerWorkspaceRefresh, loadFileTree]);
@@ -570,7 +670,10 @@ export default function CodeZWorkspace({
 
     callbacks.current.scheduleWorkspaceRefresh({ git: true, fileTree: true, force: true, delayMs: 0 });
 
-    ideApi.startWatcher(projectDir).catch(() => {});
+    const stopOwnedWatcher = startOwnedWatcher(
+      () => ideApi.startWatcher(projectDir),
+      () => ideApi.stopWatcher(projectDir),
+    );
 
     const unlistenPromise = onFileChanged((evt) => {
       if (evt.project_dir !== projectDir) return;
@@ -592,7 +695,7 @@ export default function CodeZWorkspace({
       if (evt.kind === "modified" || evt.kind === "deleted") {
         callbacks.current.scheduleTabReload(evtPath, evt.kind);
       }
-    });
+    }).then((raw) => perfCounters.trackListener(raw));
 
     return () => {
       if (tabReloadTimer.current) {
@@ -601,23 +704,33 @@ export default function CodeZWorkspace({
       }
       pendingTabPaths.current.clear();
       unlistenPromise.then((fn) => fn());
-      ideApi.stopWatcher(projectDir).catch(() => {});
+      stopOwnedWatcher();
     };
   }, [projectDir]);
 
   const openFile = useCallback(
     async (path: string, readOnly = false) => {
-      const existing = tabs.find((t) => t.path === path);
+      if (isRecoveryPath(path)) {
+        if (tabsRef.current.some(tab => tab.path === path)) setActiveTabPath(path);
+        return;
+      }
+      const existing = tabsRef.current.find((t) => t.path === path);
       if (existing) {
         setActiveTabPath(path);
         return;
       }
 
       const fullPath = projectDir ? `${projectDir}/${path}` : path;
+      const capturedGeneration = editorGeneration.current;
+      const request = ++openSequence.current;
+      openRequests.current.set(path, request);
+      const current = () => capturedGeneration === editorGeneration.current && openRequests.current.get(path) === request;
       setFileLoading(path);
       setFileLoadError(null);
       try {
         const fc = await ideApi.readFile(fullPath);
+        if (!current() || tabsRef.current.some(tab => tab.path === path)) return;
+        if (fc.sha256) diskStamps.current.set(fullPath, fc.sha256);
         if (fc.is_binary && fc.preview_data) {
           const newTab: OpenTab = {
             path,
@@ -651,14 +764,15 @@ export default function CodeZWorkspace({
         setTabs((prev) => [...prev, newTab]);
         setActiveTabPath(path);
       } catch (e) {
+        if (!current()) return;
         const msg = String(e);
         setFileLoadError(msg);
         console.error("Failed to read file:", e);
       } finally {
-        setFileLoading(null);
+        if (current() && openSequence.current === request) setFileLoading(null);
       }
     },
-    [projectDir, tabs, t],
+    [projectDir, t, setTabs],
   );
 
   openFileRef.current = openFile;
@@ -676,12 +790,15 @@ export default function CodeZWorkspace({
     setTabs((prev) =>
       prev.map((t) => (t.path === path ? { ...t, viewMode: mode } : t)),
     );
-  }, []);
+  }, [setTabs]);
 
   // ─── Open a file and jump to a line/column (search results) ──────
   const revealInFile = useCallback(
     async (path: string, line: number, column: number) => {
+      if (isRecoveryPath(path)) return;
+      const generation = editorGeneration.current;
       await openFile(path);
+      if (generation !== editorGeneration.current || !tabsRef.current.some(tab => tab.path === path)) return;
       setActiveTabPath(path);
       setReveal({ path, line, column: column || 1, nonce: Date.now() });
     },
@@ -691,7 +808,7 @@ export default function CodeZWorkspace({
   // ─── Open diff for a file ────────────────────────────────────────
   const openDiff = useCallback(
     async (path: string) => {
-      if (!projectDir) return;
+      if (!projectDir || isRecoveryPath(path)) return;
       const diffPath = `diff:${path}`;
       const existing = tabs.find((t) => t.path === diffPath);
       if (existing) {
@@ -700,7 +817,9 @@ export default function CodeZWorkspace({
       }
 
       try {
+        const generation = editorGeneration.current;
         const diff = await ideApi.gitDiff(projectDir, path);
+        if (generation !== editorGeneration.current || tabsRef.current.some(tab => tab.path === diffPath)) return;
         const newTab: OpenTab = {
           path: diffPath,
           name: `${path} (diff)`,
@@ -717,13 +836,14 @@ export default function CodeZWorkspace({
         console.error("Failed to get diff:", e);
       }
     },
-    [projectDir, tabs],
+    [projectDir, tabs, setTabs],
   );
 
   // ─── Handle editor content change ───────────────────────────────
   const handleEditorChange = useCallback(
     (value: string) => {
-      if (!activeTabPath) return;
+      if (!activeTabPath || isRecoveryPath(activeTabPath) || tabsRef.current.find(tab => tab.path === activeTabPath)?.isReadOnly) return;
+      conflicts.current.edit(activeTabPath, value);
       setTabs((prev) =>
         prev.map((t) =>
           t.path === activeTabPath
@@ -732,7 +852,7 @@ export default function CodeZWorkspace({
         ),
       );
     },
-    [activeTabPath],
+    [activeTabPath, setTabs],
   );
 
   // ─── Save file (Ctrl+S) ──────────────────────────────────────────
@@ -742,19 +862,31 @@ export default function CodeZWorkspace({
     async (path: string) => {
       const tab = tabsRef.current.find((t) => t.path === path);
       const dir = projectDirRef.current;
-      if (!tab || !dir) return;
+      if (!tab || !dir || tab.isReadOnly || isRecoveryPath(path)) return false;
       const fullPath = `${dir}/${path}`;
+      const captured = conflicts.current.beginSave(path);
+      if (!captured) return false;
       try {
-        await ideApi.writeFile(fullPath, tab.content);
+        const digest = await ideApi.writeFile(fullPath, tab.content, diskStamps.current.get(fullPath));
+        if (digest) diskStamps.current.set(fullPath, digest);
+        else diskStamps.current.delete(fullPath);
+        if (conflicts.current.settleSave(captured, true).status !== "saved") return false;
         setTabs((prev) =>
           prev.map((t) => (t.path === path ? { ...t, isDirty: false } : t)),
         );
         scheduleWorkspaceRefresh({ git: true, force: true, delayMs: 0 });
+        return true;
       } catch (e) {
-        console.error("Failed to save:", e);
+        if (conflicts.current.settleSave(captured, false).status !== "stale") {
+          const message = String(e).startsWith("conflict:")
+            ? `"${path}" changed on disk. Your edits were not saved; reload the file from disk before saving again.`
+            : `Could not save "${path}". Unsaved editor content has been retained. ${String(e)}`;
+          setFileLoadError(message);
+        }
+        return false;
       }
     },
-    [scheduleWorkspaceRefresh],
+    [scheduleWorkspaceRefresh, setTabs],
   );
 
   // The editor keeps each file's Monaco model alive across tab switches
@@ -765,7 +897,7 @@ export default function CodeZWorkspace({
     const current = new Set(
       projectDir
         ? tabs
-            .filter((tab) => !tab.isDiff && !isBrowserTab(tab.path))
+            .filter((tab) => !tab.isDiff && !isBrowserTab(tab.path) && !isRecoveryPath(tab.path))
             .map((tab) => fileUriString(`${projectDir}/${tab.path}`))
         : [],
     );
@@ -774,6 +906,74 @@ export default function CodeZWorkspace({
     }
     openModelUrisRef.current = current;
   }, [tabs, projectDir]);
+  useEffect(() => () => {
+    // Monaco retains inactive tab models. Release this workspace's models if
+    // the entire pane unmounts before its normal tab-close path runs.
+    for (const uri of openModelUrisRef.current) {
+      monaco.editor.getModel(monaco.Uri.parse(uri))?.dispose();
+    }
+    openModelUrisRef.current.clear();
+  }, []);
+
+  // Development census reads Monaco's actual model registry and the host's
+  // owned PTY registry. It reports counts only, never paths or terminal data.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const debugWindow = window as typeof window & {
+      __agentz_codez_resource_snapshot?: () => Promise<{
+        monaco_models_total: number;
+        tracked_editor_models: number;
+        live_tracked_editor_models: number;
+        tracked_listeners: ReturnType<typeof perfCounters.resourceSnapshot>["listener"];
+        native_pty: Awaited<ReturnType<typeof ideApi.terminalResourceSnapshot>> | null;
+        native_watchers: number | null;
+        extension_host: Awaited<ReturnType<typeof extHostResourceSnapshot>> | null;
+        graph_index: Awaited<ReturnType<typeof graphIndexResourceSnapshot>> | null;
+      }>;
+    };
+    const snapshot = async () => {
+      const tracked = openModelUrisRef.current;
+      const modelCounts = {
+        monaco_models_total: monaco.editor.getModels().length,
+        tracked_editor_models: tracked.size,
+        live_tracked_editor_models: [...tracked].filter(
+          (uri) => monaco.editor.getModel(monaco.Uri.parse(uri)) !== null,
+        ).length,
+        tracked_listeners: perfCounters.resourceSnapshot().listener,
+      };
+      let native_pty = null;
+      let native_watchers = null;
+      let extension_host = null;
+      let graph_index = null;
+      try {
+        native_pty = await ideApi.terminalResourceSnapshot();
+      } catch {
+        // A native census failure is unknown, never a measured zero.
+      }
+      try {
+        native_watchers = await ideApi.watcherCount();
+      } catch {
+        // Keep a failed watcher census distinct from an empty registry.
+      }
+      try {
+        extension_host = await extHostResourceSnapshot();
+      } catch {
+        // The sidecar census is unknown when the host query fails.
+      }
+      try {
+        graph_index = await graphIndexResourceSnapshot();
+      } catch {
+        // Keep an unavailable graph-index census explicit.
+      }
+      return { ...modelCounts, native_pty, native_watchers, extension_host, graph_index };
+    };
+    debugWindow.__agentz_codez_resource_snapshot = snapshot;
+    return () => {
+      if (debugWindow.__agentz_codez_resource_snapshot === snapshot) {
+        delete debugWindow.__agentz_codez_resource_snapshot;
+      }
+    };
+  }, []);
 
   // ─── Close tab (no dirty prompt — used internally) ─────────────────
   const removeTab = useCallback(
@@ -788,13 +988,17 @@ export default function CodeZWorkspace({
         return next;
       });
     },
-    [],
+    [setTabs],
   );
 
   // ─── Close tab (with dirty prompt) ──────────────────────────────────
   const closeTab = useCallback(
     (path: string) => {
       const tab = tabsRef.current.find((t) => t.path === path);
+      if (tab && isRecoveryPath(path)) {
+        if (window.confirm("Discard this recovered draft? Copy its text before closing; this does not save the original file.")) removeTab(path);
+        return;
+      }
       if (tab?.isDirty) {
         const name = tab.name || path;
         const msg = t("ide.unsavedConfirm", { name })
@@ -805,9 +1009,10 @@ export default function CodeZWorkspace({
         // User clicked OK — save then close
         const dir = projectDirRef.current;
         if (dir && !tab.isReadOnly && !tab.path.startsWith("diff:")) {
-          ideApi.writeFile(`${dir}/${tab.path}`, tab.content)
-            .then(() => removeTab(path))
-            .catch(() => removeTab(path));
+          const identity = conflicts.current.snapshot(path)?.tabIdentity;
+          void saveFile(path).then(saved => {
+            if (saved && conflicts.current.snapshot(path)?.tabIdentity === identity && !conflicts.current.snapshot(path)?.isDirty) removeTab(path);
+          });
         } else {
           removeTab(path);
         }
@@ -815,7 +1020,7 @@ export default function CodeZWorkspace({
         removeTab(path);
       }
     },
-    [removeTab, t],
+    [removeTab, saveFile, t],
   );
 
   const handleTabClose = useCallback(
@@ -840,7 +1045,10 @@ export default function CodeZWorkspace({
   // ─── Context menu actions ─────────────────────────────────────────
   const closeAllTabs = useCallback(async () => {
     const dir = projectDirRef.current;
-    const snapshot = tabsRef.current.slice();
+    const generation = editorGeneration.current;
+    // Recovered drafts stay open: they cannot be saved here, and closing them would discard data.
+    const snapshot = tabsRef.current.filter(tab => !isRecoveryPath(tab.path));
+    const identities = new Map(snapshot.map(tab => [tab.path, conflicts.current.snapshot(tab.path)?.tabIdentity]));
     // Save all dirty tabs first (with confirmation)
     const dirty = snapshot.filter((t) => t.isDirty);
     if (dirty.length > 0) {
@@ -849,18 +1057,22 @@ export default function CodeZWorkspace({
         || `${dirty.length} file(s) have unsaved changes. Save all before closing?`;
       // eslint-disable-next-line no-alert
       const save = window.confirm(msg);
-      if (save && dir) {
-        await Promise.all(
-          dirty
-            .filter((t) => !t.isReadOnly && !t.path.startsWith("diff:"))
-            .map((t) => ideApi.writeFile(`${dir}/${t.path}`, t.content).catch(() => {})),
-        );
-      }
+      // Cancel keeps every tab open and unchanged; only OK saves, then closes.
+      if (!save || !dir) return;
+      const saved = await Promise.all(
+        dirty
+          .filter((t) => !t.isReadOnly && !t.path.startsWith("diff:"))
+          .map((t) => saveFile(t.path)),
+      );
+      if (saved.some(success => !success)) return;
+      if (dirty.some(tab => conflicts.current.snapshot(tab.path)?.isDirty)) return;
     }
-    setTabs([]);
-    setActiveTabPath(null);
+    if (generation !== editorGeneration.current) return;
+    // Keep any tab edited while the save was in flight; the identity check alone cannot see content changes.
+    setTabs(previous => previous.filter(tab => !identities.has(tab.path) || conflicts.current.snapshot(tab.path)?.isDirty || conflicts.current.snapshot(tab.path)?.tabIdentity !== identities.get(tab.path)));
+    setActiveTabPath(tabsRef.current[0]?.path ?? null);
     scheduleWorkspaceRefresh({ git: true, force: true, delayMs: 0 });
-  }, [scheduleWorkspaceRefresh, t]);
+  }, [scheduleWorkspaceRefresh, t, setTabs, saveFile]);
 
   const closeSavedTabs = useCallback(() => {
     setTabs((prev) => prev.filter((t) => t.isDirty));
@@ -869,11 +1081,14 @@ export default function CodeZWorkspace({
       if (current && remaining.some((t) => t.path === current)) return current;
       return remaining[0]?.path || null;
     });
-  }, []);
+  }, [setTabs]);
 
   const closeOtherTabs = useCallback(async (keepPath: string) => {
     const dir = projectDirRef.current;
-    const snapshot = tabsRef.current.slice();
+    const generation = editorGeneration.current;
+    // Recovered drafts stay open: they cannot be saved here, and closing them would discard data.
+    const snapshot = tabsRef.current.filter(tab => !isRecoveryPath(tab.path));
+    const identities = new Map(snapshot.filter(tab => tab.path !== keepPath).map(tab => [tab.path, conflicts.current.snapshot(tab.path)?.tabIdentity]));
     const closingDirty = snapshot.filter((t) => t.path !== keepPath && t.isDirty);
     if (closingDirty.length > 0) {
       // eslint-disable-next-line no-alert
@@ -881,18 +1096,21 @@ export default function CodeZWorkspace({
         || `${closingDirty.length} file(s) have unsaved changes. Save before closing?`;
       // eslint-disable-next-line no-alert
       const save = window.confirm(msg);
-      if (save && dir) {
-        await Promise.all(
-          closingDirty
-            .filter((t) => !t.isReadOnly && !t.path.startsWith("diff:"))
-            .map((t) => ideApi.writeFile(`${dir}/${t.path}`, t.content).catch(() => {})),
-        );
-      }
+      // Cancel keeps every tab open and unchanged; only OK saves, then closes.
+      if (!save || !dir) return;
+      const saved = await Promise.all(
+        closingDirty
+          .filter((t) => !t.isReadOnly && !t.path.startsWith("diff:"))
+          .map((t) => saveFile(t.path)),
+      );
+      if (saved.some(success => !success)) return;
+      if (closingDirty.some(tab => conflicts.current.snapshot(tab.path)?.isDirty)) return;
     }
-    setTabs((prev) => prev.filter((t) => t.path === keepPath));
+    if (generation !== editorGeneration.current) return;
+    setTabs(previous => previous.filter(tab => !identities.has(tab.path) || conflicts.current.snapshot(tab.path)?.isDirty || conflicts.current.snapshot(tab.path)?.tabIdentity !== identities.get(tab.path)));
     setActiveTabPath(keepPath);
     scheduleWorkspaceRefresh({ git: true, force: true, delayMs: 0 });
-  }, [scheduleWorkspaceRefresh, t]);
+  }, [scheduleWorkspaceRefresh, t, setTabs, saveFile]);
 
   const handleTabContextMenu = useCallback(
     (e: React.MouseEvent, path: string) => {
@@ -989,17 +1207,19 @@ export default function CodeZWorkspace({
       if (e.key === "s" || e.key === "S") {
         e.preventDefault();
         const active = activeTabPathRef.current;
-        if (active && !active.startsWith("diff:")) {
-          saveFile(active);
+        if (!active) return;
+        const blocked = saveBlockReason(active, tabsRef.current.find((tab) => tab.path === active));
+        if (blocked) {
+          // Say why nothing was written instead of silently ignoring Ctrl+S.
+          setFileLoadError(t(`ide.saveBlocked.${blocked}`, { path: active }));
+          return;
         }
-      } else if ((e.key === "k" || e.key === "K") && e.shiftKey) {
-        // Ctrl+Shift+S or Ctrl+K+S — save all
-        // (handled below; included for symmetry)
+        saveFile(active);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [saveFile]);
+  }, [saveFile, t]);
 
   // ─── Workspace persistence (debounced editor + layout patch) ─────
   useEffect(() => {
@@ -1213,6 +1433,16 @@ export default function CodeZWorkspace({
               agentAction={agentBrowserAction}
               onRequestClose={requestBrowserClose}
             />
+          ) : activeTab && isRecoveryPath(activeTab.path) ? (
+            <section aria-label="Recovered unsaved draft" style={{ padding: 16, overflow: "auto", height: "100%" }}>
+              <h3>Recovered unsaved draft</h3>
+              <p>Original file: {recoveryOriginalPath(activeTab.path) ?? "Unknown"}</p>
+              <p>This read-only copy preserves an older draft. Copy the text to review it; the current file has not been replaced.</p>
+              <button type="button" onClick={() => {
+                void navigator.clipboard.writeText(activeTab.content).catch(() => setFileLoadError("Could not copy the recovered draft. Select and copy its text manually."));
+              }}>Copy draft</button>
+              <textarea readOnly aria-label="Recovered draft text" value={activeTab.content} style={{ width: "100%", height: "70%", display: "block", marginTop: 12 }} />
+            </section>
           ) : activeTab ? (
             <FileViewer
               tab={activeTab}

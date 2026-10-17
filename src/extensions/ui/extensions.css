@@ -170,3 +170,4 @@
 .agentz-debug-var-name { color: var(--accent-hover); }
 .agentz-debug-var-val { color: var(--text-secondary); }
 .agentz-debug-muted { opacity: 0.5; font-size: 12px; }
+.agentz-debug-frame-open { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; text-decoration: underline; cursor: pointer; }

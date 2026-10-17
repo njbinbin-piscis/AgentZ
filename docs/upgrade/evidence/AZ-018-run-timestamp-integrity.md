@@ -1,0 +1,9 @@
+# AZ-018 Run/Attempt时间元数据failclosed
+
+仅独占run.rs与本证据，未改schema、台账、Cargo或其它产品。load校验Run.updated_ms非负；attempts校验每条Attempt.created_ms/updated_ms非负且created<=updated；has_active_task对同task全部Run及当前/历史Attempts同样检查。复用一个Attempt时间helper，未强要求Runupdated等于currentAttemptupdated，因为人工delivery决定会单独推进Run时间。
+
+replay_events入口先load真实Run再has_active_task校验同task完整历史，因此即使选择健康currentAttempt也不会忽略历史Attempt时间腐败；readonly discovery复用has_active_task，同样拒绝。没有自动repair、时间归零或库写入。
+
+新增2真实SQLite夹具（未运行）：负Runupdated、负历史Attemptcreated、负历史Attemptupdated、历史created>updated四种损坏，readonly has_active/discovery/replay及对应load/attempts拒绝，DB bytes不变；正常成功执行后delivery在晚于Attempt的时间被接受，load/attempts/has_active/replay均仍有效，证明不误限制正常生命周期。现有合法零毫秒fixture保持允许。写入口原有非负/单调时间规则不变；损坏旧数据库现在显式错误，不隐式兼容假时间。
+
+实际rustfmt与限定diff-check exit0，本代理未Cargo。主线程需统一最新task-state tests与host metadata/discovery/replay回归；不称GUI/model/迁移恢复验收。

@@ -1,0 +1,13 @@
+
+ RUN  v2.1.9 C:/Projects/AgentZ
+
+ ✓ src/services/tauri/taskDetails.test.ts (7 tests) 36ms
+ ✓ src/workspaces/codez/DeliveryReviewPanel.test.tsx (4 tests) 81ms
+ ✓ src/workspaces/codez/TaskDetailsPanel.test.tsx (5 tests) 126ms
+ ✓ src/workspaces/codez/DeliveryReviewPanel.integration.test.tsx (3 tests) 97ms
+
+ Test Files  4 passed (4)
+      Tests  19 passed (19)
+   Start at  03:07:45
+   Duration  3.99s (transform 654ms, setup 0ms, collect 1.37s, tests 340ms, environment 3ms, prepare 1.44s)
+

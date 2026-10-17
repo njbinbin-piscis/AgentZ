@@ -1,0 +1,16 @@
+   Compiling agentz-desktop v0.9.7 (C:\Projects\AgentZ\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 25s
+     Running unittests src\lib.rs (target\debug\deps\agentz_desktop_lib-31653dfccf28278e.exe)
+
+running 8 tests
+test runtime::task_details::tests::missing_direct_sources_do_not_create_database_or_directory ... ok
+test runtime::task_details::tests::cross_project_scope_is_still_rejected ... ok
+test runtime::task_details::tests::unregistered_managed_environment_is_unavailable_with_version ... ok
+test runtime::task_details::tests::environment_record_for_another_environment_is_stale_not_error ... ok
+test runtime::task_details::tests::artifact_references_are_scoped_and_available_without_payloads ... ok
+test runtime::task_details::tests::corrupt_existing_database_is_error_not_missing_and_is_not_repaired ... ok
+test runtime::task_details::tests::current_attempt_event_cursor_is_bounded_and_scoped ... ok
+test runtime::task_details::tests::existing_cancelled_plan_and_running_run_are_read_without_writes ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 297 filtered out; finished in 0.17s
+

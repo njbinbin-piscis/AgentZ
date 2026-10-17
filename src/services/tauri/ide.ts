@@ -25,8 +25,12 @@ export const ideApi = {
 
   readFile: (path: string) => invoke<FileContent>("ide_read_file", { path }),
 
-  writeFile: (path: string, content: string) =>
-    invoke<void>("ide_write_file", { path, content }),
+  /**
+   * Save a file. `expectedSha256` is the digest of the bytes last read; the backend refuses the
+   * save (error starting with "conflict:") when the file changed on disk. Resolves with the new digest.
+   */
+  writeFile: (path: string, content: string, expectedSha256?: string) =>
+    invoke<string | null>("ide_write_file", { path, content, expectedSha256: expectedSha256 ?? null }),
 
   fileAction: (path: string, action: string, newPath?: string) =>
     invoke<void>("ide_file_action", { path, action, newPath }),
@@ -129,6 +133,12 @@ export const ideApi = {
 
   terminalCount: () => invoke<number>("ide_terminal_count"),
 
+  terminalResourceSnapshot: () => invoke<{
+    registered_sessions: number;
+    active_processes: number | null;
+    query_failures: number;
+  }>("ide_terminal_resource_snapshot"),
+
   terminalDestroyAll: () => invoke<void>("ide_terminal_destroy_all"),
 
   terminalIsAlive: (terminalId: string) =>
@@ -141,6 +151,8 @@ export const ideApi = {
 
   stopWatcher: (projectDir: string) =>
     invoke<void>("ide_stop_watcher", { projectDir }),
+
+  watcherCount: () => invoke<number>("ide_watcher_count"),
 };
 
 // ─── Event listeners ─────────────────────────────────────────────────────

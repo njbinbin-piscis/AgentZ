@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-066",
+    "verified_state": "first_task_project_tool_connection_guidance_local_checks_passed",
+    "severity": "P1",
+    "finding": "First-task failures now provide local actionable guidance for missing project, unavailable tool, and endpoint connection cases; 19 focused tests and TypeScript check pass. Native clean-install and model acceptance remain outstanding.",
+    "conclusion_proposal": "Keep pending until unified acceptance and clean signed build walkthrough.",
+    "next_action": "Review first-task UI with real tool/environment failures; run five clean signed-build first-use journeys using an authorized model after upstream dependencies are accepted.",
+    "remaining_work": ["Native tool/environment failure journey", "Five clean signed-build first-use journeys", "Independent UI review and unified acceptance"],
+    "verification_gaps": ["No native desktop or model journey run", "No clean signed-build first-use walkthrough run"],
+    "evidence": ["docs/upgrade/evidence/AZ-066-first-task-diagnostics-2026-10-15.md"]
+  }
+]

@@ -95,10 +95,10 @@ impl Tool for CodebaseSearchTool {
         })
         .await
         {
-                Ok(Ok(h)) => h,
-                Ok(Err(e)) => return Ok(ToolResult::err(format!("codebase_search failed: {e}"))),
-                Err(e) => return Ok(ToolResult::err(format!("codebase_search task failed: {e}"))),
-            };
+            Ok(Ok(h)) => h,
+            Ok(Err(e)) => return Ok(ToolResult::err(format!("codebase_search failed: {e}"))),
+            Err(e) => return Ok(ToolResult::err(format!("codebase_search task failed: {e}"))),
+        };
 
         if hits.is_empty() {
             return Ok(ToolResult::ok(

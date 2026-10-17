@@ -1,0 +1,27 @@
+{
+  "artifacts": [
+    {
+      "path": "target/release/kernel-contract-0.9.7-20261009-06e56229/candidate.tar",
+      "bytes": 2703360,
+      "sha256": "aee1264293cac757c7ce778a00bcc486b9136cd9ec0171c1b0ee037ede85f23d"
+    },
+    {
+      "path": "target/release/kernel-contract-0.9.7-20261009-06e56229/full-vendor.patch",
+      "bytes": 3597717,
+      "sha256": "df1bed1772b62d0993a75d27d9151df69b7c392876d2dab68a6fd48e3a5df69b"
+    },
+    {
+      "path": "target/release/kernel-contract-0.9.7-20261009-06e56229/baseline.tar",
+      "bytes": 2222080,
+      "sha256": "2ccfc6dd1bbb62c5f01455824499f2a1517bd24413c10f51f1ecd173ffd8ca96"
+    },
+    {
+      "path": "target/release/kernel-contract-0.9.7-20261009-06e56229/manifest.json",
+      "bytes": 68803,
+      "sha256": "1a26117c22a92ea62554cabcbda38ea576dcf544fb2c9e381feac82a4ded4406"
+    }
+  ],
+  "source_review_pending": true,
+  "schema_version": 1,
+  "release_ready": false
+}

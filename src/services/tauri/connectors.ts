@@ -73,6 +73,25 @@ export function getConnectorCredentials(id: string): Promise<Record<string, stri
   return invoke<Record<string, string>>("connectors_get_credentials", { id });
 }
 
+/** Event emitted when a started OAuth authorization completes or fails. */
+export const CONNECTOR_OAUTH_RESULT_EVENT = "connectors:oauth-result";
+
+export interface ConnectorOAuthResult {
+  id: string;
+  ok: boolean;
+  error: string | null;
+}
+
+/** Start OAuth2 authorization; returns the URL the user must open in a browser. */
+export function startConnectorOAuth(id: string): Promise<string> {
+  return invoke<string>("connectors_oauth_start", { id });
+}
+
+/** Refresh the access token using the stored refresh token. */
+export function refreshConnectorOAuth(id: string): Promise<void> {
+  return invoke<void>("connectors_oauth_refresh", { id });
+}
+
 /** Create an inline HTTP API connector (video / ASR / TTS / OCR / custom). */
 export function createApiConnector(req: CreateApiConnectorRequest): Promise<ConnectorInfo> {
   return invoke<ConnectorInfo>("connectors_create_api", { req });

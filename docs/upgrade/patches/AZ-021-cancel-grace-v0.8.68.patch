@@ -1,0 +1,339 @@
+diff --git a/src/agent/loop_.rs b/src/agent/loop_.rs
+--- a/src/agent/loop_.rs
++++ b/src/agent/loop_.rs
+@@ -48,6 +48,9 @@ async fn call_with_completion(
+ 
+ const DEFAULT_MAX_ITERATIONS: usize = 50;
+ const TOOL_TIMEOUT_SECS: u64 = 120;
++/// After a cancel request, a running tool gets this long to finish its own teardown
++/// (for example a sandboxed shell terminating its Job Object) before its future is dropped.
++const CANCEL_GRACE_SECS: u64 = 8;
+ const READ_TOOL_MAX_CONCURRENCY: usize = 4;
+ // Logical primary-agent calls only: auxiliary compaction/vision and client wire
+ // retries remain outside this budget. Correction/overflow share one iteration window.
+@@ -2390,35 +2393,51 @@ impl AgentLoop {
+                             }
+                         }
+                     };
+-                    tokio::select! {
++                    // Owned-completion tools (shell, code_run) observe `ctx.cancel` themselves and
++                    // terminate their own process tree. Dropping the future at the first watcher poll
++                    // raced that teardown and misreported the outcome as interrupted. Instead, after
++                    // a cancel request the tool gets a bounded grace period; only then is it dropped.
++                    let mut tool_future = Box::pin(tokio::time::timeout(
++                        std::time::Duration::from_secs(TOOL_TIMEOUT_SECS),
++                        call_with_completion(tool, input.clone(), &tool_ctx),
++                    ));
++                    let outcome = tokio::select! {
+                         biased;
+-                        res = tokio::time::timeout(
+-                            std::time::Duration::from_secs(TOOL_TIMEOUT_SECS),
+-                            call_with_completion(tool, input.clone(), &tool_ctx),
+-                        ) => {
+-                            match res {
+-                                Ok(Ok(r)) => r,
+-                                Ok(Err(e)) => {
+-                                    let err_msg = e.to_string();
+-                                    warn!("Tool '{}' error: {} | input: {}", name, err_msg, input_hint);
+-                                    schema_correction_envelope = maybe_schema_correction_envelope(
+-                                        &self.registry,
+-                                        name,
+-                                        &err_msg,
+-                                    );
+-                                    let friendly = friendly_tool_error(name, &err_msg);
+-                                    super::tool::ToolResult::err(friendly)
+-                                }
+-                                Err(_) => {
+-                                    warn!("Tool '{}' timed out after {}s", name, TOOL_TIMEOUT_SECS);
+-                                    super::tool::ToolResult::err(format!(
+-                                        "工具 '{}' 执行超时（{}秒）。可能原因：命令阻塞、网络超时或进程挂起。请尝试简化命令或分步执行。",
+-                                        name, TOOL_TIMEOUT_SECS
+-                                    ))
+-                                }
+-                            }
+-                        }
++                        res = &mut tool_future => Some(res),
+                         _ = cancel_watcher => {
++                            warn!(
++                                "Tool '{}' cancel requested; allowing {}s for its own teardown",
++                                name, CANCEL_GRACE_SECS
++                            );
++                            tokio::time::timeout(
++                                std::time::Duration::from_secs(CANCEL_GRACE_SECS),
++                                &mut tool_future,
++                            )
++                            .await
++                            .ok()
++                        }
++                    };
++                    match outcome {
++                        Some(Ok(Ok(r))) => r,
++                        Some(Ok(Err(e))) => {
++                            let err_msg = e.to_string();
++                            warn!("Tool '{}' error: {} | input: {}", name, err_msg, input_hint);
++                            schema_correction_envelope = maybe_schema_correction_envelope(
++                                &self.registry,
++                                name,
++                                &err_msg,
++                            );
++                            let friendly = friendly_tool_error(name, &err_msg);
++                            super::tool::ToolResult::err(friendly)
++                        }
++                        Some(Err(_)) => {
++                            warn!("Tool '{}' timed out after {}s", name, TOOL_TIMEOUT_SECS);
++                            super::tool::ToolResult::err(format!(
++                                "工具 '{}' 执行超时（{}秒）。可能原因：命令阻塞、网络超时或进程挂起。请尝试简化命令或分步执行。",
++                                name, TOOL_TIMEOUT_SECS
++                            ))
++                        }
++                        None => {
+                             warn!("Tool '{}' interrupted by user cancel", name);
+                             super::tool::ToolResult::err("已被用户取消".to_string())
+                         }
+@@ -4843,6 +4862,246 @@ mod tests {
+         );
+     }
+ 
++    /// Mimics the sandboxed shell: on cancel it finishes its own teardown and returns
++    /// a normal result instead of being dropped.
++    struct CooperativeTeardownTool;
++    #[async_trait]
++    impl Tool for CooperativeTeardownTool {
++        fn name(&self) -> &str {
++            "cooperative_teardown"
++        }
++        fn description(&self) -> &str {
++            "fixture that tears down after cancel"
++        }
++        fn input_schema(&self) -> Value {
++            json!({"type":"object"})
++        }
++        async fn call(&self, _: Value, ctx: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
++            while !ctx.cancel.load(Ordering::SeqCst) {
++                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
++            }
++            tokio::time::sleep(std::time::Duration::from_millis(600)).await;
++            Ok(crate::agent::tool::ToolResult::ok("torn down"))
++        }
++    }
++    #[tokio::test]
++    async fn cancelled_tool_that_tears_down_keeps_its_own_result() {
++        let mut agent = tier_agent(
++            CorrectionBudgetClient {
++                calls: Arc::new(AtomicUsize::new(0)),
++            },
++            None,
++            crate::agent::harness::LayeredBudget::from_context_window(
++                TIER_TEST_CONTEXT_WINDOW,
++                TIER_TEST_MAX_TOKENS,
++            ),
++        );
++        let mut registry = ToolRegistry::new();
++        registry.register(Box::new(CooperativeTeardownTool));
++        agent.registry = Arc::new(registry);
++
++        let cancel = Arc::new(AtomicBool::new(false));
++        let mut ctx = tier_tool_context("cancel-grace".into());
++        ctx.cancel = cancel.clone();
++        ctx.bypass_permissions = true;
++        let (event_tx, _event_rx) = mpsc::channel(64);
++
++        let trigger = cancel.clone();
++        tokio::spawn(async move {
++            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
++            trigger.store(true, Ordering::SeqCst);
++        });
++        let blocks = agent
++            .execute_single_tool(
++                "t-cancel",
++                "cooperative_teardown",
++                &json!({}),
++                &ctx,
++                &event_tx,
++                &cancel,
++            )
++            .await;
++        let text = format!("{blocks:?}");
++        assert!(text.contains("torn down"), "tool's own result must survive cancel: {text}");
++        assert!(!text.contains("已被用户取消"), "cancel must not override a finished teardown: {text}");
++    }
++
++    /// A tool that ignores cancel entirely (no teardown). The loop must still stop
++    /// waiting after the grace period and report the generic user-cancel result.
++    struct NonTerminatingTool;
++    #[async_trait]
++    impl Tool for NonTerminatingTool {
++        fn name(&self) -> &str {
++            "non_terminating"
++        }
++        fn description(&self) -> &str {
++            "fixture that never observes cancel"
++        }
++        fn input_schema(&self) -> Value {
++            json!({"type":"object"})
++        }
++        async fn call(&self, _: Value, _ctx: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
++            tokio::time::sleep(std::time::Duration::from_secs(600)).await;
++            Ok(crate::agent::tool::ToolResult::ok("never"))
++        }
++    }
++    #[tokio::test]
++    async fn uncooperative_tool_is_interrupted_after_grace() {
++        let mut agent = tier_agent(
++            CorrectionBudgetClient {
++                calls: Arc::new(AtomicUsize::new(0)),
++            },
++            None,
++            crate::agent::harness::LayeredBudget::from_context_window(
++                TIER_TEST_CONTEXT_WINDOW,
++                TIER_TEST_MAX_TOKENS,
++            ),
++        );
++        let mut registry = ToolRegistry::new();
++        registry.register(Box::new(NonTerminatingTool));
++        agent.registry = Arc::new(registry);
++
++        let cancel = Arc::new(AtomicBool::new(false));
++        let mut ctx = tier_tool_context("cancel-interrupt".into());
++        ctx.cancel = cancel.clone();
++        ctx.bypass_permissions = true;
++        let (event_tx, _event_rx) = mpsc::channel(64);
++
++        let trigger = cancel.clone();
++        tokio::spawn(async move {
++            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
++            trigger.store(true, Ordering::SeqCst);
++        });
++        let started = std::time::Instant::now();
++        let blocks = agent
++            .execute_single_tool("t-interrupt", "non_terminating", &json!({}), &ctx, &event_tx, &cancel)
++            .await;
++        let elapsed = started.elapsed();
++        let text = format!("{blocks:?}");
++        assert!(text.contains("已被用户取消"), "uncooperative tool must be interrupted: {text}");
++        assert!(
++            elapsed >= std::time::Duration::from_secs(super::CANCEL_GRACE_SECS),
++            "grace period must actually be waited before interrupting: {elapsed:?}"
++        );
++        assert!(
++            elapsed < std::time::Duration::from_secs(super::CANCEL_GRACE_SECS + 5),
++            "interrupt took {elapsed:?}: {text}"
++        );
++    }
++
++    /// Real sandboxed shell, cancelled mid-run through the agent's execution path.
++    /// The shell tears down its own AppContainer job and returns its cancel result; the
++    /// watcher's generic "已被用户取消" must not replace it.
++    #[cfg(windows)]
++    #[tokio::test]
++    async fn real_shell_cancel_keeps_shell_cancel_result_within_grace() {
++        let temp = tempfile::tempdir().expect("create shell cancel root");
++        let workspace = temp.path().join("workspace");
++        std::fs::create_dir_all(&workspace).expect("create shell workspace");
++        let mut agent = tier_agent(
++            CorrectionBudgetClient {
++                calls: Arc::new(AtomicUsize::new(0)),
++            },
++            None,
++            crate::agent::harness::LayeredBudget::from_context_window(
++                TIER_TEST_CONTEXT_WINDOW,
++                TIER_TEST_MAX_TOKENS,
++            ),
++        );
++        let mut registry = ToolRegistry::new();
++        registry.register(Box::new(crate::tools::shell::ShellTool));
++        agent.registry = Arc::new(registry);
++
++        let cancel = Arc::new(AtomicBool::new(false));
++        let mut ctx = tier_tool_context("shell-cancel".into());
++        ctx.workspace_root = workspace;
++        ctx.cancel = cancel.clone();
++        ctx.bypass_permissions = true;
++        let (event_tx, _event_rx) = mpsc::channel(64);
++
++        let trigger = cancel.clone();
++        tokio::spawn(async move {
++            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
++            trigger.store(true, Ordering::SeqCst);
++        });
++        let started = std::time::Instant::now();
++        let blocks = agent
++            .execute_single_tool(
++                "t-shell-cancel",
++                "shell",
++                &json!({
++                    "command": "for /L %i in (1,1,200000000) do @rem",
++                    "interpreter": "cmd",
++                    "timeout": 120
++                }),
++                &ctx,
++                &event_tx,
++                &cancel,
++            )
++            .await;
++        let elapsed = started.elapsed();
++        let text = format!("{blocks:?}");
++        assert!(text.contains("Command was cancelled"), "shell must report its own cancel: {text}");
++        assert!(!text.contains("已被用户取消"), "watcher must not replace shell teardown: {text}");
++        assert!(elapsed < std::time::Duration::from_secs(20), "cancel took {elapsed:?}: {text}");
++    }
++
++    /// Real sandboxed code_run, cancelled mid-run through the agent's execution path.
++    /// Its own teardown returns "Sandbox command was cancelled"; the watcher's generic
++    /// "已被用户取消" must not replace it.
++    #[cfg(windows)]
++    #[tokio::test]
++    async fn real_code_run_cancel_keeps_its_own_result_within_grace() {
++        let temp = tempfile::tempdir().expect("create code_run cancel root");
++        let workspace = temp.path().join("workspace");
++        std::fs::create_dir_all(&workspace).expect("create code_run workspace");
++        let mut agent = tier_agent(
++            CorrectionBudgetClient {
++                calls: Arc::new(AtomicUsize::new(0)),
++            },
++            None,
++            crate::agent::harness::LayeredBudget::from_context_window(
++                TIER_TEST_CONTEXT_WINDOW,
++                TIER_TEST_MAX_TOKENS,
++            ),
++        );
++        let mut registry = ToolRegistry::new();
++        registry.register(Box::new(crate::tools::code_run::CodeRunTool));
++        agent.registry = Arc::new(registry);
++
++        let cancel = Arc::new(AtomicBool::new(false));
++        let mut ctx = tier_tool_context("code-run-cancel".into());
++        ctx.workspace_root = workspace;
++        ctx.cancel = cancel.clone();
++        ctx.bypass_permissions = true;
++        let (event_tx, _event_rx) = mpsc::channel(64);
++
++        let trigger = cancel.clone();
++        tokio::spawn(async move {
++            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
++            trigger.store(true, Ordering::SeqCst);
++        });
++        let started = std::time::Instant::now();
++        let blocks = agent
++            .execute_single_tool(
++                "t-code-run-cancel",
++                "code_run",
++                &json!({
++                    "command": "for /L %i in (1,1,200000000) do @rem",
++                    "timeout_secs": 120
++                }),
++                &ctx,
++                &event_tx,
++                &cancel,
++            )
++            .await;
++        let elapsed = started.elapsed();
++        let text = format!("{blocks:?}");
++        assert!(text.contains("Sandbox command was cancelled"), "code_run must report its own cancel: {text}");
++        assert!(!text.contains("已被用户取消"), "watcher must not replace code_run teardown: {text}");
++        assert!(elapsed < std::time::Duration::from_secs(20), "cancel took {elapsed:?}: {text}");
++    }
++
+     #[async_trait]
+     impl Tool for SchemaTool {
+         fn name(&self) -> &str {

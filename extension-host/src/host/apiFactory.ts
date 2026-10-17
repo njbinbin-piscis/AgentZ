@@ -173,11 +173,14 @@ export function createApiFactory(services: Services) {
   };
 
   return function api(extension: ExtensionDescriptionDto): Record<string, unknown> {
-    void extension;
     return {
       // namespaces
       commands,
-      window,
+      window: {
+        ...window,
+        createWebviewPanel: (viewType: string, title: string, showOptions: any, options?: any) =>
+          s.webviews.createWebviewPanel(viewType, title, showOptions, options, extension.extensionPath),
+      },
       workspace,
       languages,
       scm,

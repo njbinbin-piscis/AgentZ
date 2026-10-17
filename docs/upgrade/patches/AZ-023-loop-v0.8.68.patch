@@ -1,0 +1,403 @@
+diff --git a/piscis-kernel/src/agent/loop_.rs b/piscis-kernel/src/agent/loop_.rs
+index 0461be6..089fb88 100644
+--- a/piscis-kernel/src/agent/loop_.rs
++++ b/piscis-kernel/src/agent/loop_.rs
+@@ -33,6 +33,28 @@ use tracing::{debug, info, warn};
+ const DEFAULT_MAX_ITERATIONS: usize = 50;
+ const TOOL_TIMEOUT_SECS: u64 = 120;
+ const READ_TOOL_MAX_CONCURRENCY: usize = 4;
++// Logical primary-agent calls only: auxiliary compaction/vision and client wire
++// retries remain outside this budget. Correction/overflow share one iteration window.
++const MAX_SAME_MODEL_ATTEMPTS: u32 = 5;
++const MAX_MODEL_CANDIDATES: usize = 4;
++const MAX_MAIN_CALLS_PER_ITERATION: u32 = 12;
++
++fn retry_backoff(attempt: u32) -> std::time::Duration {
++    std::time::Duration::from_secs(1u64.checked_shl(attempt.min(3)).unwrap_or(8).min(8))
++}
++
++fn bounded_model_candidates(primary: String, fallbacks: &[String]) -> Vec<String> {
++    let mut candidates = vec![primary];
++    for fallback in fallbacks {
++        if candidates.len() == MAX_MODEL_CANDIDATES {
++            break;
++        }
++        if !candidates.contains(fallback) {
++            candidates.push(fallback.clone());
++        }
++    }
++    candidates
++}
+ 
+ // ── Runtime guard thresholds ─────────────────────────────────────────────────
+ // Purpose: ONLY prevent true infinite loops / dead loops where the agent is
+@@ -1949,19 +1971,6 @@ fn is_context_overflow_error(msg: &str) -> bool {
+         || lower.contains("reduce the length")
+ }
+ 
+-/// Returns true if the error indicates the model is permanently unavailable
+-/// (or provider-side rate limited) and a fallback model should be tried
+-/// instead.
+-/// Note: "overloaded" is intentionally excluded — it is transient and should
+-/// be retried with exponential backoff on the same model, not switched away from.
+-///
+-/// Delegates to [`crate::llm::error_class::classify_error`] so the fallback
+-/// decision, `AgentEvent::Error.code`, and downstream UI/log consumers all
+-/// agree on the same classification (see docs/plans OpenAI 兼容链路鲁棒性).
+-fn is_fallback_eligible_error(msg: &str) -> bool {
+-    crate::llm::error_class::classify_error(msg).is_fallback_eligible()
+-}
+-
+ /// Unified entry point for the per-iteration LLM call. When
+ /// `enable_streaming` is false, delegates to `LlmClient::complete` (the
+ /// historical single-response path). When true, drives `LlmClient::stream`,
+@@ -3159,6 +3168,8 @@ impl AgentLoop {
+             // retry (P0-2) to at most one attempt per iteration, so a model
+             // that keeps truncating its output cannot loop forever.
+             let mut tool_args_correction_attempted = false;
++            let mut context_overflow_attempted = false;
++            let mut main_calls_remaining = MAX_MAIN_CALLS_PER_ITERATION;
+             let response = 'attempt_with_correction: loop {
+                 // Loop-strategy next-turn hint may override the primary model
+                 // for this iteration (default: no override).
+@@ -3175,13 +3186,11 @@ impl AgentLoop {
+                             .model
+                     })
+                     .unwrap_or_else(|| self.model.clone());
+-                let models_to_try: Vec<String> = std::iter::once(primary_model.clone())
+-                    .chain(self.fallback_models.iter().cloned())
+-                    .collect();
++                let models_to_try =
++                    bounded_model_candidates(primary_model.clone(), &self.fallback_models);
+                 let mut last_err: Option<anyhow::Error> = None;
+                 let mut resp: Option<crate::llm::LlmResponse> = None;
+                 let mut succeeded_model: Option<String> = None;
+-                let mut context_overflow_attempted = false;
+                 let mut model_index = 0usize;
+ 
+                 'model_loop: while let Some(model_candidate) = models_to_try.get(model_index) {
+@@ -3275,12 +3284,19 @@ impl AgentLoop {
+                     .with_vision_override(self.vision_override)
+                     .build_for(provider_kind);
+ 
+-                    let same_model_attempts = self.same_model_transient_retries.max(1);
++                    let same_model_attempts = self
++                        .same_model_transient_retries
++                        .clamp(1, MAX_SAME_MODEL_ATTEMPTS);
+                     for attempt in 0..same_model_attempts {
+                         // Check cancel before each LLM attempt
+                         if cancel.load(Ordering::Relaxed) {
+                             break 'model_loop;
+                         }
++                        if main_calls_remaining == 0 {
++                            last_err = Some(anyhow::anyhow!("primary agent request budget exhausted (maximum {} logical calls per iteration)", MAX_MAIN_CALLS_PER_ITERATION));
++                            break 'model_loop;
++                        }
++                        main_calls_remaining -= 1;
+ 
+                         let streaming_partial = self
+                             .enable_streaming
+@@ -3334,8 +3350,8 @@ impl AgentLoop {
+                                 let msg = e.to_string();
+                                 // P1-3 observability: structured fields so failures are
+                                 // greppable/alertable without parsing free-text messages.
+-                                let attempt_error_code =
+-                                    crate::llm::error_class::classify_error(&msg).code();
++                                let error_class = crate::llm::error_class::classify_error(&msg);
++                                let attempt_error_code = error_class.code();
+                                 warn!(
+                                     model = %model_candidate,
+                                     attempt = attempt + 1,
+@@ -3348,7 +3364,18 @@ impl AgentLoop {
+                                     msg
+                                 );
+ 
+-                                if is_context_overflow_error(&msg) && !context_overflow_attempted {
++                                if matches!(
++                                    error_class,
++                                    crate::llm::error_class::ErrorClass::AuthFailed
++                                        | crate::llm::error_class::ErrorClass::QuotaExceeded
++                                ) {
++                                    last_err = Some(e);
++                                    break 'model_loop;
++                                }
++                                if is_context_overflow_error(&msg)
++                                    && !context_overflow_attempted
++                                    && main_calls_remaining > 0
++                                {
+                                     context_overflow_attempted = true;
+                                     // Forced recovery via the same pluggable
+                                     // strategy (Overflow trigger) so a custom
+@@ -3453,7 +3480,7 @@ impl AgentLoop {
+                                         last_err = Some(e);
+                                         break 'model_loop;
+                                     }
+-                                } else if is_fallback_eligible_error(&msg) {
++                                } else if error_class.is_fallback_eligible() {
+                                     // rate_limit / model_not_found: try next fallback model.
+                                     // overloaded is intentionally excluded — it should be
+                                     // retried with backoff on the same model.
+@@ -3465,24 +3492,15 @@ impl AgentLoop {
+                                     last_err = Some(e);
+                                     break;
+                                 } else {
+-                                    let is_transient = msg.contains("timeout")
+-                                        || msg.contains("connection")
+-                                        || msg.contains("overloaded")
+-                                        || msg.contains("502")
+-                                        || msg.contains("503")
+-                                        || msg.contains("529")
+-                                        // Network-level decode errors (server closed connection
+-                                        // mid-stream, incomplete chunk, etc.) are transient
+-                                        || msg.contains("error decoding response body")
+-                                        || msg.contains("incomplete message")
+-                                        || msg.contains("unexpected eof")
+-                                        || msg.contains("broken pipe");
+-                                    if !is_transient || attempt + 1 == same_model_attempts {
++                                    if !error_class.is_retryable()
++                                        || attempt + 1 == same_model_attempts
++                                        || main_calls_remaining == 0
++                                    {
+                                         last_err = Some(e);
+                                         break 'model_loop;
+                                     }
+                                     // Interruptible backoff sleep — cancel exits immediately
+-                                    let backoff = std::time::Duration::from_secs(1 << attempt);
++                                    let backoff = retry_backoff(attempt);
+                                     let cancel_for_sleep = Arc::clone(&cancel);
+                                     tokio::select! {
+                                         biased;
+@@ -4460,6 +4478,219 @@ mod tests {
+     use serde_json::{json, Value};
+     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+     use std::{borrow::Cow, collections::HashMap, path::PathBuf, sync::Arc};
++    use tokio::sync::mpsc;
++
++    #[test]
++    fn retry_candidates_and_backoff_are_hard_bounded() {
++        let fallbacks = vec!["primary", "one", "one", "two", "three", "four"]
++            .into_iter()
++            .map(str::to_owned)
++            .collect::<Vec<_>>();
++        assert_eq!(
++            super::bounded_model_candidates("primary".into(), &fallbacks),
++            vec!["primary", "one", "two", "three"]
++        );
++        assert_eq!(super::retry_backoff(0).as_secs(), 1);
++        assert_eq!(super::retry_backoff(1).as_secs(), 2);
++        assert_eq!(super::retry_backoff(u32::MAX).as_secs(), 8);
++    }
++
++    struct RetryPolicyClient {
++        error: &'static str,
++        calls: Arc<AtomicUsize>,
++        cancel_on_call: Option<Arc<AtomicBool>>,
++    }
++    #[async_trait]
++    impl crate::llm::LlmClient for RetryPolicyClient {
++        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
++            unreachable!("retry fixture uses complete")
++        }
++        async fn complete(&self, _req: LlmRequest) -> Result<LlmResponse> {
++            self.calls.fetch_add(1, Ordering::SeqCst);
++            if let Some(cancel) = &self.cancel_on_call {
++                cancel.store(true, Ordering::SeqCst);
++            }
++            Err(anyhow::anyhow!(self.error))
++        }
++    }
++    async fn retry_fixture(error: &'static str, cancel_on_call: bool) -> usize {
++        retry_fixture_inner(error, cancel_on_call, false).await
++    }
++    async fn retry_fixture_inner(
++        error: &'static str,
++        cancel_on_call: bool,
++        cancel_during_backoff: bool,
++    ) -> usize {
++        retry_fixture_timed(error, cancel_on_call, cancel_during_backoff)
++            .await
++            .0
++    }
++    async fn retry_fixture_timed(
++        error: &'static str,
++        cancel_on_call: bool,
++        cancel_during_backoff: bool,
++    ) -> (usize, std::time::Duration) {
++        let calls = Arc::new(AtomicUsize::new(0));
++        let cancel = Arc::new(AtomicBool::new(false));
++        let mut agent = tier_agent(
++            RetryPolicyClient {
++                error,
++                calls: calls.clone(),
++                cancel_on_call: cancel_on_call.then(|| cancel.clone()),
++            },
++            None,
++            crate::agent::harness::LayeredBudget::from_context_window(
++                TIER_TEST_CONTEXT_WINDOW,
++                TIER_TEST_MAX_TOKENS,
++            ),
++        );
++        agent.same_model_transient_retries = u32::MAX;
++        agent.fallback_models = (0..50).map(|i| format!("fallback-{i}")).collect();
++        let delayed_cancel = cancel_during_backoff.then(|| {
++            let calls = calls.clone();
++            let cancel = cancel.clone();
++            tokio::spawn(async move {
++                while calls.load(Ordering::SeqCst) == 0 {
++                    tokio::task::yield_now().await;
++                }
++                // The immediate fake failure has entered its one-second backoff.
++                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
++                cancel.store(true, Ordering::SeqCst);
++            })
++        });
++        let (tx, mut rx) = mpsc::channel(64);
++        let drain = tokio::spawn(async move { while rx.recv().await.is_some() {} });
++        let started = std::time::Instant::now();
++        let result = tokio::time::timeout(
++            std::time::Duration::from_secs(30),
++            agent.run(
++                vec![make_text_msg("user", "retry fixture")],
++                tx,
++                cancel.clone(),
++                tier_tool_context("retry-fixture".into()),
++            ),
++        )
++        .await
++        .expect("bounded retry fixture must finish");
++        let elapsed = started.elapsed();
++        if !cancel_on_call && !cancel_during_backoff {
++            assert!(result.is_err());
++        }
++        drain.await.unwrap();
++        if let Some(delayed_cancel) = delayed_cancel {
++            delayed_cancel.await.unwrap();
++        }
++        (calls.load(Ordering::SeqCst), elapsed)
++    }
++    #[tokio::test]
++    async fn permanent_mixed_errors_never_retry_or_fallback() {
++        assert_eq!(
++            retry_fixture(
++                "OpenAI API error 401 Unauthorized: connection timeout context length exceeded",
++                false
++            )
++            .await,
++            1
++        );
++        assert_eq!(
++            retry_fixture(
++                "OpenAI API error 429: insufficient_quota connection timeout",
++                false
++            )
++            .await,
++            1
++        );
++    }
++    #[tokio::test]
++    async fn fallback_candidates_and_cancel_are_bounded_in_actual_loop() {
++        assert_eq!(
++            retry_fixture("OpenAI API error 429: rate_limit", false).await,
++            4
++        );
++        assert_eq!(retry_fixture("connection timeout", true).await, 1);
++    }
++
++    #[tokio::test]
++    async fn extreme_retry_count_stops_after_five_real_attempts() {
++        assert_eq!(retry_fixture("connection timeout", false).await, 5);
++    }
++    #[tokio::test]
++    async fn cancellation_during_real_backoff_starts_no_second_request() {
++        let (calls, elapsed) = retry_fixture_timed("connection timeout", false, true).await;
++        assert_eq!(calls, 1);
++        // Lower bound: cancellation is raised >=50ms after the first request, so a run that
++        // never entered backoff (finishing immediately) is rejected.
++        assert!(
++            elapsed >= std::time::Duration::from_millis(50),
++            "run finished before the backoff window was entered: {elapsed:?}"
++        );
++        // Upper bound: the first real backoff is one second; finishing under 800ms shows the
++        // wait was interrupted by cancellation rather than slept out.
++        assert!(
++            elapsed < std::time::Duration::from_millis(800),
++            "cancelled backoff took {elapsed:?}"
++        );
++    }
++    struct CorrectionBudgetClient {
++        calls: Arc<AtomicUsize>,
++    }
++    #[async_trait]
++    impl crate::llm::LlmClient for CorrectionBudgetClient {
++        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
++            unreachable!("budget fixture uses complete")
++        }
++        async fn complete(&self, _req: LlmRequest) -> Result<LlmResponse> {
++            let call = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
++            match call {
++                1..=3 | 9..=11 => Err(anyhow::anyhow!("OpenAI API error 429: rate_limit")),
++                8 => Err(anyhow::anyhow!("tool_args_invalid: incomplete JSON")),
++                _ => Err(anyhow::anyhow!("connection timeout")),
++            }
++        }
++    }
++    #[tokio::test]
++    async fn correction_shares_twelve_primary_call_budget() {
++        let calls = Arc::new(AtomicUsize::new(0));
++        let mut agent = tier_agent(
++            CorrectionBudgetClient {
++                calls: calls.clone(),
++            },
++            None,
++            crate::agent::harness::LayeredBudget::from_context_window(
++                TIER_TEST_CONTEXT_WINDOW,
++                TIER_TEST_MAX_TOKENS,
++            ),
++        );
++        agent.same_model_transient_retries = u32::MAX;
++        agent.fallback_models = vec!["one".into(), "two".into(), "three".into()];
++        let cancel = Arc::new(AtomicBool::new(false));
++        let (tx, mut rx) = mpsc::channel(64);
++        let drain = tokio::spawn(async move {
++            let mut events = Vec::new();
++            while let Some(event) = rx.recv().await {
++                events.push(event);
++            }
++            events
++        });
++        let result = tokio::time::timeout(
++            std::time::Duration::from_secs(30),
++            agent.run(
++                vec![make_text_msg("user", "bounded correction")],
++                tx,
++                cancel,
++                tier_tool_context("correction-budget".into()),
++            ),
++        )
++        .await
++        .expect("correction budget must terminate");
++        assert!(result.is_err());
++        assert_eq!(calls.load(Ordering::SeqCst), 12);
++        let events = drain.await.unwrap();
++        assert_eq!(events.iter().filter(|event| matches!(event, AgentEvent::Notice { code: Some(code), .. } if code == "tool_args_invalid")).count(), 1);
++        assert!(!events
++            .iter()
++            .any(|event| matches!(event, AgentEvent::ToolStart { .. })));
++    }
+ 
+     // ── Mock LLM clients ──────────────────────────────────────────────────────
+ 
+@@ -5393,7 +5624,12 @@ mod tests {
+ 
+         let result = tokio::time::timeout(
+             std::time::Duration::from_secs(5),
+-            agent.run(vec![make_text_msg("user", "写个文件")], event_tx, cancel, ctx),
++            agent.run(
++                vec![make_text_msg("user", "写个文件")],
++                event_tx,
++                cancel,
++                ctx,
++            ),
+         )
+         .await
+         .expect("agent run should not hang");

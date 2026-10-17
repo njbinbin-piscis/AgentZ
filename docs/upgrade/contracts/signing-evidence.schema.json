@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agentz:upgrade:signing-evidence:1",
+  "title": "AgentZ offline signing and installation evidence record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "provenance", "recorded_at", "platform", "arch", "artifact", "signing", "notarization", "installation"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "provenance": { "enum": ["actual", "candidate", "fixture"] },
+    "recorded_at": { "$ref": "#/$defs/time" },
+    "platform": { "enum": ["windows", "macos", "linux"] },
+    "arch": { "enum": ["x64", "arm64"] },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "sha256_expected", "sha256_observed"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "sha256_expected": { "$ref": "#/$defs/hash" },
+        "sha256_observed": { "$ref": "#/$defs/nullableHash" }
+      }
+    },
+    "signing": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tool_available", "certificate_available", "expected_identity", "actual_identity", "executed", "status", "verified_at", "validity", "tool_result"],
+      "properties": {
+        "tool_available": { "type": "boolean" },
+        "certificate_available": { "type": "boolean" },
+        "expected_identity": { "$ref": "#/$defs/nullableText" },
+        "actual_identity": { "$ref": "#/$defs/nullableText" },
+        "executed": { "type": "boolean" },
+        "status": { "$ref": "#/$defs/verificationStatus" },
+        "verified_at": { "$ref": "#/$defs/nullableTime" },
+        "validity": {
+          "type": "object", "additionalProperties": false,
+          "required": ["signature_valid", "certificate_valid_at_signing", "certificate_not_before", "certificate_not_after", "timestamp_required", "timestamp_valid", "timestamp_at"],
+          "properties": {
+            "signature_valid": { "$ref": "#/$defs/nullableBoolean" },
+            "certificate_valid_at_signing": { "$ref": "#/$defs/nullableBoolean" },
+            "certificate_not_before": { "$ref": "#/$defs/nullableTime" },
+            "certificate_not_after": { "$ref": "#/$defs/nullableTime" },
+            "timestamp_required": { "type": "boolean" },
+            "timestamp_valid": { "$ref": "#/$defs/nullableBoolean" },
+            "timestamp_at": { "$ref": "#/$defs/nullableTime" }
+          }
+        },
+        "tool_result": { "$ref": "#/$defs/nullableToolResult" }
+      }
+    },
+    "notarization": {
+      "type": "object", "additionalProperties": false,
+      "required": ["required", "executed", "status", "tool_result", "staple_executed", "staple_status", "staple_result"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "executed": { "type": "boolean" },
+        "status": { "$ref": "#/$defs/verificationStatus" },
+        "tool_result": { "$ref": "#/$defs/nullableToolResult" },
+        "staple_executed": { "type": "boolean" },
+        "staple_status": { "$ref": "#/$defs/verificationStatus" },
+        "staple_result": { "$ref": "#/$defs/nullableToolResult" }
+      }
+    },
+    "installation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["executed", "status", "clean_machine", "machine_id", "platform", "arch", "steps"],
+      "properties": {
+        "executed": { "type": "boolean" },
+        "status": { "enum": ["missing", "unverified", "complete", "failed"] },
+        "clean_machine": { "$ref": "#/$defs/nullableBoolean" },
+        "machine_id": { "$ref": "#/$defs/nullableText" },
+        "platform": { "enum": ["windows", "macos", "linux"] },
+        "arch": { "enum": ["x64", "arm64"] },
+        "steps": {
+          "type": "object", "additionalProperties": false,
+          "required": ["install", "launch", "uninstall"],
+          "properties": {
+            "install": { "$ref": "#/$defs/installStep" },
+            "launch": { "$ref": "#/$defs/installStep" },
+            "uninstall": { "$ref": "#/$defs/installStep" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "time": { "type": "string", "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" },
+    "nullableTime": { "type": ["string", "null"], "format": "date-time", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" },
+    "nullableText": { "type": ["string", "null"], "minLength": 1 },
+    "nullableBoolean": { "type": ["boolean", "null"] },
+    "verificationStatus": { "enum": ["missing", "unverified", "valid", "invalid"] },
+    "nullableToolResult": { "type": ["object", "null"], "$ref": "#/$defs/toolResult" },
+    "toolResult": {
+      "type": ["object", "null"], "additionalProperties": false,
+      "required": ["provenance", "tool", "version", "exit_code", "raw_result", "raw_sha256", "captured_at", "artifact_sha256", "identity"],
+      "properties": {
+        "provenance": { "enum": ["actual", "candidate", "fixture"] },
+        "tool": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "exit_code": { "type": "integer" },
+        "raw_result": { "type": "string", "minLength": 1 },
+        "raw_sha256": { "$ref": "#/$defs/hash" },
+        "captured_at": { "$ref": "#/$defs/time" },
+        "artifact_sha256": { "$ref": "#/$defs/hash" },
+        "identity": { "$ref": "#/$defs/nullableText" }
+      }
+    },
+    "installStep": {
+      "type": "object", "additionalProperties": false,
+      "required": ["provenance", "executed", "result", "executed_at", "artifact_sha256", "raw_result", "raw_sha256", "recording_sha256"],
+      "properties": {
+        "provenance": { "enum": ["actual", "candidate", "fixture"] },
+        "executed": { "type": "boolean" },
+        "result": { "enum": ["missing", "unverified", "passed", "failed"] },
+        "executed_at": { "$ref": "#/$defs/nullableTime" },
+        "artifact_sha256": { "$ref": "#/$defs/nullableHash" },
+        "raw_result": { "$ref": "#/$defs/nullableText" },
+        "raw_sha256": { "$ref": "#/$defs/nullableHash" },
+        "recording_sha256": { "$ref": "#/$defs/nullableHash" }
+      }
+    }
+  }
+}

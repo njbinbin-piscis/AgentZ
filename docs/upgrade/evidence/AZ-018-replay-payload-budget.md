@@ -1,0 +1,9 @@
+# AZ018 replay stored-record validation and byte budget
+
+Added only events.rs changes and this evidence. No RunStore/IPC changes or Cargo execution. rustfmt with skip_children and whitespace checks passed; two new SQLite fixtures were written but not run here.
+
+Replay now selects payload byte length via length(CAST(payload AS BLOB)) with event metadata first. It validates stored event_id/kind using the same identity rules as append and rejects negative timestamps, per-record payload over1MiB or total page over4MiB before reading that row's payload String/parsing JSON. Only validated bounded payloads are fetched in a second query within the same replay transaction. Budget overflow returns a specific error asking for a smaller page; it never silently returns a truncated prefix, so host len-vs-limit paging logic does not misreport end-of-stream. No retention/deletion or automatic history repair was introduced.
+
+Fixtures deliberately mutate stored id/kind/time/payload (owned in-memory SQLite with CHECK bypass only for the negative timestamp fixture) and expect replay refusal; a five-event large-payload page errors at total budget while four-event prefix and cursor continuation remain valid. Host must propagate this error and allow explicit smaller-page request, not resume a Run or fabricate lifecycle state from absent legacy history.
+
+Read-only additional observation for root: RunStore event layout checks types/PK/non-null/dedup but do not assert the sequence>0 CHECK clause. count=max plus returned-page continuity is safe under positive unique sequence invariants; a malformed table accepted without CHECK could contain sequences0,2,3 and after2 replay3 despite a gap. This package did not change run.rs or global gap policy; root may add MIN(sequence)>0 validation in replay or strengthen schema validation as an independently tested repair. No reproduced product runtime failure is claimed for this unexecuted corruption scenario.

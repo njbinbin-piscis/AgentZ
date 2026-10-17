@@ -170,6 +170,53 @@ describe("LSP transport", () => {
 // ─── Disconnect / timeout robustness (LSP-03) ─────────────────────────────
 
 describe("LSP lifecycle robustness", () => {
+  it("retries a failed handshake with a new socket rather than reusing the rejected promise", async () => {
+    FakeWebSocket.defaultServer = (msg, ws) => {
+      if (msg.method === "initialize") ws.emit({ id: 0, error: { message: "fixture failure" } });
+    };
+    const client = new LspClient(4321);
+    await expect(client.connect("/proj", "typescript")).rejects.toThrow("fixture failure");
+    FakeWebSocket.defaultServer = defaultServer;
+    await client.reconnect(5432, "/proj", "typescript");
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    expect(sentMethods(FakeWebSocket.instances[1])).toContain("initialized");
+    client.disconnect();
+  });
+  it("reopens current unsaved documents on a new bridge and omits closed files", async () => {
+    const { client, ws } = await connectClient();
+    client.openDocument("/proj/a.ts", "typescript", "old");
+    client.openDocument("/proj/b.ts", "typescript", "closed");
+    client.closeDocument("/proj/b.ts");
+    ws.simulateDrop();
+    client.sendDidChange("/proj/a.ts", "unsaved latest");
+    await client.reconnect(5432, "/proj", "typescript");
+    const next = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+    expect(next.url).toBe("ws://127.0.0.1:5432");
+    const opens = next.sent.map((frame) => JSON.parse(frame)).filter((msg) => msg.method === "textDocument/didOpen");
+    expect(opens).toHaveLength(1);
+    expect(opens[0].params.textDocument).toMatchObject({ text: "unsaved latest", version: 1 });
+    client.disconnect();
+  });
+  it("clears crashed diagnostics and ignores callbacks from the previous socket", async () => {
+    const { client, ws } = await connectClient();
+    const uri = fileUriString("/proj/a.ts");
+    const listener = vi.fn();
+    client.setDiagnosticsCallback(uri, listener);
+    ws.emit({ jsonrpc: "2.0", method: "textDocument/publishDiagnostics",
+      params: { uri, diagnostics: [{ message: "old process" }] } });
+    ws.simulateDrop();
+    expect(listener).toHaveBeenLastCalledWith([]);
+    await client.connect("/proj", "typescript");
+    const replacement = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+    ws.emit({ jsonrpc: "2.0", method: "textDocument/publishDiagnostics",
+      params: { uri, diagnostics: [{ message: "stale callback" }] } });
+    ws.simulateDrop();
+    expect(listener).toHaveBeenCalledTimes(2);
+    replacement.emit({ jsonrpc: "2.0", method: "textDocument/publishDiagnostics",
+      params: { uri, diagnostics: [] } });
+    expect(listener).toHaveBeenCalledTimes(3);
+    client.disconnect();
+  });
   it("fails in-flight requests when the socket closes", async () => {
     const { client, ws } = await connectClient();
     ws.server = () => {}; // stop answering
@@ -241,6 +288,30 @@ describe("document lifecycle", () => {
 // ─── Diagnostics routing ──────────────────────────────────────────────────
 
 describe("diagnostics routing", () => {
+  it("does not return a pull result issued before the latest edit", async () => {
+    const { client, ws } = await connectClient();
+    client.openDocument("/proj/pull.ts", "typescript", "old");
+    ws.server = () => {};
+    const pending = client.requestDiagnostics("/proj/pull.ts");
+    const id = lastSent(ws).id;
+    client.sendDidChange("/proj/pull.ts", "new");
+    ws.emit({ id, result: { items: [{ message: "obsolete pull" }] } });
+    expect(await pending).toEqual([]);
+    client.disconnect();
+  });
+  it("rejects diagnostics for a prior document version after an edit", async () => {
+    const { client, ws } = await connectClient();
+    const uri = fileUriString("/proj/versioned.ts");
+    client.openDocument("/proj/versioned.ts", "typescript", "old");
+    client.sendDidChange("/proj/versioned.ts", "new");
+    const listener = vi.fn();
+    client.setDiagnosticsCallback(uri, listener);
+    ws.emit({ method: "textDocument/publishDiagnostics", params: { uri, version: 1, diagnostics: [] } });
+    expect(listener).not.toHaveBeenCalled();
+    ws.emit({ method: "textDocument/publishDiagnostics", params: { uri, version: 2, diagnostics: [] } });
+    expect(listener).toHaveBeenCalledOnce();
+    client.disconnect();
+  });
   it("only notifies listeners of the matching URI", async () => {
     const { client, ws } = await connectClient();
     const aUri = fileUriString("/proj/a.ts");

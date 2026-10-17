@@ -1,0 +1,36 @@
+.agentz-first-run {
+  margin: 12px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.agentz-first-run-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.agentz-first-run-steps {
+  margin: 0 0 8px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.agentz-first-run-steps li[data-status="done"] {
+  opacity: 0.7;
+}
+
+.agentz-first-run-action {
+  font-size: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.agentz-assistant-error-action {
+  margin-top: 6px;
+  font-size: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+

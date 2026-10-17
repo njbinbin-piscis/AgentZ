@@ -1,0 +1,1845 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-09T12:10:48.158Z",
+  "baseline_revision": "527e55496caf4437e4265e02869f0a8c764549f6",
+  "baseline_archive_sha256": "2ccfc6dd1bbb62c5f01455824499f2a1517bd24413c10f51f1ecd173ffd8ca96",
+  "baseline_files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "290ce2865931f01ebbe36c2dd4235c68d67a4fc20ea764efd528ecd56b292570"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "6b828861f1f82fd39af0a10fde9e0c301d6b068e9c68831ae7fd2053a8e0c198"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "147d84d75b3fe21269c4353118836a2edfd7de6c6565c171975064606f952db8"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "99fb620de65792405daf7465e3fb022f93902b186f672568b9f0ca72f0ea06a8"
+    },
+    {
+      "path": "README.md",
+      "sha256": "c530a010b96480183dbf09916a7830e67d6001cb1ac2200236c617209e220755"
+    },
+    {
+      "path": "piscis-cli/Cargo.toml",
+      "sha256": "43b0bd9eb8b3a942bb656e80d43327f2b54aa9da4303e15d3db493df4bb756d8"
+    },
+    {
+      "path": "piscis-cli/src/args.rs",
+      "sha256": "12d7859012c68e9046273262041be0aef53013e7323d014040492cdb024c714c"
+    },
+    {
+      "path": "piscis-cli/src/bin/openpiscis-headless.rs",
+      "sha256": "1f7030f2a9e725641551dad076377498811854370f3485e47043951ea47fa247"
+    },
+    {
+      "path": "piscis-cli/src/host.rs",
+      "sha256": "ddef2eb2c4898371f4bd91076992fb480ee06037a53e4a3b3ae76a62a5c94aa4"
+    },
+    {
+      "path": "piscis-cli/src/interactive.rs",
+      "sha256": "f73b24030f04dfee9515737eba7befd97387094b5d38e577caaccd9b8d44ea55"
+    },
+    {
+      "path": "piscis-cli/src/lib.rs",
+      "sha256": "dc8a33e5f8b824e7c656ad16c24de1237d9e9c4980e2a7af404a1453e4b595c1"
+    },
+    {
+      "path": "piscis-cli/src/rpc_server.rs",
+      "sha256": "4b4c12959c0fc45f6bcc9d28481bed49536d58c0290cc33845d8bbd0a4acc9db"
+    },
+    {
+      "path": "piscis-cli/src/runner.rs",
+      "sha256": "c997fef2cb539c66589f6fa4ad51b8d49fd74817ff6219f8c327a8d1a508cd02"
+    },
+    {
+      "path": "piscis-cli/tests/headless_cli.rs",
+      "sha256": "a9056bbf284577263c0b4ecb2452cdb8d3297a7ef99247f6b59e723801fb2340"
+    },
+    {
+      "path": "piscis-cli/tests/pool_tools_headless.rs",
+      "sha256": "5091f3e61fe53509633e801df32ea583891923216596bcd5be6ec12da46db41d"
+    },
+    {
+      "path": "piscis-core/Cargo.toml",
+      "sha256": "c39b6114f51aa52f5586ddf3c0e4440003bdc665d7bcc156a85d821652b0b850"
+    },
+    {
+      "path": "piscis-core/src/heartbeat.rs",
+      "sha256": "c50837eecd666f4be08d36cf38308153c92fdeba850516d6384e0cedafe3a4f9"
+    },
+    {
+      "path": "piscis-core/src/host.rs",
+      "sha256": "344ddc250a1c73b164587a7307e0929525f0feca9622cf87a6035c51217d6da0"
+    },
+    {
+      "path": "piscis-core/src/integration.rs",
+      "sha256": "4966ffe1fd52c5db41db1b812ac33ea7185ac8782f49e9c44baa325b84009400"
+    },
+    {
+      "path": "piscis-core/src/koi_prompt.rs",
+      "sha256": "f35a2c1f7abcfc8b709c6b6cc27fc42418750e9109d15dd880277f6b420968cf"
+    },
+    {
+      "path": "piscis-core/src/lib.rs",
+      "sha256": "ed08c3076eaca11ba3f0bf0ebd31c8ce017d5c3acbf86317306bc4b66c8893da"
+    },
+    {
+      "path": "piscis-core/src/models.rs",
+      "sha256": "36a8198fe1b2f00b359ab6bef192953ff3d6268acade3cd6375a496c28371c91"
+    },
+    {
+      "path": "piscis-core/src/project_state.rs",
+      "sha256": "f4a760c6db3ce330f485adfcbf73ec1163b74c0495875ca9d1b48ff6db6c2622"
+    },
+    {
+      "path": "piscis-core/src/scene.rs",
+      "sha256": "0ca373ff6e0aafd54311d76174534c447e2175cf829bc06ae01a03f5e4ae3581"
+    },
+    {
+      "path": "piscis-core/src/trial.rs",
+      "sha256": "1b87f8df577edd7ceab39fe1fb26c1b3a8a5305482c9970c9c3d4ddf41f3bbfa"
+    },
+    {
+      "path": "piscis-core/tests/collab_trial.rs",
+      "sha256": "38b62513104511fcb62129bbeb57b3a3337d1203e54cc05209f998c423037c43"
+    },
+    {
+      "path": "piscis-ide-tools/Cargo.toml",
+      "sha256": "2d324f9d9954f8120afea428ffc58568fbd386f8c89586cdd7ee8e5343781950"
+    },
+    {
+      "path": "piscis-ide-tools/src/lib.rs",
+      "sha256": "061a855cebb535c1576ae0a004c1eaade16bca4f73aa4ffcf5aefe46053c5a60"
+    },
+    {
+      "path": "piscis-ide-tools/src/lsp/bridge.rs",
+      "sha256": "3dd8e23545a4341512e42bb1d1ebcf4a128c2a2d3c0320e446e6476e136d904f"
+    },
+    {
+      "path": "piscis-ide-tools/src/lsp/client.rs",
+      "sha256": "ac6c40816acb914449cb63228fc08cee850df9d0b7a64b85e46e31afee6da195"
+    },
+    {
+      "path": "piscis-ide-tools/src/lsp/manager.rs",
+      "sha256": "40ff05f7fe2da56fb9a40a0637eb18efff9cffde138bb1fc193b2dd50b4049f8"
+    },
+    {
+      "path": "piscis-ide-tools/src/lsp/mod.rs",
+      "sha256": "42c4dec49d9ba7d9cddaac8ef6d7320cf6d81fde0ae3b78f33651eb60c4374e4"
+    },
+    {
+      "path": "piscis-ide-tools/src/tools/lsp.rs",
+      "sha256": "e68f0f9d89a43302177255f6e8b032e17db8351e881a827d8d082ba788e76fc1"
+    },
+    {
+      "path": "piscis-ide-tools/src/tools/mod.rs",
+      "sha256": "bdf2fca0719292f1da40ddff1970e7dcadf2d55699f027a28194e51911bc3426"
+    },
+    {
+      "path": "piscis-ide-tools/src/tools/read_lints.rs",
+      "sha256": "e7f3a94dec0fb59e57f7e055096d9cc4df63ab065cb2146ac1bb201c80446216"
+    },
+    {
+      "path": "piscis-ide-tools/tests/lsp_live.rs",
+      "sha256": "bebab8621172bd32675814a451832c0ce140cfd7d5a0d9d6f5a188f912949d6b"
+    },
+    {
+      "path": "piscis-kernel/Cargo.toml",
+      "sha256": "893f12b879c0ce45abbc099b405ecbea2c52089acbdfe38bac97f2bdfa1cfa29"
+    },
+    {
+      "path": "piscis-kernel/src/agent/bench_compact.rs",
+      "sha256": "00580d67e1df5898eb8eebd5b61ad0c356b8b875ae54880156039d6d6c6e4cb2"
+    },
+    {
+      "path": "piscis-kernel/src/agent/compaction.rs",
+      "sha256": "675b544bd9d1818feef75aec12b2f45d9e8042b9dbea222daf0e64348f517d41"
+    },
+    {
+      "path": "piscis-kernel/src/agent/compaction_eval.rs",
+      "sha256": "1cc3f18c050ad0ddd5e1880d9c6ec8d5b30f43fb826c56fd9fe6e77e99d9a467"
+    },
+    {
+      "path": "piscis-kernel/src/agent/compaction_strategy.rs",
+      "sha256": "7cafcd0b41f52f8279cbd0cbd5b54ee1d91f9dcc8aed9a7f9238be71fb850f38"
+    },
+    {
+      "path": "piscis-kernel/src/agent/contrib.rs",
+      "sha256": "c79ebdf189c79b10a011418d2041b41f35aba9ec75c05ad4dcfceaa7e0e71428"
+    },
+    {
+      "path": "piscis-kernel/src/agent/file_journal.rs",
+      "sha256": "b7a3ce4e0d70af4baddaeb44ed660f2e15978a7d3a00da7b8548b62a396b7d34"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/budget.rs",
+      "sha256": "96e2a5779b0d12b6214592ca410d95365ed413087ba71d5c7aa7f6cd07fa4842"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/config.rs",
+      "sha256": "bc4446d5a503a95a0e0b178d8b221125806429716ea92293d1ec99875536c757"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/context_builder.rs",
+      "sha256": "b733fb9e0ace1efd5fda9cf3ba5c23351fa3c029a2105fee570c9a5bed411403"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/layered_prompt.rs",
+      "sha256": "a72a4d07cfbcc90a75898d6ef6b6ac5c4aa2c1b438e680b986ee8c104c1b2593"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/mod.rs",
+      "sha256": "97a8a20d905ea47e315aa896cffc6c306d5ce9d7a4070e84b948e817731e8cbd"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/request_builder.rs",
+      "sha256": "6d70a8850da8248487177bca7529fed90570a3be5d550bb3e08dd3dd0070bc9a"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/runner.rs",
+      "sha256": "26e9f0c1f0ce4ef00a457f1ab010c3e0a9f477e702c1024534932fff82292951"
+    },
+    {
+      "path": "piscis-kernel/src/agent/hooks.rs",
+      "sha256": "2af54db7f42898c1ab1f831907e85cc8b88af51ec7fbfdcae932d5d20636bbf8"
+    },
+    {
+      "path": "piscis-kernel/src/agent/loop_.rs",
+      "sha256": "daf4e104c71119a236d626139914b587a0d4ce81d4b07ade5fced0eb7a5b0f7e"
+    },
+    {
+      "path": "piscis-kernel/src/agent/loop_strategy.rs",
+      "sha256": "8469d1784fe4c1d62b38f6696816b4a80c05a6f6c4b40ee0d2096318b635f948"
+    },
+    {
+      "path": "piscis-kernel/src/agent/message_utils.rs",
+      "sha256": "0ecd34ca1bef47c00cbfd0ff066050fcaef9c52cd04f74d747de2a9056633efc"
+    },
+    {
+      "path": "piscis-kernel/src/agent/messages.rs",
+      "sha256": "0b71d4b7b912b9ae606735030098b4f18382620f34d33843ad9aef8c8df49e69"
+    },
+    {
+      "path": "piscis-kernel/src/agent/mod.rs",
+      "sha256": "7263a83496ea4881183fa4866cfbdd49a6053ad9f1634cf3985afb74120eb7d5"
+    },
+    {
+      "path": "piscis-kernel/src/agent/plan.rs",
+      "sha256": "17b34806077f0ac217635634b3fe6cdef1f7bed2516601c73b4a37abdac41d57"
+    },
+    {
+      "path": "piscis-kernel/src/agent/plan_doc.rs",
+      "sha256": "b2cd5724b6bd8f82f6ad77e19c18b1d89169345f30e6d5e32ccbcbe0fd01e97a"
+    },
+    {
+      "path": "piscis-kernel/src/agent/rule_preprocess.rs",
+      "sha256": "db968679d3e0c30a972d181d76c990141c10c9fc32e407fb9dbd12b3a8858bc3"
+    },
+    {
+      "path": "piscis-kernel/src/agent/state_frame.rs",
+      "sha256": "78f4d76adec1e106a8b80ee017b48409dfe1e7c277deaba3a2354208772693d4"
+    },
+    {
+      "path": "piscis-kernel/src/agent/summary_worker.rs",
+      "sha256": "21c53ac248ebf5fe19d5b42a6327e31106b1016b47da3397d6129cbac5c0773c"
+    },
+    {
+      "path": "piscis-kernel/src/agent/tool.rs",
+      "sha256": "77d63223103e2c3bdfe067d8e4cac6f1d989ede22afc4b422bdbb3c3634e337d"
+    },
+    {
+      "path": "piscis-kernel/src/agent/tool_receipt.rs",
+      "sha256": "230c760e79859a11e27c8cac15b0a72b7212af9c8ad900d3a01d5a573b7196c3"
+    },
+    {
+      "path": "piscis-kernel/src/agent/vision.rs",
+      "sha256": "085e6f37f2f003b61720f27853c8fa0b5021def75043c65d0a7c91a2b14c5fa5"
+    },
+    {
+      "path": "piscis-kernel/src/context/mod.rs",
+      "sha256": "ba92b18a464e78dec40fabc3df87898f0d55e4f7b79aa104a4c8eed0dad65426"
+    },
+    {
+      "path": "piscis-kernel/src/headless/mod.rs",
+      "sha256": "6059365ba2215b3a9871dbf1578c8f9f013a4bac43994a021c5192239e50dcf3"
+    },
+    {
+      "path": "piscis-kernel/src/lib.rs",
+      "sha256": "ca5ccd52e2b9c73581a30c484cdcb31e138ed553ce83592e8669af61cb60c9ab"
+    },
+    {
+      "path": "piscis-kernel/src/llm/auto_select.rs",
+      "sha256": "4bfdffd2057cb0cb7cb90493bcdaa69570bf123a62cca7b5415188e4f400f74f"
+    },
+    {
+      "path": "piscis-kernel/src/llm/claude.rs",
+      "sha256": "e0ad5095844721a605a493c840edb1738445c6c38227a268d7de59abda197269"
+    },
+    {
+      "path": "piscis-kernel/src/llm/error_class.rs",
+      "sha256": "85b6e167a4ae63fa317dc0b68f9d7b97e97c39b1fd59547e594e5b04fe16efd5"
+    },
+    {
+      "path": "piscis-kernel/src/llm/json_repair.rs",
+      "sha256": "f64343be9497c06be9720e35b2a4914b63459034936109881ef581eaa9695706"
+    },
+    {
+      "path": "piscis-kernel/src/llm/mod.rs",
+      "sha256": "6ed6dd2d8a7903db72a71863b8effb9d3b96d9716c0fcd4a5f4b2e1d93ec55e6"
+    },
+    {
+      "path": "piscis-kernel/src/llm/openai.rs",
+      "sha256": "9961f8c25ede8771b0ce9e3ae29f59b3e7a5b1d77a5463a98aa9e381e910917e"
+    },
+    {
+      "path": "piscis-kernel/src/memory/mod.rs",
+      "sha256": "636261e171c09a1963a9901071101bdf7a18121b85b6d762b78ca822d7687598"
+    },
+    {
+      "path": "piscis-kernel/src/memory/plugin.rs",
+      "sha256": "e1cf16d17f97ab1443107422944ff911dd0a95a069df7f5570a783c07bd59df3"
+    },
+    {
+      "path": "piscis-kernel/src/memory/vector.rs",
+      "sha256": "62b39917c9aafd22743f32e4f96bfd2b5232a59794899038c327e7c5127f8d41"
+    },
+    {
+      "path": "piscis-kernel/src/notify.rs",
+      "sha256": "6a887b89d95c35e855bbea7a2ee1628cd38f4b4663ed9ae5e4bd7c08db729bf8"
+    },
+    {
+      "path": "piscis-kernel/src/policy/gate.rs",
+      "sha256": "377b3b0587f5c0b605bc8d120aa62bbecc798ceaa1b7610f415022704503a6b5"
+    },
+    {
+      "path": "piscis-kernel/src/policy/mod.rs",
+      "sha256": "38359cbfaa9a480b084ae28b6eba8799bd4e109d5a48840ca6f8186e8642f908"
+    },
+    {
+      "path": "piscis-kernel/src/pool/coordinator.rs",
+      "sha256": "77367d0d5becbe7f6d03b7c3ba7949c6e74bd733fca99ec44df697b760637443"
+    },
+    {
+      "path": "piscis-kernel/src/pool/git.rs",
+      "sha256": "a0904457d383c7cc3e5c2afbe71d758df958d914fafad641d7e8243c1d3b2fe0"
+    },
+    {
+      "path": "piscis-kernel/src/pool/koi_execute_todo.tmpl",
+      "sha256": "2251c2483f231f4b803b20b03e67f4de2354820fb6f21eb1e9a1c2b572a4648b"
+    },
+    {
+      "path": "piscis-kernel/src/pool/metadata.rs",
+      "sha256": "f09809e670f258b12e174a9e97670ac5c283ddf1d6e156e191fbd58635b2afbc"
+    },
+    {
+      "path": "piscis-kernel/src/pool/mod.rs",
+      "sha256": "434d8be0dda1cb9c2fdda480271c08612ba6f8ba28b7b19e40324f8344975f01"
+    },
+    {
+      "path": "piscis-kernel/src/pool/model.rs",
+      "sha256": "74b2a592538d3afc298f344b2c9d344fef182aa557257c002bbadc0040700b2b"
+    },
+    {
+      "path": "piscis-kernel/src/pool/services.rs",
+      "sha256": "fa08140cc7ebd8e5fbcf7adbad98920f896b1bd67020fb65888a9e0d8d3b6ef2"
+    },
+    {
+      "path": "piscis-kernel/src/pool/store.rs",
+      "sha256": "09a9cec7dcc9bcd57610de2b0f3cf81003b2981cc193d065eab1f1102648a468"
+    },
+    {
+      "path": "piscis-kernel/src/pool/subagent.rs",
+      "sha256": "2082dfc9ccf8a9b8c82085157d51b0b1451e007d9da5638126a0b023b45d6a5b"
+    },
+    {
+      "path": "piscis-kernel/src/proc.rs",
+      "sha256": "85db0625628449f60781de02588d57dcbaf1a6b1e6f9ced9a1a78d21f8e30c35"
+    },
+    {
+      "path": "piscis-kernel/src/project_context.rs",
+      "sha256": "69b9341db90cbf704aabed8c759987edd4e326ff3faf573769023951a6a76485"
+    },
+    {
+      "path": "piscis-kernel/src/scheduler/cron.rs",
+      "sha256": "feec796c6ec2119d3ae744b7b5abc36080743a2f985317b690eb8fff5d067852"
+    },
+    {
+      "path": "piscis-kernel/src/scheduler/mod.rs",
+      "sha256": "97d37e088ce7b005318546b0b10bb531d0828a86b18c9f0e4be33febe0f61008"
+    },
+    {
+      "path": "piscis-kernel/src/security/injection.rs",
+      "sha256": "8121106107b23da248d70157bb4795694119c043b8cd1b352b26b6e5428ccae5"
+    },
+    {
+      "path": "piscis-kernel/src/security/mod.rs",
+      "sha256": "44e82cc6af830af4e249f5470c516861059e28383a43686e5fa937618f2e6db8"
+    },
+    {
+      "path": "piscis-kernel/src/security/secrets.rs",
+      "sha256": "351ebd39e1d62f2787348cc5a9f9aa0f6843ecac58e79b53a4a337bac8262a07"
+    },
+    {
+      "path": "piscis-kernel/src/store/db.rs",
+      "sha256": "fb181c1a2e9e35dc0cfc6a576807d788f68ec4c10512f4d9c9caa8ebad2d526c"
+    },
+    {
+      "path": "piscis-kernel/src/store/mod.rs",
+      "sha256": "561cf46cc81f78805beda1d9a89356b94f19b5d5557d997948912e91df105d1d"
+    },
+    {
+      "path": "piscis-kernel/src/store/settings.rs",
+      "sha256": "17b9b90a1998b5309e69d6c1018535aac5415a62bc2e69a7947f551f121d334e"
+    },
+    {
+      "path": "piscis-kernel/src/tools/code_run.rs",
+      "sha256": "c746d545397413405b88f5a24771b43dcd78e9f8f69a55713d7d2ebf8d71021d"
+    },
+    {
+      "path": "piscis-kernel/src/tools/elevate.rs",
+      "sha256": "0c7fb2cb0c3be294f06d28db79c159c4cf2358880a42bd319e51a6c1e4bde86b"
+    },
+    {
+      "path": "piscis-kernel/src/tools/email.rs",
+      "sha256": "1253587a1da0134f53c08ce45606ce4b52826de18a0f5e165263a7f00af81a5e"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_diff.rs",
+      "sha256": "ce862125b6ce46ce7ee153f6a6ef1d8a7f6d80d105c3b010202228e1105e68cf"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_list.rs",
+      "sha256": "c603f2c9699b079cdc089dd81903f85a8576a461e108b91d1a57b488b44d5700"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_read.rs",
+      "sha256": "6f63e229c5e580c0e2aa0c789b9e3c106a02b0186c8dd9114287558859a11d49"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_search.rs",
+      "sha256": "432e1489d24c78e14f28e9bbfa55cc87aae32799618eedfea1c98af581f4147e"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_write.rs",
+      "sha256": "917e8c4210172a66e79da87ded33e81fa4b5cad562e6a65f6929b046c3de41c6"
+    },
+    {
+      "path": "piscis-kernel/src/tools/mcp.rs",
+      "sha256": "55470b5f4ddfaa52709a453848b77eae77c365bc045297de23d57f10027c355c"
+    },
+    {
+      "path": "piscis-kernel/src/tools/memory_tool.rs",
+      "sha256": "9fa82add5bffa471cd85e09e27afbd603d35aae890f693219db3226aac5f6259"
+    },
+    {
+      "path": "piscis-kernel/src/tools/mod.rs",
+      "sha256": "bf95440165e9c1cea8b1cdab12de98b47b2bd387d8cba7360b5597d62e8bee6e"
+    },
+    {
+      "path": "piscis-kernel/src/tools/output.rs",
+      "sha256": "e98a7599f1039cf92da555b1b27f58e2dedfdb5df939daae52c6847d1e60db70"
+    },
+    {
+      "path": "piscis-kernel/src/tools/pdf.rs",
+      "sha256": "49478fb365b13e19dbefd7453188a9bb974a990069395569a703ac2b2a4c15f5"
+    },
+    {
+      "path": "piscis-kernel/src/tools/plan_todo.rs",
+      "sha256": "d5932f8e4087cb7e43aafa265d329e501b75cbe942c2ac4f94d6f9d6837cbcd6"
+    },
+    {
+      "path": "piscis-kernel/src/tools/plan_write.rs",
+      "sha256": "d0963efb2edf3401683578b0ea3a44010a0b62da644717fdb437167b7ea736de"
+    },
+    {
+      "path": "piscis-kernel/src/tools/pool_chat.rs",
+      "sha256": "bf5f23b80a8aa5080a34879307fc5047a3c078bda77c6c098153e6a3d3a0cc84"
+    },
+    {
+      "path": "piscis-kernel/src/tools/pool_org.rs",
+      "sha256": "d0ec5fee69d85a3485d073ba6cc003e74c724492656ff67282ab6fe334e01f00"
+    },
+    {
+      "path": "piscis-kernel/src/tools/process_control.rs",
+      "sha256": "cf0b1ccc7ae57213298c30a6a9bcd3d32f10737925c664db0dff8ab576dfe86b"
+    },
+    {
+      "path": "piscis-kernel/src/tools/recall_tool.rs",
+      "sha256": "fddf400fc7d644372b1f9045468da215f31c70bd8c0dfdcb2df2b8c9dfb23fe3"
+    },
+    {
+      "path": "piscis-kernel/src/tools/shell.rs",
+      "sha256": "d78639e8e78cb8b293dde9facca8796b9721c58b0284ff0c416b59d10f0e0a27"
+    },
+    {
+      "path": "piscis-kernel/src/tools/ssh.rs",
+      "sha256": "d55fa8c5a3409dc218751520984c1fae662ae65ee1826f9b447a0992fc5b5695"
+    },
+    {
+      "path": "piscis-kernel/src/tools/user_tool.rs",
+      "sha256": "9278c8c5be4000231844a01e5608853076df7fc60180844b0563b31bce0a1310"
+    },
+    {
+      "path": "piscis-kernel/src/tools/vision_context.rs",
+      "sha256": "a2be09353ecabbd9d20c33d0d02c061106949f6139a67ad4c1608e8c752ed3e2"
+    },
+    {
+      "path": "piscis-kernel/src/tools/web_fetch.rs",
+      "sha256": "ff34e9eabe8b4a40611525381f76fcb899f20dc707c65aebb270ce7004f27da1"
+    },
+    {
+      "path": "piscis-kernel/src/tools/web_search.rs",
+      "sha256": "98189eee910fcb68cdabf22a4bf8d36247c02ef7308178c0676a84f84ac6ae09"
+    },
+    {
+      "path": "piscis-kernel/tests/pool_services.rs",
+      "sha256": "6c76d207083f77095acecad9d47a84c9eca6738801786730b3e434d6a6750cca"
+    }
+  ],
+  "vendor_files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "c80aa47be6bebae4408ba7b399ba88558835649e1dd4d96ad5e8ac8ab7b71db7"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "713e8d8cba53abda03686966282bc4233b1569c1652e597f3865d8798daf5c4f"
+    },
+    {
+      "path": "AGENTZ-BASELINE.md",
+      "sha256": "d96b47309c650644c4746e5496bf1183ad125c1a3b7ed50fdeadb96b3a726400"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "e048b4d74dabcfa52117fbacd6486b7d980f7e2a347bd249dc58ae31d2311364"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "06bc756a8b2e3f3c2ef8c07f3f07f91a4d1c565a89b0fb898dc887eed3f81ff9"
+    },
+    {
+      "path": "README.md",
+      "sha256": "da240857234a444865fc6e6c4459a616cd072633bd80ea93f10984802e716a59"
+    },
+    {
+      "path": "piscis-cli/Cargo.toml",
+      "sha256": "ceeed8582ae58b4b375cdc2e7f84fad86277d8baf5ce4f74fd074335e9f23eaa"
+    },
+    {
+      "path": "piscis-cli/src/args.rs",
+      "sha256": "066dcc9bc203e9cd4b788ff8d836c2b6dcd1f37dc5dd5b903fa2867510e7b1e0"
+    },
+    {
+      "path": "piscis-cli/src/bin/openpiscis-headless.rs",
+      "sha256": "0c884f793550f127a53e679b881ea4368440c051cfcab500eb9c4a6d2830e06d"
+    },
+    {
+      "path": "piscis-cli/src/host.rs",
+      "sha256": "2de4c8b48c87431ae83c43708550953a6ee49c5b2009c5749ef56c614a22d222"
+    },
+    {
+      "path": "piscis-cli/src/interactive.rs",
+      "sha256": "97df85c03cbd73f84ab42c9afc98b0bc0ded5719dad0ff44bbb98690474032f0"
+    },
+    {
+      "path": "piscis-cli/src/lib.rs",
+      "sha256": "bd999bc89286f2b117e297a27dc159714cb9bce64bd46c0646fdb648453d9bc0"
+    },
+    {
+      "path": "piscis-cli/src/rpc_server.rs",
+      "sha256": "f0f0110129f4f8a9a21476931fe7738e9969f4b8e6b437c9a1208299a445eb34"
+    },
+    {
+      "path": "piscis-cli/src/runner.rs",
+      "sha256": "acb49de73c02cd67838805a853d0b905f2809b89865bf3d41a0c378974bd2415"
+    },
+    {
+      "path": "piscis-cli/tests/headless_cli.rs",
+      "sha256": "ec48393844acddad9d6765753e03310b83618216120d03784bea70dc8b9e3a9e"
+    },
+    {
+      "path": "piscis-cli/tests/pool_tools_headless.rs",
+      "sha256": "b193d05f374f7d713642bc1abd4437088902a1b57a438fe67735c48710d589ba"
+    },
+    {
+      "path": "piscis-core/Cargo.toml",
+      "sha256": "85925933d43e0dbaa7b819b222793c446ea4326d9dda832094eb1580b280233f"
+    },
+    {
+      "path": "piscis-core/src/heartbeat.rs",
+      "sha256": "fc4f4af7e8cb19ee813808348d214d1727292e30a684d2781d89a7448d45206e"
+    },
+    {
+      "path": "piscis-core/src/host.rs",
+      "sha256": "29e4363efac5441e6f818ad62cf8448490f2cdc305197c4a928740823ff20219"
+    },
+    {
+      "path": "piscis-core/src/integration.rs",
+      "sha256": "e254193d1dc19baa1673d7f12c6e2312f6bb60193d72c2b07859afec74051be2"
+    },
+    {
+      "path": "piscis-core/src/koi_prompt.rs",
+      "sha256": "0653bf8b9fad34effb0d9ff0069aa73537eb93e0d86ccd9e69b8e796634cb22e"
+    },
+    {
+      "path": "piscis-core/src/lib.rs",
+      "sha256": "cb10ef0ba223442a8f5a7e3a2388423fa3888d527215982effafc980e9166c09"
+    },
+    {
+      "path": "piscis-core/src/models.rs",
+      "sha256": "b4bc2cc86de89adcb52992789c88a6dd59bf5050245f479f0cd985163cca0cc0"
+    },
+    {
+      "path": "piscis-core/src/project_state.rs",
+      "sha256": "5c9558d127787d0c1211489bd49cfdb82d7341244f24abb92d6e9bd5a4a549dd"
+    },
+    {
+      "path": "piscis-core/src/scene.rs",
+      "sha256": "63206cffcb16ccbab88304c97cfcdbe8709226ea798dc1001f3504879c54c4af"
+    },
+    {
+      "path": "piscis-core/src/trial.rs",
+      "sha256": "5adfdaf3a876cbccb6d458a2dc32944c684ad696afe7b22c736912d2b7c80df7"
+    },
+    {
+      "path": "piscis-core/tests/collab_trial.rs",
+      "sha256": "48b3eec3f426ff4bcb1246485fb3330d47056fef3348023674e75c61e1d64cfb"
+    },
+    {
+      "path": "piscis-ide-tools/Cargo.toml",
+      "sha256": "e952d8a58c25c10f3994990be8ace59660f7907abeedb35ed5bf2b16816a88c6"
+    },
+    {
+      "path": "piscis-ide-tools/src/lib.rs",
+      "sha256": "3400a842949bea1518f2d06ef879ccd5268f6d3a108b77f131e435af5cdb0524"
+    },
+    {
+      "path": "piscis-ide-tools/src/lsp/bridge.rs",
+      "sha256": "b83651782c64bbb20f12f556fe2cba1ccebb400d97195fde1ee14fa0fa350703"
+    },
+    {
+      "path": "piscis-ide-tools/src/lsp/client.rs",
+      "sha256": "88e3abc5e2df6509dc1bc482360cfbeff73242e932b44c0bf8418d2b1d04a5c4"
+    },
+    {
+      "path": "piscis-ide-tools/src/lsp/manager.rs",
+      "sha256": "f4c747a94eed47889039e867e97c0aa54402e9fa1e61a9b0727ea132fd78ae51"
+    },
+    {
+      "path": "piscis-ide-tools/src/lsp/mod.rs",
+      "sha256": "a9831590d3220217d8d2b197ba358ff9bdf75bf615e22008aa0c7baec849a960"
+    },
+    {
+      "path": "piscis-ide-tools/src/tools/lsp.rs",
+      "sha256": "b6a7ed2f75c0871b4953546ee1e6979512c112016309064d5366bd20eb62539a"
+    },
+    {
+      "path": "piscis-ide-tools/src/tools/mod.rs",
+      "sha256": "8a8c30ae23e006d859c5a3bba250e84ceeec017b567e9ed090e218f34e7f3ad8"
+    },
+    {
+      "path": "piscis-ide-tools/src/tools/read_lints.rs",
+      "sha256": "50ec30a9ecf6c9a2bf16c278ef3724c3987d27600ad63778ed97096a56f0ad2c"
+    },
+    {
+      "path": "piscis-ide-tools/tests/lsp_live.rs",
+      "sha256": "8784b920eee26cfefa53959fdce1b66f92227b11c1a44aa90e64ad1cbf219c25"
+    },
+    {
+      "path": "piscis-kernel/Cargo.toml",
+      "sha256": "6ea352f900da7e3a3e2a7202f1b1a27eb3b69d9a98ced8f5dad316a18bdc29d6"
+    },
+    {
+      "path": "piscis-kernel/src/agent/bench_compact.rs",
+      "sha256": "56b440d94d77d5271e0fc629648e7cbeebe7bba715ac7bd880818b40688a2527"
+    },
+    {
+      "path": "piscis-kernel/src/agent/compaction.rs",
+      "sha256": "5c2452cf97394f2534107807110622ae84da48696d4f83ec170a7e3b86ef8288"
+    },
+    {
+      "path": "piscis-kernel/src/agent/compaction_eval.rs",
+      "sha256": "191dda57617518511946d46ada0924b26537e4553edcee74430d7baf80a6feb9"
+    },
+    {
+      "path": "piscis-kernel/src/agent/compaction_strategy.rs",
+      "sha256": "0b315bca2205bbcfe391031cec4d3316a332a1a7d60527d3af3a4ef91e0840ab"
+    },
+    {
+      "path": "piscis-kernel/src/agent/contrib.rs",
+      "sha256": "e271c40497b06027d2866621bc69c1fa07efe3ae5e3d9c67cdbc02056ce72eab"
+    },
+    {
+      "path": "piscis-kernel/src/agent/file_journal.rs",
+      "sha256": "21760a63d436ba40ca6849ead944f912ac662976675455e9c8d16dd55132bfe3"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/budget.rs",
+      "sha256": "a7128dac488d79bf37d03469204c5c19431c6c0337fe51363f8dd42dc6c88a0e"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/config.rs",
+      "sha256": "58b030fea9609b28360841e2b7703d7feead261cabe0e2b12f556bd4b59e09e5"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/context_builder.rs",
+      "sha256": "277dbd3e3c545bfa09b1c83e2e414a86ec7e763e8e04b0b003ab5d66a9c15e51"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/layered_prompt.rs",
+      "sha256": "09902943246b5e3f42b9966f755705bdd78771e2891458a95f10c8cb0bb50cf4"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/mod.rs",
+      "sha256": "8f169641205c88d600216cbf3629b62a15275de1d587dd4065712f5c5b6f6685"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/request_builder.rs",
+      "sha256": "5875a51b01f99e45647bd31435b51c7859cc22cfc1da711622200af36096f711"
+    },
+    {
+      "path": "piscis-kernel/src/agent/harness/runner.rs",
+      "sha256": "41c63edfc6f68de53625681346313a1b218b573035ceeb873587a4114e2ad629"
+    },
+    {
+      "path": "piscis-kernel/src/agent/hooks.rs",
+      "sha256": "f4b9266238f35a9acbc8539f03085f5ac37182a80b56b44987a30b031d6f6abb"
+    },
+    {
+      "path": "piscis-kernel/src/agent/loop_.rs",
+      "sha256": "32f68e24181f1f6b63f43af27485c56ff7a5be1d0c5bd6b12a3c3c68cdd17280"
+    },
+    {
+      "path": "piscis-kernel/src/agent/loop_strategy.rs",
+      "sha256": "77e9417f23e9b155d192be049d3c999118e9cb3e342c31380e10c2e584f709fa"
+    },
+    {
+      "path": "piscis-kernel/src/agent/message_utils.rs",
+      "sha256": "abf071beaf12c1f612c2bb40a77ce3d665795406dbcc4d457bd923e6351ec148"
+    },
+    {
+      "path": "piscis-kernel/src/agent/messages.rs",
+      "sha256": "92d07826fb3755ee27dc8feb7bbeef131064489ea233082ae9ad7c54cda47127"
+    },
+    {
+      "path": "piscis-kernel/src/agent/mod.rs",
+      "sha256": "245e7169f40e7e77eade00d119f277e4532cbc275df77b246881856e6009204e"
+    },
+    {
+      "path": "piscis-kernel/src/agent/plan.rs",
+      "sha256": "258095157d2d0688e11442e44a7c7334a143688583cdaa8eb97a6fa7ac4e70c2"
+    },
+    {
+      "path": "piscis-kernel/src/agent/plan_doc.rs",
+      "sha256": "ed7fd1567794e241d0ba1018a921f40240de9a73f7119645a82aec9ba3503f42"
+    },
+    {
+      "path": "piscis-kernel/src/agent/rule_preprocess.rs",
+      "sha256": "22f10460bbf32e950f9bcab5840b49f038af9460d748325f9db5d6f3cdd17ca9"
+    },
+    {
+      "path": "piscis-kernel/src/agent/state_frame.rs",
+      "sha256": "e1e6d21a8a58ef23d2cfef8d0b91d6ce7b480e50a03cdad010748619f5e0e7d3"
+    },
+    {
+      "path": "piscis-kernel/src/agent/summary_worker.rs",
+      "sha256": "4675f5ab49d934cc75c843b53f200e4dca853820e77ae7e5f8564a87a70e7a55"
+    },
+    {
+      "path": "piscis-kernel/src/agent/tool.rs",
+      "sha256": "7a5ad41c1f1c47c31aefee00d00da9aceb95620b60b52da8cfee1723d9c6d4fa"
+    },
+    {
+      "path": "piscis-kernel/src/agent/tool_completion.rs",
+      "sha256": "410cf09ca388a927c7394aaf2192ffe7bf5df3c43dd51eec4ae95affeddd8622"
+    },
+    {
+      "path": "piscis-kernel/src/agent/tool_receipt.rs",
+      "sha256": "d432cb9de799c87e183a6402d334cff8d55dce790a8b62dca73aed253a24a92e"
+    },
+    {
+      "path": "piscis-kernel/src/agent/vision.rs",
+      "sha256": "66a0f8202b9543626c749616d82cf8d2c57b263545ee3c6ec8cc0c966d100837"
+    },
+    {
+      "path": "piscis-kernel/src/context/mod.rs",
+      "sha256": "05e10c334fb5708e97437c05fb573308d9eb0e0fbfa689b602da597159382f26"
+    },
+    {
+      "path": "piscis-kernel/src/headless/mod.rs",
+      "sha256": "5cc32dae2a8f6ed1d80e95923df2d31db43e1652a85c9d4db868ec657789790f"
+    },
+    {
+      "path": "piscis-kernel/src/lib.rs",
+      "sha256": "3a0a1ab49ce533c0217d161e5bddd67e7f7c0e08fbd241738cdba0c6c1173e8c"
+    },
+    {
+      "path": "piscis-kernel/src/llm/auto_select.rs",
+      "sha256": "237862dd2e5e4f7d3e2e90f4e004d59ac1d2751e284a02acf94a257a1c2d2d20"
+    },
+    {
+      "path": "piscis-kernel/src/llm/claude.rs",
+      "sha256": "27ec784684631ae6a272585fc5d20327d41b730795223685c07e5331834633a4"
+    },
+    {
+      "path": "piscis-kernel/src/llm/error_class.rs",
+      "sha256": "2517c81c22e7bdf3a65590e83cb3bf9cb5d9f5e5a5021c15f000599cb8c43621"
+    },
+    {
+      "path": "piscis-kernel/src/llm/json_repair.rs",
+      "sha256": "f6120e928cf83022514c3809b1e11e28a9498b2c99e66bf72402ea24529d9ca0"
+    },
+    {
+      "path": "piscis-kernel/src/llm/mod.rs",
+      "sha256": "1a6d45eb914ededa28b8e981c88ea8986ac556ead4e8e2cd1a5c8ae3a60196a8"
+    },
+    {
+      "path": "piscis-kernel/src/llm/openai.rs",
+      "sha256": "867fb09c51ec118be21d4d413a48eb57d5a7ffab61c83c07e2e2164ca633ed38"
+    },
+    {
+      "path": "piscis-kernel/src/memory/mod.rs",
+      "sha256": "4684fed761c2b2996cd87370307208715533fa092f6df5191df48bb3eb52bf29"
+    },
+    {
+      "path": "piscis-kernel/src/memory/plugin.rs",
+      "sha256": "69fdc5fd547a91dcebacdcc76103b7ca1996e3dfef2a29cb5022689a8cd86a1c"
+    },
+    {
+      "path": "piscis-kernel/src/memory/vector.rs",
+      "sha256": "cfebd77a3c11e345097006cd7af933a8dbf380b764216209a8104a882e197c1f"
+    },
+    {
+      "path": "piscis-kernel/src/notify.rs",
+      "sha256": "a9447afa8df99a5f0c73130c2fe25d263243ba3d349cf0300fe4c73d0ee0ab5c"
+    },
+    {
+      "path": "piscis-kernel/src/policy/gate.rs",
+      "sha256": "2f8d89b53889b0edb91f44329b4fd8bd88cfec63b343827c3958bfb84ece8e66"
+    },
+    {
+      "path": "piscis-kernel/src/policy/mod.rs",
+      "sha256": "215112f4ce6856fd51409da00529648fbda6f4e3a1ff6e7c92a8e526060599de"
+    },
+    {
+      "path": "piscis-kernel/src/pool/coordinator.rs",
+      "sha256": "dd9556713ba927ebc36141fa7738a3da576e728c530148e4895e9d96e27a743d"
+    },
+    {
+      "path": "piscis-kernel/src/pool/git.rs",
+      "sha256": "7e3325680960ac668f1ea739218661794f14dfe81dee2f85bd9afa2f8a06bd59"
+    },
+    {
+      "path": "piscis-kernel/src/pool/koi_execute_todo.tmpl",
+      "sha256": "1ea56274fcf612744d7d78065c2d26385c392e293c6080d881541ad9cd3f695f"
+    },
+    {
+      "path": "piscis-kernel/src/pool/metadata.rs",
+      "sha256": "7624231553e11d71f37ca37561d75e26946f5d08224c1258c16e74aeaa355592"
+    },
+    {
+      "path": "piscis-kernel/src/pool/mod.rs",
+      "sha256": "2a146daa16dce585f72fb095800b94cb163afcaaf2681004529bdcf7595e204f"
+    },
+    {
+      "path": "piscis-kernel/src/pool/model.rs",
+      "sha256": "a3fbbc97830e387fa2ee40a1f295d42d1d236cc331fff6de292aecbfa048cfb4"
+    },
+    {
+      "path": "piscis-kernel/src/pool/services.rs",
+      "sha256": "76b44a8f594b126793a56e10c83369a348a73413ab5498d6c739986a2a4c60d1"
+    },
+    {
+      "path": "piscis-kernel/src/pool/store.rs",
+      "sha256": "cd77923e38f30309696b60236e68b6e55512f5634b455ea3a9079d2fc202a63f"
+    },
+    {
+      "path": "piscis-kernel/src/pool/subagent.rs",
+      "sha256": "84b33db27220a8df9f3adceb954cffd569c5d654640f66cba803c01a2b69a660"
+    },
+    {
+      "path": "piscis-kernel/src/proc.rs",
+      "sha256": "dd8df6b7a5353daf3e4d0ac6b4e1737577e9d83f542594b6344e5bcfc1ea4819"
+    },
+    {
+      "path": "piscis-kernel/src/proc_windows_sandbox.rs",
+      "sha256": "e169ed6de0649400cfc40fec732e8300a01ba11319738f427fb09ca89dcb00d6"
+    },
+    {
+      "path": "piscis-kernel/src/project_context.rs",
+      "sha256": "7e2ad96e7e88ac8bc782fa8c241afb6c195c491b4120ee4c9def21eb430cd3af"
+    },
+    {
+      "path": "piscis-kernel/src/scheduler/cron.rs",
+      "sha256": "f6f29899d91219dbf09ad90b322441f90cafbc053526969bb25055da185fb17e"
+    },
+    {
+      "path": "piscis-kernel/src/scheduler/mod.rs",
+      "sha256": "4759d888e76c22bcc4fa895f21c4017bd329b3199fe7e577fda49811be8cf2a1"
+    },
+    {
+      "path": "piscis-kernel/src/security/injection.rs",
+      "sha256": "c3a4ed54d85e116815f28884a0328572c73557cf454eb240089b44891d19dd53"
+    },
+    {
+      "path": "piscis-kernel/src/security/linux_keyring.rs",
+      "sha256": "b81db6dde01397d72969d5e15c24c2e53cce86c9026c7f8e61c4d6d182b7791b"
+    },
+    {
+      "path": "piscis-kernel/src/security/macos_keychain.rs",
+      "sha256": "8c56d9f9ca66cb664b207f6e89147f3602b97eff9b8c35003d227c9eedb9d3e1"
+    },
+    {
+      "path": "piscis-kernel/src/security/mod.rs",
+      "sha256": "407401256ba3db7484a460cc175e2df6e68fa708bd6316dfabaecc3b4e26ddfd"
+    },
+    {
+      "path": "piscis-kernel/src/security/secrets.rs",
+      "sha256": "b6f1cdcff4398478ef7aa82f6c79ec08a0ef735b4d0869be065ac702103b8660"
+    },
+    {
+      "path": "piscis-kernel/src/store/db.rs",
+      "sha256": "e02c365feeeeca5f8ab01f39b0bed4805259ecd2b8c83cdbbf36a144d35a9295"
+    },
+    {
+      "path": "piscis-kernel/src/store/mod.rs",
+      "sha256": "792d90b0d54b38aaf1dc70511e53dc8838602caa080e4f9d9f268630841221e1"
+    },
+    {
+      "path": "piscis-kernel/src/store/settings.rs",
+      "sha256": "9984b99abb9cbdc91b2f0b4a903f9951d556d6ceb73c7af660b10a817177954f"
+    },
+    {
+      "path": "piscis-kernel/src/tool_recovery.rs",
+      "sha256": "160c62b98401d56fe3e68b835c143b158d148816cdb16c3f59e9091b2c36f1ea"
+    },
+    {
+      "path": "piscis-kernel/src/tools/code_run.rs",
+      "sha256": "f8fb17c19f34d332702aadb8f2f1aa9cb362b83428bca5fae7997723f847344b"
+    },
+    {
+      "path": "piscis-kernel/src/tools/elevate.rs",
+      "sha256": "cb3ca578cd08883e2fcbd7f1d1dd78841cd11b260cb8dded56eeb2adabc56124"
+    },
+    {
+      "path": "piscis-kernel/src/tools/email.rs",
+      "sha256": "11fff4680847c006f0be24f4718704221227c7e669eecbf0379fb55c329f57c1"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_diff.rs",
+      "sha256": "80fe39425fa81fbc4a3214f5a6a04dc9646f96625473e974d75412e2957d612c"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_list.rs",
+      "sha256": "d8c9c55e4cc7f614fb21008bd17793a5ecdef9095ff90a5432978fcf32c0f1f0"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_read.rs",
+      "sha256": "375747c2b7f729ee13086251ec3f53970273b028ec3316bd90d08f5eb82f07ec"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_search.rs",
+      "sha256": "450c9510e5cd2d43dc8403c3ee65230f499c19cd65f07c67bff337c3497ce059"
+    },
+    {
+      "path": "piscis-kernel/src/tools/file_write.rs",
+      "sha256": "7cd735aa5f69880cebc0b891c425fe87d4961d6c48425c4718a27351bfbec21f"
+    },
+    {
+      "path": "piscis-kernel/src/tools/mcp.rs",
+      "sha256": "973a4d86fb80088530a970377d74fd0b6cc6d5a6d2478c37a8d3a694cb85335f"
+    },
+    {
+      "path": "piscis-kernel/src/tools/memory_tool.rs",
+      "sha256": "5eacd349079e08c676a434d0749a04b9bb7cb47cce9e222c4e90a3e6344c2a04"
+    },
+    {
+      "path": "piscis-kernel/src/tools/mod.rs",
+      "sha256": "9d15484a2dfe6807b609556754e5dd2854dfbc5eaa41f5c5730d594588f734db"
+    },
+    {
+      "path": "piscis-kernel/src/tools/output.rs",
+      "sha256": "4063be86b67d6bdf71b1432c67ae8da65e365ee6587481424d3e528b7250b97d"
+    },
+    {
+      "path": "piscis-kernel/src/tools/pdf.rs",
+      "sha256": "fd4f5fc76fc101669c76b2626e7c61b2ec007ce0074be0f6d4ee45d7920fe12a"
+    },
+    {
+      "path": "piscis-kernel/src/tools/plan_todo.rs",
+      "sha256": "80d74f0a25808b0e1c4fd6575cc7daf39054988a522a65ba0575aa446b4e4ef8"
+    },
+    {
+      "path": "piscis-kernel/src/tools/plan_write.rs",
+      "sha256": "addb8cbd9daaeb8df160ab94cfdd8cb053b8cc9d5e0933fca5de9808bb7d29c0"
+    },
+    {
+      "path": "piscis-kernel/src/tools/pool_chat.rs",
+      "sha256": "dc7f5dcd3fe63baa4b2a536b29d6b351b4e7b0ecbf881b6a6b48b82acfa5e2a1"
+    },
+    {
+      "path": "piscis-kernel/src/tools/pool_org.rs",
+      "sha256": "07bf549721284cf91b2023482cc8e29a05ad5693f0912a397bde02059fffa678"
+    },
+    {
+      "path": "piscis-kernel/src/tools/process_control.rs",
+      "sha256": "f8f7c8b550771ebba86dcf5170041541baf7c40ab47d48f1c6fd2b1a044a9baf"
+    },
+    {
+      "path": "piscis-kernel/src/tools/recall_tool.rs",
+      "sha256": "4230255fa95e56446eda46ea8fed4f684e379d5aa8fb353403d118f968524a7c"
+    },
+    {
+      "path": "piscis-kernel/src/tools/shell.rs",
+      "sha256": "32505ce2869c1ee7ddf2577089b03af5aa6b25ca0253065d9c7c3c2f9f263a9a"
+    },
+    {
+      "path": "piscis-kernel/src/tools/ssh.rs",
+      "sha256": "6c6ca619d6c355aaea530b43a74873346416282a855cdc4d43cdfc5878c3fa66"
+    },
+    {
+      "path": "piscis-kernel/src/tools/user_tool.rs",
+      "sha256": "7832b71296e031c6665b3bee059dd54cca747e6f5408df2fffa8e97894c113d2"
+    },
+    {
+      "path": "piscis-kernel/src/tools/vision_context.rs",
+      "sha256": "9ec11734476eeedb647d92bc68ff00cd978c41e4643c57a99f83c965ac8ffce2"
+    },
+    {
+      "path": "piscis-kernel/src/tools/web_fetch.rs",
+      "sha256": "afecf94e8510c90fa0405ae734686785d6cb8881bf2aacd5f309b113f3e7ece0"
+    },
+    {
+      "path": "piscis-kernel/src/tools/web_search.rs",
+      "sha256": "257bd818b11866bd31394fcfdcc6c31845cb0bb0110939f36c96550cb69884cc"
+    },
+    {
+      "path": "piscis-kernel/tests/az023_retry_http.rs",
+      "sha256": "91d5ddf718857f11ca59c9fc149bfd3a18841b46e52f4551ea9d7ca9affd3e92"
+    },
+    {
+      "path": "piscis-kernel/tests/pool_services.rs",
+      "sha256": "8f04e0250cc0c66de59ed2d50a7ec01e4769129ad8fba813e5783806fef28925"
+    },
+    {
+      "path": "piscis-kernel/tests/upgrade_live_baseline.rs",
+      "sha256": "1a9243308dd564364e91ccbdbe46a727cc2cc5f8ad0ed5abfd43a5654977ad7e"
+    }
+  ],
+  "integration_files": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "0849722f98bcd1e96a264197f3aed86bbb67ea5bef2fac055065830464b1d852"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "ac85bb2b047b7949feed9aedc632ab476af7670f079d733f409d68c0404d3098"
+    },
+    {
+      "path": "src-tauri/Cargo.toml",
+      "sha256": "e225c34ec4d218705620b9deb81eaf1646aea6d20e396268bda9fc1c45d8fcf6"
+    },
+    {
+      "path": "crates/agentz-host/Cargo.toml",
+      "sha256": "940059ccff8f16c3326004ef46e1a3fb5d7ca9ac680c009a6101f0455d217d88"
+    },
+    {
+      "path": "crates/agentz-host/tests/kernel_contract.rs",
+      "sha256": "4376f533deed58215d68532b4f4f53f936b4ac3835e3218709d446b986f8013b"
+    },
+    {
+      "path": "scripts/upgrade-kernel-freeze.mjs",
+      "sha256": "27cff80d41ab2145265b124b90458b18b5f44d693a4faa81fcf6b8022b7eae28"
+    }
+  ],
+  "companion": {
+    "name": "secret-service",
+    "files": [
+      {
+        "path": ".cargo-ok",
+        "sha256": "afbf9d0f3560b0fd7795e81c42a0a79ee6b6fc67e064f77826aee642cad28d91"
+      },
+      {
+        "path": ".cargo_vcs_info.json",
+        "sha256": "e087f3fcb6f9f6cb630c6fb8b554b02e31c8fc6ad5b2430f9681789f47d145f4"
+      },
+      {
+        "path": ".github/workflows/ci.yaml",
+        "sha256": "a05737c2561b21944ac057486bf534b9fcff24ca4a3a5bb6ec04158ce81650f6"
+      },
+      {
+        "path": ".gitignore",
+        "sha256": "db9d1819da2b92de288874ed2648b89e8f9a542381877ed611a9db81023e414c"
+      },
+      {
+        "path": "AGENTZ-BASELINE.md",
+        "sha256": "eca3549cd576792bfca6bb4f1375d99a7801b710c73c428c9beb216a33a059b4"
+      },
+      {
+        "path": "CHANGELOG.md",
+        "sha256": "151a8a23a5e48a51959d19cfd630c94d53be83fa34ccd01e57a3df92f70957a6"
+      },
+      {
+        "path": "Cargo.lock",
+        "sha256": "29bd49c89539f42fd6a6c91bca18c307e421cbb59ef40c9cdc65a1c12f254699"
+      },
+      {
+        "path": "Cargo.toml",
+        "sha256": "d45fb3b746a587954875f95635cf455ec8f007d4e3a10beb510bf537466d9a99"
+      },
+      {
+        "path": "Cargo.toml.orig",
+        "sha256": "614b9f7ee2a34e4bd7cf4b29e959b21e75cb3965a38d1047300cbdee6e090815"
+      },
+      {
+        "path": "LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+      },
+      {
+        "path": "LICENSE-MIT",
+        "sha256": "074585dbaf488db540c26f7b20f36053a157d7580bb1c390dc9f6afdb017c83a"
+      },
+      {
+        "path": "NOTES_ON_PORT.md",
+        "sha256": "02132c378add48a1820a4774c1f8b3f40a8a78bf3bacd90fb4d95f7768749265"
+      },
+      {
+        "path": "README.md",
+        "sha256": "652e0c2d953847bd319655be86a699e86cfae9230a918ab4ddab1a661ba3f60c"
+      },
+      {
+        "path": "examples/example.rs",
+        "sha256": "23774ae4c05951386dfeeb3742ee9356c066ba599284b85c615318750374d95c"
+      },
+      {
+        "path": "src/blocking/collection.rs",
+        "sha256": "342c6bb81507de799209985c6eceacc73a7bb1314381054aab677dbff1d36a4b"
+      },
+      {
+        "path": "src/blocking/item.rs",
+        "sha256": "d198c8e139845d3fef674913dc4da0945f4cb392f3e4c9eb3b8ca5165081a03e"
+      },
+      {
+        "path": "src/blocking/mod.rs",
+        "sha256": "b6381bc696f1d28ab4fff12920a228356ff3d763b74abc71775ab4acabcec9ae"
+      },
+      {
+        "path": "src/collection.rs",
+        "sha256": "20e2eb5f798dbdc62827a70bed67a9bca4fc9ec411b527f64b94deb1504666a0"
+      },
+      {
+        "path": "src/error.rs",
+        "sha256": "2ee0c2cc122002c3a5e42a72b0cb6b3fa606eb4654b8015585d80f9d3c46e59e"
+      },
+      {
+        "path": "src/item.rs",
+        "sha256": "da626fa65e2864c643096c28f53bae301b891739c52f799647e8ddcd10621b50"
+      },
+      {
+        "path": "src/lib.rs",
+        "sha256": "d09ba116fc0d3d0a26d42f10571cf06c39088f822e52c8564a860ca2d2643e8c"
+      },
+      {
+        "path": "src/proxy/collection.rs",
+        "sha256": "75b90ac96601295cad733f56711e27ff4c41125a2687b391af014708ff037511"
+      },
+      {
+        "path": "src/proxy/item.rs",
+        "sha256": "bf7eb831b3d5b64b4945ac8f531070bde0b051a787e4ee022f205af36c03aa73"
+      },
+      {
+        "path": "src/proxy/mod.rs",
+        "sha256": "5c89709f27a218d936ec618dbae5215fe3b3daf9e7430132bef94f3b4e35d696"
+      },
+      {
+        "path": "src/proxy/prompt.rs",
+        "sha256": "f7c3745568065ba7f602c71884dcb92ec7303fa0376508d0305a9186c9722af4"
+      },
+      {
+        "path": "src/proxy/service.rs",
+        "sha256": "d46f02cfe2aaf9652c42c9f1f761379ebd4a5257ef143080f2bf75e74912533d"
+      },
+      {
+        "path": "src/session.rs",
+        "sha256": "67d9e22c046102e7317418ce54c64d22787dcafa36aca0fc0b5f288c70f8f75e"
+      },
+      {
+        "path": "src/ss.rs",
+        "sha256": "c2e6b0bbbe19657f745dc2f99d7da494519a436283166369edb23a2aa66b94c6"
+      },
+      {
+        "path": "src/util.rs",
+        "sha256": "7b5234e82413b3c6db2e02fa3dfbe33d128fc0d73dfb2bd46284c700e290ede7"
+      }
+    ]
+  },
+  "bundle_files": [
+    {
+      "path": "piscis-engine/.github/workflows/ci.yml",
+      "sha256": "c80aa47be6bebae4408ba7b399ba88558835649e1dd4d96ad5e8ac8ab7b71db7"
+    },
+    {
+      "path": "piscis-engine/.gitignore",
+      "sha256": "713e8d8cba53abda03686966282bc4233b1569c1652e597f3865d8798daf5c4f"
+    },
+    {
+      "path": "piscis-engine/AGENTZ-BASELINE.md",
+      "sha256": "d96b47309c650644c4746e5496bf1183ad125c1a3b7ed50fdeadb96b3a726400"
+    },
+    {
+      "path": "piscis-engine/CHANGELOG.md",
+      "sha256": "e048b4d74dabcfa52117fbacd6486b7d980f7e2a347bd249dc58ae31d2311364"
+    },
+    {
+      "path": "piscis-engine/Cargo.toml",
+      "sha256": "06bc756a8b2e3f3c2ef8c07f3f07f91a4d1c565a89b0fb898dc887eed3f81ff9"
+    },
+    {
+      "path": "piscis-engine/README.md",
+      "sha256": "da240857234a444865fc6e6c4459a616cd072633bd80ea93f10984802e716a59"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/Cargo.toml",
+      "sha256": "ceeed8582ae58b4b375cdc2e7f84fad86277d8baf5ce4f74fd074335e9f23eaa"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/src/args.rs",
+      "sha256": "066dcc9bc203e9cd4b788ff8d836c2b6dcd1f37dc5dd5b903fa2867510e7b1e0"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/src/bin/openpiscis-headless.rs",
+      "sha256": "0c884f793550f127a53e679b881ea4368440c051cfcab500eb9c4a6d2830e06d"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/src/host.rs",
+      "sha256": "2de4c8b48c87431ae83c43708550953a6ee49c5b2009c5749ef56c614a22d222"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/src/interactive.rs",
+      "sha256": "97df85c03cbd73f84ab42c9afc98b0bc0ded5719dad0ff44bbb98690474032f0"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/src/lib.rs",
+      "sha256": "bd999bc89286f2b117e297a27dc159714cb9bce64bd46c0646fdb648453d9bc0"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/src/rpc_server.rs",
+      "sha256": "f0f0110129f4f8a9a21476931fe7738e9969f4b8e6b437c9a1208299a445eb34"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/src/runner.rs",
+      "sha256": "acb49de73c02cd67838805a853d0b905f2809b89865bf3d41a0c378974bd2415"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/tests/headless_cli.rs",
+      "sha256": "ec48393844acddad9d6765753e03310b83618216120d03784bea70dc8b9e3a9e"
+    },
+    {
+      "path": "piscis-engine/piscis-cli/tests/pool_tools_headless.rs",
+      "sha256": "b193d05f374f7d713642bc1abd4437088902a1b57a438fe67735c48710d589ba"
+    },
+    {
+      "path": "piscis-engine/piscis-core/Cargo.toml",
+      "sha256": "85925933d43e0dbaa7b819b222793c446ea4326d9dda832094eb1580b280233f"
+    },
+    {
+      "path": "piscis-engine/piscis-core/src/heartbeat.rs",
+      "sha256": "fc4f4af7e8cb19ee813808348d214d1727292e30a684d2781d89a7448d45206e"
+    },
+    {
+      "path": "piscis-engine/piscis-core/src/host.rs",
+      "sha256": "29e4363efac5441e6f818ad62cf8448490f2cdc305197c4a928740823ff20219"
+    },
+    {
+      "path": "piscis-engine/piscis-core/src/integration.rs",
+      "sha256": "e254193d1dc19baa1673d7f12c6e2312f6bb60193d72c2b07859afec74051be2"
+    },
+    {
+      "path": "piscis-engine/piscis-core/src/koi_prompt.rs",
+      "sha256": "0653bf8b9fad34effb0d9ff0069aa73537eb93e0d86ccd9e69b8e796634cb22e"
+    },
+    {
+      "path": "piscis-engine/piscis-core/src/lib.rs",
+      "sha256": "cb10ef0ba223442a8f5a7e3a2388423fa3888d527215982effafc980e9166c09"
+    },
+    {
+      "path": "piscis-engine/piscis-core/src/models.rs",
+      "sha256": "b4bc2cc86de89adcb52992789c88a6dd59bf5050245f479f0cd985163cca0cc0"
+    },
+    {
+      "path": "piscis-engine/piscis-core/src/project_state.rs",
+      "sha256": "5c9558d127787d0c1211489bd49cfdb82d7341244f24abb92d6e9bd5a4a549dd"
+    },
+    {
+      "path": "piscis-engine/piscis-core/src/scene.rs",
+      "sha256": "63206cffcb16ccbab88304c97cfcdbe8709226ea798dc1001f3504879c54c4af"
+    },
+    {
+      "path": "piscis-engine/piscis-core/src/trial.rs",
+      "sha256": "5adfdaf3a876cbccb6d458a2dc32944c684ad696afe7b22c736912d2b7c80df7"
+    },
+    {
+      "path": "piscis-engine/piscis-core/tests/collab_trial.rs",
+      "sha256": "48b3eec3f426ff4bcb1246485fb3330d47056fef3348023674e75c61e1d64cfb"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/Cargo.toml",
+      "sha256": "e952d8a58c25c10f3994990be8ace59660f7907abeedb35ed5bf2b16816a88c6"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/src/lib.rs",
+      "sha256": "3400a842949bea1518f2d06ef879ccd5268f6d3a108b77f131e435af5cdb0524"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/src/lsp/bridge.rs",
+      "sha256": "b83651782c64bbb20f12f556fe2cba1ccebb400d97195fde1ee14fa0fa350703"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/src/lsp/client.rs",
+      "sha256": "88e3abc5e2df6509dc1bc482360cfbeff73242e932b44c0bf8418d2b1d04a5c4"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/src/lsp/manager.rs",
+      "sha256": "f4c747a94eed47889039e867e97c0aa54402e9fa1e61a9b0727ea132fd78ae51"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/src/lsp/mod.rs",
+      "sha256": "a9831590d3220217d8d2b197ba358ff9bdf75bf615e22008aa0c7baec849a960"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/src/tools/lsp.rs",
+      "sha256": "b6a7ed2f75c0871b4953546ee1e6979512c112016309064d5366bd20eb62539a"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/src/tools/mod.rs",
+      "sha256": "8a8c30ae23e006d859c5a3bba250e84ceeec017b567e9ed090e218f34e7f3ad8"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/src/tools/read_lints.rs",
+      "sha256": "50ec30a9ecf6c9a2bf16c278ef3724c3987d27600ad63778ed97096a56f0ad2c"
+    },
+    {
+      "path": "piscis-engine/piscis-ide-tools/tests/lsp_live.rs",
+      "sha256": "8784b920eee26cfefa53959fdce1b66f92227b11c1a44aa90e64ad1cbf219c25"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/Cargo.toml",
+      "sha256": "6ea352f900da7e3a3e2a7202f1b1a27eb3b69d9a98ced8f5dad316a18bdc29d6"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/bench_compact.rs",
+      "sha256": "56b440d94d77d5271e0fc629648e7cbeebe7bba715ac7bd880818b40688a2527"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/compaction.rs",
+      "sha256": "5c2452cf97394f2534107807110622ae84da48696d4f83ec170a7e3b86ef8288"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/compaction_eval.rs",
+      "sha256": "191dda57617518511946d46ada0924b26537e4553edcee74430d7baf80a6feb9"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/compaction_strategy.rs",
+      "sha256": "0b315bca2205bbcfe391031cec4d3316a332a1a7d60527d3af3a4ef91e0840ab"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/contrib.rs",
+      "sha256": "e271c40497b06027d2866621bc69c1fa07efe3ae5e3d9c67cdbc02056ce72eab"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/file_journal.rs",
+      "sha256": "21760a63d436ba40ca6849ead944f912ac662976675455e9c8d16dd55132bfe3"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/harness/budget.rs",
+      "sha256": "a7128dac488d79bf37d03469204c5c19431c6c0337fe51363f8dd42dc6c88a0e"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/harness/config.rs",
+      "sha256": "58b030fea9609b28360841e2b7703d7feead261cabe0e2b12f556bd4b59e09e5"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/harness/context_builder.rs",
+      "sha256": "277dbd3e3c545bfa09b1c83e2e414a86ec7e763e8e04b0b003ab5d66a9c15e51"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/harness/layered_prompt.rs",
+      "sha256": "09902943246b5e3f42b9966f755705bdd78771e2891458a95f10c8cb0bb50cf4"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/harness/mod.rs",
+      "sha256": "8f169641205c88d600216cbf3629b62a15275de1d587dd4065712f5c5b6f6685"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/harness/request_builder.rs",
+      "sha256": "5875a51b01f99e45647bd31435b51c7859cc22cfc1da711622200af36096f711"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/harness/runner.rs",
+      "sha256": "41c63edfc6f68de53625681346313a1b218b573035ceeb873587a4114e2ad629"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/hooks.rs",
+      "sha256": "f4b9266238f35a9acbc8539f03085f5ac37182a80b56b44987a30b031d6f6abb"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/loop_.rs",
+      "sha256": "32f68e24181f1f6b63f43af27485c56ff7a5be1d0c5bd6b12a3c3c68cdd17280"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/loop_strategy.rs",
+      "sha256": "77e9417f23e9b155d192be049d3c999118e9cb3e342c31380e10c2e584f709fa"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/message_utils.rs",
+      "sha256": "abf071beaf12c1f612c2bb40a77ce3d665795406dbcc4d457bd923e6351ec148"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/messages.rs",
+      "sha256": "92d07826fb3755ee27dc8feb7bbeef131064489ea233082ae9ad7c54cda47127"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/mod.rs",
+      "sha256": "245e7169f40e7e77eade00d119f277e4532cbc275df77b246881856e6009204e"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/plan.rs",
+      "sha256": "258095157d2d0688e11442e44a7c7334a143688583cdaa8eb97a6fa7ac4e70c2"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/plan_doc.rs",
+      "sha256": "ed7fd1567794e241d0ba1018a921f40240de9a73f7119645a82aec9ba3503f42"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/rule_preprocess.rs",
+      "sha256": "22f10460bbf32e950f9bcab5840b49f038af9460d748325f9db5d6f3cdd17ca9"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/state_frame.rs",
+      "sha256": "e1e6d21a8a58ef23d2cfef8d0b91d6ce7b480e50a03cdad010748619f5e0e7d3"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/summary_worker.rs",
+      "sha256": "4675f5ab49d934cc75c843b53f200e4dca853820e77ae7e5f8564a87a70e7a55"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/tool.rs",
+      "sha256": "7a5ad41c1f1c47c31aefee00d00da9aceb95620b60b52da8cfee1723d9c6d4fa"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/tool_completion.rs",
+      "sha256": "410cf09ca388a927c7394aaf2192ffe7bf5df3c43dd51eec4ae95affeddd8622"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/tool_receipt.rs",
+      "sha256": "d432cb9de799c87e183a6402d334cff8d55dce790a8b62dca73aed253a24a92e"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/agent/vision.rs",
+      "sha256": "66a0f8202b9543626c749616d82cf8d2c57b263545ee3c6ec8cc0c966d100837"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/context/mod.rs",
+      "sha256": "05e10c334fb5708e97437c05fb573308d9eb0e0fbfa689b602da597159382f26"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/headless/mod.rs",
+      "sha256": "5cc32dae2a8f6ed1d80e95923df2d31db43e1652a85c9d4db868ec657789790f"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/lib.rs",
+      "sha256": "3a0a1ab49ce533c0217d161e5bddd67e7f7c0e08fbd241738cdba0c6c1173e8c"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/llm/auto_select.rs",
+      "sha256": "237862dd2e5e4f7d3e2e90f4e004d59ac1d2751e284a02acf94a257a1c2d2d20"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/llm/claude.rs",
+      "sha256": "27ec784684631ae6a272585fc5d20327d41b730795223685c07e5331834633a4"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/llm/error_class.rs",
+      "sha256": "2517c81c22e7bdf3a65590e83cb3bf9cb5d9f5e5a5021c15f000599cb8c43621"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/llm/json_repair.rs",
+      "sha256": "f6120e928cf83022514c3809b1e11e28a9498b2c99e66bf72402ea24529d9ca0"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/llm/mod.rs",
+      "sha256": "1a6d45eb914ededa28b8e981c88ea8986ac556ead4e8e2cd1a5c8ae3a60196a8"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/llm/openai.rs",
+      "sha256": "867fb09c51ec118be21d4d413a48eb57d5a7ffab61c83c07e2e2164ca633ed38"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/memory/mod.rs",
+      "sha256": "4684fed761c2b2996cd87370307208715533fa092f6df5191df48bb3eb52bf29"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/memory/plugin.rs",
+      "sha256": "69fdc5fd547a91dcebacdcc76103b7ca1996e3dfef2a29cb5022689a8cd86a1c"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/memory/vector.rs",
+      "sha256": "cfebd77a3c11e345097006cd7af933a8dbf380b764216209a8104a882e197c1f"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/notify.rs",
+      "sha256": "a9447afa8df99a5f0c73130c2fe25d263243ba3d349cf0300fe4c73d0ee0ab5c"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/policy/gate.rs",
+      "sha256": "2f8d89b53889b0edb91f44329b4fd8bd88cfec63b343827c3958bfb84ece8e66"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/policy/mod.rs",
+      "sha256": "215112f4ce6856fd51409da00529648fbda6f4e3a1ff6e7c92a8e526060599de"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/pool/coordinator.rs",
+      "sha256": "dd9556713ba927ebc36141fa7738a3da576e728c530148e4895e9d96e27a743d"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/pool/git.rs",
+      "sha256": "7e3325680960ac668f1ea739218661794f14dfe81dee2f85bd9afa2f8a06bd59"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/pool/koi_execute_todo.tmpl",
+      "sha256": "1ea56274fcf612744d7d78065c2d26385c392e293c6080d881541ad9cd3f695f"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/pool/metadata.rs",
+      "sha256": "7624231553e11d71f37ca37561d75e26946f5d08224c1258c16e74aeaa355592"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/pool/mod.rs",
+      "sha256": "2a146daa16dce585f72fb095800b94cb163afcaaf2681004529bdcf7595e204f"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/pool/model.rs",
+      "sha256": "a3fbbc97830e387fa2ee40a1f295d42d1d236cc331fff6de292aecbfa048cfb4"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/pool/services.rs",
+      "sha256": "76b44a8f594b126793a56e10c83369a348a73413ab5498d6c739986a2a4c60d1"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/pool/store.rs",
+      "sha256": "cd77923e38f30309696b60236e68b6e55512f5634b455ea3a9079d2fc202a63f"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/pool/subagent.rs",
+      "sha256": "84b33db27220a8df9f3adceb954cffd569c5d654640f66cba803c01a2b69a660"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/proc.rs",
+      "sha256": "dd8df6b7a5353daf3e4d0ac6b4e1737577e9d83f542594b6344e5bcfc1ea4819"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/proc_windows_sandbox.rs",
+      "sha256": "e169ed6de0649400cfc40fec732e8300a01ba11319738f427fb09ca89dcb00d6"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/project_context.rs",
+      "sha256": "7e2ad96e7e88ac8bc782fa8c241afb6c195c491b4120ee4c9def21eb430cd3af"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/scheduler/cron.rs",
+      "sha256": "f6f29899d91219dbf09ad90b322441f90cafbc053526969bb25055da185fb17e"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/scheduler/mod.rs",
+      "sha256": "4759d888e76c22bcc4fa895f21c4017bd329b3199fe7e577fda49811be8cf2a1"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/security/injection.rs",
+      "sha256": "c3a4ed54d85e116815f28884a0328572c73557cf454eb240089b44891d19dd53"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/security/linux_keyring.rs",
+      "sha256": "b81db6dde01397d72969d5e15c24c2e53cce86c9026c7f8e61c4d6d182b7791b"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/security/macos_keychain.rs",
+      "sha256": "8c56d9f9ca66cb664b207f6e89147f3602b97eff9b8c35003d227c9eedb9d3e1"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/security/mod.rs",
+      "sha256": "407401256ba3db7484a460cc175e2df6e68fa708bd6316dfabaecc3b4e26ddfd"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/security/secrets.rs",
+      "sha256": "b6f1cdcff4398478ef7aa82f6c79ec08a0ef735b4d0869be065ac702103b8660"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/store/db.rs",
+      "sha256": "e02c365feeeeca5f8ab01f39b0bed4805259ecd2b8c83cdbbf36a144d35a9295"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/store/mod.rs",
+      "sha256": "792d90b0d54b38aaf1dc70511e53dc8838602caa080e4f9d9f268630841221e1"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/store/settings.rs",
+      "sha256": "9984b99abb9cbdc91b2f0b4a903f9951d556d6ceb73c7af660b10a817177954f"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tool_recovery.rs",
+      "sha256": "160c62b98401d56fe3e68b835c143b158d148816cdb16c3f59e9091b2c36f1ea"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/code_run.rs",
+      "sha256": "f8fb17c19f34d332702aadb8f2f1aa9cb362b83428bca5fae7997723f847344b"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/elevate.rs",
+      "sha256": "cb3ca578cd08883e2fcbd7f1d1dd78841cd11b260cb8dded56eeb2adabc56124"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/email.rs",
+      "sha256": "11fff4680847c006f0be24f4718704221227c7e669eecbf0379fb55c329f57c1"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/file_diff.rs",
+      "sha256": "80fe39425fa81fbc4a3214f5a6a04dc9646f96625473e974d75412e2957d612c"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/file_list.rs",
+      "sha256": "d8c9c55e4cc7f614fb21008bd17793a5ecdef9095ff90a5432978fcf32c0f1f0"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/file_read.rs",
+      "sha256": "375747c2b7f729ee13086251ec3f53970273b028ec3316bd90d08f5eb82f07ec"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/file_search.rs",
+      "sha256": "450c9510e5cd2d43dc8403c3ee65230f499c19cd65f07c67bff337c3497ce059"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/file_write.rs",
+      "sha256": "7cd735aa5f69880cebc0b891c425fe87d4961d6c48425c4718a27351bfbec21f"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/mcp.rs",
+      "sha256": "973a4d86fb80088530a970377d74fd0b6cc6d5a6d2478c37a8d3a694cb85335f"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/memory_tool.rs",
+      "sha256": "5eacd349079e08c676a434d0749a04b9bb7cb47cce9e222c4e90a3e6344c2a04"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/mod.rs",
+      "sha256": "9d15484a2dfe6807b609556754e5dd2854dfbc5eaa41f5c5730d594588f734db"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/output.rs",
+      "sha256": "4063be86b67d6bdf71b1432c67ae8da65e365ee6587481424d3e528b7250b97d"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/pdf.rs",
+      "sha256": "fd4f5fc76fc101669c76b2626e7c61b2ec007ce0074be0f6d4ee45d7920fe12a"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/plan_todo.rs",
+      "sha256": "80d74f0a25808b0e1c4fd6575cc7daf39054988a522a65ba0575aa446b4e4ef8"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/plan_write.rs",
+      "sha256": "addb8cbd9daaeb8df160ab94cfdd8cb053b8cc9d5e0933fca5de9808bb7d29c0"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/pool_chat.rs",
+      "sha256": "dc7f5dcd3fe63baa4b2a536b29d6b351b4e7b0ecbf881b6a6b48b82acfa5e2a1"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/pool_org.rs",
+      "sha256": "07bf549721284cf91b2023482cc8e29a05ad5693f0912a397bde02059fffa678"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/process_control.rs",
+      "sha256": "f8f7c8b550771ebba86dcf5170041541baf7c40ab47d48f1c6fd2b1a044a9baf"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/recall_tool.rs",
+      "sha256": "4230255fa95e56446eda46ea8fed4f684e379d5aa8fb353403d118f968524a7c"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/shell.rs",
+      "sha256": "32505ce2869c1ee7ddf2577089b03af5aa6b25ca0253065d9c7c3c2f9f263a9a"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/ssh.rs",
+      "sha256": "6c6ca619d6c355aaea530b43a74873346416282a855cdc4d43cdfc5878c3fa66"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/user_tool.rs",
+      "sha256": "7832b71296e031c6665b3bee059dd54cca747e6f5408df2fffa8e97894c113d2"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/vision_context.rs",
+      "sha256": "9ec11734476eeedb647d92bc68ff00cd978c41e4643c57a99f83c965ac8ffce2"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/web_fetch.rs",
+      "sha256": "afecf94e8510c90fa0405ae734686785d6cb8881bf2aacd5f309b113f3e7ece0"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/src/tools/web_search.rs",
+      "sha256": "257bd818b11866bd31394fcfdcc6c31845cb0bb0110939f36c96550cb69884cc"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/tests/az023_retry_http.rs",
+      "sha256": "91d5ddf718857f11ca59c9fc149bfd3a18841b46e52f4551ea9d7ca9affd3e92"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/tests/pool_services.rs",
+      "sha256": "8f04e0250cc0c66de59ed2d50a7ec01e4769129ad8fba813e5783806fef28925"
+    },
+    {
+      "path": "piscis-engine/piscis-kernel/tests/upgrade_live_baseline.rs",
+      "sha256": "1a9243308dd564364e91ccbdbe46a727cc2cc5f8ad0ed5abfd43a5654977ad7e"
+    },
+    {
+      "path": "secret-service/.cargo-ok",
+      "sha256": "afbf9d0f3560b0fd7795e81c42a0a79ee6b6fc67e064f77826aee642cad28d91"
+    },
+    {
+      "path": "secret-service/.cargo_vcs_info.json",
+      "sha256": "e087f3fcb6f9f6cb630c6fb8b554b02e31c8fc6ad5b2430f9681789f47d145f4"
+    },
+    {
+      "path": "secret-service/.github/workflows/ci.yaml",
+      "sha256": "a05737c2561b21944ac057486bf534b9fcff24ca4a3a5bb6ec04158ce81650f6"
+    },
+    {
+      "path": "secret-service/.gitignore",
+      "sha256": "db9d1819da2b92de288874ed2648b89e8f9a542381877ed611a9db81023e414c"
+    },
+    {
+      "path": "secret-service/AGENTZ-BASELINE.md",
+      "sha256": "eca3549cd576792bfca6bb4f1375d99a7801b710c73c428c9beb216a33a059b4"
+    },
+    {
+      "path": "secret-service/CHANGELOG.md",
+      "sha256": "151a8a23a5e48a51959d19cfd630c94d53be83fa34ccd01e57a3df92f70957a6"
+    },
+    {
+      "path": "secret-service/Cargo.lock",
+      "sha256": "29bd49c89539f42fd6a6c91bca18c307e421cbb59ef40c9cdc65a1c12f254699"
+    },
+    {
+      "path": "secret-service/Cargo.toml",
+      "sha256": "d45fb3b746a587954875f95635cf455ec8f007d4e3a10beb510bf537466d9a99"
+    },
+    {
+      "path": "secret-service/Cargo.toml.orig",
+      "sha256": "614b9f7ee2a34e4bd7cf4b29e959b21e75cb3965a38d1047300cbdee6e090815"
+    },
+    {
+      "path": "secret-service/LICENSE-APACHE",
+      "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+    },
+    {
+      "path": "secret-service/LICENSE-MIT",
+      "sha256": "074585dbaf488db540c26f7b20f36053a157d7580bb1c390dc9f6afdb017c83a"
+    },
+    {
+      "path": "secret-service/NOTES_ON_PORT.md",
+      "sha256": "02132c378add48a1820a4774c1f8b3f40a8a78bf3bacd90fb4d95f7768749265"
+    },
+    {
+      "path": "secret-service/README.md",
+      "sha256": "652e0c2d953847bd319655be86a699e86cfae9230a918ab4ddab1a661ba3f60c"
+    },
+    {
+      "path": "secret-service/examples/example.rs",
+      "sha256": "23774ae4c05951386dfeeb3742ee9356c066ba599284b85c615318750374d95c"
+    },
+    {
+      "path": "secret-service/src/blocking/collection.rs",
+      "sha256": "342c6bb81507de799209985c6eceacc73a7bb1314381054aab677dbff1d36a4b"
+    },
+    {
+      "path": "secret-service/src/blocking/item.rs",
+      "sha256": "d198c8e139845d3fef674913dc4da0945f4cb392f3e4c9eb3b8ca5165081a03e"
+    },
+    {
+      "path": "secret-service/src/blocking/mod.rs",
+      "sha256": "b6381bc696f1d28ab4fff12920a228356ff3d763b74abc71775ab4acabcec9ae"
+    },
+    {
+      "path": "secret-service/src/collection.rs",
+      "sha256": "20e2eb5f798dbdc62827a70bed67a9bca4fc9ec411b527f64b94deb1504666a0"
+    },
+    {
+      "path": "secret-service/src/error.rs",
+      "sha256": "2ee0c2cc122002c3a5e42a72b0cb6b3fa606eb4654b8015585d80f9d3c46e59e"
+    },
+    {
+      "path": "secret-service/src/item.rs",
+      "sha256": "da626fa65e2864c643096c28f53bae301b891739c52f799647e8ddcd10621b50"
+    },
+    {
+      "path": "secret-service/src/lib.rs",
+      "sha256": "d09ba116fc0d3d0a26d42f10571cf06c39088f822e52c8564a860ca2d2643e8c"
+    },
+    {
+      "path": "secret-service/src/proxy/collection.rs",
+      "sha256": "75b90ac96601295cad733f56711e27ff4c41125a2687b391af014708ff037511"
+    },
+    {
+      "path": "secret-service/src/proxy/item.rs",
+      "sha256": "bf7eb831b3d5b64b4945ac8f531070bde0b051a787e4ee022f205af36c03aa73"
+    },
+    {
+      "path": "secret-service/src/proxy/mod.rs",
+      "sha256": "5c89709f27a218d936ec618dbae5215fe3b3daf9e7430132bef94f3b4e35d696"
+    },
+    {
+      "path": "secret-service/src/proxy/prompt.rs",
+      "sha256": "f7c3745568065ba7f602c71884dcb92ec7303fa0376508d0305a9186c9722af4"
+    },
+    {
+      "path": "secret-service/src/proxy/service.rs",
+      "sha256": "d46f02cfe2aaf9652c42c9f1f761379ebd4a5257ef143080f2bf75e74912533d"
+    },
+    {
+      "path": "secret-service/src/session.rs",
+      "sha256": "67d9e22c046102e7317418ce54c64d22787dcafa36aca0fc0b5f288c70f8f75e"
+    },
+    {
+      "path": "secret-service/src/ss.rs",
+      "sha256": "c2e6b0bbbe19657f745dc2f99d7da494519a436283166369edb23a2aa66b94c6"
+    },
+    {
+      "path": "secret-service/src/util.rs",
+      "sha256": "7b5234e82413b3c6db2e02fa3dfbe33d128fc0d73dfb2bd46284c700e290ede7"
+    }
+  ],
+  "patch": {
+    "name": "full-vendor.patch",
+    "sha256": "df1bed1772b62d0993a75d27d9151df69b7c392876d2dab68a6fd48e3a5df69b"
+  },
+  "archive": {
+    "name": "candidate.tar",
+    "sha256": "aee1264293cac757c7ce778a00bcc486b9136cd9ec0171c1b0ee037ede85f23d"
+  },
+  "checks": {
+    "forward_bytes": true,
+    "reverse_bytes": true,
+    "second_forward_bytes": true,
+    "relocated_bytes": true,
+    "snapshot_stable": true
+  },
+  "compatibility_tests_run": false,
+  "all_source_reviewed": false,
+  "release_ready": false
+}

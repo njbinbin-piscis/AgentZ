@@ -1,0 +1,13 @@
+Research: Module Entry Points
+
+Findings
+- Two module entry points were identified in the source fixture.
+- module-a.ts — entry point: start
+- module-b.ts — entry point: finish
+
+Sources cited (exact file names)
+- module-a.ts
+- module-b.ts
+
+Summary
+The codebase exposes two entry points across two modules: start (module-a.ts) and finish (module-b.ts).

@@ -25,6 +25,7 @@ path = "examples/graph_verify.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+agentz-task-state = { path = "../crates/agentz-task-state" }
 # Shared agent kernel (used today for process spawning; agent loop wiring lands in M1).
 piscis-core = { workspace = true }
 piscis-kernel = { workspace = true }
@@ -102,6 +103,19 @@ tree-sitter-typescript = "0.23.2"
 tree-sitter-javascript = "0.25.0"
 tree-sitter-python = "0.25.0"
 tree-sitter-go = "0.25.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [lints]
 workspace = true

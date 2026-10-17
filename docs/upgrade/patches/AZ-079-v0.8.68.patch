@@ -1,0 +1,125 @@
+diff --git a/piscis-kernel/src/agent/file_journal.rs b/piscis-kernel/src/agent/file_journal.rs
+index b1de377..51c5d6b 100644
+--- a/piscis-kernel/src/agent/file_journal.rs
++++ b/piscis-kernel/src/agent/file_journal.rs
+@@ -258,15 +258,15 @@ impl FileJournal {
+     /// Undo all applied changes in a turn, restoring pre-edit content.
+     /// Returns the list of restored relative paths.
+     pub fn undo_turn(&self, session_id: &str, turn_id: &str) -> Result<Vec<String>> {
+-        // Reverse application order so later edits to the same file are unwound
+-        // before earlier ones, leaving the oldest pre-edit content as final.
++        // Restore each path once from its earliest still-applied snapshot.
++        // Selecting the latest snapshot would leave earlier edits in place.
+         let snapshots: Vec<(i64, String, bool, Option<Vec<u8>>)> = {
+             let conn = self.conn.lock().unwrap();
+             let mut stmt = conn.prepare(
+                 "SELECT id, rel_path, existed, before_content
+                  FROM file_snapshots
+                  WHERE session_id = ?1 AND turn_id = ?2 AND applied = 1 AND undone = 0
+-                 ORDER BY id DESC",
++                 ORDER BY id ASC",
+             )?;
+             let rows = stmt.query_map(params![session_id, turn_id], |r| {
+                 Ok((
+@@ -286,7 +286,7 @@ impl FileJournal {
+         let mut restored = Vec::new();
+         let mut restored_paths = std::collections::HashSet::new();
+         for (_id, rel, existed, before) in &snapshots {
+-            // Only act once per path (the latest snapshot wins for restore).
++            // Only act once per path (the earliest eligible snapshot wins).
+             if !restored_paths.insert(rel.clone()) {
+                 continue;
+             }
+@@ -331,6 +331,92 @@ impl AgentHooks for FileJournal {
+     }
+ }
+ 
++#[cfg(test)]
++mod undo_tests {
++    use super::*;
++    fn change(journal: &FileJournal, session: &str, id: &str, path: &str, bytes: &[u8], ok: bool) {
++        let input = serde_json::json!({"path":path});
++        let event = ToolHookEvent {
++            session_id: session,
++            tool_use_id: id,
++            tool_name: "file_write",
++            input: &input,
++            workspace_root: &journal.workspace_root,
++        };
++        journal.snapshot_before(session, &event);
++        if ok {
++            std::fs::write(journal.abs_path(path), bytes).unwrap();
++        }
++        journal.finalize(&event, ok);
++    }
++    #[test]
++    fn repeated_edits_restore_original_bytes_once_and_do_not_replay() {
++        let dir = tempfile::tempdir().unwrap();
++        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
++        std::fs::write(dir.path().join("a.bin"), [0, 255, 13, 10]).unwrap();
++        let turn = journal.begin_turn("a");
++        change(&journal, "a", "one", "a.bin", b"first", true);
++        change(&journal, "a", "two", "a.bin", b"second", true);
++        assert_eq!(journal.undo_turn("a", &turn).unwrap(), vec!["a.bin"]);
++        assert_eq!(
++            std::fs::read(dir.path().join("a.bin")).unwrap(),
++            [0, 255, 13, 10]
++        );
++        assert!(journal.undo_turn("a", &turn).unwrap().is_empty());
++    }
++    #[test]
++    fn previously_undone_snapshot_is_not_selected_for_restore() {
++        let dir = tempfile::tempdir().unwrap();
++        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
++        std::fs::write(dir.path().join("a.txt"), b"original").unwrap();
++        let turn = journal.begin_turn("a");
++        change(&journal, "a", "one", "a.txt", b"first", true);
++        change(&journal, "a", "two", "a.txt", b"second", true);
++        journal
++            .conn
++            .lock()
++            .unwrap()
++            .execute(
++                "UPDATE file_snapshots SET undone=1 WHERE tool_use_id='one'",
++                [],
++            )
++            .unwrap();
++        journal.undo_turn("a", &turn).unwrap();
++        assert_eq!(std::fs::read(dir.path().join("a.txt")).unwrap(), b"first");
++        assert!(journal.undo_turn("a", &turn).unwrap().is_empty());
++    }
++    #[test]
++    fn new_file_then_edit_restores_absence() {
++        let dir = tempfile::tempdir().unwrap();
++        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
++        let turn = journal.begin_turn("a");
++        change(&journal, "a", "one", "new.txt", b"first", true);
++        change(&journal, "a", "two", "new.txt", b"second", true);
++        journal.undo_turn("a", &turn).unwrap();
++        assert!(!dir.path().join("new.txt").exists());
++    }
++    #[test]
++    fn failed_changes_and_other_sessions_do_not_replace_original() {
++        let dir = tempfile::tempdir().unwrap();
++        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
++        std::fs::write(dir.path().join("a.txt"), b"original").unwrap();
++        let turn = journal.begin_turn("a");
++        change(&journal, "a", "failed", "a.txt", b"never", false);
++        change(&journal, "a", "one", "a.txt", b"first", true);
++        change(&journal, "b", "other", "b.txt", b"other-session", true);
++        change(&journal, "a", "two", "a.txt", b"second", true);
++        journal.undo_turn("a", &turn).unwrap();
++        assert_eq!(
++            std::fs::read(dir.path().join("a.txt")).unwrap(),
++            b"original"
++        );
++        assert_eq!(
++            std::fs::read(dir.path().join("b.txt")).unwrap(),
++            b"other-session"
++        );
++    }
++}
++
+ /// Lightweight unique turn id (hyphen-free, time + address entropy).
+ fn turn_id() -> String {
+     use std::time::{SystemTime, UNIX_EPOCH};

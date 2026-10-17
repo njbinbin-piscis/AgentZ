@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "task_id": "example-research-task",
+  "question": "Which local files document the current feature?",
+  "conclusion": "The selected fixture documents the current feature boundary.",
+  "findings": [
+    { "claim": "The fixture names the supported boundary.", "source_ids": ["S1"] }
+  ],
+  "sources": [
+    { "id": "S1", "title": "Local feature fixture", "locator": "workspace:docs/feature.md" }
+  ],
+  "limitations": [
+    "This example does not establish behavior outside the local fixture."
+  ]
+}

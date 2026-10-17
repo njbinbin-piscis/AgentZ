@@ -1,0 +1,11 @@
+.agentz-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.agentz-plan-actions > div,
+.agentz-plan-actions > small { width: 100%; overflow-wrap: anywhere; }
+.agentz-plan-actions input { flex: 1; min-width: 120px; }
+.agentz-plan-actions [role="alert"] { color: var(--color-error, #c94b4b); }

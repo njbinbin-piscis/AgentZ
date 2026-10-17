@@ -129,8 +129,11 @@ fn symbol_kind(l: Lang, n: Node<'_>) -> Option<&'static str> {
             "enum_declaration" => Some("enum"),
             "variable_declarator" => {
                 let v = n.child_by_field_name("value")?;
-                matches!(v.kind(), "arrow_function" | "function_expression" | "function")
-                    .then_some("function")
+                matches!(
+                    v.kind(),
+                    "arrow_function" | "function_expression" | "function"
+                )
+                .then_some("function")
             }
             _ => None,
         },
@@ -208,7 +211,10 @@ fn walk(
             if matches!(kind, "fn" | "function" | "method" | "func") {
                 next_enclosing = Some(idx);
             }
-            if matches!(kind, "struct" | "enum" | "trait" | "class" | "interface" | "mod") {
+            if matches!(
+                kind,
+                "struct" | "enum" | "trait" | "class" | "interface" | "mod"
+            ) {
                 next_container = Some(name);
             }
         }
@@ -251,7 +257,16 @@ pub fn extract_file(path: &Path, rel: &str, source: &str) -> Option<FileSymbols>
     parser.set_language(&language(l)).ok()?;
     let tree = parser.parse(source, None)?;
     let mut out = FileSymbols::default();
-    walk(l, tree.root_node(), source.as_bytes(), rel, None, None, 0, &mut out);
+    walk(
+        l,
+        tree.root_node(),
+        source.as_bytes(),
+        rel,
+        None,
+        None,
+        0,
+        &mut out,
+    );
     Some(out)
 }
 
@@ -268,6 +283,13 @@ fn collect_source_files(root: &Path) -> Vec<PathBuf> {
         for entry in entries.flatten() {
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
+            if entry
+                .file_type()
+                .map(|kind| kind.is_symlink())
+                .unwrap_or(true)
+            {
+                continue;
+            }
             let Ok(meta) = entry.metadata() else { continue };
             if meta.is_dir() {
                 if crate::path_filter::is_ignored_dir_name(&name) || name == "bundled" {
@@ -275,7 +297,16 @@ fn collect_source_files(root: &Path) -> Vec<PathBuf> {
                 }
                 stack.push((path, depth + 1));
             } else if meta.is_file() && meta.len() <= MAX_PARSE_BYTES && lang_for(&path).is_some() {
-                files.push(path);
+                if path
+                    .strip_prefix(root)
+                    .ok()
+                    .and_then(|relative| relative.to_str())
+                    .is_some_and(|relative| {
+                        crate::commands::codebase::safe_cached_source_path(root, relative)
+                    })
+                {
+                    files.push(path);
+                }
             }
         }
     }
@@ -292,7 +323,9 @@ fn fingerprint(files: &[PathBuf]) -> u64 {
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
-        h = h.wrapping_mul(1_099_511_628_211).wrapping_add(m ^ (f.as_os_str().len() as u64));
+        h = h
+            .wrapping_mul(1_099_511_628_211)
+            .wrapping_add(m ^ (f.as_os_str().len() as u64));
     }
     h
 }
@@ -324,8 +357,21 @@ pub fn build_index(root: &Path, files: &[PathBuf]) -> SymbolIndex {
 
 fn kind_static(k: &str) -> &'static str {
     const KINDS: [&str; 15] = [
-        "fn", "struct", "enum", "trait", "mod", "type", "const", "function", "class", "method",
-        "interface", "func", "var", "let", "other",
+        "fn",
+        "struct",
+        "enum",
+        "trait",
+        "mod",
+        "type",
+        "const",
+        "function",
+        "class",
+        "method",
+        "interface",
+        "func",
+        "var",
+        "let",
+        "other",
     ];
     KINDS.iter().find(|x| **x == k).copied().unwrap_or("other")
 }
@@ -352,7 +398,13 @@ fn persist_index(root: &Path, idx: &SymbolIndex, fp: u64) -> Result<(), String> 
             .map_err(|e| e.to_string())?;
         for (i, s) in idx.symbols.iter().enumerate() {
             ins.execute(rusqlite::params![
-                i as i64, s.name, s.kind, s.file, s.start_line as i64, s.end_line as i64, s.container
+                i as i64,
+                s.name,
+                s.kind,
+                s.file,
+                s.start_line as i64,
+                s.end_line as i64,
+                s.container
             ])
             .map_err(|e| e.to_string())?;
         }
@@ -360,8 +412,13 @@ fn persist_index(root: &Path, idx: &SymbolIndex, fp: u64) -> Result<(), String> 
             .prepare("INSERT INTO symbol_calls VALUES (?1,?2,?3,?4)")
             .map_err(|e| e.to_string())?;
         for c in &idx.calls {
-            insc.execute(rusqlite::params![c.0.map(|v| v as i64), c.1, c.2, c.3 as i64])
-                .map_err(|e| e.to_string())?;
+            insc.execute(rusqlite::params![
+                c.0.map(|v| v as i64),
+                c.1,
+                c.2,
+                c.3 as i64
+            ])
+            .map_err(|e| e.to_string())?;
         }
     }
     tx.execute(
@@ -378,14 +435,20 @@ fn load_persisted(root: &Path, fp: u64) -> Option<SymbolIndex> {
     }
     let conn = crate::commands::graph_db::open_graph_db(root).ok()?;
     let stored: String = conn
-        .query_row("SELECT value FROM symbol_meta WHERE key='fingerprint'", [], |r| r.get(0))
+        .query_row(
+            "SELECT value FROM symbol_meta WHERE key='fingerprint'",
+            [],
+            |r| r.get(0),
+        )
         .ok()?;
     if stored != fp.to_string() {
         return None;
     }
     let mut idx = SymbolIndex::default();
     let mut st = conn
-        .prepare("SELECT name, kind, file, start_line, end_line, container FROM symbols ORDER BY id")
+        .prepare(
+            "SELECT name, kind, file, start_line, end_line, container FROM symbols ORDER BY id",
+        )
         .ok()?;
     let rows = st
         .query_map([], |r| {
@@ -414,6 +477,17 @@ fn load_persisted(root: &Path, fp: u64) -> Option<SymbolIndex> {
         })
         .ok()?;
     idx.calls = crows.flatten().collect();
+    let canonical_root = std::fs::canonicalize(root).ok()?;
+    if idx.symbols.iter().any(|symbol| {
+        !crate::commands::codebase::safe_cached_source_path(&canonical_root, &symbol.file)
+    }) || idx
+        .calls
+        .iter()
+        .any(|call| !crate::commands::codebase::safe_cached_source_path(&canonical_root, &call.2))
+    {
+        // Rebuild the complete graph rather than shifting symbol/caller indices.
+        return None;
+    }
     idx.finish();
     Some(idx)
 }
@@ -426,6 +500,10 @@ fn cache() -> &'static Cache {
 }
 
 pub fn index_for(root: &Path) -> Arc<SymbolIndex> {
+    let Ok(canonical_root) = std::fs::canonicalize(root) else {
+        return Arc::new(SymbolIndex::default());
+    };
+    let root = canonical_root.as_path();
     let files = collect_source_files(root);
     let fp = fingerprint(&files);
     if let Some((cached_fp, idx)) = cache().lock().ok().and_then(|c| c.get(root).cloned()) {
@@ -473,7 +551,10 @@ pub fn search_symbols(idx: &SymbolIndex, query: &str, kind: Option<&str>, limit:
     }
     scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
     if scored.is_empty() {
-        return format!("No symbol matching `{query}` ({} symbols indexed).", idx.symbols.len());
+        return format!(
+            "No symbol matching `{query}` ({} symbols indexed).",
+            idx.symbols.len()
+        );
     }
     let mut out = format!("{} match(es) for `{query}`:\n", scored.len().min(limit));
     for (_, i) in scored.into_iter().take(limit) {
@@ -498,10 +579,15 @@ pub fn impact_report(idx: &SymbolIndex, symbol: &str, depth: usize, limit: usize
         );
     };
     let mut out = String::new();
-    out.push_str(&format!("Impact of `{symbol}` (name-based call resolution, may over-approximate):\n\nDefined at:\n"));
+    out.push_str(&format!(
+        "Impact of `{symbol}` (name-based call resolution, may over-approximate):\n\nDefined at:\n"
+    ));
     for &d in defs.iter().take(8) {
         let s = &idx.symbols[d];
-        out.push_str(&format!("- {} {}:{}-{}\n", s.kind, s.file, s.start_line, s.end_line));
+        out.push_str(&format!(
+            "- {} {}:{}-{}\n",
+            s.kind, s.file, s.start_line, s.end_line
+        ));
     }
 
     let mut seen: HashSet<String> = HashSet::new();
@@ -532,7 +618,10 @@ pub fn impact_report(idx: &SymbolIndex, symbol: &str, depth: usize, limit: usize
                 })
                 .unwrap_or_else(|| "(top level)".into());
             if lines.len() < limit {
-                lines.push(format!("{}- `{who}` at {file}:{line} calls `{name}`", "  ".repeat(d)));
+                lines.push(format!(
+                    "{}- `{who}` at {file}:{line} calls `{name}`",
+                    "  ".repeat(d)
+                ));
             }
             if let Some(c) = caller {
                 let cname = idx.symbols[*c].name.clone();
@@ -686,7 +775,15 @@ pub fn find_symbols(idx: &SymbolIndex, query: &str, limit: usize) -> Vec<usize> 
         .filter(|(_, s)| matches!(s.kind, "fn" | "function" | "method" | "func"))
         .filter_map(|(i, s)| {
             let n = s.name.to_lowercase();
-            let sc = if n == q { 100 } else if n.starts_with(&q) { 70 } else if n.contains(&q) { 40 } else { return None };
+            let sc = if n == q {
+                100
+            } else if n.starts_with(&q) {
+                70
+            } else if n.contains(&q) {
+                40
+            } else {
+                return None;
+            };
             Some((sc, i))
         })
         .collect();
@@ -699,7 +796,9 @@ pub async fn symbol_find(
     project_dir: Option<String>,
     query: String,
 ) -> Result<Vec<CallGraphNode>, String> {
-    let root = PathBuf::from(crate::commands::data_scope::require_project_dir(project_dir.as_deref())?);
+    let root = PathBuf::from(crate::commands::data_scope::require_project_dir(
+        project_dir.as_deref(),
+    )?);
     tokio::task::spawn_blocking(move || {
         let idx = index_for(&root);
         find_symbols(&idx, &query, 30)
@@ -728,7 +827,9 @@ pub async fn symbol_call_graph(
     symbol_id: usize,
     depth: Option<usize>,
 ) -> Result<CallGraph, String> {
-    let root = PathBuf::from(crate::commands::data_scope::require_project_dir(project_dir.as_deref())?);
+    let root = PathBuf::from(crate::commands::data_scope::require_project_dir(
+        project_dir.as_deref(),
+    )?);
     tokio::task::spawn_blocking(move || {
         let idx = index_for(&root);
         call_graph(&idx, symbol_id, depth.unwrap_or(2).clamp(1, 4), 80)
@@ -740,6 +841,26 @@ pub async fn symbol_call_graph(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn persisted_symbol_sources_are_validated_without_reindexing_caller_ids() {
+        let root =
+            std::env::temp_dir().join(format!("agentz-symbol-cache-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let root = std::fs::canonicalize(root).unwrap();
+        let file = root.join("source.rs");
+        std::fs::write(&file, "fn inside_source() {}\n").unwrap();
+        let idx = build_index(&root, &[file]);
+        assert!(!idx.symbols.is_empty());
+        persist_index(&root, &idx, 42).unwrap();
+        assert!(load_persisted(&root, 42).is_some());
+        let conn = crate::commands::graph_db::open_graph_db(&root).unwrap();
+        conn.execute("UPDATE symbols SET file='../outside.rs'", [])
+            .unwrap();
+        assert!(load_persisted(&root, 42).is_none());
+        let missing = root.join("missing-workspace");
+        assert!(index_for(&missing).symbols.is_empty());
+        assert!(!missing.exists());
+    }
 
     fn idx_of(files: &[(&str, &str)]) -> SymbolIndex {
         let mut idx = SymbolIndex::default();
@@ -748,8 +869,12 @@ mod tests {
             let base = idx.symbols.len();
             idx.symbols.extend(fs.symbols);
             for c in fs.calls {
-                idx.calls
-                    .push((c.caller.map(|i| base + i), c.callee, rel.to_string(), c.line));
+                idx.calls.push((
+                    c.caller.map(|i| base + i),
+                    c.callee,
+                    rel.to_string(),
+                    c.line,
+                ));
             }
         }
         idx.finish();
@@ -777,14 +902,29 @@ mod tests {
         )
         .unwrap();
         let names: Vec<_> = ts.symbols.iter().map(|s| s.name.as_str()).collect();
-        assert!(names.contains(&"a") && names.contains(&"b") && names.contains(&"K") && names.contains(&"m"));
+        assert!(
+            names.contains(&"a")
+                && names.contains(&"b")
+                && names.contains(&"K")
+                && names.contains(&"m")
+        );
         assert!(ts.calls.iter().any(|c| c.callee == "d"));
 
-        let py = extract_file(Path::new("a.py"), "a.py", "def f():\n    g()\nclass C:\n    def m(self):\n        self.f()\n").unwrap();
+        let py = extract_file(
+            Path::new("a.py"),
+            "a.py",
+            "def f():\n    g()\nclass C:\n    def m(self):\n        self.f()\n",
+        )
+        .unwrap();
         assert!(py.symbols.iter().any(|s| s.name == "m"));
         assert!(py.calls.iter().any(|c| c.callee == "g"));
 
-        let go = extract_file(Path::new("a.go"), "a.go", "package p\nfunc F() { G() }\nfunc (r T) M() { r.F2() }\n").unwrap();
+        let go = extract_file(
+            Path::new("a.go"),
+            "a.go",
+            "package p\nfunc F() { G() }\nfunc (r T) M() { r.F2() }\n",
+        )
+        .unwrap();
         assert!(go.symbols.iter().any(|s| s.name == "M"));
         assert!(go.calls.iter().any(|c| c.callee == "F2"));
     }
@@ -806,7 +946,10 @@ mod tests {
             ("b.rs", "fn top() { mid(); }\n"),
         ]);
         let r = impact_report(&idx, "leaf", 3, 20);
-        assert!(r.contains("mid") && r.contains("top") && r.contains("b.rs"), "{r}");
+        assert!(
+            r.contains("mid") && r.contains("top") && r.contains("b.rs"),
+            "{r}"
+        );
         let s = search_symbols(&idx, "mi", None, 5);
         assert!(s.contains("`mid`"), "{s}");
     }

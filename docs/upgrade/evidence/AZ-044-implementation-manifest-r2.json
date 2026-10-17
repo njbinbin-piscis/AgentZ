@@ -1,0 +1,26 @@
+{
+  "task": "AZ-044",
+  "generated": "2026-10-11T12:47:18.084Z",
+  "files": [
+    {
+      "path": "src/workspaces/codez/Terminal.tsx",
+      "sha256": "6aa81fac92e4e3dd5ecb8fb75dccb6fb91958c7b335d1df784e35c43527938d2"
+    },
+    {
+      "path": "src/workspaces/codez/terminalLifecycle.ts",
+      "sha256": "60d7e6eab42c4dceea6d120c6dfc66a381b08031193cc66c846a77548f1acd53"
+    },
+    {
+      "path": "src/workspaces/codez/terminalLifecycle.test.ts",
+      "sha256": "812140fc9ffd182478416adc351c70bab9f285eeac5d5d04e5bd028659b017e5"
+    },
+    {
+      "path": "src/workspaces/codez/Terminal.lifecycle.test.tsx",
+      "sha256": "43b702e585b38ba68cb66cecdb8664e71430b9f6807a69dfed07caf7bd8680d3"
+    },
+    {
+      "path": "src-tauri/src/commands/ide.rs",
+      "sha256": "c5b11e5fda948bbecbf16c463e917f3faa5e1a28a7dd4b8017134f019e06cb42"
+    }
+  ]
+}

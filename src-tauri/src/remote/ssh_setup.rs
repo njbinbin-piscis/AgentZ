@@ -13,7 +13,9 @@ use super::{dirs_home, shell_quote, RemoteTarget};
 const OK_MARKER: &str = "AGENTZ_KEY_OK";
 
 fn ssh_dir() -> Result<PathBuf, String> {
-    Ok(dirs_home().ok_or("cannot locate home directory")?.join(".ssh"))
+    Ok(dirs_home()
+        .ok_or("cannot locate home directory")?
+        .join(".ssh"))
 }
 
 /// Existing public key, or a freshly generated passphrase-less ed25519 key.
@@ -35,7 +37,10 @@ pub async fn ensure_public_key() -> Result<String, String> {
         .await
         .map_err(|e| format!("ssh-keygen unavailable: {e}"))?;
     if !out.status.success() {
-        return Err(format!("ssh-keygen failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
+        return Err(format!(
+            "ssh-keygen failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
     }
     std::fs::read_to_string(key.with_extension("pub"))
         .map(|k| k.trim().to_string())
@@ -45,7 +50,12 @@ pub async fn ensure_public_key() -> Result<String, String> {
 /// Log in with `password` once and append `pubkey` to `authorized_keys`.
 fn install_key_blocking(host: &str, password: &str, pubkey: &str) -> Result<(), String> {
     let pair = native_pty_system()
-        .openpty(PtySize { rows: 24, cols: 200, pixel_width: 0, pixel_height: 0 })
+        .openpty(PtySize {
+            rows: 24,
+            cols: 200,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|e| format!("open pty: {e}"))?;
     let q = shell_quote(pubkey);
     let remote = format!(
@@ -63,7 +73,10 @@ fn install_key_blocking(host: &str, password: &str, pubkey: &str) -> Result<(), 
         host,
         &remote,
     ]);
-    let mut child = pair.slave.spawn_command(cmd).map_err(|e| format!("spawn ssh: {e}"))?;
+    let mut child = pair
+        .slave
+        .spawn_command(cmd)
+        .map_err(|e| format!("spawn ssh: {e}"))?;
     drop(pair.slave);
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let mut writer = pair.master.take_writer().map_err(|e| e.to_string())?;
@@ -72,7 +85,11 @@ fn install_key_blocking(host: &str, password: &str, pubkey: &str) -> Result<(), 
     std::thread::spawn(move || {
         let mut buf = [0u8; 1024];
         while let Ok(n) = reader.read(&mut buf) {
-            if n == 0 || tx.send(String::from_utf8_lossy(&buf[..n]).into_owned()).is_err() {
+            if n == 0
+                || tx
+                    .send(String::from_utf8_lossy(&buf[..n]).into_owned())
+                    .is_err()
+            {
                 break;
             }
         }
@@ -100,7 +117,10 @@ fn install_key_blocking(host: &str, password: &str, pubkey: &str) -> Result<(), 
         if seen.contains(OK_MARKER) {
             break Ok(());
         }
-        if lower.contains("permission denied") || lower.contains("could not resolve") || lower.contains("connection refused") {
+        if lower.contains("permission denied")
+            || lower.contains("could not resolve")
+            || lower.contains("connection refused")
+        {
             break Err(last_line(&seen));
         }
         if !sent && (lower.contains("password:") || lower.contains("password for")) {
@@ -130,10 +150,12 @@ pub async fn setup_key_auth(host: &str, password: &str) -> Result<String, String
     tokio::task::spawn_blocking(move || install_key_blocking(&h, &p, &k))
         .await
         .map_err(|e| e.to_string())??;
-    RemoteTarget::Ssh { host: host.to_string() }
-        .run("echo ok")
-        .await
-        .map_err(|e| format!("key installed but key login still fails: {e}"))?;
+    RemoteTarget::Ssh {
+        host: host.to_string(),
+    }
+    .run("echo ok")
+    .await
+    .map_err(|e| format!("key installed but key login still fails: {e}"))?;
     Ok(pubkey)
 }
 

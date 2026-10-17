@@ -1,0 +1,18 @@
+# AZ040 summary/Advanced independent implementation review
+
+2026-10-10. Read-only review of InputContextSummary and the added CodeZ/WorkZ JSX integration. Existing unrelated repository diff was not attributed to this slice. No independent tests/build/models/GUI run.
+
+The shared summary is presentational: props, translated strings and native details only; no IPC, tool execution, permission response, state mutation or scope minting. Unknown/empty strings remain Unknown, optional counts reject negative/unsafe values. Policy explicitly says configured policy does not grant permission. Workspace is explicitly configured context rather than host-verified environment. Queued text explicitly says “Queued locally”/“本地待发”; it is not persisted Run state. The approval display is a typed possibility but neither current caller supplies it, avoiding inference from stale permissionRequest.
+
+CodeZ adds the summary immediately above its existing composer. Authority and workspace are the configured projectDir. Model uses current selected ID or loaded configured default label; the ID is a selection identifier, not a provider-confirmed effective model. Settings-loading failure falls back to Unknown. Busy displays Running, then existing error, then local queuedView presence, otherwise Idle. Busy takes precedence over pending local messages, so this slice is not an exhaustive queue dashboard. Existing Send/Stop and composer fields remain unchanged by the summary. CodeZ optional skills/connectors count is not yet supplied; their existing controls remain visible and functional, so no hidden-option behavior is introduced by this slice.
+
+WorkZ only displays worktree_path when worktree.id matches sessionRef.current; otherwise the workspace fallback is configured free cwd/direct project, or Unknown for unverified isolated/agent/team contexts. Hidden model selector forces model/source Unknown and does not display the remembered scoped ID or global default. Mode labels separate agent/team/plain; policy remains configuration. Summary counts existing selected optional skills/connectors only when generic controls apply. No stale permission card is converted to waiting state, and no local queue is fabricated for WorkZ.
+
+Native Advanced details keeps its children mounted while collapsed. Team/persona selectors retain original values, callbacks and taskBound/busy disabling. Free cwd and isolation remain outside the collapsed controls. The new start-source/base controls are scoped to isolate && !isFree && !taskBound and busy-disabled, feeding already existing startMode/startBase state consumed by task creation. The default remains working; no automatic switching or selection clearing was added. This adds access to existing configurable inputs rather than changing the send algorithm. Keyboard/focus, overlay placement within collapsed details, layout clipping and native desktop interaction still require GUI acceptance.
+
+No blocking source defect was found in this bounded descriptive-summary/Advanced slice. It does not close budget presentation, permission receipt ownership, verified Run/Attempt live state, five-user first-use evaluation or full AZ040 acceptance. Selected model IDs are intentionally descriptive configured identifiers; future friendly-label resolution must preserve Unknown for missing provider definitions.
+
+Reviewed SHA256:
+- src/components/chat/InputContextSummary.tsx: 10ab6a5753f3874655cb2c9636c4b146afc0d8b63f68b3e024ab0f282e1c5847
+- src/workspaces/codez/AssistantPanel.tsx: 7c82b46a98d816b34f4ab0ffedbff22f48fa6eaee0010cd9bfcaae25d82a7598
+- src/workspaces/workz/index.tsx: e11099d392fe3184eb539db9b2c8b612b1b52af18ac12262c68a9c90ba51f468

@@ -370,11 +370,7 @@ pub async fn workflow_start(
     graph.validate()?;
 
     let run_id = format!("wf-{}", uuid::Uuid::new_v4());
-    let pool_name = format!(
-        "{} · {}",
-        team.name,
-        &run_id[..8.min(run_id.len())]
-    );
+    let pool_name = format!("{} · {}", team.name, &run_id[..8.min(run_id.len())]);
 
     let (db, _settings) = open_project_kernel_state(&app, &project_dir)?;
     let pool_id = {

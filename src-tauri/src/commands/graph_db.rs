@@ -107,11 +107,8 @@ fn sync_from_graph_doc_conn(conn: &Connection, doc: &GraphDoc) -> Result<(), Str
         params![GRAPH_DB_VERSION, doc.generated_at],
     )
     .map_err(|e| format!("meta: {e}"))?;
-    tx.execute(
-        "INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')",
-        [],
-    )
-    .map_err(|e| format!("fts rebuild: {e}"))?;
+    tx.execute("INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')", [])
+        .map_err(|e| format!("fts rebuild: {e}"))?;
     tx.commit().map_err(|e| format!("commit: {e}"))?;
     Ok(())
 }
@@ -131,9 +128,8 @@ fn ensure_synced(root: &Path) -> Result<Connection, String> {
     if count > 0 {
         return Ok(conn);
     }
-    let doc = crate::commands::graph::load_graph(root).ok_or(
-        "graph index empty — run Wiki → Rebuild graph first".to_string(),
-    )?;
+    let doc = crate::commands::graph::load_graph(root)
+        .ok_or("graph index empty — run Wiki → Rebuild graph first".to_string())?;
     sync_from_graph_doc_conn(&conn, &doc)?;
     Ok(conn)
 }
@@ -280,7 +276,8 @@ fn search_nodes_by_content(
         let Some(rel) = node.path.as_ref() else {
             continue;
         };
-        if symbol_query && !rel.ends_with(".rs") && !rel.ends_with(".ts") && !rel.ends_with(".tsx") {
+        if symbol_query && !rel.ends_with(".rs") && !rel.ends_with(".ts") && !rel.ends_with(".tsx")
+        {
             continue;
         }
         let pre = path_prefilter_score(rel, &tokens, &q);
@@ -348,7 +345,8 @@ fn grep_symbol_callers(
             if !line.contains(&call_needle) {
                 continue;
             }
-            if line.contains(&format!("\"{call_needle}")) || line.contains(&format!("'{call_needle}"))
+            if line.contains(&format!("\"{call_needle}"))
+                || line.contains(&format!("'{call_needle}"))
             {
                 continue;
             }
@@ -426,7 +424,11 @@ fn blast_radius(conn: &Connection, node_id: &str) -> Vec<String> {
         Err(_) => return lines,
     };
     let Ok(rows) = stmt.query_map(params![node_id, MAX_BLAST_ITEMS as i64], |r| {
-        Ok((r.get::<_, String>(0)?, r.get::<_, Option<String>>(1)?, r.get::<_, String>(2)?))
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get::<_, Option<String>>(1)?,
+            r.get::<_, String>(2)?,
+        ))
     }) else {
         return lines;
     };
@@ -494,10 +496,7 @@ pub fn explore_graph(root: &Path, query: &str, limit: usize) -> Result<String, S
         ));
     }
 
-    let file_paths: BTreeSet<String> = nodes
-        .iter()
-        .filter_map(|n| n.path.clone())
-        .collect();
+    let file_paths: BTreeSet<String> = nodes.iter().filter_map(|n| n.path.clone()).collect();
     let mut files_ordered: Vec<String> = Vec::new();
     for n in &nodes {
         if let Some(p) = &n.path {
@@ -555,12 +554,12 @@ pub fn explore_graph(root: &Path, query: &str, limit: usize) -> Result<String, S
     }
 
     out.push_str("**Source Code**\n\n");
-    out.push_str(
-        "> Verbatim on-disk source with line numbers — treat as already Read.\n\n",
-    );
+    out.push_str("> Verbatim on-disk source with line numbers — treat as already Read.\n\n");
 
     for rel in files_ordered.iter().take(8) {
-        let node = nodes.iter().find(|n| n.path.as_deref() == Some(rel.as_str()));
+        let node = nodes
+            .iter()
+            .find(|n| n.path.as_deref() == Some(rel.as_str()));
         let label = node
             .map(|n| {
                 let mut s = format!("{} ({})", n.name, n.kind);

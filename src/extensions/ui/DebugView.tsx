@@ -1,12 +1,14 @@
 import { useSyncExternalStore } from "react";
 import { debugStore } from "../debug/debugStore";
 import { debugController } from "../debug/debugController";
+import { useProjectEdgeActions } from "../../contexts/ProjectEdgeContext";
 import { useExtensionUi } from "./useExtensionUi";
 
 /** Debug session view: toolbar + call stack + variables + console. */
 export default function DebugView() {
   const dbg = useSyncExternalStore(debugStore.subscribe, debugStore.getSnapshot);
   const { debugOutput } = useExtensionUi();
+  const { onSelectPath } = useProjectEdgeActions();
 
   return (
     <div className="agentz-debug-view">
@@ -42,11 +44,32 @@ export default function DebugView() {
             {dbg.frames.length === 0 ? (
               <div className="agentz-debug-muted">—</div>
             ) : (
-              dbg.frames.map((f) => (
-                <div key={f.id} className="agentz-debug-frame">
-                  {f.name} <span className="agentz-debug-muted">:{f.line}</span>
-                </div>
-              ))
+              dbg.frames.map((f) => {
+                const relative = debugController.projectRelativePath(f.source);
+                return (
+                  <div key={f.id} className="agentz-debug-frame">
+                    {relative ? (
+                      <button
+                        type="button"
+                        className="agentz-debug-frame-open"
+                        title={`Open ${relative}`}
+                        onClick={() => onSelectPath(relative)}
+                      >
+                        {f.name}
+                      </button>
+                    ) : (
+                      f.name
+                    )}{" "}
+                    <span className="agentz-debug-muted">:{f.line}</span>
+                    {!relative && (
+                      <span className="agentz-debug-muted">
+                        {" "}
+                        ({f.source ? "outside project" : "no source"})
+                      </span>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
           <div className="agentz-debug-col">

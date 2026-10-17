@@ -1,0 +1,3 @@
+Observed: timeout (source: trace.md).
+Cause: unknown (source: trace.md).
+No network failure is asserted; the cause is not established by the available evidence.

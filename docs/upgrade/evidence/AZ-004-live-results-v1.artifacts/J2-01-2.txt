@@ -1,0 +1,14 @@
+Research: Module Entry Points
+
+Findings
+--------
+Two module entry points were identified in the source fixture:
+
+1. module-a.ts — entry point is `start`
+2. module-b.ts — entry point is `finish`
+
+Both exact file names are cited above: module-a.ts and module-b.ts.
+
+Summary
+-------
+The codebase exposes two entry points across two modules. module-a.ts begins execution at `start`, while module-b.ts begins execution at `finish`.

@@ -1,0 +1,13 @@
+Goal: offline guide.
+Completed: overview.
+Open: backup instructions.
+
+Overview
+This guide covers working offline. It explains the setup and the core steps needed to operate without a network connection.
+
+Backup instructions
+1. Identify the files and settings you need to keep.
+2. Choose a backup destination, such as an external drive or a local folder.
+3. Copy the selected items to that destination.
+4. Verify the copies open correctly.
+5. Repeat the backup on a regular schedule.

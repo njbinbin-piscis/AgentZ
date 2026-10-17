@@ -2,6 +2,7 @@
 //! append-only log, pre-change snapshots for rollback, a per-session write
 //! rate limit, and the Tauri commands behind the settings "change log" panel.
 
+use piscis_kernel::security::secrets::SecretStore;
 use piscis_kernel::store::settings::Settings;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -14,6 +15,7 @@ use tauri::{AppHandle, Emitter};
 use crate::commands::agents::{agents_get, agents_save, agents_uninstall, AgentManifest};
 use crate::commands::data_scope::resolve_global_config_dir;
 use crate::commands::teams::{teams_get, teams_save, teams_uninstall, TeamManifest};
+use crate::tools::settings_catalog::is_secret_key;
 
 pub const APP_CONTROL_UPDATED_EVENT: &str = "agentz:app-control-updated";
 
@@ -47,7 +49,9 @@ fn new_id() -> String {
 pub fn check_rate_limit(session_id: &str) -> Result<(), String> {
     static HITS: once_cell::sync::Lazy<Mutex<HashMap<String, Vec<Instant>>>> =
         once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
-    let mut map = HITS.lock().map_err(|_| "rate limiter poisoned".to_string())?;
+    let mut map = HITS
+        .lock()
+        .map_err(|_| "rate limiter poisoned".to_string())?;
     let hits = map.entry(session_id.to_string()).or_default();
     let now = Instant::now();
     hits.retain(|t| now.duration_since(*t) < WINDOW);
@@ -78,7 +82,7 @@ pub fn record(config_dir: &Path, rec: ChangeRecord<'_>) -> Result<String, String
     let id = new_id();
     let snap = snapshot_path(config_dir, &id);
     std::fs::create_dir_all(snap.parent().unwrap()).map_err(|e| e.to_string())?;
-    std::fs::write(&snap, serde_json::to_vec_pretty(&rec.before).map_err(|e| e.to_string())?)
+    std::fs::write(&snap, encode_snapshot(config_dir, &id, &rec.before)?)
         .map_err(|e| e.to_string())?;
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -92,6 +96,45 @@ pub fn record(config_dir: &Path, rec: ChangeRecord<'_>) -> Result<String, String
     Ok(id)
 }
 
+fn encode_snapshot(config_dir: &Path, id: &str, before: &Value) -> Result<Vec<u8>, String> {
+    let store = SecretStore::new(config_dir).map_err(|error| error.to_string())?;
+    let payload = json!({"id": id, "before": before});
+    let ciphertext = store
+        .encrypt_hex(&payload.to_string())
+        .map_err(|error| error.to_string())?;
+    serde_json::to_vec(&json!({
+        "agentz_audit_snapshot_format": 1,
+        "ciphertext": ciphertext,
+    }))
+    .map_err(|error| error.to_string())
+}
+
+fn decode_snapshot(config_dir: &Path, id: &str, bytes: &[u8]) -> Result<Value, String> {
+    let value: Value = serde_json::from_slice(bytes).map_err(|error| error.to_string())?;
+    if value.get("agentz_audit_snapshot_format").is_none() {
+        // Historical snapshots were plaintext; retain rollback compatibility.
+        return Ok(value);
+    }
+    if value["agentz_audit_snapshot_format"] != 1 {
+        return Err("unsupported audit snapshot format".into());
+    }
+    let ciphertext = value["ciphertext"]
+        .as_str()
+        .ok_or_else(|| "audit snapshot ciphertext missing".to_string())?;
+    let store = SecretStore::new(config_dir).map_err(|error| error.to_string())?;
+    let plaintext = store
+        .decrypt_hex(ciphertext)
+        .map_err(|error| error.to_string())?;
+    let payload: Value = serde_json::from_str(&plaintext).map_err(|error| error.to_string())?;
+    if payload["id"] != id {
+        return Err("audit snapshot identity mismatch".into());
+    }
+    payload
+        .get("before")
+        .cloned()
+        .ok_or_else(|| "audit snapshot payload missing".to_string())
+}
+
 fn append_line(config_dir: &Path, line: &Value) -> Result<(), String> {
     use std::io::Write;
     let path = log_path(config_dir);
@@ -102,6 +145,131 @@ fn append_line(config_dir: &Path, line: &Value) -> Result<(), String> {
         .open(path)
         .map_err(|e| e.to_string())?;
     writeln!(f, "{line}").map_err(|e| e.to_string())
+}
+
+fn redact_audit_value(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map.iter_mut() {
+                if is_secret_key(key)
+                    || matches!(
+                        key.to_ascii_lowercase().as_str(),
+                        "mcp_servers" | "env" | "headers" | "credentials" | "auth"
+                    )
+                {
+                    *child = json!("***");
+                } else {
+                    redact_audit_value(child);
+                }
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(redact_audit_value),
+        _ => {}
+    }
+}
+
+fn redact_audit_diff(entry: &mut Value) {
+    let Some(diffs) = entry.get_mut("diff").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for diff in diffs {
+        let secret_path = diff
+            .get("path")
+            .and_then(Value::as_str)
+            .is_some_and(|path| {
+                path.split(['.', '[', ']']).any(|part| {
+                    is_secret_key(part)
+                        || matches!(
+                            part,
+                            "mcp_servers" | "env" | "headers" | "credentials" | "auth"
+                        )
+                })
+            });
+        for field in ["old", "new"] {
+            if let Some(value) = diff.get_mut(field) {
+                if secret_path {
+                    *value = json!("***");
+                } else {
+                    redact_audit_value(value);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod secret_audit_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_plaintext_snapshot_restores_into_encrypted_settings_v2() {
+        let directory = std::env::temp_dir().join(format!("agentz-audit-rollback-{}", new_id()));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("config.json");
+        let marker = "AZ031_LEGACY_ROLLBACK_SECRET_MARKER";
+        let mut previous = Settings {
+            config_path: path.clone(),
+            ..Settings::default()
+        };
+        previous
+            .mcp_servers
+            .push(piscis_kernel::store::settings::McpServerConfig {
+                name: "fixture".into(),
+                command: marker.into(),
+                ..Default::default()
+            });
+        let before = json!({"mcp_servers": previous.mcp_servers});
+        let legacy = serde_json::to_vec(&before).unwrap();
+        let decoded = decode_snapshot(&directory, "old-change", &legacy).unwrap();
+        let current = Settings {
+            config_path: path.clone(),
+            ..Settings::default()
+        };
+        current.save().unwrap();
+        let current_bytes = std::fs::read(&path).unwrap();
+        assert!(restore_settings_snapshot(&path, &Value::Null).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), current_bytes);
+        restore_settings_snapshot(&path, &decoded).unwrap();
+        let loaded = Settings::load(&path).unwrap();
+        assert_eq!(loaded.mcp_servers[0].command, marker);
+        let saved = std::fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("\"agentz_secret_format\": 2"));
+        assert!(!saved.contains(marker));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn snapshots_are_encrypted_and_bound_to_change_id() {
+        let directory = std::env::temp_dir().join(format!("agentz-audit-secret-{}", new_id()));
+        std::fs::create_dir(&directory).unwrap();
+        let marker = "AZ031_AUDIT_SNAPSHOT_SECRET_MARKER";
+        let before = json!({"mcp_servers": [{"env": {"TOKEN": marker}}]});
+        let encoded = encode_snapshot(&directory, "change-one", &before).unwrap();
+        assert!(!String::from_utf8_lossy(&encoded).contains(marker));
+        assert_eq!(
+            decode_snapshot(&directory, "change-one", &encoded).unwrap(),
+            before
+        );
+        assert!(decode_snapshot(&directory, "change-two", &encoded).is_err());
+        assert_eq!(
+            decode_snapshot(&directory, "legacy", &serde_json::to_vec(&before).unwrap()).unwrap(),
+            before
+        );
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn historical_audit_diff_is_masked_on_read() {
+        let marker = "AZ031_HISTORICAL_AUDIT_SYNTHETIC_SECRET";
+        let mut entry = json!({"diff": [
+            {"path":"mcp_servers[old].url", "old":marker, "new":marker},
+            {"path":"llm_providers[p]", "old":{"api_key":marker}, "new":{"api_key":marker}}
+        ]});
+        redact_audit_diff(&mut entry);
+        assert!(!entry.to_string().contains(marker));
+        assert_eq!(entry["diff"][0]["old"], "***");
+        assert_eq!(entry["diff"][1]["new"]["api_key"], "***");
+    }
 }
 
 /// Newest first. Each entry gets `rolled_back` set when a later rollback entry references it.
@@ -121,8 +289,12 @@ pub fn list(config_dir: &Path, limit: usize) -> Vec<Value> {
         .filter(|e| e["kind"] != "rollback")
         .take(limit)
         .map(|mut e| {
-            let done = e["id"].as_str().map(|i| undone.contains(i)).unwrap_or(false);
+            let done = e["id"]
+                .as_str()
+                .map(|i| undone.contains(i))
+                .unwrap_or(false);
             e["rolled_back"] = json!(done);
+            redact_audit_diff(&mut e);
             e
         })
         .collect()
@@ -143,22 +315,14 @@ pub async fn rollback(app: &AppHandle, id: &str, session: &str) -> Result<String
     }
     let before: Value = std::fs::read(snapshot_path(&config_dir, id))
         .map_err(|e| format!("snapshot missing: {e}"))
-        .and_then(|b| serde_json::from_slice(&b).map_err(|e| e.to_string()))?;
+        .and_then(|bytes| decode_snapshot(&config_dir, id, &bytes))?;
     let kind = entry["kind"].as_str().unwrap_or("");
     let target = entry["target"].as_str().unwrap_or("").to_string();
     match kind {
         "settings" => {
+            let _write_guard = crate::commands::settings::settings_write_guard().await;
             let path = config_dir.join("config.json");
-            let current = Settings::load(&path).map_err(|e| e.to_string())?;
-            let mut value = serde_json::to_value(&current).map_err(|e| e.to_string())?;
-            if let (Some(obj), Some(old)) = (value.as_object_mut(), before.as_object()) {
-                for (k, v) in old {
-                    obj.insert(k.clone(), v.clone());
-                }
-            }
-            let mut restored: Settings = serde_json::from_value(value).map_err(|e| e.to_string())?;
-            restored.config_path = path;
-            restored.save().map_err(|e| e.to_string())?;
+            restore_settings_snapshot(&path, &before)?;
         }
         "assistant" => {
             if before.is_null() {
@@ -188,6 +352,24 @@ pub async fn rollback(app: &AppHandle, id: &str, session: &str) -> Result<String
     )?;
     let _ = app.emit(APP_CONTROL_UPDATED_EVENT, json!({ "kind": kind }));
     Ok(format!("Rolled back {kind} change {id}."))
+}
+
+fn restore_settings_snapshot(path: &Path, before: &Value) -> Result<(), String> {
+    let current = Settings::load(path).map_err(|error| error.to_string())?;
+    let mut value = serde_json::to_value(&current).map_err(|error| error.to_string())?;
+    let old = before
+        .as_object()
+        .ok_or_else(|| "settings snapshot must be an object".to_string())?;
+    let obj = value
+        .as_object_mut()
+        .ok_or_else(|| "settings shape must be an object".to_string())?;
+    for (key, field) in old {
+        obj.insert(key.clone(), field.clone());
+    }
+    let mut restored: Settings =
+        serde_json::from_value(value).map_err(|error| error.to_string())?;
+    restored.config_path = path.to_path_buf();
+    restored.save().map_err(|error| error.to_string())
 }
 
 pub async fn current_manifest_json(app: &AppHandle, kind: &str, id: &str) -> Value {

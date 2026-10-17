@@ -1,0 +1,5 @@
+# AZ-049 task-bound structured report capture candidate
+
+The existing artifact capture path now recognizes a `report` kind with a `.json` source. After the host re-resolves the current task/environment binding and reads the file from the authorized workspace, it checks the versioned research-report contract, requires the report task ID to match the bound session, validates finding/source references and locator syntax, escapes Markdown/HTML control characters, and stores the rendered Markdown as an immutable report artifact. The original source path remains in artifact metadata. Other report files retain the existing plain-text capture behavior. The artifact viewer explains this structured capture path.
+
+Local checks: a native contract fixture passed with task mismatch, traversal and unknown-source rejection; `cargo check -p agentz-desktop --offline --locked`, `npm run typecheck`, and 9 scoped artifact-viewer tests passed. This does not prove that cited sources are factually correct or that external URLs are reachable. No native UI capture, fixed real research-task review, model run, or unified acceptance was performed. AZ-049 remains deferred.

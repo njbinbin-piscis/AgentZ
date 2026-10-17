@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-050",
+    "verified_state": "host_resolved_versioned_continuation_local_checks_passed",
+    "severity": "P1",
+    "finding": "CodeZ now sends an explicit immutable document/report reference; the host rechecks project and task binding, reads the exact stored version and digest, and supplies a bounded excerpt at send time. Local Rust, TypeScript and client checks pass; native journey is unverified.",
+    "conclusion_proposal": "Keep deferred until complete native document journey and independent review.",
+    "next_action": "Run native create/edit/restore/continue/archive journey, verify HTML/Markdown preview and failed-send recovery, then independently review final source and upstream contracts.",
+    "remaining_work": ["Native complete document journey", "Preview and failed-send recovery", "Independent final review and upstream acceptance"],
+    "verification_gaps": ["No live native send or model turn", "No full document lifecycle or preview exercise"],
+    "evidence": ["docs/upgrade/evidence/AZ-050-2026-10-14/implementation.md", "docs/upgrade/evidence/AZ-050-host-resolved-continuation-2026-10-15.md"]
+  }
+]

@@ -9,10 +9,10 @@
 //! ControlMaster all behave exactly like in a terminal.
 
 pub mod forward;
-pub mod lsp;
-pub mod mirror;
 #[cfg(test)]
 mod live_tests;
+pub mod lsp;
+pub mod mirror;
 pub mod ssh_setup;
 pub mod vfs;
 
@@ -45,46 +45,132 @@ pub fn manager() -> Option<std::sync::Arc<crate::commands::ext_host::ExtHostMana
 /// If `path` is an `agentz-remote://` URI for the connected remote, return the
 /// remote path; error if it names a remote that is not connected.
 pub async fn resolve(path: &str) -> Result<Option<String>, String> {
-    let Some(parsed) = vfs::parse(path) else { return Ok(None) };
+    let Some(parsed) = vfs::parse(path) else {
+        if vfs::has_scheme(path) {
+            return Err("invalid remote workspace URI".into());
+        }
+        return Ok(None);
+    };
+    if let Ok(session) = EXECUTION_SESSION.try_with(Clone::clone) {
+        if !session.authority.eq_ignore_ascii_case(&parsed.authority) {
+            return Err("remote workspace authority differs from execution session".into());
+        }
+        return Ok(Some(parsed.path));
+    }
     let mgr = manager().ok_or("remote broker unavailable")?;
     mgr.wait_for_authority(&parsed.authority).await?;
     Ok(Some(parsed.path))
 }
 
 pub fn is_remote(path: &str) -> bool {
-    vfs::parse(path).is_some()
+    vfs::has_scheme(path)
 }
 
 fn git_repo_cache() -> &'static std::sync::Mutex<HashMap<String, Vec<String>>> {
-    static C: std::sync::OnceLock<std::sync::Mutex<HashMap<String, Vec<String>>>> = std::sync::OnceLock::new();
+    static C: std::sync::OnceLock<std::sync::Mutex<HashMap<String, Vec<String>>>> =
+        std::sync::OnceLock::new();
     C.get_or_init(|| std::sync::Mutex::new(HashMap::new()))
 }
 
 fn cache_key(workspace: &str) -> String {
-    workspace.replace('\\', "/").trim_end_matches('/').to_string()
+    workspace
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_string()
 }
 
 /// Rediscover git repos under a remote workspace (async; feeds the sync
 /// `git_workspace::discover_git_repos`).
 pub async fn refresh_git_repos(workspace: &str) -> Result<(), String> {
-    let Some(root) = resolve(workspace).await? else { return Ok(()) };
-    let v = call("git.discover", serde_json::json!({ "path": root, "maxDepth": 4 })).await?;
+    if !is_remote(workspace) {
+        return Ok(());
+    }
+    let session = bind(workspace).await?;
+    let v = session
+        .call(
+            "git.discover",
+            serde_json::json!({ "path": session.path, "maxDepth": 4 }),
+        )
+        .await?;
     let repos: Vec<String> = serde_json::from_value(v).map_err(|e| e.to_string())?;
-    git_repo_cache().lock().unwrap().insert(cache_key(workspace), repos);
+    git_repo_cache()
+        .lock()
+        .unwrap()
+        .insert(cache_key(workspace), repos);
     Ok(())
 }
 
 /// Cached workspace-relative repo roots; `None` until first refresh.
 pub fn cached_git_repos(workspace: &str) -> Option<Vec<String>> {
-    git_repo_cache().lock().unwrap().get(&cache_key(workspace)).cloned()
+    git_repo_cache()
+        .lock()
+        .unwrap()
+        .get(&cache_key(workspace))
+        .cloned()
 }
 
 /// Call an agentz-server method on the connected remote.
 pub async fn call(method: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    if let Ok(session) = EXECUTION_SESSION.try_with(Clone::clone) {
+        return session.call(method, params).await;
+    }
     manager()
         .ok_or("remote broker unavailable")?
         .request(method, params)
         .await
+}
+
+#[derive(Clone)]
+pub struct RemoteSession {
+    pub target: RemoteTarget,
+    pub authority: String,
+    pub path: String,
+    pub generation: u64,
+    pub manager: std::sync::Arc<crate::commands::ext_host::ExtHostManager>,
+}
+
+impl RemoteSession {
+    pub async fn call(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        self.manager
+            .request_generation(method, params, self.generation)
+            .await
+    }
+}
+
+tokio::task_local! {
+    static EXECUTION_SESSION: RemoteSession;
+}
+
+pub fn bound_session() -> Option<RemoteSession> {
+    EXECUTION_SESSION.try_with(Clone::clone).ok()
+}
+
+pub async fn bind(workspace: &str) -> Result<RemoteSession, String> {
+    let uri = vfs::parse(workspace).ok_or("invalid remote workspace URI")?;
+    let manager = manager().ok_or("remote broker unavailable")?;
+    let generation = manager.bind_authority(&uri.authority).await?;
+    let target = manager.target_for_generation(generation).await?;
+    if !target.authority().eq_ignore_ascii_case(&uri.authority) {
+        return Err("remote target differs from workspace authority".into());
+    }
+    Ok(RemoteSession {
+        target,
+        authority: uri.authority,
+        path: uri.path,
+        generation,
+        manager,
+    })
+}
+
+pub async fn with_session<T>(
+    session: RemoteSession,
+    future: impl std::future::Future<Output = T>,
+) -> T {
+    EXECUTION_SESSION.scope(session, future).await
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -169,7 +255,12 @@ impl RemoteTarget {
         match self {
             RemoteTarget::Local => vec![],
             RemoteTarget::Ssh { host } => {
-                let mut v: Vec<String> = vec!["ssh".into(), "-tt".into(), "-o".into(), "ServerAliveInterval=15".into()];
+                let mut v: Vec<String> = vec![
+                    "ssh".into(),
+                    "-tt".into(),
+                    "-o".into(),
+                    "ServerAliveInterval=15".into(),
+                ];
                 v.extend(ssh_mux_args());
                 v.push(host.clone());
                 v.push(format!("cd {} 2>/dev/null; {login}", shell_quote(cwd)));
@@ -180,7 +271,14 @@ impl RemoteTarget {
                 if let Some(u) = user.as_deref().filter(|u| !u.is_empty()) {
                     v.extend(["-u".into(), u.to_string()]);
                 }
-                v.extend(["-w".into(), cwd.to_string(), container.clone(), "sh".into(), "-c".into(), login.into()]);
+                v.extend([
+                    "-w".into(),
+                    cwd.to_string(),
+                    container.clone(),
+                    "sh".into(),
+                    "-c".into(),
+                    login.into(),
+                ]);
                 v
             }
             RemoteTarget::Wsl { distro } => vec![
@@ -242,7 +340,9 @@ fn ssh_mux_args() -> Vec<String> {
     if cfg!(windows) {
         return vec![];
     }
-    let Some(home) = dirs_home() else { return vec![] };
+    let Some(home) = dirs_home() else {
+        return vec![];
+    };
     let dir = home.join(".ssh").join("agentz-mux");
     let _ = std::fs::create_dir_all(&dir);
     vec![
@@ -304,7 +404,10 @@ pub async fn deploy(
         ))
         .await?;
     let mut lines = probe.lines().map(str::trim).filter(|l| !l.is_empty());
-    let home = lines.next().ok_or("remote probe returned no $HOME")?.to_string();
+    let home = lines
+        .next()
+        .ok_or("remote probe returned no $HOME")?
+        .to_string();
     let arch = lines.next().unwrap_or("x86_64").to_string();
     let present = lines.next() == Some("present");
     let node = lines.next().map(str::to_string);
@@ -313,7 +416,10 @@ pub async fn deploy(
     if !present {
         target
             .run_with_stdin(
-                &format!("cat > {p}.tmp && mv {p}.tmp {p}", p = shell_quote(&server_js)),
+                &format!(
+                    "cat > {p}.tmp && mv {p}.tmp {p}",
+                    p = shell_quote(&server_js)
+                ),
                 &bytes,
             )
             .await?;
@@ -324,7 +430,12 @@ pub async fn deploy(
         None => upload_node(target, &home, &arch, node_resources).await?,
     };
 
-    Ok(DeployedServer { home, node, server_js, arch })
+    Ok(DeployedServer {
+        home,
+        node,
+        server_js,
+        arch,
+    })
 }
 
 async fn upload_node(
@@ -336,7 +447,11 @@ async fn upload_node(
     let node_arch = match arch {
         "x86_64" | "amd64" => "x64",
         "aarch64" | "arm64" => "arm64",
-        other => return Err(format!("no bundled Node for remote arch '{other}'; install node >= 18 on the target")),
+        other => {
+            return Err(format!(
+                "no bundled Node for remote arch '{other}'; install node >= 18 on the target"
+            ))
+        }
     };
     let dir = node_resources.ok_or("remote has no node >= 18 and no bundled Node runtime is available (run `npm run fetch-node` in extension-host)")?;
     let tarball = std::fs::read_dir(dir)
@@ -347,7 +462,12 @@ async fn upload_node(
                 .and_then(|n| n.to_str())
                 .is_some_and(|n| n.ends_with(&format!("-linux-{node_arch}.tar.xz")))
         })
-        .ok_or_else(|| format!("bundled node tarball for linux-{node_arch} not found in {}", dir.display()))?;
+        .ok_or_else(|| {
+            format!(
+                "bundled node tarball for linux-{node_arch} not found in {}",
+                dir.display()
+            )
+        })?;
     let stem = tarball
         .file_name()
         .and_then(|n| n.to_str())
@@ -357,10 +477,7 @@ async fn upload_node(
     let data = std::fs::read(&tarball).map_err(|e| e.to_string())?;
     let base = format!("{home}/{SERVER_DIR}");
     target
-        .run_with_stdin(
-            &format!("cd {} && tar -xJf -", shell_quote(&base)),
-            &data,
-        )
+        .run_with_stdin(&format!("cd {} && tar -xJf -", shell_quote(&base)), &data)
         .await?;
     Ok(format!("{base}/{stem}/bin/node"))
 }
@@ -393,7 +510,10 @@ pub async fn sync_extensions(
     for ext in extensions {
         let remote_dir = format!("{home}/{SERVER_DIR}/extensions/{}-{}", ext.id, ext.version);
         let present = target
-            .run(&format!("test -f {}/package.json && echo yes || true", shell_quote(&remote_dir)))
+            .run(&format!(
+                "test -f {}/package.json && echo yes || true",
+                shell_quote(&remote_dir)
+            ))
             .await?;
         if present.trim() != "yes" {
             let archive = tar_dir(Path::new(&ext.extension_path)).await?;
@@ -424,7 +544,11 @@ async fn tar_dir(dir: &Path) -> Result<Vec<u8>, String> {
         .await
         .map_err(|e| format!("tar not available: {e}"))?;
     if !out.status.success() {
-        return Err(format!("tar {} failed: {}", dir.display(), String::from_utf8_lossy(&out.stderr)));
+        return Err(format!(
+            "tar {} failed: {}",
+            dir.display(),
+            String::from_utf8_lossy(&out.stderr)
+        ));
     }
     Ok(out.stdout)
 }
@@ -433,7 +557,9 @@ async fn tar_dir(dir: &Path) -> Result<Vec<u8>, String> {
 /// `extensionKind` rules: anything that is not UI-only).
 pub fn runs_on_workspace(manifest: &serde_json::Value) -> bool {
     match manifest.get("extensionKind") {
-        Some(serde_json::Value::Array(kinds)) => kinds.iter().any(|k| k.as_str() == Some("workspace")),
+        Some(serde_json::Value::Array(kinds)) => {
+            kinds.iter().any(|k| k.as_str() == Some("workspace"))
+        }
         Some(serde_json::Value::String(k)) => k == "workspace",
         _ => manifest.get("main").is_some(),
     }
@@ -446,7 +572,9 @@ pub fn read_manifest(ext_dir: &Path) -> Option<serde_json::Value> {
 
 /// `Host` aliases from `~/.ssh/config` (wildcards excluded).
 pub fn ssh_config_hosts() -> Vec<String> {
-    let Some(home) = dirs_home() else { return vec![] };
+    let Some(home) = dirs_home() else {
+        return vec![];
+    };
     let Ok(text) = std::fs::read_to_string(home.join(".ssh").join("config")) else {
         return vec![];
     };
@@ -593,7 +721,12 @@ pub async fn devcontainer_up(workspace: &str) -> Result<DevcontainerUp, String> 
         .lines()
         .rev()
         .find_map(|l| serde_json::from_str(l.trim()).ok())
-        .ok_or_else(|| format!("devcontainer up failed: {}", String::from_utf8_lossy(&out.stderr).trim()))?;
+        .ok_or_else(|| {
+            format!(
+                "devcontainer up failed: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            )
+        })?;
     if result.get("outcome").and_then(|v| v.as_str()) != Some("success") {
         return Err(format!("devcontainer up failed: {result}"));
     }
@@ -613,7 +746,10 @@ pub fn devcontainer_extensions(workspace: &Path) -> Vec<String> {
         workspace.join(".devcontainer").join("devcontainer.json"),
         workspace.join(".devcontainer.json"),
     ];
-    let Some(text) = candidates.iter().find_map(|p| std::fs::read_to_string(p).ok()) else {
+    let Some(text) = candidates
+        .iter()
+        .find_map(|p| std::fs::read_to_string(p).ok())
+    else {
         return vec![];
     };
     let cleaned: String = text
@@ -626,7 +762,11 @@ pub fn devcontainer_extensions(workspace: &Path) -> Vec<String> {
     };
     v.pointer("/customizations/vscode/extensions")
         .and_then(|e| e.as_array())
-        .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(str::to_string))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -647,8 +787,14 @@ mod tests {
 
     #[test]
     fn extension_kind_rules() {
-        assert!(!runs_on_workspace(&serde_json::json!({"extensionKind": ["ui"]})));
-        assert!(runs_on_workspace(&serde_json::json!({"extensionKind": ["ui", "workspace"]})));
-        assert!(runs_on_workspace(&serde_json::json!({"main": "./out/ext.js"})));
+        assert!(!runs_on_workspace(
+            &serde_json::json!({"extensionKind": ["ui"]})
+        ));
+        assert!(runs_on_workspace(
+            &serde_json::json!({"extensionKind": ["ui", "workspace"]})
+        ));
+        assert!(runs_on_workspace(
+            &serde_json::json!({"main": "./out/ext.js"})
+        ));
     }
 }

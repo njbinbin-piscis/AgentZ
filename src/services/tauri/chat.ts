@@ -27,7 +27,7 @@ export type AgentEvent =
   | { type: "text_delta"; delta: string }
   | { type: "tool_start"; id: string; name: string; input: unknown }
   | { type: "tool_end"; id: string; name: string; result: string; is_error: boolean }
-  | { type: "permission_request"; request_id: string; tool_name: string; tool_input: unknown; description: string }
+  | { type: "permission_request"; request_id: string; tool_name: string; tool_input: unknown; description: string; approval?: { digest: string; taskId: string; environmentId: string; expiresMs: number } }
   | { type: "plan_update"; items: PlanTodoItem[] }
   | {
       type: "context_usage";
@@ -87,19 +87,38 @@ export type ChatMode = "agent" | "plan";
 export const SESSION_SOURCE_CODEZ = "codez";
 export const SESSION_SOURCE_WORKZ = "workz";
 export const SESSION_SOURCE_WORKZ_TEAM = "workz-team";
+/**
+ * Sessions listed for one project in both CodeZ and WorkZ (same project database).
+ * Team sessions are listed too, but are read-only outside WorkZ (enforced by the backend).
+ */
+export const SESSION_SOURCES_PROJECT_SHARED: string[] = [
+  SESSION_SOURCE_CODEZ,
+  SESSION_SOURCE_WORKZ,
+  SESSION_SOURCE_WORKZ_TEAM,
+];
+/** Team sessions cannot be continued from CodeZ. */
+export function isReadOnlyInCodeZ(source: string | null | undefined): boolean {
+  return source === SESSION_SOURCE_WORKZ_TEAM;
+}
 
 /** Start one agent turn. Resolves with the final assistant text. */
 export function chatSend(args: {
   prompt: string;
   /** User-visible text stored in session history (defaults to prompt). */
   displayPrompt?: string | null;
+  /** Host re-resolves this immutable text version under the current task binding at send time. */
+  artifactRef?: { artifact_id: string; version: number; payload_sha256: string; expected_binding: import("./chatPlan").DurablePlanBinding } | null;
+  artifactScopeHandle?: string | null;
   sessionId?: string | null;
   projectDir: string;
   /** Isolated worktree the agent should work in (M4). Sessions stay in projectDir. */
   workspaceDir?: string | null;
+  /** Refuse an isolated task without a durable environment binding. */
+  requireTaskEnvironment?: boolean;
   attachment?: ChatAttachment | null;
   chatMode?: ChatMode;
   modelId?: string | null;
+  /** Legacy field. Only false is supported; replacement requires an explicit host API. */
   clearPlan?: boolean;
   /** Unique key for a parallel Agent task so it can be cancelled on its own (M7). */
   taskKey?: string | null;
@@ -118,17 +137,23 @@ export function chatSend(args: {
   /** Prefer Chinese prompt/description when available. */
   preferZh?: boolean | null;
 }): Promise<ChatResult> {
+  if (args.clearPlan === true) {
+    return Promise.reject(new Error("clearPlan=true is deprecated; ordinary continuation preserves the plan. Explicit goal replacement is not supported by this field."));
+  }
   return invoke<ChatResult>("chat_send", {
     prompt: args.prompt,
     displayPrompt: args.displayPrompt ?? null,
+    artifactRef: args.artifactRef ?? null,
+    artifactScopeHandle: args.artifactScopeHandle ?? null,
     sessionId: args.sessionId ?? null,
     workspace: args.projectDir,
     projectDir: args.projectDir,
     workspaceDir: args.workspaceDir ?? null,
+    requireTaskEnvironment: args.requireTaskEnvironment ?? false,
     attachment: args.attachment ?? null,
     chatMode: args.chatMode ?? "agent",
     modelId: args.modelId ?? null,
-    clearPlan: args.clearPlan ?? true,
+    clearPlan: false,
     taskKey: args.taskKey ?? null,
     enabledSkills: args.enabledSkills ?? null,
     enabledConnectors: args.enabledConnectors ?? null,

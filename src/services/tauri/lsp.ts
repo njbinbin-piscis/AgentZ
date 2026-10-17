@@ -166,7 +166,22 @@ interface Pending {
  * correlates responses via numeric request ids. Tracks open documents and
  * diagnostics per URI so one client can serve several files.
  */
+export type LspHealth = "idle" | "connecting" | "ready" | "recovering" | "unavailable";
 export class LspClient {
+  private health: LspHealth = "idle";
+  private healthListeners = new Set<(health: LspHealth) => void>();
+  subscribeHealth(listener: (health: LspHealth) => void): () => void {
+    this.healthListeners.add(listener);
+    listener(this.health);
+    return () => this.healthListeners.delete(listener);
+  }
+  setRecoveryHealth(health: "recovering" | "unavailable") {
+    this.updateHealth(health);
+  }
+  private updateHealth(health: LspHealth) {
+    this.health = health;
+    this.healthListeners.forEach((listener) => listener(health));
+  }
   private ws: WebSocket | null = null;
   private nextId = 1;
   private pending = new Map<number, Pending>();
@@ -175,19 +190,37 @@ export class LspClient {
   private diagnosticsListeners = new Map<string, Set<(d: LspDiagnostic[]) => void>>();
   private docVersions = new Map<string, number>();
   private connectPromise: Promise<void> | null = null;
+  private documents = new Map<string, { filePath: string; languageId: string; text: string }>();
 
-  constructor(port: number) {
+  constructor(port: number, private onDisconnected?: () => void) {
     this.url = `ws://127.0.0.1:${port}`;
+  }
+  /** Reuse provider subscriptions after the host creates a fresh bridge port. */
+  async reconnect(port: number, projectDir: string, language: string): Promise<void> {
+    this.url = `ws://127.0.0.1:${port}`;
+    await this.connect(projectDir, language);
   }
 
   /** Connect to the bridge and perform the LSP handshake. */
   async connect(projectDir: string, language: string): Promise<void> {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
     if (this.connectPromise) return this.connectPromise;
+    if (this.health !== "recovering") this.updateHealth("connecting");
 
     this.connectPromise = new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(this.url);
       this.ws = ws;
+      const failConnection = (error: Error) => {
+        if (this.ws === ws) {
+          this.ws = null;
+          this.connectPromise = null;
+          this.rejectAllPending(error);
+          this.updateHealth("unavailable");
+          try { ws.close(); } catch { /* Already closed. */ }
+          this.onDisconnected?.();
+        }
+        reject(error);
+      };
 
       ws.onopen = async () => {
         try {
@@ -219,31 +252,46 @@ export class LspClient {
           );
 
           this.send({ jsonrpc: "2.0", method: "initialized", params: {} });
+          if (this.ws !== ws) throw new Error("LSP connection superseded");
+          for (const document of this.documents.values()) {
+            this.openDocument(document.filePath, document.languageId, document.text);
+          }
+          this.updateHealth("ready");
 
           if (import.meta.env.DEV) {
             console.log(`[LSP] Connected to ${this.url} for ${language}`);
           }
           resolve();
         } catch (err) {
-          reject(err instanceof Error ? err : new Error(String(err)));
+          failConnection(err instanceof Error ? err : new Error(String(err)));
         }
       };
 
       ws.onmessage = (evt) => {
+        if (this.ws !== ws) return;
         this.handleMessage(evt.data as string);
       };
 
       ws.onerror = () => {
+        if (this.ws !== ws) return;
         console.error("[LSP] WebSocket error");
-        reject(new Error("WebSocket connection failed"));
+        failConnection(new Error("WebSocket connection failed"));
       };
 
       ws.onclose = () => {
+        if (this.ws !== ws) return;
         if (import.meta.env.DEV) console.log("[LSP] WebSocket closed");
         this.ws = null;
         this.connectPromise = null;
+        this.updateHealth("unavailable");
         // Fail anything still waiting so callers never hang.
         this.rejectAllPending(new Error("LSP disconnected"));
+        this.diagnosticsByUri.clear();
+        this.diagnosticsListeners.forEach((listeners) =>
+          listeners.forEach((listener) => listener([])),
+        );
+        reject(new Error("LSP disconnected before handshake completed"));
+        this.onDisconnected?.();
       };
     });
 
@@ -253,6 +301,7 @@ export class LspClient {
   /** Notify the server that a document was opened (resets its version to 1). */
   openDocument(filePath: string, languageId: string, content: string) {
     const uri = fileUriString(filePath);
+    this.documents.set(uri, { filePath, languageId, text: content });
     this.docVersions.set(uri, 1);
     this.send({
       jsonrpc: "2.0",
@@ -266,6 +315,7 @@ export class LspClient {
   /** Notify the server that a document was closed. */
   closeDocument(filePath: string) {
     const uri = fileUriString(filePath);
+    this.documents.delete(uri);
     this.docVersions.delete(uri);
     this.diagnosticsByUri.delete(uri);
     this.send({
@@ -279,6 +329,10 @@ export class LspClient {
    * increasing per-document version (required by the LSP spec). */
   sendDidChange(filePath: string, content: string) {
     const uri = fileUriString(filePath);
+    const document = this.documents.get(uri);
+    if (document) document.text = content;
+    this.diagnosticsByUri.delete(uri);
+    this.diagnosticsListeners.get(uri)?.forEach((listener) => listener([]));
     const version = (this.docVersions.get(uri) ?? 1) + 1;
     this.docVersions.set(uri, version);
     this.send({
@@ -294,6 +348,8 @@ export class LspClient {
   /** Request diagnostics for a file (pull model, falling back to cached push). */
   async requestDiagnostics(filePath: string): Promise<LspDiagnostic[]> {
     const uri = fileUriString(filePath);
+    const socket = this.ws;
+    const version = this.docVersions.get(uri);
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         const result = await this.sendRequest(
@@ -302,11 +358,13 @@ export class LspClient {
           { label: "diagnostic", timeoutMs: 3000 },
         );
         const items = (result as { items?: LspDiagnostic[] } | null)?.items;
+        if (this.ws !== socket || this.docVersions.get(uri) !== version) return [];
         if (items) return items;
       } catch {
         // Server may not implement pull diagnostics — fall back to cache.
       }
     }
+    if (this.ws !== socket || this.docVersions.get(uri) !== version) return [];
     return this.diagnosticsByUri.get(uri) ?? [];
   }
 
@@ -410,6 +468,8 @@ export class LspClient {
 
   /** Disconnect and clean up. Fails any in-flight requests. */
   disconnect() {
+    this.onDisconnected = undefined;
+    this.documents.clear();
     this.rejectAllPending(new Error("LSP disconnected"));
     this.docVersions.clear();
     this.diagnosticsByUri.clear();
@@ -423,6 +483,8 @@ export class LspClient {
       this.ws = null;
     }
     this.connectPromise = null;
+    this.updateHealth("idle");
+    this.healthListeners.clear();
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────
@@ -552,9 +614,11 @@ export class LspClient {
     // Pushed diagnostics — route to the matching URI only.
     if (msg.method === "textDocument/publishDiagnostics") {
       const params = msg.params as
-        | { uri: string; diagnostics: LspDiagnostic[] }
+        | { uri: string; version?: number; diagnostics: LspDiagnostic[] }
         | undefined;
       if (params?.uri) {
+        const currentVersion = this.docVersions.get(params.uri);
+        if (params.version !== undefined && currentVersion !== undefined && params.version !== currentVersion) return;
         this.diagnosticsByUri.set(params.uri, params.diagnostics ?? []);
         this.diagnosticsListeners
           .get(params.uri)

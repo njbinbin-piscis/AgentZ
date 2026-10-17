@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-062",
+    "verified_state": "local_trend_gate_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "Local trend and versioned synthetic-kernel gate exist; summary validation now also rejects unsafe integer sample counts and intervention/fault counts above attempted samples.",
+    "conclusion_proposal": "Keep pending until the lifecycle harness and actual target-scope measurements support a quality decision.",
+    "next_action": "Wire the gate to the stable lifecycle harness, collect repeated actual desktop/model summaries, then perform unified review.",
+    "remaining_work": ["Stable lifecycle harness dependency AZ-056", "Repeated actual target-scope measurements", "Unified acceptance review"],
+    "verification_gaps": ["Only synthetic-kernel baseline gate exercised", "No desktop or live model trend"],
+    "evidence": ["docs/upgrade/evidence/implementation-batch-2026-10-14/implementation.md"]
+  }
+]

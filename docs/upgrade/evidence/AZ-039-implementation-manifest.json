@@ -1,0 +1,33 @@
+{
+  "captured_at": "2026-10-09T23:03:38.756Z",
+  "files": [
+    {
+      "path": "src/workspaces/codez/DeliverySummary.tsx",
+      "sha256": "504f8776ef6ccc20c18b7d6dd84c0f263f299452336cafbb236d1c05b6cbb4df"
+    },
+    {
+      "path": "src/workspaces/codez/DeliverySummary.test.tsx",
+      "sha256": "f06f3adec81df0e7e2eb851b1b0420752365c10084e3252db59ca0b8f3b6776c"
+    },
+    {
+      "path": "src/workspaces/codez/DeliveryReviewPanel.tsx",
+      "sha256": "237c6d2c2310fda3379729fc29acbbbf3f401b2294cceb5d37949ab6c8681458"
+    },
+    {
+      "path": "src/workspaces/codez/DeliveryReviewPanel.test.tsx",
+      "sha256": "cd5d1f9a732a9e10909e1c6c33ceb123d81f4ce8a67d530be59414e3040b87f0"
+    },
+    {
+      "path": "src/workspaces/codez/DeliveryReviewPanel.integration.test.tsx",
+      "sha256": "4f8e21d75dad6a132f38e0152941476de649f16e2ae15c3f2f0caad9f3bc0c5c"
+    },
+    {
+      "path": "src/workspaces/workz/index.tsx",
+      "sha256": "472d401fd2bf8b543162f2ffe30a00b4e7aab145fd94a81a224d9b68a20cb866"
+    },
+    {
+      "path": "src/workspaces/codez/AssistantPanel.tsx",
+      "sha256": "ab469eb32e479f537b7819a2e95311821398f091c6243a8393a2dfc755874673"
+    }
+  ]
+}

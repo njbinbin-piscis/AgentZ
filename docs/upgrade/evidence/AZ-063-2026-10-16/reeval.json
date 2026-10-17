@@ -1,0 +1,23 @@
+[
+  {
+    "id": "AZ-063",
+    "verified_state": "offline_encrypted_backup_preview_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "A versioned inventory and encrypted offline bundle candidate now cover explicit global config and project .agentz roots. Synthetic Windows fixtures passed for inventory, encrypted create/verify/restore-preview and failure cases, including rejection of an authenticated case-colliding manifest and unlisted bundle object before preview publication. The bundle requires an operator quiescence assertion and restores only to a new review directory. Live SQLite snapshot consistency, in-place recovery and credential/task binding remain unverified.",
+    "conclusion_proposal": "Keep pending until protected versioned backup/restore and historical migration fixtures are accepted.",
+    "next_action": "Integrate enforced writer quiescence and coherent SQLite snapshot capture, then implement guarded atomic in-place recovery with original preservation and credential/task binding validation using historical fixtures.",
+    "remaining_work": [
+      "Enforced writer quiescence and coherent live SQLite snapshot of config/key and project state",
+      "Atomic restore with original preservation and identity binding validation",
+      "At least two historical-version migration/corruption fixtures",
+      "Native recovery and rollback acceptance"
+    ],
+    "verification_gaps": [
+      "Encrypted bundle creation depends on an operator quiescence assertion and does not guarantee a coherent live SQLite snapshot",
+      "Only synthetic layout and restore-preview were exercised; no real user data or in-place recovery was tested"
+    ],
+    "evidence": [
+      "docs/upgrade/evidence/AZ-063-2026-10-16/implementation.md"
+    ]
+  }
+]

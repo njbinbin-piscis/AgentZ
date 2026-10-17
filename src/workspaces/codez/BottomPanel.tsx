@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useId, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import DropdownSelect from "../../components/DropdownSelect";
 import TerminalPanel from "./Terminal";
+import { tabNavigationTarget } from "./tabNavigation";
 import { useExtensionUi } from "../../extensions/ui/useExtensionUi";
 import { extensionService } from "../../extensions/extensionService";
 import { extensionUiStore } from "../../extensions/extensionUiStore";
@@ -57,6 +58,8 @@ export default function BottomPanel({
 }: BottomPanelProps) {
   const { t } = useTranslation();
   const ui = useExtensionUi();
+  const panelId = useId();
+  const tabButtons = useRef(new Map<string, HTMLButtonElement>());
 
   const scmCount = ui.scm.reduce((n, p) => n + p.groups.reduce((g, gr) => g + gr.resources.length, 0), 0);
 
@@ -80,10 +83,25 @@ export default function BottomPanel({
 
   return (
     <div className={`ide-bottom-panel${open ? "" : " is-hidden"}`} style={open ? { height } : undefined} aria-hidden={!open}>
-      <div className="ide-bottom-tabs">
+      <div className="ide-bottom-tabs" role="tablist" aria-label={t("ide.terminal")}>
         {tabs.map((tb) => (
           <button
             key={tb.id}
+            type="button"
+            role="tab"
+            id={`${panelId}-tab-${tb.id}`}
+            aria-selected={current === tb.id}
+            aria-controls={`${panelId}-pane`}
+            tabIndex={current === tb.id ? 0 : -1}
+            ref={node => { if (node) tabButtons.current.set(tb.id, node); else tabButtons.current.delete(tb.id); }}
+            onKeyDown={event => {
+              if (event.altKey || event.ctrlKey || event.metaKey) return;
+              const target = tabNavigationTarget(tabs.map(tab => tab.id), tb.id, event.key) as BottomTab | null;
+              if (!target) return;
+              event.preventDefault();
+              onTabChange(target);
+              tabButtons.current.get(target)?.focus();
+            }}
             className={`ide-bottom-tab${current === tb.id ? " active" : ""}`}
             onClick={() => onTabChange(tb.id)}
           >
@@ -92,12 +110,12 @@ export default function BottomPanel({
           </button>
         ))}
         <div className="ide-bottom-tabs-spacer" />
-        <button className="ide-bottom-close" onClick={onClose} title={t("ide.terminalHidePanel") || "Hide panel"}>
+        <button className="ide-bottom-close" onClick={onClose} title={t("ide.terminalHidePanel") || "Hide panel"} aria-label={t("ide.terminalHidePanel") || "Hide panel"}>
           ✕
         </button>
       </div>
 
-      <div className="ide-bottom-body">
+      <div className="ide-bottom-body" role="tabpanel" id={`${panelId}-pane`} aria-labelledby={`${panelId}-tab-${current}`} tabIndex={0}>
         {/* Terminal stays mounted to preserve PTY sessions; just hidden. */}
         <div className="ide-bottom-pane" style={{ display: current === "terminal" ? "flex" : "none" }}>
           <TerminalPanel

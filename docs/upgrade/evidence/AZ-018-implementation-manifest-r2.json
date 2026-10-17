@@ -1,0 +1,46 @@
+{
+  "task": "AZ-018",
+  "generated": "2026-10-11T13:55:09.643Z",
+  "files": [
+    {
+      "path": "crates/agentz-task-state/src/events.rs",
+      "sha256": "7fcfa29dc35ab483caa641d86a6b702de09b155fcebd01b6c68f4e7db7c5fe98"
+    },
+    {
+      "path": "crates/agentz-task-state/src/run.rs",
+      "sha256": "ea4b9f4e701e2d623c690d6356a43cb9d0c9b20d6a0daa9c9b91a3ae936c01d6"
+    },
+    {
+      "path": "crates/agentz-task-state/src/lib.rs",
+      "sha256": "ba73a74324b07960b853780e797af76d34929047c03f9008505385e0fb2acc73"
+    },
+    {
+      "path": "src-tauri/src/runtime/event_replay.rs",
+      "sha256": "706f3c6944751fd07508fa787c6f133b50c91ae5423667facbebeb6f16889219"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_stream.rs",
+      "sha256": "07299c200f118046f39e3b22a0844479f854f58f8ee89e180b5c41cb4b8f362c"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_events.rs",
+      "sha256": "c86837f4a6fbf45cc7ff7e632b01973e924f24feaa409f4215a66b1f3102c9a6"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_turn.rs",
+      "sha256": "b6a9d13b7093af4645c3e7e049f3e4e9fd82e52784c7198381aae656d09a5851"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_plan.rs",
+      "sha256": "2392747b2def2b915e115159629cda076b8865ee62abcc90271a62cc5348f4a5"
+    },
+    {
+      "path": "src-tauri/src/commands/session_metadata.rs",
+      "sha256": "1d9adfbdc8263e12a37f1a58fa767e008b28a3f884cec200243c39de23e192c6"
+    },
+    {
+      "path": "src-tauri/src/runtime/project_scope.rs",
+      "sha256": "3bbf91b8af83010753cc720c8b61a8dd252465dcb49ec4842237c4de1394cba0"
+    }
+  ]
+}

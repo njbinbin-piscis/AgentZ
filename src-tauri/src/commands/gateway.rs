@@ -122,23 +122,46 @@ fn im_to_dto(s: &Settings) -> ImSettingsDto {
         dingtalk_enabled: s.dingtalk_enabled,
         telegram_bot_token: mask(&s.telegram_bot_token),
         telegram_enabled: s.telegram_enabled,
-        slack_webhook_url: s.slack_webhook_url.clone(),
+        slack_webhook_url: mask(&s.slack_webhook_url),
         slack_enabled: s.slack_enabled,
-        discord_webhook_url: s.discord_webhook_url.clone(),
+        discord_webhook_url: mask(&s.discord_webhook_url),
         discord_enabled: s.discord_enabled,
-        teams_webhook_url: s.teams_webhook_url.clone(),
+        teams_webhook_url: mask(&s.teams_webhook_url),
         teams_enabled: s.teams_enabled,
         matrix_homeserver: s.matrix_homeserver.clone(),
         matrix_access_token: mask(&s.matrix_access_token),
         matrix_room_id: s.matrix_room_id.clone(),
         matrix_enabled: s.matrix_enabled,
-        webhook_outbound_url: s.webhook_outbound_url.clone(),
+        webhook_outbound_url: mask(&s.webhook_outbound_url),
         webhook_auth_token: mask(&s.webhook_auth_token),
         webhook_enabled: s.webhook_enabled,
         wechat_enabled: s.wechat_enabled,
         wechat_gateway_port: s.wechat_gateway_port,
         wechat_bot_id: s.wechat_bot_id.clone(),
         im_message_mode: s.im_message_mode.clone(),
+    }
+}
+
+#[cfg(test)]
+mod im_settings_dto_tests {
+    use super::*;
+
+    #[test]
+    fn webhook_urls_are_masked_in_settings_response() {
+        let mut settings = Settings::default();
+        settings.slack_webhook_url = "https://example.test/slack/secret-marker".into();
+        settings.discord_webhook_url = "https://example.test/discord/secret-marker".into();
+        settings.teams_webhook_url = "https://example.test/teams/secret-marker".into();
+        settings.webhook_outbound_url = "https://example.test/outbound/secret-marker".into();
+        let dto = im_to_dto(&settings);
+        for value in [
+            dto.slack_webhook_url,
+            dto.discord_webhook_url,
+            dto.teams_webhook_url,
+            dto.webhook_outbound_url,
+        ] {
+            assert_eq!(value, "••••••••");
+        }
     }
 }
 
@@ -186,11 +209,11 @@ pub async fn save_im_settings(
     s.telegram_bot_token = keep_secret(&updates.telegram_bot_token, &s.telegram_bot_token);
     s.telegram_enabled = updates.telegram_enabled;
 
-    s.slack_webhook_url = updates.slack_webhook_url;
+    s.slack_webhook_url = keep_secret(&updates.slack_webhook_url, &s.slack_webhook_url);
     s.slack_enabled = updates.slack_enabled;
-    s.discord_webhook_url = updates.discord_webhook_url;
+    s.discord_webhook_url = keep_secret(&updates.discord_webhook_url, &s.discord_webhook_url);
     s.discord_enabled = updates.discord_enabled;
-    s.teams_webhook_url = updates.teams_webhook_url;
+    s.teams_webhook_url = keep_secret(&updates.teams_webhook_url, &s.teams_webhook_url);
     s.teams_enabled = updates.teams_enabled;
 
     s.matrix_homeserver = updates.matrix_homeserver;
@@ -198,7 +221,7 @@ pub async fn save_im_settings(
     s.matrix_room_id = updates.matrix_room_id;
     s.matrix_enabled = updates.matrix_enabled;
 
-    s.webhook_outbound_url = updates.webhook_outbound_url;
+    s.webhook_outbound_url = keep_secret(&updates.webhook_outbound_url, &s.webhook_outbound_url);
     s.webhook_auth_token = keep_secret(&updates.webhook_auth_token, &s.webhook_auth_token);
     s.webhook_enabled = updates.webhook_enabled;
 
@@ -387,14 +410,10 @@ pub async fn start_wechat_login() -> Result<WechatLoginStatus, String> {
         .header("iLink-App-ClientVersion", "1")
         .send()
         .await
-        .map_err(|e| format!("Network error fetching QR code: {}", e))?;
+        .map_err(|_| "Network error fetching QR code".to_string())?;
 
     if !resp.status().is_success() {
-        return Err(format!(
-            "iLink API returned HTTP {}: {}",
-            resp.status(),
-            resp.text().await.unwrap_or_default()
-        ));
+        return Err(format!("iLink API returned HTTP {}", resp.status()));
     }
 
     let body: Value = resp
@@ -440,7 +459,7 @@ pub async fn poll_wechat_login(
         .timeout(std::time::Duration::from_secs(38))
         .send()
         .await
-        .map_err(|e| format!("Network error polling QR status: {}", e))?;
+        .map_err(|_| "Network error polling QR status".to_string())?;
 
     if !resp.status().is_success() {
         return Err(format!("iLink status API returned HTTP {}", resp.status()));
@@ -449,7 +468,7 @@ pub async fn poll_wechat_login(
     let body: Value = resp
         .json()
         .await
-        .map_err(|e| format!("Failed to parse status response: {}", e))?;
+        .map_err(|_| "Failed to parse status response".to_string())?;
 
     let status = body["status"].as_str().unwrap_or("wait");
 
@@ -683,6 +702,7 @@ async fn handle_inbound(
         crate::commands::chat_turn::materialize_headless_llm_settings(&mut s, &app, None);
     }
 
+    crate::runtime::approval::restrict_unapproved_background(&mut registry);
     let deps = HeadlessDeps::new(db.clone(), settings.clone(), registry, sink.clone());
     let turn_ok = match run_piscis_turn(request, deps).await {
         Ok(resp) => {
@@ -713,7 +733,18 @@ async fn handle_inbound(
             let sid = session_id.clone();
             tokio::spawn(async move {
                 crate::commands::post_turn::run_post_turn_hooks(
-                    &app_bg, db_bg, sid, msgs, provider, api_key, base_url, model, max_tokens,
+                    &app_bg,
+                    db_bg,
+                    sid,
+                    msgs,
+                    provider,
+                    api_key,
+                    base_url,
+                    model,
+                    max_tokens,
+                    // IM turns are not bound to a task; their post-turn calls stay outside the
+                    // task budget (explicit residual in AZ-024).
+                    crate::runtime::task_budget::BudgetScope::default(),
                 )
                 .await;
             });

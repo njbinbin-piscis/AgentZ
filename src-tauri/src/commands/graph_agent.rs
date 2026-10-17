@@ -34,7 +34,6 @@ pub struct GraphValidation {
     pub warnings: Vec<String>,
 }
 
-
 fn module_node_id(name: &str) -> String {
     format!("module:{name}")
 }
@@ -66,9 +65,10 @@ pub fn validate_graph(doc: &GraphDoc) -> GraphValidation {
         .iter()
         .filter(|m| {
             m.in_degree == 0
-                && !doc.edges.iter().any(|e| {
-                    e.kind == "depends" && e.from == module_node_id(&m.name)
-                })
+                && !doc
+                    .edges
+                    .iter()
+                    .any(|e| e.kind == "depends" && e.from == module_node_id(&m.name))
         })
         .map(|m| m.name.clone())
         .take(5)
@@ -115,7 +115,9 @@ fn module_dependencies(doc: &GraphDoc) -> BTreeMap<String, Vec<String>> {
             continue;
         };
         if from != to {
-            deps.entry(from.to_string()).or_default().insert(to.to_string());
+            deps.entry(from.to_string())
+                .or_default()
+                .insert(to.to_string());
         }
     }
     deps.into_iter()
@@ -148,7 +150,10 @@ pub fn build_domain_doc(doc: &GraphDoc) -> DomainDoc {
     let mut grouped: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for m in &doc.modules {
         let domain = infer_domain(&m.name);
-        grouped.entry(domain.to_string()).or_default().push(m.name.clone());
+        grouped
+            .entry(domain.to_string())
+            .or_default()
+            .push(m.name.clone());
     }
     let domains: Vec<DomainEntry> = grouped
         .into_iter()
@@ -228,7 +233,12 @@ Legacy **`graph_search`** remains for module ids. Mention **`@graph <topic>`** i
         let dep_str = if dep_list.is_empty() {
             "—".into()
         } else {
-            dep_list.iter().take(6).cloned().collect::<Vec<_>>().join(", ")
+            dep_list
+                .iter()
+                .take(6)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
         };
         md.push_str(&format!(
             "- **`{}/`** — {} files, in-degree {} → depends on: {dep_str}\n",
@@ -292,7 +302,9 @@ Legacy **`graph_search`** remains for module ids. Mention **`@graph <topic>`** i
 
     md.push_str("## Coding playbook\n\n");
     md.push_str("| Goal | First steps |\n|------|-------------|\n");
-    md.push_str("| Find where X is implemented | `codebase_search(\"X\")` then `graph_search(\"X\")` |\n");
+    md.push_str(
+        "| Find where X is implemented | `codebase_search(\"X\")` then `graph_search(\"X\")` |\n",
+    );
     md.push_str("| Understand module boundaries | Read this brief → `file_read` hub files |\n");
     md.push_str("| Assess change impact | `graph_search` importers of target file/module |\n");
     md.push_str("| Add a new feature | Follow tour order; match layer of similar code |\n");
@@ -300,7 +312,9 @@ Legacy **`graph_search`** remains for module ids. Mention **`@graph <topic>`** i
 
     if md.len() > MAX_BRIEF_CHARS {
         md.truncate(MAX_BRIEF_CHARS);
-        md.push_str("\n\n… [truncated — use `file_read .agentz/AGENT_CODING_BRIEF.md` for full brief]\n");
+        md.push_str(
+            "\n\n… [truncated — use `file_read .agentz/AGENT_CODING_BRIEF.md` for full brief]\n",
+        );
     }
     md
 }
@@ -312,8 +326,10 @@ pub fn write_agent_artifacts(root: &Path, doc: &GraphDoc) -> Result<(), String> 
     std::fs::write(root.join(CODING_BRIEF_PATH), &brief)
         .map_err(|e| format!("write coding brief: {e}"))?;
     let domain = build_domain_doc(doc);
-    let domain_json = serde_json::to_string_pretty(&domain).map_err(|e| format!("serialize domain: {e}"))?;
-    std::fs::write(root.join(DOMAIN_PATH), domain_json).map_err(|e| format!("write domain: {e}"))?;
+    let domain_json =
+        serde_json::to_string_pretty(&domain).map_err(|e| format!("serialize domain: {e}"))?;
+    std::fs::write(root.join(DOMAIN_PATH), domain_json)
+        .map_err(|e| format!("write domain: {e}"))?;
     Ok(())
 }
 
@@ -365,9 +381,8 @@ fn collect_related_edges(doc: &GraphDoc, seed_ids: &BTreeSet<String>) -> Vec<Gra
 
 /// Search graph and format as agent-readable text (tool + @graph mention).
 pub fn search_graph(root: &Path, query: &str, limit: usize) -> Result<String, String> {
-    let doc = load_graph(root).ok_or(
-        "graph.json not found — run Wiki → Rebuild graph first".to_string(),
-    )?;
+    let doc = load_graph(root)
+        .ok_or("graph.json not found — run Wiki → Rebuild graph first".to_string())?;
     let q = query.trim();
     let limit = limit.clamp(1, 30);
 
@@ -379,7 +394,10 @@ pub fn search_graph(root: &Path, query: &str, limit: usize) -> Result<String, St
             doc.modules
                 .iter()
                 .take(limit)
-                .map(|m| format!("- {}/ ({} files, in-degree {})", m.name, m.file_count, m.in_degree))
+                .map(|m| format!(
+                    "- {}/ ({} files, in-degree {})",
+                    m.name, m.file_count, m.in_degree
+                ))
                 .collect::<Vec<_>>()
                 .join("\n")
         ));
@@ -400,11 +418,7 @@ pub fn search_graph(root: &Path, query: &str, limit: usize) -> Result<String, St
             .filter(|m| m.name.to_lowercase().contains(&q.to_lowercase()))
             .take(limit)
         {
-            if let Some(n) = doc
-                .nodes
-                .iter()
-                .find(|n| n.id == module_node_id(&m.name))
-            {
+            if let Some(n) = doc.nodes.iter().find(|n| n.id == module_node_id(&m.name)) {
                 matched.push(n.clone());
             } else {
                 matched.push(GraphNode {
@@ -489,23 +503,24 @@ pub fn parse_deep_wiki_module_summaries(content: &str) -> BTreeMap<String, Strin
     let mut current_title: Option<String> = None;
     let mut paragraph = String::new();
 
-    let flush = |title: &mut Option<String>, para: &mut String, map: &mut BTreeMap<String, String>| {
-        let Some(t) = title.take() else {
+    let flush =
+        |title: &mut Option<String>, para: &mut String, map: &mut BTreeMap<String, String>| {
+            let Some(t) = title.take() else {
+                para.clear();
+                return;
+            };
+            let summary: String = para
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with("```"))
+                .take(4)
+                .collect::<Vec<_>>()
+                .join(" ");
+            if summary.len() >= 20 {
+                map.insert(normalize_module_title(&t), summary);
+            }
             para.clear();
-            return;
         };
-        let summary: String = para
-            .lines()
-            .map(str::trim)
-            .filter(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with("```"))
-            .take(4)
-            .collect::<Vec<_>>()
-            .join(" ");
-        if summary.len() >= 20 {
-            map.insert(normalize_module_title(&t), summary);
-        }
-        para.clear();
-    };
 
     for line in content.lines() {
         if line.starts_with("### ") {
@@ -597,7 +612,12 @@ pub fn domain_context_excerpt(root: &Path, max_domains: usize) -> Option<String>
             d.name,
             d.modules.len(),
             d.hint,
-            d.modules.iter().take(5).cloned().collect::<Vec<_>>().join(", ")
+            d.modules
+                .iter()
+                .take(5)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
         ));
     }
     Some(lines.join("\n"))
@@ -609,9 +629,8 @@ pub fn graph_validate(project_dir: String) -> Result<GraphValidation, String> {
     if project_dir.trim().is_empty() {
         return Err("project_dir is empty".into());
     }
-    let doc = load_graph(root).ok_or(
-        "graph.json not found — run Wiki → Rebuild graph first".to_string(),
-    )?;
+    let doc = load_graph(root)
+        .ok_or("graph.json not found — run Wiki → Rebuild graph first".to_string())?;
     Ok(validate_graph(&doc))
 }
 
@@ -685,10 +704,7 @@ Rust 后端，提供 Tauri 命令与 Agent 运行时。
 
     #[test]
     fn merge_deep_wiki_applies_to_module_nodes() {
-        let dir = std::env::temp_dir().join(format!(
-            "agentz-graph-test-{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("agentz-graph-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join(".agentz")).unwrap();
         std::fs::write(
@@ -699,16 +715,16 @@ Rust 后端，提供 Tauri 命令与 Agent 运行时。
         let mut doc = sample_doc();
         let n = merge_deep_wiki_summaries(&mut doc, &dir);
         assert_eq!(n, 1);
-        assert!(doc.nodes.iter().any(|node| node.name == "src" && !node.summary.is_empty()));
+        assert!(doc
+            .nodes
+            .iter()
+            .any(|node| node.name == "src" && !node.summary.is_empty()));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn search_graph_finds_module() {
-        let dir = std::env::temp_dir().join(format!(
-            "agentz-graph-search-{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("agentz-graph-search-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join(".agentz")).unwrap();
         let doc = sample_doc();

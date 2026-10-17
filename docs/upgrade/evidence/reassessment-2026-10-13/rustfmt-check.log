@@ -1,0 +1,1036 @@
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-host\tests\tool_recovery_windows.rs:73:
+                 thread::sleep(Duration::from_millis(200));
+             }
+         });
+-        Self { done, max_seen, handle }
++        Self {
++            done,
++            max_seen,
++            handle,
++        }
+     }
+ 
+     fn finish(self) -> bool {
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-host\tests\tool_recovery_windows.rs:124:
+ 
+     let started = Instant::now();
+     let result = ShellTool
+-        .call(json!({"command": long_tree(count), "interpreter": "cmd", "timeout": 8}), &ctx)
++        .call(
++            json!({"command": long_tree(count), "interpreter": "cmd", "timeout": 8}),
++            &ctx,
++        )
+         .await
+         .expect("shell call returns a result");
+     let elapsed = started.elapsed();
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-host\tests\tool_recovery_windows.rs:131:
+     let seen_alive = observer.finish();
+ 
+     assert!(result.is_error, "{}", result.content);
+-    assert!(result.content.contains("[recovery_v1]"), "{}", result.content);
+     assert!(
++        result.content.contains("[recovery_v1]"),
++        "{}",
++        result.content
++    );
++    assert!(
+         result.content.contains("\"outcome\":\"timed_out\""),
+         "{}",
+         result.content
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-host\tests\tool_recovery_windows.rs:139:
+     );
+     assert!(
+-        result.content.contains("\"termination\":\"tree_terminated\""),
++        result
++            .content
++            .contains("\"termination\":\"tree_terminated\""),
+         "{}",
+         result.content
+     );
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-host\tests\tool_recovery_windows.rs:146:
+         elapsed < Duration::from_secs(60),
+         "timeout did not bound the run: {elapsed:?}"
+     );
+-    assert!(seen_alive, "two-level child tree was never observed alive; test proves nothing");
++    assert!(
++        seen_alive,
++        "two-level child tree was never observed alive; test proves nothing"
++    );
+     assert_eq!(
+         wait_for_no_survivors(count),
+         0,
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-host\tests\tool_recovery_windows.rs:177:
+         trigger.store(true, Ordering::SeqCst);
+     });
+     let result = ShellTool
+-        .call(json!({"command": long_tree(count), "interpreter": "cmd", "timeout": 120}), &ctx)
++        .call(
++            json!({"command": long_tree(count), "interpreter": "cmd", "timeout": 120}),
++            &ctx,
++        )
+         .await
+         .expect("shell call returns a result");
+     canceller.join().unwrap();
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-host\tests\tool_recovery_windows.rs:188:
+     );
+ 
+     assert!(result.is_error, "{}", result.content);
+-    assert!(result.content.contains("[recovery_v1]"), "{}", result.content);
+     assert!(
++        result.content.contains("[recovery_v1]"),
++        "{}",
++        result.content
++    );
++    assert!(
+         result.content.contains("\"outcome\":\"cancelled\""),
+         "{}",
+         result.content
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-host\tests\tool_recovery_windows.rs:196:
+     );
+     assert!(
+-        result.content.contains("\"termination\":\"tree_terminated\""),
++        result
++            .content
++            .contains("\"termination\":\"tree_terminated\""),
+         "{}",
+         result.content
+     );
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-host\tests\tool_recovery_windows.rs:202:
+-    assert!(seen_alive, "two-level child tree was never observed alive; test proves nothing");
++    assert!(
++        seen_alive,
++        "two-level child tree was never observed alive; test proves nothing"
++    );
+     assert_eq!(
+         wait_for_no_survivors(count),
+         0,
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\artifacts.rs:62:
+             Capture::Created(m) => m,
+             other => panic!("expected created, got {other:?}"),
+         };
+-        assert_eq!(created(s.capture_next(&scope, input(0, Kind::Document), b"one").unwrap()).version, 1);
++        assert_eq!(
++            created(
++                s.capture_next(&scope, input(0, Kind::Document), b"one")
++                    .unwrap()
++            )
++            .version,
++            1
++        );
+         // Same digest, kind and title as the newest version: returned as existing, nothing written.
+         assert!(matches!(
+             s.capture_next(&scope, input(0, Kind::Document), b"one").unwrap(),
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\artifacts.rs:69:
+             Capture::Existing(m) if m.version == 1
+         ));
+-        assert_eq!(created(s.capture_next(&scope, input(0, Kind::Document), b"two").unwrap()).version, 2);
++        assert_eq!(
++            created(
++                s.capture_next(&scope, input(0, Kind::Document), b"two")
++                    .unwrap()
++            )
++            .version,
++            2
++        );
+         // Matching an older version is not a duplicate when the newest differs: a new version.
+-        assert_eq!(created(s.capture_next(&scope, input(0, Kind::Document), b"one").unwrap()).version, 3);
++        assert_eq!(
++            created(
++                s.capture_next(&scope, input(0, Kind::Document), b"one")
++                    .unwrap()
++            )
++            .version,
++            3
++        );
+         assert_eq!(s.next_version(&scope, "artifact").unwrap(), 4);
+-        assert_eq!(s.list_versions(&scope, None, 200).unwrap().versions.len(), 3);
++        assert_eq!(
++            s.list_versions(&scope, None, 200).unwrap().versions.len(),
++            3
++        );
+     }
+ 
+     #[test]
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\budget.rs:288:
+     snapshot(tx, project, task)?;
+     Ok(())
+ }
+-pub(crate) fn snapshot(tx: &Transaction<'_>, project: &str, task: &str) -> Result<Option<Snapshot>, String> {
++pub(crate) fn snapshot(
++    tx: &Transaction<'_>,
++    project: &str,
++    task: &str,
++) -> Result<Option<Snapshot>, String> {
+     let Some(configuration) = configuration(tx, project, task)? else {
+         let count: i64 = tx
+             .query_row(
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\budget_reservation.rs:616:
+     }
+     /// Advance the task's policy to `expected + 1`, updating the budget configuration and the
+     /// reservation policy in one transaction. Stale or skipped revisions are refused.
+-    pub fn revise_policy(&mut self, task: &str, expected: i64, value: Policy) -> Result<(), String> {
++    pub fn revise_policy(
++        &mut self,
++        task: &str,
++        expected: i64,
++        value: Policy,
++    ) -> Result<(), String> {
+         id(task)?;
+         policy(&value)?;
+         let tx = self
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\budget_reservation.rs:1250:
+         let mut f = Fixture::new();
+         let mut store = f.store(policy());
+         store.reserve(f.request("orphan", 4)).unwrap();
+-        store.start(&f.binding, "orphan", "host-claim", "boot").unwrap();
++        store
++            .start(&f.binding, "orphan", "host-claim", "boot")
++            .unwrap();
+ 
+         // A second process while the run is still running must not reclaim the call.
+         let mut live = f.store(policy());
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\budget_reservation.rs:1265:
+             .unwrap();
+         let mut conn = rusqlite::Connection::open(f.path.join(".agentz/runs.db")).unwrap();
+         let tx = conn.transaction().unwrap();
+-        let refreshed =
+-            reconcile_orphans(&tx, &f.binding.project_id, "task", "new-boot").unwrap();
++        let refreshed = reconcile_orphans(&tx, &f.binding.project_id, "task", "new-boot").unwrap();
+         tx.commit().unwrap();
+         let orphan = refreshed
+             .iter()
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\lib.rs:6:
+ pub mod artifacts;
+ pub mod budget;
+ pub mod budget_reservation;
+-pub mod recovery;
+-pub mod task_details;
+ pub mod changes;
+ pub mod cleanup;
+ pub mod events;
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\lib.rs:14:
+ pub mod external_action;
+ pub mod merge;
+ pub mod plan;
++pub mod recovery;
+ pub mod run;
+ pub mod start;
++pub mod task_details;
+ use std::path::{Path, PathBuf};
+ use std::time::Duration;
+ 
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\projectless.rs:564:
+         let session = uuid::Uuid::new_v4().to_string();
+         // Never initialized: the session is simply not projectless, and nothing is created.
+         assert_eq!(store.session_directory(&project, &session).unwrap(), None);
+-        assert!(!app_data.join("projectless/session-bindings.sqlite").exists());
++        assert!(!app_data
++            .join("projectless/session-bindings.sqlite")
++            .exists());
+ 
+         let id = uuid::Uuid::new_v4().to_string();
+         let directory = store.create_task(&id).unwrap();
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\task_details.rs:12:
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+ #[serde(tag = "status", rename_all = "snake_case")]
+ pub enum Source<T> {
+-    Available { value: T, version: String },
++    Available {
++        value: T,
++        version: String,
++    },
+     Missing,
+     Unsupported,
+     /// The source cannot be read for a known reason, e.g. a managed environment that is not
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\task_details.rs:19:
+     /// registered. `version` identifies the observation that produced this state.
+-    Unavailable { version: String },
++    Unavailable {
++        version: String,
++    },
+     /// The stored source does not belong to the requested scope (for example an environment
+     /// record for a different environment). `version` identifies the observation.
+-    Stale { version: String },
++    Stale {
++        version: String,
++    },
+     Unknown,
+ }
+ impl<T> Source<T> {
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\src\task_details.rs:37:
+             | Self::Stale { version } => version,
+             _ => return Ok(()),
+         };
+-        if version.trim().is_empty()
+-            || version.len() > 256
+-            || version.chars().any(char::is_control)
++        if version.trim().is_empty() || version.len() > 256 || version.chars().any(char::is_control)
+         {
+             return Err("task detail source version invalid".into());
+         }
+Diff in \\?\C:\Projects\AgentZ\crates\agentz-task-state\tests\execution_transitions.rs:32:
+ ];
+ 
+ fn fresh_project() -> PathBuf {
+-    let directory = std::env::temp_dir().join(format!("agentz-exec-table-{}", uuid::Uuid::new_v4()));
++    let directory =
++        std::env::temp_dir().join(format!("agentz-exec-table-{}", uuid::Uuid::new_v4()));
+     std::fs::create_dir_all(&directory).unwrap();
+     let root = canonical_root(&directory).unwrap();
+     register(
+Diff in \\?\C:\Projects\AgentZ\src-tauri\examples\graph_verify.rs:12:
+     let root = env::args()
+         .nth(1)
+         .expect("usage: graph_verify <project_root> [query]");
+-    let query = env::args().nth(2).unwrap_or_else(|| "graph_context_block".into());
++    let query = env::args()
++        .nth(2)
++        .unwrap_or_else(|| "graph_context_block".into());
+     let root = Path::new(&root);
+ 
+     eprintln!("==> queue background index …");
+Diff in \\?\C:\Projects\AgentZ\src-tauri\examples\graph_verify.rs:22:
+     for _ in 0..120 {
+         let st = status(root);
+         if st.phase == IndexPhase::Idle {
+-            eprintln!(
+-                "    graph.db: {} nodes, {} edges",
+-                st.nodes, st.edges
+-            );
++            eprintln!("    graph.db: {} nodes, {} edges", st.nodes, st.edges);
+             if let Some(err) = st.last_error {
+                 eprintln!("    error: {err}");
+             }
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\chat_events.rs:13:
+ ) -> Result<agentz_task_state::task_details::TaskDetails, String> {
+     let _environment = state.environment_access.execution().await;
+     let scope = super::project_scope::lookup_for_main(&state, &window, &scope_handle)?;
+-    let binding = super::chat_plan::existing_binding(
+-        &app, scope.project(), &session_id, scope.source(),
+-    ).await?;
++    let binding =
++        super::chat_plan::existing_binding(&app, scope.project(), &session_id, scope.source())
++            .await?;
+     super::project_scope::with_verified_scope(&state, &window, &scope_handle, |verified| {
+         if verified.project() != scope.project() {
+             return Err("project scope changed during task detail lookup".into());
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\chat_turn.rs:2142:
+     // directory bound to it. A bound session that cannot be resolved refuses the turn; it never
+     // falls back to the shared root.
+     let workspace_root = {
+-        let free_root = agentz_task_state::canonical_root(&super::projects::free_sessions_path(
+-            &config_dir,
+-        ))
+-        .ok();
++        let free_root =
++            agentz_task_state::canonical_root(&super::projects::free_sessions_path(&config_dir))
++                .ok();
+         if free_root.as_deref() == Some(approval_project_dir.as_str()) {
+             use tauri::Manager as _;
+             let app_data = app
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\chat_turn.rs:2159:
+             )
+             .map_err(anyhow::Error::msg)?
+             {
+-                Some(directory) => agentz_task_state::canonical_root(&directory)
+-                    .map_err(anyhow::Error::msg)?,
++                Some(directory) => {
++                    agentz_task_state::canonical_root(&directory).map_err(anyhow::Error::msg)?
++                }
+                 None => workspace_root,
+             }
+         } else {
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\chat_turn.rs:2555:
+     .with_hooks(hooks)
+     .with_streaming(enable_streaming);
+     // AZ-024: refuse the turn if its task budget cannot be loaded or bound.
+-    let budget_limits = crate::runtime::task_budget::load_limits_for_app(&app)
++    let budget_limits =
++        crate::runtime::task_budget::load_limits_for_app(&app).map_err(|e| anyhow!(e))?;
++    budget_scope
++        .bind(
++            Path::new(&approval_project_dir),
++            &early_binding,
++            &budget_limits,
++        )
+         .map_err(|e| anyhow!(e))?;
+-    budget_scope.bind(
+-        Path::new(&approval_project_dir),
+-        &early_binding,
+-        &budget_limits,
+-    ).map_err(|e| anyhow!(e))?;
+     let client = budget_scope.guard(client);
+     // Durable host hooks replace the legacy warning bool approval in this runner.
+     let agent = harness.into_agent_loop(client, None, None);
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\chat_turn.rs:2585:
+     };
+ 
+     // Only the actual captured local single-agent execution authorizes this writer.
+-    let cancellation_completion = crate::runtime::cancel_completion::CancellationCompletion::capture(
+-        &early_binding, &cancel,
+-    ).map_err(anyhow::Error::msg)?;
++    let cancellation_completion =
++        crate::runtime::cancel_completion::CancellationCompletion::capture(&early_binding, &cancel)
++            .map_err(anyhow::Error::msg)?;
+     let mut durable_stream = if !crate::remote::is_remote(&workspace_root)
+         && workz_team_id.is_none()
+         && workz_pool_id.is_none()
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\chat_turn.rs:2851:
+         if let Some(run) = durable_run.as_mut() {
+             run.request_cancelling().map_err(anyhow::Error::msg)?;
+         }
+-        !cancellation_completion.wait_requested(
+-            &early_binding, std::time::Duration::from_secs(10),
+-        ).await.map_err(anyhow::Error::msg)?.may_finalize_cancelled()
+-    } else { false };
++        !cancellation_completion
++            .wait_requested(&early_binding, std::time::Duration::from_secs(10))
++            .await
++            .map_err(anyhow::Error::msg)?
++            .may_finalize_cancelled()
++    } else {
++        false
++    };
+     let turn_failed = error_msg.is_some() || stream_error.is_some() || cancellation_unconfirmed;
+     // A recording failure retains its cause even if the agent deadline also expired.
+     let effective_timeout = turn_timeout_secs.filter(|_| !durability_failed);
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\connectors.rs:390:
+     }
+ 
+     fn creds(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
++        pairs
++            .iter()
++            .map(|(k, v)| (k.to_string(), v.to_string()))
++            .collect()
+     }
+ 
+     #[test]
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\connectors.rs:443:
+     #[test]
+     fn expired_token_is_not_authorized_and_undated_token_is_not_expired() {
+         let now = 1_000_000;
+-        assert!(!oauth_token_expired(&creds(&[("expires_at", "1000600")]), now));
++        assert!(!oauth_token_expired(
++            &creds(&[("expires_at", "1000600")]),
++            now
++        ));
+         // Within the skew window the token already counts as expired.
+-        assert!(oauth_token_expired(&creds(&[("expires_at", "1000030")]), now));
+-        assert!(oauth_token_expired(&creds(&[("expires_at", "999000")]), now));
++        assert!(oauth_token_expired(
++            &creds(&[("expires_at", "1000030")]),
++            now
++        ));
++        assert!(oauth_token_expired(
++            &creds(&[("expires_at", "999000")]),
++            now
++        ));
+         assert!(!oauth_token_expired(&creds(&[]), now));
+         assert!(!oauth_token_expired(&creds(&[("expires_at", "soon")]), now));
+     }
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\ide.rs:549:
+     fn save_is_refused_when_file_was_deleted() {
+         let file = fixture("c.txt");
+         let err = ensure_unchanged_since(&file, &sha256_hex(b"x")).unwrap_err();
+-        assert!(err.starts_with(WRITE_CONFLICT_PREFIX) && err.contains("deleted"), "{err}");
++        assert!(
++            err.starts_with(WRITE_CONFLICT_PREFIX) && err.contains("deleted"),
++            "{err}"
++        );
+     }
+ 
+     #[test]
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\ide.rs:1751:
+             SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+         };
+-        use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
++        use windows_sys::Win32::System::Threading::{
++            OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
++        };
+ 
+         // SAFETY: each handle is checked before use. The job is wrapped as soon as it is
+         // created, so every later error path closes it through Drop.
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\ide.rs:2077:
+     /// as long as the session is used, exactly as `ide_terminal_create` does.
+     fn spawn_pty(
+         cmd: CommandBuilder,
+-    ) -> (Box<dyn portable_pty::Child + Send>, Box<dyn portable_pty::MasterPty + Send>) {
++    ) -> (
++        Box<dyn portable_pty::Child + Send>,
++        Box<dyn portable_pty::MasterPty + Send>,
++    ) {
+         let pair = native_pty_system()
+-            .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
++            .openpty(PtySize {
++                rows: 24,
++                cols: 80,
++                pixel_width: 0,
++                pixel_height: 0,
++            })
+             .expect("open pty");
+         let child = pair.slave.spawn_command(cmd).expect("spawn pty child");
+         (child, pair.master)
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\ide.rs:2088:
+     /// Spawn a shell and contain it, as `ide_terminal_create` does.
+     fn spawn_contained(
+         cmd: CommandBuilder,
+-    ) -> (Box<dyn portable_pty::Child + Send>, Box<dyn portable_pty::MasterPty + Send>, TerminalJob)
+-    {
++    ) -> (
++        Box<dyn portable_pty::Child + Send>,
++        Box<dyn portable_pty::MasterPty + Send>,
++        TerminalJob,
++    ) {
+         let (child, master) = spawn_pty(cmd);
+         let job = contain_shell(&*child).expect("contain shell");
+         (child, master, job)
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\ide.rs:2150:
+             {
+                 break pid;
+             }
+-            assert!(Instant::now() < deadline, "shell never published a descendant pid");
++            assert!(
++                Instant::now() < deadline,
++                "shell never published a descendant pid"
++            );
+             std::thread::sleep(Duration::from_millis(200));
+         };
+         let _ = std::fs::remove_file(&pid_file);
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\ide.rs:2171:
+                 .output();
+         }
+         assert!(result.is_ok(), "terminate failed: {result:?}");
+-        assert!(matches!(child.try_wait(), Ok(Some(_))), "shell should have exited");
++        assert!(
++            matches!(child.try_wait(), Ok(Some(_))),
++            "shell should have exited"
++        );
+         assert!(!survived, "descendant {descendant} survived terminal close");
+     }
+ 
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\ide.rs:2200:
+             {
+                 break pid;
+             }
+-            assert!(Instant::now() < deadline, "shell never published a descendant pid");
++            assert!(
++                Instant::now() < deadline,
++                "shell never published a descendant pid"
++            );
+             std::thread::sleep(Duration::from_millis(200));
+         };
+         let _ = std::fs::remove_file(&pid_file);
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\ide.rs:2208:
+         // Kill only the shell, leaving the descendant running.
+         child.kill().expect("kill shell root");
+         child.wait().expect("reap shell root");
+-        assert!(pid_alive(descendant), "descendant should outlive the shell root");
++        assert!(
++            pid_alive(descendant),
++            "descendant should outlive the shell root"
++        );
+ 
+         let result = terminate_terminal_tree(child.as_mut(), &job);
+ 
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\ide.rs:2224:
+                 .output();
+         }
+         assert!(result.is_ok(), "terminate failed: {result:?}");
+-        assert!(!survived, "descendant {descendant} survived terminal close after shell exit");
++        assert!(
++            !survived,
++            "descendant {descendant} survived terminal close after shell exit"
++        );
+     }
+ }
+ 
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\mod.rs:15:
+ pub mod curator;
+ pub mod dap;
+ pub mod data_scope;
+-pub mod diagnostics;
+ pub mod debug_scenarios;
+ pub mod devenv;
++pub mod diagnostics;
+ pub mod edit;
+ pub mod ext_host;
+ pub mod fish;
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\mod.rs:53:
+ pub mod slash_commands;
+ pub mod symbols;
+ pub mod system_prompt;
+-pub mod teams;
+-pub mod task_view;
+ pub mod task_artifacts;
++pub mod task_view;
+ pub mod task_view_read;
++pub mod teams;
+ pub mod user_tools;
+ pub mod vsix;
+ pub mod webview_resources;
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\project_scope.rs:171:
+         if store_dir.join("session-bindings.sqlite").exists()
+             || store_dir.join("workspaces").exists()
+         {
+-            return Err("projectless catalog is missing; refusing legacy workspace fallback".into());
++            return Err(
++                "projectless catalog is missing; refusing legacy workspace fallback".into(),
++            );
+         }
+         return Ok(None);
+     }
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\skill_review.rs:141:
+         evo.create_skill_min_tool_calls, summary, tool_calls
+     );
+ 
+-    let client = budget.guard(build_client_with_timeout(&provider, &api_key, base_url.as_deref(), 90));
++    let client = budget.guard(build_client_with_timeout(
++        &provider,
++        &api_key,
++        base_url.as_deref(),
++        90,
++    ));
+     let req = LlmRequest {
+         messages: vec![LlmMessage {
+             role: "user".to_string(),
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\commands\task_view_read.rs:247:
+     Ok((entries, truncated))
+ }
+ /// Caller must retain a fresh verified task binding and its environment lease.
+-pub(crate) fn read_captured_text(root: &Path, relative_path: &str) -> Result<(String, u64), String> {
++pub(crate) fn read_captured_text(
++    root: &Path,
++    relative_path: &str,
++) -> Result<(String, u64), String> {
+     let rel = relative(relative_path, false)?;
+     let path = checked(root, &rel)?;
+     read_text(root, &path)
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\diagnostics.rs:91:
+     let secrets = secret_values(settings);
+     let mut body = String::new();
+     for file in &files {
+-        let text = std::fs::read_to_string(file).map_err(|e| format!("read {}: {e}", file.display()))?;
++        let text =
++            std::fs::read_to_string(file).map_err(|e| format!("read {}: {e}", file.display()))?;
+         body.push_str(&redact_known_secrets(&text, &secrets));
+     }
+ 
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\mod.rs:7:
+ //! out to member Koi without leaving the desktop process.
+ 
+ pub mod approval;
++pub mod cancel_completion;
+ pub mod chat_cancel;
+ pub mod durable_plan;
+ pub mod durable_run;
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\mod.rs:22:
+ pub mod task_activity;
+ pub mod task_budget;
+ pub mod task_details;
+-pub mod cancel_completion;
+ pub mod workflow;
+ 
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:14:
+ 
+ use agentz_task_state::{
+     approval::Binding,
+-    recovery::{CapturedRun, OwnerEvidence, Outcome, RecoveryStore},
++    recovery::{CapturedRun, Outcome, OwnerEvidence, RecoveryStore},
+     run::RunStore,
+ };
+ use serde::{Deserialize, Serialize};
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:159:
+             acquired_ms: now(),
+         };
+         let bytes = serde_json::to_vec(&record).map_err(|e| format!("owner lease encode: {e}"))?;
+-        file.set_len(0).map_err(|e| format!("owner lease truncate: {e}"))?;
++        file.set_len(0)
++            .map_err(|e| format!("owner lease truncate: {e}"))?;
+         file.seek(SeekFrom::Start(0))
+             .and_then(|_| file.write_all(&bytes))
+             .and_then(|_| file.sync_data())
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:166:
+             .map_err(|e| format!("owner lease write: {e}"))?;
+-        Ok(Self { _lock: file, record })
++        Ok(Self {
++            _lock: file,
++            record,
++        })
+     }
+ }
+ 
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:197:
+ 
+ /// Reconciles every active Run in a project against its owner lease. Runs without a lease
+ /// file are reported as unverifiable and left untouched. Errors are per Run.
+-pub fn reconcile_project(project: &Path, now_ms: i64) -> Result<Vec<(String, Disposition)>, String> {
++pub fn reconcile_project(
++    project: &Path,
++    now_ms: i64,
++) -> Result<Vec<(String, Disposition)>, String> {
+     if !project.join(".agentz").join("runs.db").is_file() {
+         return Ok(Vec::new());
+     }
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:246:
+     const CHILD_ATTEMPT: &str = "child-attempt";
+ 
+     fn project() -> PathBuf {
+-        let root = std::env::temp_dir().join(format!("agentz-owner-lease-{}", uuid::Uuid::new_v4()));
++        let root =
++            std::env::temp_dir().join(format!("agentz-owner-lease-{}", uuid::Uuid::new_v4()));
+         fs::create_dir_all(&root).unwrap();
+         RunStore::open(&root).unwrap();
+         root
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:270:
+         let root = project();
+         let b = binding(&root, "run-held", "attempt-held");
+         let lease = OwnerLease::acquire(&root, &b).unwrap();
+-        assert!(matches!(probe(&root, "run-held", "attempt-held").unwrap(), Probe::Held));
++        assert!(matches!(
++            probe(&root, "run-held", "attempt-held").unwrap(),
++            Probe::Held
++        ));
+         assert!(
+             OwnerLease::acquire(&root, &b).is_err(),
+             "a second live owner must not acquire the same attempt"
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:285:
+     #[test]
+     fn attempt_without_lease_file_is_unverifiable() {
+         let root = project();
+-        assert!(matches!(probe(&root, "run-none", "attempt-none").unwrap(), Probe::Missing));
++        assert!(matches!(
++            probe(&root, "run-none", "attempt-none").unwrap(),
++            Probe::Missing
++        ));
+     }
+ 
+     #[test]
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:313:
+     fn killed_owner_is_interrupted_while_live_owner_is_preserved() {
+         let root = project();
+         let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+-            .args(["--exact", "runtime::owner_lease::tests::lease_child_process", "--nocapture", "--test-threads=1"])
++            .args([
++                "--exact",
++                "runtime::owner_lease::tests::lease_child_process",
++                "--nocapture",
++                "--test-threads=1",
++            ])
+             .env(CHILD_ENV, &root)
+             .stdout(std::process::Stdio::null())
+             .stderr(std::process::Stdio::null())
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:322:
+         let ready = root.join("child.ready");
+         let started = Instant::now();
+         while !ready.exists() {
+-            assert!(started.elapsed() < Duration::from_secs(120), "child never became ready");
++            assert!(
++                started.elapsed() < Duration::from_secs(120),
++                "child never became ready"
++            );
+             std::thread::sleep(Duration::from_millis(50));
+         }
+ 
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:331:
+         assert_eq!(report.len(), 1, "{report:?}");
+         assert_eq!(report[0], (CHILD_RUN.to_string(), Disposition::Alive));
+         let store = RunStore::open_existing_readonly(&root).unwrap();
+-        assert_eq!(store.load(CHILD_RUN).unwrap().unwrap().execution, Execution::Running);
++        assert_eq!(
++            store.load(CHILD_RUN).unwrap().unwrap().execution,
++            Execution::Running
++        );
+         drop(store);
+ 
+         // Crash: kill the owner. The OS releases its lock; the Run must be interrupted.
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\owner_lease.rs:338:
+         child.kill().unwrap();
+         child.wait().unwrap();
+         let report = reconcile_project(&root, now()).unwrap();
+-        assert_eq!(report, vec![(CHILD_RUN.to_string(), Disposition::Interrupted)]);
++        assert_eq!(
++            report,
++            vec![(CHILD_RUN.to_string(), Disposition::Interrupted)]
++        );
+         let store = RunStore::open_existing_readonly(&root).unwrap();
+         let run = store.load(CHILD_RUN).unwrap().unwrap();
+         assert_eq!(run.execution, Execution::Interrupted);
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:10:
+     approval::Binding,
+     budget::{self, BudgetStore, Measurement, Usage},
+     budget_reservation::{
+-        Policy as ReservePolicy, ReserveOutcome, Request, Reservation, ReservationStore, Resources,
++        Policy as ReservePolicy, Request, Reservation, ReservationStore, ReserveOutcome, Resources,
+         StartOutcome, Status,
+     },
+ };
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:46:
+ 
+ impl TaskBudgetLimits {
+     pub fn validate(&self) -> Result<(), String> {
+-        for value in [self.max_total_tokens, self.max_active_ms].into_iter().flatten() {
++        for value in [self.max_total_tokens, self.max_active_ms]
++            .into_iter()
++            .flatten()
++        {
+             if value < 0 {
+                 return Err("budget limits must not be negative".into());
+             }
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:60:
+     let path = config_dir.join(LIMITS_FILE);
+     match std::fs::read_to_string(&path) {
+         Ok(raw) => match serde_json::from_str::<TaskBudgetLimits>(&raw) {
+-            Ok(limits) => { limits.validate()?; Ok(limits) },
+-            Err(error) => Err(format!("invalid task budget limits {}: {error}", path.display())),
++            Ok(limits) => {
++                limits.validate()?;
++                Ok(limits)
++            }
++            Err(error) => Err(format!(
++                "invalid task budget limits {}: {error}",
++                path.display()
++            )),
+         },
+-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(TaskBudgetLimits::default()),
+-        Err(error) => Err(format!("cannot read task budget limits {}: {error}", path.display())),
++        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
++            Ok(TaskBudgetLimits::default())
++        }
++        Err(error) => Err(format!(
++            "cannot read task budget limits {}: {error}",
++            path.display()
++        )),
+     }
+ }
+ 
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:173:
+ 
+ impl BudgetScope {
+     /// Prepare the task policy and bind this scope to the task.
+-    pub fn bind(&self, project: &Path, binding: &Binding, limits: &TaskBudgetLimits) -> Result<(), String> {
++    pub fn bind(
++        &self,
++        project: &Path,
++        binding: &Binding,
++        limits: &TaskBudgetLimits,
++    ) -> Result<(), String> {
+         ensure_policy(project, &binding.task_id, limits)?;
+-        self.0.set(Bound {
+-            project: project.to_path_buf(),
+-            binding: binding.clone(),
+-        }).map_err(|_| "task budget scope was already bound".to_string())
++        self.0
++            .set(Bound {
++                project: project.to_path_buf(),
++                binding: binding.clone(),
++            })
++            .map_err(|_| "task budget scope was already bound".to_string())
+     }
+ 
+     /// Wrap a model client so each call is reserved and settled against the bound task.
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:243:
+ }
+ 
+ fn pending() -> MutexGuard<'static, Vec<(PathBuf, Pending)>> {
+-    PENDING.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
++    PENDING
++        .lock()
++        .unwrap_or_else(|poisoned| poisoned.into_inner())
+ }
+ 
+ fn apply_pending(project: &Path, item: &Pending) -> Result<(), String> {
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:354:
+                     return Err(format!("{DENIED_PREFIX} duplicate call operation"));
+                 }
+                 Ok(_) => break active_ms,
+-                Err(error) if error.starts_with(STALE_REVISION) && attempt < MAX_RESERVE_ATTEMPTS => {
++                Err(error)
++                    if error.starts_with(STALE_REVISION) && attempt < MAX_RESERVE_ATTEMPTS =>
++                {
+                     continue;
+                 }
+                 Err(error) => {
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:361:
+                     // A failed commit may still have landed; undo it so it cannot hold a slot.
+                     if !error.starts_with(DENIED_PREFIX) {
+-                        self.recover_outstanding(&mut store, &operation, reserved_tokens, active_ms);
++                        self.recover_outstanding(
++                            &mut store,
++                            &operation,
++                            reserved_tokens,
++                            active_ms,
++                        );
+                     }
+                     return denied_or_unavailable(error);
+                 }
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:389:
+         let active_ms = i64::try_from(ticket.started.elapsed().as_millis()).unwrap_or(i64::MAX);
+         let (input_tokens, output_tokens, source) = match measured {
+             Some((input, output)) => (i64::from(input), i64::from(output), "kernel-usage"),
+-            None => (
+-                ticket.reserved_tokens,
+-                0,
+-                "estimate-without-usage",
+-            ),
++            None => (ticket.reserved_tokens, 0, "estimate-without-usage"),
+         };
+-        match self.usage_for(&ticket.operation, input_tokens, output_tokens, active_ms, source) {
++        match self.usage_for(
++            &ticket.operation,
++            input_tokens,
++            output_tokens,
++            active_ms,
++            source,
++        ) {
+             Ok(usage) => self.settle_or_queue(usage),
+-            Err(error) => tracing::warn!(%error, operation = %ticket.operation, "budget settlement skipped"),
++            Err(error) => {
++                tracing::warn!(%error, operation = %ticket.operation, "budget settlement skipped")
++            }
+         }
+     }
+ 
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:464:
+             return;
+         };
+         if started {
+-            match self.usage_for(operation, reserved_tokens, 0, active_ms, "estimate-without-usage") {
++            match self.usage_for(
++                operation,
++                reserved_tokens,
++                0,
++                active_ms,
++                "estimate-without-usage",
++            ) {
+                 Ok(usage) => self.settle_or_queue(usage),
+                 Err(error) => tracing::warn!(%error, %operation, "budget settlement skipped"),
+             }
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:485:
+ 
+ #[async_trait]
+ impl LlmClient for BudgetedClient {
+-    async fn stream(&self, req: LlmRequest, tx: tokio::sync::mpsc::Sender<LlmChunk>) -> anyhow::Result<()> {
++    async fn stream(
++        &self,
++        req: LlmRequest,
++        tx: tokio::sync::mpsc::Sender<LlmChunk>,
++    ) -> anyhow::Result<()> {
+         let ticket = self.begin(&req).map_err(anyhow::Error::msg)?;
+         let settlement = Settlement {
+             client: self,
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:729:
+         // More stopped calls than the slot cap: none may leave a reservation in flight.
+         for _ in 0..(MAX_IN_FLIGHT + 1) {
+             let (tx, _rx) = tokio::sync::mpsc::channel(8);
+-            let stopped =
+-                tokio::time::timeout(std::time::Duration::from_millis(5), hanging.stream(request(4), tx))
+-                    .await;
++            let stopped = tokio::time::timeout(
++                std::time::Duration::from_millis(5),
++                hanging.stream(request(4), tx),
++            )
++            .await;
+             assert!(stopped.is_err());
+         }
+         let calls = Arc::new(AtomicUsize::new(0));
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\runtime\task_budget.rs:832:
+         };
+         let calls = Arc::new(AtomicUsize::new(0));
+         let scope = BudgetScope::default();
+-        let error = scope.bind(
+-            &path,
+-            &binding,
+-            &TaskBudgetLimits {
+-                max_total_tokens: Some(1),
+-                max_active_ms: None,
+-            },
+-        ).unwrap_err();
++        let error = scope
++            .bind(
++                &path,
++                &binding,
++                &TaskBudgetLimits {
++                    max_total_tokens: Some(1),
++                    max_active_ms: None,
++                },
++            )
++            .unwrap_err();
+         assert!(!error.is_empty());
+         let guarded = scope.guard(Box::new(FakeClient {
+             calls: calls.clone(),
+Diff in \\?\C:\Projects\AgentZ\src-tauri\src\tools\durable_plan_todo.rs:168:
+                 .unwrap()
+                 .unwrap()
+         };
+-        assert!(!tool
+-            .call(
+-                json!({"todos":[
+-                    {"id":"one","content":"step","status":"pending"},
+-                    {"id":"two","content":"other","status":"in_progress"}
+-                ]}),
+-                &ctx
+-            )
+-            .await
+-            .unwrap()
+-            .is_error);
++        assert!(
++            !tool
++                .call(
++                    json!({"todos":[
++                        {"id":"one","content":"step","status":"pending"},
++                        {"id":"two","content":"other","status":"in_progress"}
++                    ]}),
++                    &ctx
++                )
++                .await
++                .unwrap()
++                .is_error
++        );
+         // Continuation lists only one step and omits merge: the other open item survives.
+-        assert!(!tool
+-            .call(
+-                json!({"todos":[{"id":"one","content":"step","status":"completed"}]}),
+-                &ctx
+-            )
+-            .await
+-            .unwrap()
+-            .is_error);
++        assert!(
++            !tool
++                .call(
++                    json!({"todos":[{"id":"one","content":"step","status":"completed"}]}),
++                    &ctx
++                )
++                .await
++                .unwrap()
++                .is_error
++        );
+         let plan = stored().await;
+         assert_eq!(plan.items.len(), 2);
+         assert_eq!(plan.items[1].id, "two");
+Diff in \\?\C:\Projects\AgentZ\src-tauri\tests\approval_execution.rs:419:
+     let id = event["request_id"].as_str().unwrap();
+     let preview = f.broker.preview(id).await.unwrap();
+     assert_eq!(preview["toolInput"]["command"], "fixture-only");
+-    let intent = ApprovalStore::open_existing(
+-        &f.root.join(".agentz/approvals.db"),
+-        "boot-fixture",
+-        now(),
+-    )
+-    .unwrap()
+-    .get(id)
+-    .unwrap()
+-    .unwrap()
+-    .0;
++    let intent =
++        ApprovalStore::open_existing(&f.root.join(".agentz/approvals.db"), "boot-fixture", now())
++            .unwrap()
++            .get(id)
++            .unwrap()
++            .unwrap()
++            .0;
+     assert_eq!(intent.binding.run_id, "fixture-run");
+     assert_eq!(intent.binding.attempt_id, "fixture-attempt");
+     assert_eq!(event["tool_input"], Value::Null);

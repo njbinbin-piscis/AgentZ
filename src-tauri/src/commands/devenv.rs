@@ -228,7 +228,9 @@ fn walk(dir: &Path, depth: usize, d: &mut Detected) {
                 }
             }
             _ => {
-                if lower.ends_with(".csproj") || lower.ends_with(".sln") || lower.ends_with(".fsproj")
+                if lower.ends_with(".csproj")
+                    || lower.ends_with(".sln")
+                    || lower.ends_with(".fsproj")
                 {
                     d.stacks.insert("dotnet");
                 }
@@ -386,7 +388,9 @@ pub fn parse_version(text: &str) -> Option<String> {
     let bytes: Vec<char> = text.chars().collect();
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i].is_ascii_digit() && (i == 0 || !(bytes[i - 1].is_ascii_digit() || bytes[i - 1] == '.')) {
+        if bytes[i].is_ascii_digit()
+            && (i == 0 || !(bytes[i - 1].is_ascii_digit() || bytes[i - 1] == '.'))
+        {
             let mut j = i;
             let mut dots = 0;
             while j < bytes.len() && (bytes[j].is_ascii_digit() || (bytes[j] == '.' && dots < 3)) {
@@ -472,8 +476,7 @@ fn spec(
 }
 
 fn read_trim(path: &Option<PathBuf>) -> Option<String> {
-    path.as_ref()
-        .and_then(|p| std::fs::read_to_string(p).ok())
+    path.as_ref().and_then(|p| std::fs::read_to_string(p).ok())
 }
 
 fn rust_channel(d: &Detected) -> Option<String> {
@@ -482,7 +485,11 @@ fn rust_channel(d: &Detected) -> Option<String> {
         let l = line.trim();
         let candidate = l
             .strip_prefix("channel")
-            .map(|r| r.trim_start_matches([' ', '=', '"']).trim_end_matches('"').trim())
+            .map(|r| {
+                r.trim_start_matches([' ', '=', '"'])
+                    .trim_end_matches('"')
+                    .trim()
+            })
             .unwrap_or(l);
         if candidate.chars().next().is_some_and(|c| c.is_ascii_digit()) {
             return Some(candidate.to_string());
@@ -512,7 +519,10 @@ fn node_requirement(d: &Detected) -> Option<String> {
 fn python_requirement(d: &Detected) -> Option<String> {
     let raw = read_trim(&d.python_version)?;
     let v = raw.lines().next()?.trim().to_string();
-    v.chars().next().is_some_and(|c| c.is_ascii_digit()).then_some(v)
+    v.chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_digit())
+        .then_some(v)
 }
 
 fn go_requirement(d: &Detected) -> Option<String> {
@@ -524,17 +534,34 @@ fn go_requirement(d: &Detected) -> Option<String> {
 fn dotnet_requirement(d: &Detected) -> Option<String> {
     let raw = read_trim(&d.global_json)?;
     let json: serde_json::Value = serde_json::from_str(&raw).ok()?;
-    json.get("sdk")?.get("version")?.as_str().map(str::to_string)
+    json.get("sdk")?
+        .get("version")?
+        .as_str()
+        .map(str::to_string)
 }
 
 fn specs_for(d: &Detected) -> Vec<ToolSpec> {
     let mut v: Vec<ToolSpec> = Vec::new();
     let has = |s: &str| d.stacks.contains(s);
     if has("rust") || has("tauri") {
-        let mut rustc = spec("rustc", "rust", &["rustc"], &["--version"], true, "Cargo.toml");
+        let mut rustc = spec(
+            "rustc",
+            "rust",
+            &["rustc"],
+            &["--version"],
+            true,
+            "Cargo.toml",
+        );
         rustc.required_version = rust_channel(d);
         v.push(rustc);
-        v.push(spec("cargo", "rust", &["cargo"], &["--version"], true, "Cargo.toml"));
+        v.push(spec(
+            "cargo",
+            "rust",
+            &["cargo"],
+            &["--version"],
+            true,
+            "Cargo.toml",
+        ));
         v.push(spec(
             "rust-analyzer",
             "rust",
@@ -545,17 +572,52 @@ fn specs_for(d: &Detected) -> Vec<ToolSpec> {
         ));
     }
     if has("node") || has("tauri") {
-        let mut node = spec("node", "node", &["node"], &["--version"], true, "package.json");
+        let mut node = spec(
+            "node",
+            "node",
+            &["node"],
+            &["--version"],
+            true,
+            "package.json",
+        );
         node.required_version = node_requirement(d);
         v.push(node);
         if d.has_pnpm_lock {
-            v.push(spec("pnpm", "node", &["pnpm"], &["--version"], true, "pnpm-lock.yaml"));
+            v.push(spec(
+                "pnpm",
+                "node",
+                &["pnpm"],
+                &["--version"],
+                true,
+                "pnpm-lock.yaml",
+            ));
         } else if d.has_yarn_lock {
-            v.push(spec("yarn", "node", &["yarn"], &["--version"], true, "yarn.lock"));
+            v.push(spec(
+                "yarn",
+                "node",
+                &["yarn"],
+                &["--version"],
+                true,
+                "yarn.lock",
+            ));
         } else if d.has_bun_lock {
-            v.push(spec("bun", "node", &["bun"], &["--version"], true, "bun lockfile"));
+            v.push(spec(
+                "bun",
+                "node",
+                &["bun"],
+                &["--version"],
+                true,
+                "bun lockfile",
+            ));
         } else {
-            v.push(spec("npm", "node", &["npm"], &["--version"], true, "package.json"));
+            v.push(spec(
+                "npm",
+                "node",
+                &["npm"],
+                &["--version"],
+                true,
+                "package.json",
+            ));
         }
         v.push(spec(
             "typescript-language-server",
@@ -590,26 +652,75 @@ fn specs_for(d: &Detected) -> Vec<ToolSpec> {
         let mut go = spec("go", "go", &["go"], &["version"], true, "go.mod");
         go.required_version = go_requirement(d);
         v.push(go);
-        v.push(spec("gopls", "go", &["gopls"], &["version"], false, "code navigation (lsp tool)"));
+        v.push(spec(
+            "gopls",
+            "go",
+            &["gopls"],
+            &["version"],
+            false,
+            "code navigation (lsp tool)",
+        ));
     }
     if has("java") {
-        v.push(spec("java", "java", &["java"], &["-version"], true, "Maven/Gradle project"));
-        v.push(spec("javac", "java", &["javac"], &["-version"], true, "JDK (not just a JRE)"));
+        v.push(spec(
+            "java",
+            "java",
+            &["java"],
+            &["-version"],
+            true,
+            "Maven/Gradle project",
+        ));
+        v.push(spec(
+            "javac",
+            "java",
+            &["javac"],
+            &["-version"],
+            true,
+            "JDK (not just a JRE)",
+        ));
         if d.has_maven && !d.has_mvnw {
-            v.push(spec("mvn", "java", &["mvn"], &["-version"], true, "pom.xml without wrapper"));
+            v.push(spec(
+                "mvn",
+                "java",
+                &["mvn"],
+                &["-version"],
+                true,
+                "pom.xml without wrapper",
+            ));
         }
         if d.has_gradle && !d.has_gradlew {
-            v.push(spec("gradle", "java", &["gradle"], &["--version"], true, "Gradle build without wrapper"));
+            v.push(spec(
+                "gradle",
+                "java",
+                &["gradle"],
+                &["--version"],
+                true,
+                "Gradle build without wrapper",
+            ));
         }
     }
     if has("dotnet") {
-        let mut dn = spec("dotnet", "dotnet", &["dotnet"], &["--version"], true, ".NET project files");
+        let mut dn = spec(
+            "dotnet",
+            "dotnet",
+            &["dotnet"],
+            &["--version"],
+            true,
+            ".NET project files",
+        );
         dn.required_version = dotnet_requirement(d);
         v.push(dn);
     }
     if has("cpp") {
         if d.has_cmake {
-            v.push(spec("cmake", "cpp", &["cmake"], &["--version"], true, "CMakeLists.txt"));
+            v.push(spec(
+                "cmake",
+                "cpp",
+                &["cmake"],
+                &["--version"],
+                true,
+                "CMakeLists.txt",
+            ));
         }
         v.push(spec(
             "c-compiler",
@@ -619,21 +730,70 @@ fn specs_for(d: &Detected) -> Vec<ToolSpec> {
             true,
             "C/C++ sources",
         ));
-        v.push(spec("clangd", "cpp", &["clangd"], &["--version"], false, "code navigation (lsp tool)"));
+        v.push(spec(
+            "clangd",
+            "cpp",
+            &["clangd"],
+            &["--version"],
+            false,
+            "code navigation (lsp tool)",
+        ));
     }
     if has("php") {
-        v.push(spec("php", "php", &["php"], &["--version"], true, "composer.json"));
-        v.push(spec("composer", "php", &["composer"], &["--version"], true, "composer.json"));
+        v.push(spec(
+            "php",
+            "php",
+            &["php"],
+            &["--version"],
+            true,
+            "composer.json",
+        ));
+        v.push(spec(
+            "composer",
+            "php",
+            &["composer"],
+            &["--version"],
+            true,
+            "composer.json",
+        ));
     }
     if has("ruby") {
-        v.push(spec("ruby", "ruby", &["ruby"], &["--version"], true, "Gemfile"));
-        v.push(spec("bundle", "ruby", &["bundle"], &["--version"], true, "Gemfile"));
+        v.push(spec(
+            "ruby",
+            "ruby",
+            &["ruby"],
+            &["--version"],
+            true,
+            "Gemfile",
+        ));
+        v.push(spec(
+            "bundle",
+            "ruby",
+            &["bundle"],
+            &["--version"],
+            true,
+            "Gemfile",
+        ));
     }
     if has("dart") {
         if d.has_flutter {
-            v.push(spec("flutter", "dart", &["flutter"], &["--version"], true, "pubspec.yaml (flutter)"));
+            v.push(spec(
+                "flutter",
+                "dart",
+                &["flutter"],
+                &["--version"],
+                true,
+                "pubspec.yaml (flutter)",
+            ));
         } else {
-            v.push(spec("dart", "dart", &["dart"], &["--version"], true, "pubspec.yaml"));
+            v.push(spec(
+                "dart",
+                "dart",
+                &["dart"],
+                &["--version"],
+                true,
+                "pubspec.yaml",
+            ));
         }
     }
     v
@@ -656,7 +816,11 @@ fn install_hint(id: &str) -> String {
             "brew install node",
             "install Node LTS via your package manager or nvm",
         ),
-        "pnpm" => ("npm i -g pnpm", "npm i -g pnpm (or brew install pnpm)", "npm i -g pnpm"),
+        "pnpm" => (
+            "npm i -g pnpm",
+            "npm i -g pnpm (or brew install pnpm)",
+            "npm i -g pnpm",
+        ),
         "yarn" => ("npm i -g yarn", "npm i -g yarn", "npm i -g yarn"),
         "bun" => (
             "winget install Oven-sh.Bun",
@@ -674,7 +838,11 @@ fn install_hint(id: &str) -> String {
             "apt install python3 python3-pip / dnf install python3",
         ),
         "pyright-langserver" => ("npm i -g pyright", "npm i -g pyright", "npm i -g pyright"),
-        "go" => ("winget install GoLang.Go", "brew install go", "apt install golang-go / dnf install golang"),
+        "go" => (
+            "winget install GoLang.Go",
+            "brew install go",
+            "apt install golang-go / dnf install golang",
+        ),
         "gopls" => (
             "go install golang.org/x/tools/gopls@latest",
             "go install golang.org/x/tools/gopls@latest",
@@ -685,30 +853,66 @@ fn install_hint(id: &str) -> String {
             "brew install openjdk",
             "apt install default-jdk / dnf install java-latest-openjdk-devel",
         ),
-        "mvn" => ("winget install Apache.Maven", "brew install maven", "apt install maven"),
-        "gradle" => ("winget install Gradle.Gradle", "brew install gradle", "sdk install gradle (SDKMAN)"),
+        "mvn" => (
+            "winget install Apache.Maven",
+            "brew install maven",
+            "apt install maven",
+        ),
+        "gradle" => (
+            "winget install Gradle.Gradle",
+            "brew install gradle",
+            "sdk install gradle (SDKMAN)",
+        ),
         "dotnet" => (
             "winget install Microsoft.DotNet.SDK.8",
             "brew install --cask dotnet-sdk",
             "apt install dotnet-sdk-8.0 / dnf install dotnet-sdk-8.0",
         ),
-        "cmake" => ("winget install Kitware.CMake", "brew install cmake", "apt install cmake"),
+        "cmake" => (
+            "winget install Kitware.CMake",
+            "brew install cmake",
+            "apt install cmake",
+        ),
         "c-compiler" => (
             "winget install Microsoft.VisualStudio.2022.BuildTools (C++ workload) or install LLVM",
             "xcode-select --install",
             "apt install build-essential / dnf groupinstall 'Development Tools'",
         ),
-        "clangd" => ("winget install LLVM.LLVM", "brew install llvm", "apt install clangd"),
-        "php" => ("winget install PHP.PHP", "brew install php", "apt install php-cli"),
-        "composer" => ("winget install Composer.Composer", "brew install composer", "apt install composer"),
-        "ruby" | "bundle" => ("winget install RubyInstallerTeam.Ruby", "brew install ruby", "apt install ruby-full"),
-        "dart" => ("winget install Google.DartSDK", "brew install dart-sdk", "apt install dart"),
+        "clangd" => (
+            "winget install LLVM.LLVM",
+            "brew install llvm",
+            "apt install clangd",
+        ),
+        "php" => (
+            "winget install PHP.PHP",
+            "brew install php",
+            "apt install php-cli",
+        ),
+        "composer" => (
+            "winget install Composer.Composer",
+            "brew install composer",
+            "apt install composer",
+        ),
+        "ruby" | "bundle" => (
+            "winget install RubyInstallerTeam.Ruby",
+            "brew install ruby",
+            "apt install ruby-full",
+        ),
+        "dart" => (
+            "winget install Google.DartSDK",
+            "brew install dart-sdk",
+            "apt install dart",
+        ),
         "flutter" => (
             "winget install Google.Flutter (or git clone flutter)",
             "brew install --cask flutter",
             "snap install flutter --classic",
         ),
-        _ => ("see the tool's official install guide", "see the tool's official install guide", "see the tool's official install guide"),
+        _ => (
+            "see the tool's official install guide",
+            "see the tool's official install guide",
+            "see the tool's official install guide",
+        ),
     };
     if cfg!(windows) {
         win.to_string()
@@ -837,12 +1041,20 @@ pub fn render_report(report: &DevEnvReport, dismissed: &HashSet<String>) -> Stri
         } else {
             "ok"
         };
-        let dismissed_tag = if dismissed.contains(&t.id) { " (dismissed)" } else { "" };
+        let dismissed_tag = if dismissed.contains(&t.id) {
+            " (dismissed)"
+        } else {
+            ""
+        };
         out.push_str(&format!(
             "- {} [{}{}]{} {}{}{}\n",
             t.id,
             state,
-            if t.required { ", required" } else { ", optional" },
+            if t.required {
+                ", required"
+            } else {
+                ", optional"
+            },
             dismissed_tag,
             t.version.clone().unwrap_or_default(),
             t.required_version
@@ -855,7 +1067,10 @@ pub fn render_report(report: &DevEnvReport, dismissed: &HashSet<String>) -> Stri
                 .unwrap_or_default()
         ));
         if t.is_problem() && !dismissed.contains(&t.id) {
-            out.push_str(&format!("    needed for: {}; install: {}\n", t.reason, t.install_hint));
+            out.push_str(&format!(
+                "    needed for: {}; install: {}\n",
+                t.reason, t.install_hint
+            ));
         }
     }
     out
@@ -863,6 +1078,14 @@ pub fn render_report(report: &DevEnvReport, dismissed: &HashSet<String>) -> Stri
 
 /// Prompt section handed to the agent. `None` when nothing is wrong.
 pub fn hint_section(report: &DevEnvReport, dismissed: &HashSet<String>) -> Option<String> {
+    hint_section_with_plan_mode(report, dismissed, true)
+}
+
+fn hint_section_with_plan_mode(
+    report: &DevEnvReport,
+    dismissed: &HashSet<String>,
+    legacy_implicit_todo: bool,
+) -> Option<String> {
     let problems = report.problems(dismissed);
     if problems.is_empty() {
         return None;
@@ -874,7 +1097,11 @@ pub fn hint_section(report: &DevEnvReport, dismissed: &HashSet<String>) -> Optio
         report.stacks.join(", ")
     ));
     for t in &problems {
-        let what = if t.found { "version too old" } else { "not found" };
+        let what = if t.found {
+            "version too old"
+        } else {
+            "not found"
+        };
         s.push_str(&format!(
             "- {} ({}, {}): needed for {}{}; install: {}\n",
             t.id,
@@ -888,17 +1115,32 @@ pub fn hint_section(report: &DevEnvReport, dismissed: &HashSet<String>) -> Optio
             t.install_hint
         ));
     }
-    s.push_str(
+    if legacy_implicit_todo {
+        s.push_str(
         "\nThese are clues, not commands. Judge for yourself whether they matter for the user's \
          current request (for example, ignore them for a casual greeting or a question that needs \
          no toolchain). When the task needs a tool, configure it yourself with `shell` (the user \
          confirms commands), then call `devenv` with action `resolve` to re-check and clear the \
          implicit todo. Use `devenv` action `dismiss` for items the user does not want.\n",
-    );
+        );
+    } else {
+        s.push_str(
+            "\nThese are environment clues only, not commands or an automatically created plan. \
+             Judge whether the missing tools matter for the user's current request. \
+             Tool execution still follows the host's permission rules. Use `devenv` action \
+             `resolve` to re-check the environment and action `dismiss` for unwanted clues. \
+             Neither action updates the task plan in this turn. Manage the task plan explicitly \
+             with `plan_todo`; do not assume an environment todo has been created or cleared.\n",
+        );
+    }
     Some(s)
 }
 
-pub fn todo_content(report: &DevEnvReport, dismissed: &HashSet<String>, zh: bool) -> Option<String> {
+pub fn todo_content(
+    report: &DevEnvReport,
+    dismissed: &HashSet<String>,
+    zh: bool,
+) -> Option<String> {
     let problems = report.problems(dismissed);
     if problems.is_empty() {
         return None;
@@ -928,7 +1170,14 @@ fn emit_plan(sink: &Arc<dyn EventSink>, session_id: &str, items: Vec<PlanTodoIte
     sink.emit_session(session_id, "agent_event", payload);
 }
 
-/// Per-turn hook for the agent chat: returns the prompt clue section and, the
+/// Prompt-only clues for durable-plan turns. Never mutates session plans or emits events.
+pub async fn context_hint_for_turn(project: &Path) -> Option<String> {
+    let report = scan(project, false).await;
+    let dismissed = load_dismissed(project);
+    hint_section_with_plan_mode(&report, &dismissed, false)
+}
+
+/// Legacy per-turn hook: returns the prompt clue section and, the
 /// first time a session sees problems, adds the implicit todo to its plan.
 pub async fn context_for_turn(
     project: &Path,
@@ -982,13 +1231,97 @@ pub async fn clear_todo(plan_store: &PlanStore, sink: &Arc<dyn EventSink>, sessi
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn pure_hint_respects_dismissal_without_changing_durable_plan_or_projection() {
+        let project =
+            std::env::temp_dir().join(format!("agentz-devenv-pure-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&project).unwrap();
+        let key = project.to_string_lossy().to_string();
+        let report = DevEnvReport {
+            os: "fixture".into(),
+            stacks: vec!["rust".into()],
+            tools: vec![ToolStatus {
+                id: "fixture-tool".into(),
+                stack: "rust".into(),
+                required: true,
+                found: false,
+                path: None,
+                version: None,
+                required_version: None,
+                version_ok: None,
+                reason: "fixture marker".into(),
+                install_hint: "fixture only".into(),
+            }],
+        };
+        cache()
+            .lock()
+            .unwrap()
+            .insert(key.clone(), (Instant::now(), report));
+        let fingerprint = "a".repeat(64);
+        let binding = agentz_task_state::plan::PlanBinding {
+            project_id: agentz_task_state::canonical_root(&project).unwrap(),
+            task_id: "task".into(),
+            environment_id: format!("direct:{fingerprint}"),
+            binding_version: fingerprint,
+        };
+        let mut durable = agentz_task_state::plan::PlanStore::open(&project).unwrap();
+        let original = durable
+            .create(
+                &binding,
+                "plan",
+                "user goal",
+                vec![agentz_task_state::plan::PlanItem {
+                    id: "user-step".into(),
+                    description: "preserve this user step".into(),
+                    state: agentz_task_state::plan::ItemState::Pending,
+                }],
+                1,
+            )
+            .unwrap();
+        let projection = piscis_kernel::agent::plan::new_plan_store();
+        projection.lock().await.insert(
+            "task".into(),
+            vec![PlanTodoItem {
+                id: "user-step".into(),
+                content: "preserve this user step".into(),
+                status: "pending".into(),
+            }],
+        );
+        let before = projection.lock().await.clone();
+        let hint = context_hint_for_turn(&project).await.unwrap();
+        assert!(hint.contains("fixture-tool"));
+        assert!(hint.contains("Manage the task plan explicitly"));
+        assert!(!hint.contains("clear the implicit todo"));
+        assert!(!hint.contains("the user confirms commands"));
+        assert_eq!(
+            durable.continue_plan(&binding).unwrap(),
+            Some(original.clone())
+        );
+        assert_eq!(*projection.lock().await, before);
+        dismiss(&project, &["fixture-tool".into()]).unwrap();
+        assert!(context_hint_for_turn(&project).await.is_none());
+        assert_eq!(durable.continue_plan(&binding).unwrap(), Some(original));
+        drop(durable);
+        cache().lock().unwrap().remove(&key);
+        assert!(project.starts_with(std::env::temp_dir()));
+        std::fs::remove_dir_all(project).unwrap();
+    }
 
     #[test]
     fn parses_versions_from_tool_output() {
-        assert_eq!(parse_version("rustc 1.98.1 (48a229cea 2026-09-01)").as_deref(), Some("1.98.1"));
+        assert_eq!(
+            parse_version("rustc 1.98.1 (48a229cea 2026-09-01)").as_deref(),
+            Some("1.98.1")
+        );
         assert_eq!(parse_version("v22.3.0").as_deref(), Some("22.3.0"));
-        assert_eq!(parse_version("go version go1.22.4 windows/amd64").as_deref(), Some("1.22.4"));
-        assert_eq!(parse_version("openjdk version \"21.0.2\" 2024-01-16").as_deref(), Some("21.0.2"));
+        assert_eq!(
+            parse_version("go version go1.22.4 windows/amd64").as_deref(),
+            Some("1.22.4")
+        );
+        assert_eq!(
+            parse_version("openjdk version \"21.0.2\" 2024-01-16").as_deref(),
+            Some("21.0.2")
+        );
         assert_eq!(parse_version("no digits"), None);
     }
 
@@ -1013,8 +1346,16 @@ mod tests {
             "[toolchain]\nchannel = \"1.80.0\"\n",
         )
         .unwrap();
-        std::fs::write(dir.join("web").join("package.json"), r#"{"engines":{"node":">=20.1"}}"#).unwrap();
-        std::fs::write(dir.join("node_modules").join("x").join("go.mod"), "module x\ngo 1.22").unwrap();
+        std::fs::write(
+            dir.join("web").join("package.json"),
+            r#"{"engines":{"node":">=20.1"}}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("node_modules").join("x").join("go.mod"),
+            "module x\ngo 1.22",
+        )
+        .unwrap();
         std::fs::write(dir.join("web").join("pnpm-lock.yaml"), "").unwrap();
 
         let d = detect(&dir);
@@ -1034,7 +1375,11 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("agentz-devenv-bin-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let name = if cfg!(windows) { "faketool.exe" } else { "faketool" };
+        let name = if cfg!(windows) {
+            "faketool.exe"
+        } else {
+            "faketool"
+        };
         std::fs::write(dir.join(name), "").unwrap();
         assert!(locate_in("faketool", std::slice::from_ref(&dir)).is_some());
         assert!(locate_in("nothere", std::slice::from_ref(&dir)).is_none());

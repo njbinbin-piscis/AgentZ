@@ -1,0 +1,25 @@
+[
+  {
+    "id": "AZ-061",
+    "verified_state": "bounded_redacted_log_manifest_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "Local log export redacts short settings/current connector credentials and MCP command/URL/args/env/header values plus URL-percent and base64 forms; a synthetic MCP marker is absent from an actual local export fixture. Bounded versioned scope preview lists log basenames/byte counts without contents or secret values. Settings requires preview before offering local export. Export includes a bounded source-file and WARN/ERROR line locator manifest with optional task/run/environment/tool IDs parsed after redaction. The durable tool-event collector emits a fixed WARN under the turn span with an allowlisted tool name on errors. Each log read is capped at its selected metadata size and fails on growth/truncation. Feishu, DingTalk and WeChat gateway failure paths audited so selected HTTP/auth/stream/media errors no longer copy untrusted response bodies or messages; emitted Feishu codes are numeric. WeChat CDN transport errors no longer include signed URLs, confirmed by a one-case synthetic marker fixture. Connector HTTP and iLink QR failure paths also omit untrusted URLs/bodies. The iLink QR status poll returns fixed transport and decode failures, avoiding disclosure of a QR token carried in its request URL. Diagnostic secret collection includes token-bearing webhook URLs and any settings key named url or ending _url. Connector, log and export directory roots fail closed when linked; unreadable log entries are no longer silently omitted. Exports use unique create-new files to avoid overwriting an earlier redacted copy. Windows junction and repeat-export fixtures pass; diagnostics suite passed 14/14. Non-settings secret sources and native export remain open.",
+    "conclusion_proposal": "Keep pending until AZ-031, reliable task/run/tool/environment correlation, full-source secret review and native journey are complete.",
+    "next_action": "Verify task/run/environment/tool fields with a real failing tool and native export, then run all-source secret scan after AZ-031.",
+    "remaining_work": [
+      "AZ-031 secret-reference dependency",
+      "Real failing-tool correlation",
+      "All-source secret inventory and scan",
+      "Native preview/export journey",
+      "Unified review"
+    ],
+    "verification_gaps": [
+      "Current settings including MCP and connector files only; other secret stores not fully inventoried",
+      "Correlation tested only with synthetic spans; tool field may be absent in real logs",
+      "No native desktop journey"
+    ],
+    "evidence": [
+      "docs/upgrade/evidence/AZ-061-2026-10-14/implementation.md"
+    ]
+  }
+]

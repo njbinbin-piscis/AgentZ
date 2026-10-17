@@ -1,0 +1,8 @@
+
+C:\Projects\AgentZ\src\workspaces\codez\AssistantPanel.tsx
+   676:5  warning  React Hook useCallback has missing dependencies: 'flushStreamDelta' and 't'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+   960:5  warning  React Hook useCallback has a missing dependency: 'onModeChange'. Either include it or remove the dependency array                react-hooks/exhaustive-deps
+  1078:5  warning  React Hook useCallback has a missing dependency: 'stickToBottomRef'. Either include it or remove the dependency array            react-hooks/exhaustive-deps
+
+✖ 3 problems (0 errors, 3 warnings)
+

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-050",
+    "verified_state": "local_text_revision_and_draft_handoff_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "Scoped compare-and-insert text edit and restore-as-new-version exist for document/report artifacts, with draft preview and a bounded fresh-read handoff to the next message draft.",
+    "conclusion_proposal": "Keep deferred pending host-resolved continuation attachment, full native document journey and unified acceptance.",
+    "next_action": "Add a host-resolved continuation reference at send time, then run the complete native document journey and independent review.",
+    "remaining_work": ["Host-resolved continuation reference or explicit scope decision", "HTML preview-save consistency", "Native document edit/restore/archive journey", "Independent implementation review"],
+    "verification_gaps": ["No native GUI run", "No host-resolved attachment at send time", "No full document journey"],
+    "evidence": ["docs/upgrade/evidence/AZ-050-2026-10-14/implementation.md"]
+  }
+]

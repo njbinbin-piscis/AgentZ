@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "artifact": "C:\\Projects\\AgentZ\\target\\release\\candidate-0.9.7-workflows-20261010\\AgentZ_0.9.7_x64-setup.exe",
+  "bytes": 98766742,
+  "sha256": "e4bd973f1f0da2bc6eabaeecdbc9e0690b2e8c20b35e6aba860e83e21d284223",
+  "signature": "NotSigned",
+  "build_session": 40602,
+  "build_exit": 0,
+  "source_entries_verified": 348,
+  "build_input_entries_verified": 2094,
+  "installed": false,
+  "release_ready": false,
+  "known_risk": "AZ041 dirty buffer and asynchronous reload/save",
+  "captured_at": "2026-10-10T00:59:12.9232009Z"
+}

@@ -8,7 +8,7 @@
 //! is intentionally simple so an embedding column can be layered on later
 //! (reusing `piscis_kernel::memory::vector`).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use rusqlite::{params, Connection};
@@ -82,6 +82,13 @@ fn collect_files(dir: &Path, out: &mut Vec<PathBuf>, depth: usize) {
         }
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().to_string();
+        if entry
+            .file_type()
+            .map(|kind| kind.is_symlink())
+            .unwrap_or(true)
+        {
+            continue;
+        }
         let Ok(meta) = entry.metadata() else { continue };
         if meta.is_dir() {
             if is_ignored_dir(&name) {
@@ -231,8 +238,18 @@ const STOPWORDS: &[&str] = &[
 ];
 
 const DEFINITION_PREFIXES: &[&str] = &[
-    "fn ", "struct ", "enum ", "trait ", "impl ", "class ", "interface ", "function ", "def ",
-    "type ", "const ", "mod ",
+    "fn ",
+    "struct ",
+    "enum ",
+    "trait ",
+    "impl ",
+    "class ",
+    "interface ",
+    "function ",
+    "def ",
+    "type ",
+    "const ",
+    "mod ",
 ];
 
 fn tokenize(q: &str) -> Vec<String> {
@@ -300,9 +317,18 @@ pub fn search_index_opts(
         .map_err(|e| format!("query search: {e}"))?;
 
     let limit = limit.clamp(1, 50);
+    let canonical_root =
+        std::fs::canonicalize(root).map_err(|e| format!("resolve index root: {e}"))?;
+    let mut safe_paths = HashMap::new();
     let mut hits: Vec<CodeSearchHit> = Vec::new();
     for row in rows.flatten() {
         let (path, start_line, end_line, content, lower) = row;
+        if !*safe_paths
+            .entry(path.clone())
+            .or_insert_with(|| safe_cached_source_path(&canonical_root, &path))
+        {
+            continue;
+        }
         let path_lower = path.to_lowercase();
         let class = classify(&path);
         match opts.kind {
@@ -374,6 +400,36 @@ pub fn search_index_opts(
     hits.truncate(limit.clamp(1, 50));
     Ok(hits)
 }
+pub(crate) fn safe_cached_source_path(root: &Path, raw: &str) -> bool {
+    let path = Path::new(raw);
+    if raw.is_empty()
+        || !path
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
+    {
+        return false;
+    }
+    let mut target = root.to_path_buf();
+    for part in path.components() {
+        let name = part.as_os_str().to_string_lossy().to_lowercase();
+        if matches!(
+            name.as_str(),
+            ".git" | ".agentz" | ".codez" | ".piscis" | ".secret_key" | ".env"
+        ) || name.starts_with(".env.")
+        {
+            return false;
+        }
+        target.push(part.as_os_str());
+        let Ok(meta) = std::fs::symlink_metadata(&target) else {
+            return false;
+        };
+        if meta.file_type().is_symlink() {
+            return false;
+        }
+    }
+    target.is_file()
+        && std::fs::canonicalize(&target).is_ok_and(|resolved| resolved.starts_with(root))
+}
 
 // ─── Tauri commands ──────────────────────────────────────────────────────
 
@@ -442,7 +498,10 @@ mod search_ranking_tests {
             dir.as_path(),
             q,
             5,
-            &SearchOptions { kind: SearchKind::Docs, ..Default::default() },
+            &SearchOptions {
+                kind: SearchKind::Docs,
+                ..Default::default()
+            },
         )
         .unwrap();
         assert!(docs.iter().all(|h| h.path.starts_with("docs/")));
@@ -451,7 +510,10 @@ mod search_ranking_tests {
             dir.as_path(),
             q,
             5,
-            &SearchOptions { kind: SearchKind::Code, ..Default::default() },
+            &SearchOptions {
+                kind: SearchKind::Code,
+                ..Default::default()
+            },
         )
         .unwrap();
         assert!(code.iter().all(|h| h.path == "src/turn.rs"));

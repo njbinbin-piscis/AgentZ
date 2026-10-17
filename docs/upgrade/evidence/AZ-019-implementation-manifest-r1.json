@@ -1,0 +1,38 @@
+{
+  "task": "AZ-019",
+  "generated": "2026-10-11T15:32:57.836Z",
+  "files": [
+    {
+      "path": "crates/agentz-task-state/src/run.rs",
+      "sha256": "b68c1cddcc413633e6de4e7bb0b38df4c12f31e54d9f4eb9e0df3d65b2e327e6"
+    },
+    {
+      "path": "crates/agentz-task-state/src/recovery.rs",
+      "sha256": "c420a768911ee951076c656f0613cd841737b27d6df4e70977700287cca45c91"
+    },
+    {
+      "path": "src-tauri/src/runtime/owner_lease.rs",
+      "sha256": "82785bccf05f9b59d1e060214f2836f3a9a61fc7dd6055e78091edcd4299bd1d"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_run.rs",
+      "sha256": "9aa68fab02bfdac84b7f8088f64b76c4b29e3860fe16e676c593360a64ff9d3d"
+    },
+    {
+      "path": "src-tauri/src/runtime/mod.rs",
+      "sha256": "5d7b35eca7dbfdc51c6e89422600b4b7718dd971a8ac0653a8e08c02a2933232"
+    },
+    {
+      "path": "src-tauri/src/commands/data_scope.rs",
+      "sha256": "951e04e0fd5c25e7fc807207adaf4e7d01244900c1a30d02eccc43e00ba71e78"
+    },
+    {
+      "path": "src-tauri/Cargo.toml",
+      "sha256": "a24ce0101fe616c99b5e0c26f5615762543a44d69b59764bde8b6ed59b80572a"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "7a43e0def3833363150e086207fa6ef6d2fa7e2c4fecb86b7d7a53f5569f9580"
+    }
+  ]
+}

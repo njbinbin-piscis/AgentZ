@@ -1,0 +1,28 @@
+{
+  "files": [
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tool_recovery.rs",
+      "sha256": "160c62b98401d56fe3e68b835c143b158d148816cdb16c3f59e9091b2c36f1ea"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/proc_windows_sandbox.rs",
+      "sha256": "e169ed6de0649400cfc40fec732e8300a01ba11319738f427fb09ca89dcb00d6"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/shell.rs",
+      "sha256": "32505ce2869c1ee7ddf2577089b03af5aa6b25ca0253065d9c7c3c2f9f263a9a"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/code_run.rs",
+      "sha256": "f8fb17c19f34d332702aadb8f2f1aa9cb362b83428bca5fae7997723f847344b"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/lib.rs",
+      "sha256": "3a0a1ab49ce533c0217d161e5bddd67e7f7c0e08fbd241738cdba0c6c1173e8c"
+    },
+    {
+      "path": "docs/upgrade/patches/AZ-022-tool-recovery-v0.8.68.patch",
+      "sha256": "8acc9e219dcdd859afcfaf322c62d42a26b650938deb1cf16e441d05b176a711"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+Platform support evidence (from release.md)
+
+Tested:
+- Windows: tested
+
+Not tested:
+- macOS: not tested
+- Linux: not tested
+
+Notes:
+- Only Windows has explicit test evidence in the source.
+- macOS and Linux are explicitly marked "not tested"; no support claim is made for them.
+- No untested platform is claimed as tested or supported.

@@ -110,13 +110,16 @@
   color: #fff;
 }
 
-.agentz-task-review-badge.added {
+.agentz-task-review-badge.added,
+.agentz-task-review-badge.A {
   background: #2ea043;
 }
-.agentz-task-review-badge.modified {
+.agentz-task-review-badge.modified,
+.agentz-task-review-badge.M {
   background: #b08800;
 }
-.agentz-task-review-badge.deleted {
+.agentz-task-review-badge.deleted,
+.agentz-task-review-badge.D {
   background: #cf222e;
 }
 
@@ -124,6 +127,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.agentz-task-review-path small {
+  display: block;
+  opacity: 0.7;
+  font-size: 10px;
 }
 
 .agentz-task-review-diff {

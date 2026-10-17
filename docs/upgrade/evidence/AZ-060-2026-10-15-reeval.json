@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-060",
+    "verified_state": "pty_io_failure_and_duplicate_registration_cleanup_fixtures_passed",
+    "severity": "P1",
+    "finding": "Both post-spawn PTY I/O acquisition failure branches now share teardown; a native contained-shell fixture injected reader and writer errors and verified process-tree cleanup. A two-shell late duplicate registration fixture preserves the first shell and reaps the rejected second. Six native terminal-tree tests pass. Concurrent Tauri invocation and long-soak remain unverified.",
+    "conclusion_proposal": "Keep pending until resource census and frozen-budget soak acceptance.",
+    "next_action": "Add owned resource census, exercise concurrent Tauri create invocations, then run two-hour close/restart soak against the AZ-057 frozen budget.",
+    "remaining_work": ["Owned resource census", "Concurrent Tauri create fixture", "Two-hour close/restart soak against frozen AZ-057 budget"],
+    "verification_gaps": ["No real PTY API failure emulation", "No concurrent Tauri create invocation fixture", "No long resource soak"],
+    "evidence": ["docs/upgrade/evidence/AZ-060-2026-10-14/implementation.md", "docs/upgrade/evidence/AZ-060-pty-io-failure-2026-10-15.md"]
+  }
+]

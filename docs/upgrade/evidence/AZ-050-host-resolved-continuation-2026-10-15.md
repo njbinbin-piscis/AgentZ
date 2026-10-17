@@ -1,0 +1,5 @@
+# AZ-050 host-resolved artifact continuation candidate
+
+CodeZ now holds the selected document/report version as a visible, removable reference rather than pasting its bytes into the composer. On send, the client passes the immutable artifact ID, version, digest and freshly observed task binding separately from the user-visible prompt. The host checks the current main-window project scope and task/environment identity, re-reads the stored version, checks its digest and type, and appends a bounded quoted excerpt to the model prompt. The original user text remains the display prompt. A changed scope, task, environment, version or digest refuses the turn. Historical versions remain usable after a binding fingerprint change within the same task/environment.
+
+Local checks: `cargo check -p agentz-desktop --offline --locked`, `npm run typecheck`, 13 scoped client/viewer tests and the native immutable-version/excerpt fixture passed. The helper is exercised by the chat command but no full native desktop send/model run was performed. End-to-end create/edit/restore/continue/archive, browser preview and independent final review remain outstanding. AZ-050 stays deferred.

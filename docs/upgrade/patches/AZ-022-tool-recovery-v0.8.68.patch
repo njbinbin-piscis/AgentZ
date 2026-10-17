@@ -1,0 +1,1164 @@
+--- a/piscis-kernel/src/lib.rs
++++ b/piscis-kernel/src/lib.rs
+@@ -23,6 +23,7 @@
+ pub mod security;
+ pub mod store;
+ pub mod tools;
++pub mod tool_recovery;
+ 
+ // Re-export for downstream crates that want `piscis_kernel::core::...`.
+ pub use piscis_core as core;
+--- a/piscis-kernel/src/proc_windows_sandbox.rs
++++ b/piscis-kernel/src/proc_windows_sandbox.rs
+@@ -99,6 +99,30 @@
+     pub stderr: Vec<u8>,
+     pub timed_out: bool,
+     pub cancelled: bool,
++    /// Bytes actually read before EOF, including bytes omitted by the capture limit.
++    pub stdout_total_bytes: u64,
++    pub stderr_total_bytes: u64,
++}
++
++impl AppContainerOutput {
++    /// Ok is returned only after root exit, zero active Job members, both EOF readers
++    /// and workspace ACL cleanup. Early errors have no such confirmation.
++    pub fn recovery_report(
++        &self,
++        operation_id: String,
++    ) -> Result<crate::tool_recovery::RecoveryReport> {
++        crate::tool_recovery::RecoveryReport::confirmed_result(
++            operation_id,
++            self.exit_code,
++            self.timed_out,
++            self.cancelled,
++            self.stdout_total_bytes,
++            self.stdout.len() as u64,
++            self.stderr_total_bytes,
++            self.stderr.len() as u64,
++        )
++        .map_err(anyhow::Error::msg)
++    }
+ }
+ 
+ struct AppContainerProfile {
+@@ -360,21 +384,30 @@
+     drop(process);
+     wait_for_job_empty(job.raw(), Duration::from_secs(5))?;
+     drop(job);
++    // Join both readers and attempt ACL cleanup even if one stage fails. A failed stage
++    // must not skip the other reader or be converted into confirmed cleanup.
+     let stdout = stdout_thread
+         .join()
+-        .map_err(|_| anyhow::anyhow!("stdout capture thread panicked"))??;
++        .map_err(|_| anyhow::anyhow!("stdout capture thread panicked"))
++        .and_then(|result| result);
+     let stderr = stderr_thread
+         .join()
+-        .map_err(|_| anyhow::anyhow!("stderr capture thread panicked"))??;
+-    workspace.finish()?;
++        .map_err(|_| anyhow::anyhow!("stderr capture thread panicked"))
++        .and_then(|result| result);
++    let acl_cleanup = workspace.finish();
++    let stdout = stdout?;
++    let stderr = stderr?;
++    acl_cleanup?;
+     drop(workspace);
+     drop(profile);
+     Ok(AppContainerOutput {
+         exit_code: exit_code as i32,
+-        stdout,
+-        stderr,
++        stdout: stdout.bytes,
++        stderr: stderr.bytes,
+         timed_out,
+         cancelled,
++        stdout_total_bytes: stdout.total_bytes,
++        stderr_total_bytes: stderr.total_bytes,
+     })
+ }
+ 
+@@ -472,20 +505,32 @@
+     }
+ }
+ 
+-fn spawn_capture(mut file: File, limit: usize) -> thread::JoinHandle<Result<Vec<u8>>> {
++struct CapturedStream {
++    bytes: Vec<u8>,
++    total_bytes: u64,
++}
++
++fn spawn_capture(mut file: File, limit: usize) -> thread::JoinHandle<Result<CapturedStream>> {
+     thread::spawn(move || {
+         use std::io::Read;
+         let mut captured = Vec::with_capacity(limit.min(64 * 1024));
+         let mut buffer = [0u8; 8192];
++        let mut total_bytes = 0u64;
+         loop {
+             let read = file.read(&mut buffer)?;
+             if read == 0 {
+                 break;
+             }
++            total_bytes = total_bytes
++                .checked_add(read as u64)
++                .context("sandbox captured byte count overflow")?;
+             let remaining = limit.saturating_sub(captured.len());
+             captured.extend_from_slice(&buffer[..read.min(remaining)]);
+         }
+-        Ok(captured)
++        Ok(CapturedStream {
++            bytes: captured,
++            total_bytes,
++        })
+     })
+ }
+ 
+@@ -587,6 +632,53 @@
+ 
+     fn cmd_exe() -> PathBuf {
+         PathBuf::from(std::env::var_os("WINDIR").expect("WINDIR")).join("System32\\cmd.exe")
++    }
++
++    #[test]
++    fn capture_reports_exact_limit_overflow_and_zero_limit_without_losing_eof() {
++        use std::io::Write;
++        for (input, limit) in [
++            (b"abcd".as_slice(), 4),
++            (b"abcde".as_slice(), 4),
++            ("中文".as_bytes(), 4),
++            (b"abc".as_slice(), 0),
++        ] {
++            let mut file = tempfile::tempfile().expect("create capture fixture");
++            file.write_all(input).expect("write capture fixture");
++            use std::io::{Seek, SeekFrom};
++            file.seek(SeekFrom::Start(0)).expect("rewind fixture");
++            let result = spawn_capture(file, limit).join().unwrap().unwrap();
++            assert_eq!(result.total_bytes, input.len() as u64);
++            assert_eq!(result.bytes, input[..input.len().min(limit)]);
++        }
++    }
++
++    #[test]
++    fn production_runner_reports_both_truncated_streams_after_cleanup() {
++        let temp = tempfile::tempdir().expect("create truncation fixture");
++        let result = run_appcontainer_command(
++            cmd_exe().as_os_str(),
++            &[
++                OsString::from("/d"),
++                OsString::from("/c"),
++                OsString::from(
++                    "for /L %i in (1,1,100) do @(echo stdout-line & echo stderr-line 1>&2)",
++                ),
++            ],
++            temp.path(),
++            temp.path(),
++            Duration::from_secs(10),
++            Arc::new(AtomicBool::new(false)),
++            &[],
++            64,
++        )
++        .expect("run two-stream truncation fixture");
++        assert_eq!(result.exit_code, 0);
++        assert_eq!(result.stdout.len(), 64);
++        assert_eq!(result.stderr.len(), 64);
++        assert!(result.stdout_total_bytes > 64);
++        assert!(result.stderr_total_bytes > 64);
++        assert!(!result.cancelled && !result.timed_out);
+     }
+ 
+     #[test]
+--- a/piscis-kernel/src/tools/shell.rs
++++ b/piscis-kernel/src/tools/shell.rs
+@@ -98,21 +98,24 @@
+     async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult> {
+         let command = match input["command"].as_str() {
+             Some(command) if !command.trim().is_empty() => command,
+-            _ => return Ok(ToolResult::err("Missing required parameter: command")),
++            _ => return recovery_error("Missing required parameter: command", ctx, false),
+         };
+ 
+         if input["elevated"].as_bool().unwrap_or(false) {
+-            return Ok(ToolResult::err(
++            let report = crate::tool_recovery::RecoveryReport::refused_elevation_before_launch(
++                recovery_operation_id(ctx),
++            )
++            .map_err(anyhow::Error::msg)?;
++            return report.attach(ToolResult::err(
+                 "Elevated shell execution is refused: it is incompatible with the restricted AppContainer policy.",
+-            ));
++            )).map_err(anyhow::Error::msg);
+         }
+ 
+         #[cfg(not(windows))]
+         {
+             let _ = (command, ctx);
+-            return Ok(ToolResult::err(
+-                "Command execution refused: operating-system containment is unavailable on this platform.",
+-            ));
++            return recovery_error(
++                "Command execution refused: operating-system containment is unavailable on this platform.", ctx, false);
+         }
+ 
+         #[cfg(windows)]
+@@ -120,9 +123,11 @@
+             let workspace_root = match ctx.workspace_root.canonicalize() {
+                 Ok(root) => root,
+                 Err(error) => {
+-                    return Ok(ToolResult::err(format!(
+-                        "Sandbox workspace is unavailable: {error}"
+-                    )))
++                    return recovery_error(
++                        format!("Sandbox workspace is unavailable: {error}"),
++                        ctx,
++                        false,
++                    )
+                 }
+             };
+             let requested_cwd = match input["cwd"].as_str() {
+@@ -133,14 +138,13 @@
+             let cwd = match requested_cwd.canonicalize() {
+                 Ok(cwd) if cwd.is_dir() && cwd.starts_with(&workspace_root) => cwd,
+                 Ok(_) => {
+-                    return Ok(ToolResult::err(
+-                        "Sandbox working directory must be an existing directory inside workspace_root.",
+-                    ))
++                    return recovery_error(
++                        "Sandbox working directory must be an existing directory inside workspace_root.", ctx, false)
+                 }
+                 Err(error) => {
+-                    return Ok(ToolResult::err(format!(
++                    return recovery_error(format!(
+                         "Sandbox working directory is unavailable: {error}"
+-                    )))
++                    ), ctx, false)
+                 }
+             };
+ 
+@@ -148,9 +152,11 @@
+             let windir = match std::env::var_os("WINDIR") {
+                 Some(windir) => PathBuf::from(windir),
+                 None => {
+-                    return Ok(ToolResult::err(
++                    return recovery_error(
+                         "Cannot locate Windows system tools; refusing unsandboxed fallback.",
+-                    ))
++                        ctx,
++                        false,
++                    )
+                 }
+             };
+             let (program, args) = match interpreter {
+@@ -189,9 +195,11 @@
+                     )
+                 }
+                 _ => {
+-                    return Ok(ToolResult::err(
++                    return recovery_error(
+                         "Unsupported shell interpreter. Choose powershell, powershell32, or cmd.",
+-                    ))
++                        ctx,
++                        false,
++                    )
+                 }
+             };
+ 
+@@ -219,7 +227,7 @@
+             let started = Instant::now();
+             let receipt = match ctx.owned_completion().register() {
+                 Ok(receipt) => receipt,
+-                Err(error) => return Ok(ToolResult::err(error)),
++                Err(error) => return recovery_error(error, ctx, false),
+             };
+             let result = tokio::task::spawn_blocking(move || {
+                 let result = crate::proc::windows_sandbox::run_appcontainer_command(
+@@ -245,37 +253,46 @@
+             let output = match result {
+                 Ok(Ok(output)) => output,
+                 Ok(Err(error)) => {
+-                    return Ok(ToolResult::err(format!(
++                    return recovery_error(format!(
+                         "Sandbox setup or cleanup failed; command was not retried outside the sandbox: {error:#}"
+-                    )))
++                    ), ctx, true)
+                 }
+                 Err(error) => {
+-                    return Ok(ToolResult::err(format!(
++                    return recovery_error(format!(
+                         "Sandbox command worker failed: {error}"
+-                    )))
+-                }
+-            };
++                    ), ctx, true)
++                }
++            };
++            let mut report = output.recovery_report(recovery_operation_id(ctx))?;
+             if output.timed_out {
+-                return Ok(ToolResult::err(format!(
++                return report.attach(ToolResult::err(format!(
+                     "Command timed out after {timeout_secs}s; the AppContainer Job Object was terminated."
+-                )));
++                ))).map_err(anyhow::Error::msg);
+             }
+             if output.cancelled {
+-                return Ok(ToolResult::err(
+-                    "Command was cancelled; the AppContainer Job Object was terminated.",
+-                ));
+-            }
+-
+-            let stdout = truncate_output(
++                return report
++                    .attach(ToolResult::err(
++                        "Command was cancelled; the AppContainer Job Object was terminated.",
++                    ))
++                    .map_err(anyhow::Error::msg);
++            }
++
++            let (stdout, stdout_trimmed) = truncate_output(
+                 &String::from_utf8_lossy(&output.stdout),
+                 MAX_OUTPUT_BYTES * 3 / 4,
+             );
+-            let stderr = truncate_output(
++            let (stderr, stderr_trimmed) = truncate_output(
+                 &String::from_utf8_lossy(&output.stderr),
+                 MAX_OUTPUT_BYTES / 4,
+             );
+-            let stdout = collapse_repeated_lines(&stdout);
+-            let stderr = collapse_repeated_lines(&stderr);
++            let collapsed_stdout = collapse_repeated_lines(&stdout);
++            let collapsed_stderr = collapse_repeated_lines(&stderr);
++            report.note_presentation_truncation(
++                stdout_trimmed || collapsed_stdout != stdout,
++                stderr_trimmed || collapsed_stderr != stderr,
++            );
++            let stdout = collapsed_stdout;
++            let stderr = collapsed_stderr;
+             let mut parts = vec![format!(
+                 "[exit: {}] [duration: {}ms]",
+                 output.exit_code, duration_ms
+@@ -295,19 +312,45 @@
+                     parts.push(format!("--- errors ---\n{}", errors.join("\n")));
+                 }
+             }
+-            Ok(ToolResult::ok(parts.join("\n\n")))
++            report
++                .attach(ToolResult::ok(parts.join("\n\n")))
++                .map_err(anyhow::Error::msg)
+         }
+     }
+ }
+ 
+ #[cfg(windows)]
+-fn truncate_output(s: &str, max_bytes: usize) -> String {
++fn truncate_output(s: &str, max_bytes: usize) -> (String, bool) {
+     let strategy = if s.contains("error") || s.contains("Error") || s.contains("FAILED") {
+         TruncateStrategy::ErrorAware
+     } else {
+         TruncateStrategy::HeadTail
+     };
+-    smart_truncate(s.trim(), max_bytes, strategy).0
++    let (body, meta) = smart_truncate(s.trim(), max_bytes, strategy);
++    (body, meta.truncated)
++}
++
++fn recovery_operation_id(ctx: &ToolContext) -> String {
++    ctx.tool_use_id
++        .clone()
++        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string())
++}
++
++fn recovery_error(
++    content: impl Into<String>,
++    ctx: &ToolContext,
++    launched: bool,
++) -> Result<ToolResult> {
++    use crate::tool_recovery::RecoveryReport;
++    let report = if launched {
++        RecoveryReport::unknown_failure(recovery_operation_id(ctx))
++    } else {
++        RecoveryReport::refused_before_launch(recovery_operation_id(ctx))
++    }
++    .map_err(anyhow::Error::msg)?;
++    report
++        .attach(ToolResult::err(content))
++        .map_err(anyhow::Error::msg)
+ }
+ 
+ #[cfg(test)]
+@@ -360,6 +403,10 @@
+             .expect("call shell");
+         assert!(!result.is_error, "{}", result.content);
+         assert!(result.content.contains("shell-appcontainer"));
++        assert!(result.content.contains("\"outcome\":\"completed\""));
++        assert!(result
++            .content
++            .contains("\"termination\":\"tree_terminated\""));
+ 
+         let outside_read = format!("type \"{}\"", outside_file.display());
+         let result = ShellTool
+@@ -369,8 +416,9 @@
+             )
+             .await
+             .expect("call shell with out-of-scope file read");
+-        assert!(!result.is_error, "{}", result.content);
++        assert!(result.is_error, "{}", result.content);
+         assert!(result.content.contains("[exit: 1]"), "{}", result.content);
++        assert!(result.content.contains("\"outcome\":\"tool_failed\""));
+         assert!(!result.content.contains("must-not-leak-shell"));
+ 
+         let outside = temp.path().to_string_lossy().to_string();
+@@ -383,6 +431,7 @@
+             .expect("call shell with out-of-workspace cwd");
+         assert!(result.is_error);
+         assert!(result.content.contains("inside workspace_root"));
++        assert!(result.content.contains("\"termination\":\"not_started\""));
+ 
+         let result = ShellTool
+             .call(
+@@ -395,5 +444,8 @@
+         assert!(result
+             .content
+             .contains("Elevated shell execution is refused"));
++        assert!(result
++            .content
++            .contains("\"outcome\":\"elevation_unsupported\""));
+     }
+ }
+--- a/piscis-kernel/src/tools/code_run.rs
++++ b/piscis-kernel/src/tools/code_run.rs
+@@ -80,7 +80,7 @@
+     async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult> {
+         let command = match input["command"].as_str() {
+             Some(c) if !c.trim().is_empty() => c,
+-            _ => return Ok(ToolResult::err("Missing required parameter: command")),
++            _ => return recovery_error("Missing required parameter: command", ctx, false),
+         };
+ 
+         let cwd = if let Some(cwd_str) = input["cwd"].as_str() {
+@@ -94,10 +94,11 @@
+         };
+ 
+         if !cwd.exists() {
+-            return Ok(ToolResult::err(format!(
+-                "Working directory does not exist: {}",
+-                cwd.display()
+-            )));
++            return recovery_error(
++                format!("Working directory does not exist: {}", cwd.display()),
++                ctx,
++                false,
++            );
+         }
+ 
+         let timeout_secs = input["timeout_secs"]
+@@ -108,39 +109,41 @@
+         #[cfg(not(windows))]
+         {
+             let _ = (command, cwd, timeout_secs, ctx);
+-            return Ok(ToolResult::err(
+-                "Command execution refused: operating-system containment is unavailable on this platform.",
+-            ));
++            return recovery_error(
++                "Command execution refused: operating-system containment is unavailable on this platform.", ctx, false);
+         }
+ 
+         #[cfg(windows)]
+-        let (exit_code, stdout_bytes, stderr_bytes, duration_ms) = {
++        let (exit_code, stdout_bytes, stderr_bytes, duration_ms, mut report) = {
+             let workspace_root = match ctx.workspace_root.canonicalize() {
+                 Ok(root) => root,
+                 Err(error) => {
+-                    return Ok(ToolResult::err(format!(
+-                        "Sandbox workspace is unavailable: {error}"
+-                    )))
++                    return recovery_error(
++                        format!("Sandbox workspace is unavailable: {error}"),
++                        ctx,
++                        false,
++                    )
+                 }
+             };
+             let cwd = match cwd.canonicalize() {
+                 Ok(cwd) if cwd.is_dir() && cwd.starts_with(&workspace_root) => cwd,
+                 Ok(_) => {
+-                    return Ok(ToolResult::err(
+-                        "Sandbox working directory must be an existing directory inside workspace_root.",
+-                    ))
++                    return recovery_error(
++                        "Sandbox working directory must be an existing directory inside workspace_root.", ctx, false)
+                 }
+                 Err(error) => {
+-                    return Ok(ToolResult::err(format!(
++                    return recovery_error(format!(
+                         "Sandbox working directory is unavailable: {error}"
+-                    )))
++                    ), ctx, false)
+                 }
+             };
+             let program = match std::env::var_os("WINDIR") {
+                 Some(windir) => PathBuf::from(windir).join("System32\\cmd.exe"),
+-                None => return Ok(ToolResult::err(
++                None => return recovery_error(
+                     "Cannot locate the Windows command interpreter; refusing unsandboxed fallback.",
+-                )),
++                    ctx,
++                    false,
++                ),
+             };
+             let full_command = format!("chcp 65001 >nul 2>&1 & {command}");
+             let args = [
+@@ -167,7 +170,7 @@
+             let start = Instant::now();
+             let receipt = match ctx.owned_completion().register() {
+                 Ok(receipt) => receipt,
+-                Err(error) => return Ok(ToolResult::err(error)),
++                Err(error) => return recovery_error(error, ctx, false),
+             };
+             let run_result = tokio::task::spawn_blocking(move || {
+                 let result = crate::proc::windows_sandbox::run_appcontainer_command(
+@@ -193,27 +196,36 @@
+             let output = match run_result {
+                 Ok(Ok(output)) => output,
+                 Ok(Err(error)) => {
+-                    return Ok(ToolResult::err(format!(
++                    return recovery_error(format!(
+                         "Sandbox setup or cleanup failed; command was not retried outside the sandbox: {error:#}"
+-                    )))
++                    ), ctx, true)
+                 }
+                 Err(error) => {
+-                    return Ok(ToolResult::err(format!(
++                    return recovery_error(format!(
+                         "Sandbox command worker failed: {error}"
+-                    )))
++                    ), ctx, true)
+                 }
+             };
++            let report = output.recovery_report(recovery_operation_id(ctx))?;
+             if output.timed_out {
+-                return Ok(ToolResult::err(format!(
++                return report.attach(ToolResult::err(format!(
+                     "Sandbox command timed out after {timeout_secs}s; the Job Object was terminated."
+-                )));
++                ))).map_err(anyhow::Error::msg);
+             }
+             if output.cancelled {
+-                return Ok(ToolResult::err(
+-                    "Sandbox command was cancelled; the Job Object was terminated.",
+-                ));
+-            }
+-            (output.exit_code, output.stdout, output.stderr, duration_ms)
++                return report
++                    .attach(ToolResult::err(
++                        "Sandbox command was cancelled; the Job Object was terminated.",
++                    ))
++                    .map_err(anyhow::Error::msg);
++            }
++            (
++                output.exit_code,
++                output.stdout,
++                output.stderr,
++                duration_ms,
++                report,
++            )
+         };
+ 
+         #[cfg(windows)]
+@@ -222,6 +234,10 @@
+             let stderr_raw = String::from_utf8_lossy(&stderr_bytes);
+             let stdout = trim_stream(&stdout_raw, MAX_STREAM_BYTES);
+             let stderr = trim_stream(&stderr_raw, MAX_STREAM_BYTES);
++            report.note_presentation_truncation(
++                stdout_raw.trim().len() > MAX_STREAM_BYTES,
++                stderr_raw.trim().len() > MAX_STREAM_BYTES,
++            );
+             let status_label = if exit_code == 0 { "SUCCESS" } else { "FAILED" };
+             let mut parts = vec![format!(
+                 "exit_code: {} ({})  duration: {}ms  cwd: {}",
+@@ -249,7 +265,9 @@
+                     parts.push(format!("--- errors ---\n{}", errors.join("\n")));
+                 }
+             }
+-            Ok(ToolResult::ok(parts.join("\n\n")))
++            report
++                .attach(ToolResult::ok(parts.join("\n\n")))
++                .map_err(anyhow::Error::msg)
+         }
+     }
+ }
+@@ -354,7 +372,7 @@
+     // Generic
+     if out_lower.contains("permission denied") || out_lower.contains("access is denied") {
+         return Some(
+-            "Permission denied. Try running with elevated privileges or check file ownership."
++            "Permission denied. Check workspace access and the sandbox capability; elevated execution is unavailable."
+                 .to_string(),
+         );
+     }
+@@ -366,6 +384,29 @@
+     }
+ 
+     None
++}
++
++fn recovery_operation_id(ctx: &ToolContext) -> String {
++    ctx.tool_use_id
++        .clone()
++        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string())
++}
++
++fn recovery_error(
++    content: impl Into<String>,
++    ctx: &ToolContext,
++    launched: bool,
++) -> Result<ToolResult> {
++    use crate::tool_recovery::RecoveryReport;
++    let report = if launched {
++        RecoveryReport::unknown_failure(recovery_operation_id(ctx))
++    } else {
++        RecoveryReport::refused_before_launch(recovery_operation_id(ctx))
++    }
++    .map_err(anyhow::Error::msg)?;
++    report
++        .attach(ToolResult::err(content))
++        .map_err(anyhow::Error::msg)
+ }
+ 
+ #[cfg(test)]
+@@ -416,19 +457,24 @@
+             .expect("call code_run");
+         assert!(!result.is_error, "{}", result.content);
+         assert!(result.content.contains("code-run-appcontainer"));
++        assert!(result.content.contains("\"outcome\":\"completed\""));
++        assert!(result
++            .content
++            .contains("\"termination\":\"tree_terminated\""));
+ 
+         let outside_read = format!("type \"{}\"", outside_file.display());
+         let result = CodeRunTool
+             .call(json!({"command": outside_read, "timeout_secs": 10}), &ctx)
+             .await
+             .expect("call code_run with out-of-scope file read");
+-        assert!(!result.is_error, "{}", result.content);
++        assert!(result.is_error, "{}", result.content);
+         assert!(
+             result.content.contains("exit_code: 1 (FAILED)"),
+             "{}",
+             result.content
+         );
+         assert!(!result.content.contains("must-not-leak-code-run"));
++        assert!(result.content.contains("\"outcome\":\"tool_failed\""));
+ 
+         let outside = temp.path().to_string_lossy().to_string();
+         let result = CodeRunTool
+@@ -440,5 +486,6 @@
+             .expect("call code_run with out-of-scope cwd");
+         assert!(result.is_error);
+         assert!(result.content.contains("inside workspace_root"));
+-    }
+-}
++        assert!(result.content.contains("\"termination\":\"not_started\""));
++    }
++}
+--- /dev/null
++++ b/piscis-kernel/src/tool_recovery.rs
+@@ -0,0 +1,501 @@
++//! Versioned observations for tool/process recovery, not execution permissions.
++//! Reports never authorize retries or infer cleanup from a plain tool error.
++use serde::{Deserialize, Serialize};
++
++pub const REPORT_VERSION: u32 = 1;
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum Outcome {
++    Completed,
++    ToolFailed,
++    TimedOut,
++    Cancelled,
++    ElevationNoResponse,
++    ElevationDenied,
++    ElevationUnsupported,
++    SetupFailed,
++    WorkerFailed,
++}
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum Termination {
++    Unknown,
++    NotStarted,
++    Exited,
++    TreeTerminated,
++}
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum Evidence {
++    Unknown,
++    Confirmed,
++    Failed,
++    NotApplicable,
++}
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct Cleanup {
++    pub stdout_drained: Evidence,
++    pub stderr_drained: Evidence,
++    pub access_restored: Evidence,
++}
++impl Cleanup {
++    pub fn unknown() -> Self {
++        Self {
++            stdout_drained: Evidence::Unknown,
++            stderr_drained: Evidence::Unknown,
++            access_restored: Evidence::Unknown,
++        }
++    }
++    fn confirmed(&self) -> bool {
++        [
++            self.stdout_drained,
++            self.stderr_drained,
++            self.access_restored,
++        ]
++        .iter()
++        .all(|s| matches!(s, Evidence::Confirmed | Evidence::NotApplicable))
++    }
++}
++/// Truncation is orthogonal to exit/timeout/cancellation; never overwrites them.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
++pub enum OutputCapture {
++    Unknown,
++    Complete {
++        captured_bytes: u64,
++    },
++    Truncated {
++        captured_bytes: u64,
++        total_bytes: u64,
++    },
++}
++impl OutputCapture {
++    fn validate(&self) -> Result<(), String> {
++        if let Self::Truncated {
++            captured_bytes,
++            total_bytes,
++        } = self
++        {
++            if captured_bytes >= total_bytes {
++                return Err("invalid output truncation observation".into());
++            }
++        }
++        Ok(())
++    }
++}
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum AutomaticRetry {
++    Forbidden,
++}
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum NextStep {
++    NotRequired,
++    ReviewOutput,
++    ManualReconcile,
++}
++/// Trusted runner observations only. No command, arguments, raw errors, output,
++/// secret or arbitrary path is included; operation identity is host supplied.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct RecoveryReport {
++    pub version: u32,
++    pub operation_id: String,
++    pub outcome: Outcome,
++    pub exit_code: Option<i32>,
++    pub termination: Termination,
++    pub cleanup: Cleanup,
++    pub stdout: OutputCapture,
++    pub stderr: OutputCapture,
++    /// Presentation trimming is separate from raw pipe capture byte counts.
++    #[serde(default)]
++    pub stdout_presentation_truncated: bool,
++    #[serde(default)]
++    pub stderr_presentation_truncated: bool,
++    pub automatic_retry: AutomaticRetry,
++}
++impl RecoveryReport {
++    pub fn note_presentation_truncation(&mut self, stdout: bool, stderr: bool) {
++        // Monotonic: a later formatter cannot undo an earlier omission.
++        self.stdout_presentation_truncated |= stdout;
++        self.stderr_presentation_truncated |= stderr;
++    }
++    /// Use only after a runner confirms tree termination, both pipe joins and
++    /// access restoration. Counts are raw bytes, never lossy UTF-8 string length.
++    #[allow(clippy::too_many_arguments)]
++    pub fn confirmed_result(
++        operation_id: String,
++        exit_code: i32,
++        timed_out: bool,
++        cancelled: bool,
++        stdout_total_bytes: u64,
++        stdout_retained_bytes: u64,
++        stderr_total_bytes: u64,
++        stderr_retained_bytes: u64,
++    ) -> Result<Self, String> {
++        if timed_out && cancelled {
++            return Err("contradictory process timeout/cancellation observation".into());
++        }
++        fn capture(total: u64, retained: u64) -> Result<OutputCapture, String> {
++            if retained > total {
++                return Err("retained output exceeds observed raw bytes".into());
++            }
++            Ok(if retained == total {
++                OutputCapture::Complete {
++                    captured_bytes: retained,
++                }
++            } else {
++                OutputCapture::Truncated {
++                    captured_bytes: retained,
++                    total_bytes: total,
++                }
++            })
++        }
++        let outcome = if timed_out {
++            Outcome::TimedOut
++        } else if cancelled {
++            Outcome::Cancelled
++        } else if exit_code == 0 {
++            Outcome::Completed
++        } else {
++            Outcome::ToolFailed
++        };
++        Self::from_observation(
++            operation_id,
++            outcome,
++            Some(exit_code),
++            Termination::TreeTerminated,
++            Cleanup {
++                stdout_drained: Evidence::Confirmed,
++                stderr_drained: Evidence::Confirmed,
++                access_restored: Evidence::Confirmed,
++            },
++            capture(stdout_total_bytes, stdout_retained_bytes)?,
++            capture(stderr_total_bytes, stderr_retained_bytes)?,
++        )
++    }
++    pub fn unknown_failure(operation_id: String) -> Result<Self, String> {
++        Self::unclassified_error(operation_id)
++    }
++    /// Preflight refusal before ANY process/resource setup; not a UAC response.
++    pub fn refused_before_launch(operation_id: String) -> Result<Self, String> {
++        Self::refused(operation_id, Outcome::SetupFailed)
++    }
++    pub fn refused_elevation_before_launch(operation_id: String) -> Result<Self, String> {
++        Self::refused(operation_id, Outcome::ElevationUnsupported)
++    }
++    fn refused(operation_id: String, outcome: Outcome) -> Result<Self, String> {
++        Self::from_observation(
++            operation_id,
++            outcome,
++            None,
++            Termination::NotStarted,
++            Cleanup {
++                stdout_drained: Evidence::NotApplicable,
++                stderr_drained: Evidence::NotApplicable,
++                access_restored: Evidence::NotApplicable,
++            },
++            OutputCapture::Complete { captured_bytes: 0 },
++            OutputCapture::Complete { captured_bytes: 0 },
++        )
++    }
++    /// Passive metadata footer in the existing tool-content/event channel.
++    /// Never parse this text as execution authority or an automatic retry permit.
++    pub fn attach(
++        self,
++        mut result: crate::agent::tool::ToolResult,
++    ) -> Result<crate::agent::tool::ToolResult, String> {
++        self.validate()?;
++        let json = serde_json::to_string(&self).map_err(|e| e.to_string())?;
++        result.content.push_str("\n\n[recovery_v1]\n");
++        result.content.push_str(&json);
++        result.content.push_str("\n[/recovery_v1]");
++        if self.outcome != Outcome::Completed {
++            result.is_error = true;
++        }
++        Ok(result)
++    }
++    pub fn from_observation(
++        operation_id: String,
++        outcome: Outcome,
++        exit_code: Option<i32>,
++        termination: Termination,
++        cleanup: Cleanup,
++        stdout: OutputCapture,
++        stderr: OutputCapture,
++    ) -> Result<Self, String> {
++        let report = Self {
++            version: REPORT_VERSION,
++            operation_id,
++            outcome,
++            exit_code,
++            termination,
++            cleanup,
++            stdout,
++            stderr,
++            stdout_presentation_truncated: false,
++            stderr_presentation_truncated: false,
++            automatic_retry: AutomaticRetry::Forbidden,
++        };
++        report.validate()?;
++        Ok(report)
++    }
++    /// A plain Err has no process or cleanup proof. Do not parse error strings
++    /// for UAC/timeout classification or claim a child never launched.
++    pub fn unclassified_error(operation_id: String) -> Result<Self, String> {
++        Self::from_observation(
++            operation_id,
++            Outcome::WorkerFailed,
++            None,
++            Termination::Unknown,
++            Cleanup::unknown(),
++            OutputCapture::Unknown,
++            OutputCapture::Unknown,
++        )
++    }
++    pub fn validate(&self) -> Result<(), String> {
++        if self.version != REPORT_VERSION {
++            return Err("unsupported tool recovery report version".into());
++        }
++        if self.operation_id.trim().is_empty()
++            || self.operation_id.trim() != self.operation_id
++            || self.operation_id.len() > 256
++            || self.operation_id.chars().any(char::is_control)
++        {
++            return Err("invalid tool recovery operation identity".into());
++        }
++        self.stdout.validate()?;
++        self.stderr.validate()?;
++        match self.outcome {
++            Outcome::Completed if self.exit_code != Some(0) => {
++                return Err("completed process requires zero exit code".into())
++            }
++            Outcome::ToolFailed if self.exit_code.is_none() || self.exit_code == Some(0) => {
++                return Err("tool failure requires a nonzero exit code".into())
++            }
++            Outcome::Completed | Outcome::ToolFailed
++                if matches!(
++                    self.termination,
++                    Termination::NotStarted | Termination::Unknown
++                ) =>
++            {
++                return Err("exit outcome requires observed process termination".into())
++            }
++            _ => {}
++        }
++        if self.termination == Termination::NotStarted {
++            if self.exit_code.is_some()
++                || !matches!(
++                    self.stdout,
++                    OutputCapture::Unknown | OutputCapture::Complete { captured_bytes: 0 }
++                )
++                || !matches!(
++                    self.stderr,
++                    OutputCapture::Unknown | OutputCapture::Complete { captured_bytes: 0 }
++                )
++            {
++                return Err("unstarted process cannot have exit or captured output".into());
++            }
++        }
++        Ok(())
++    }
++    /// Exited means only the root exited; it is not a process-tree proof.
++    pub fn resources_confirmed(&self) -> Result<bool, String> {
++        self.validate()?;
++        Ok(matches!(
++            self.termination,
++            Termination::NotStarted | Termination::TreeTerminated
++        ) && self.cleanup.confirmed())
++    }
++    pub fn next_step(&self) -> Result<NextStep, String> {
++        if !self.resources_confirmed()? || self.outcome != Outcome::Completed {
++            return Ok(NextStep::ManualReconcile);
++        }
++        if self.stdout_presentation_truncated
++            || self.stderr_presentation_truncated
++            || !matches!(self.stdout, OutputCapture::Complete { .. })
++            || !matches!(self.stderr, OutputCapture::Complete { .. })
++        {
++            return Ok(NextStep::ReviewOutput);
++        }
++        Ok(NextStep::NotRequired)
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    fn clean() -> Cleanup {
++        Cleanup {
++            stdout_drained: Evidence::Confirmed,
++            stderr_drained: Evidence::Confirmed,
++            access_restored: Evidence::Confirmed,
++        }
++    }
++    fn report(outcome: Outcome, exit: Option<i32>) -> RecoveryReport {
++        RecoveryReport::from_observation(
++            "host-operation".into(),
++            outcome,
++            exit,
++            Termination::TreeTerminated,
++            clean(),
++            OutputCapture::Complete { captured_bytes: 5 },
++            OutputCapture::Complete { captured_bytes: 0 },
++        )
++        .unwrap()
++    }
++    #[test]
++    fn clean_success_nonzero_timeout_and_cancel_are_distinct_without_retry() {
++        for (outcome, exit, next) in [
++            (Outcome::Completed, Some(0), NextStep::NotRequired),
++            (Outcome::ToolFailed, Some(2), NextStep::ManualReconcile),
++            (Outcome::TimedOut, Some(124), NextStep::ManualReconcile),
++            (Outcome::Cancelled, Some(130), NextStep::ManualReconcile),
++        ] {
++            let r = report(outcome, exit);
++            assert_eq!(r.next_step().unwrap(), next);
++            assert!(r.resources_confirmed().unwrap());
++            assert_eq!(r.automatic_retry, AutomaticRetry::Forbidden);
++            assert_eq!(
++                serde_json::from_str::<RecoveryReport>(&serde_json::to_string(&r).unwrap())
++                    .unwrap(),
++                r
++            );
++        }
++    }
++    #[test]
++    fn ordinary_error_root_exit_and_failed_cleanup_never_confirm_resources() {
++        let r = RecoveryReport::unclassified_error("op".into()).unwrap();
++        assert!(!r.resources_confirmed().unwrap());
++        assert_eq!(r.next_step().unwrap(), NextStep::ManualReconcile);
++        let mut r = report(Outcome::Completed, Some(0));
++        r.termination = Termination::Exited;
++        assert!(!r.resources_confirmed().unwrap());
++        r.termination = Termination::TreeTerminated;
++        r.cleanup.access_restored = Evidence::Failed;
++        assert!(!r.resources_confirmed().unwrap());
++    }
++    #[test]
++    fn elevation_no_response_and_denial_do_not_infer_launch_or_cleanup() {
++        for outcome in [Outcome::ElevationNoResponse, Outcome::ElevationDenied] {
++            let r = RecoveryReport::from_observation(
++                "uac".into(),
++                outcome,
++                None,
++                Termination::Unknown,
++                Cleanup::unknown(),
++                OutputCapture::Unknown,
++                OutputCapture::Unknown,
++            )
++            .unwrap();
++            assert!(!r.resources_confirmed().unwrap());
++            assert_eq!(r.next_step().unwrap(), NextStep::ManualReconcile);
++        }
++    }
++    #[test]
++    fn truncation_keeps_primary_outcome_and_requires_review_not_rerun() {
++        let mut r = report(Outcome::Completed, Some(0));
++        r.stdout = OutputCapture::Truncated {
++            captured_bytes: 8,
++            total_bytes: 12,
++        };
++        assert_eq!(r.next_step().unwrap(), NextStep::ReviewOutput);
++        r.outcome = Outcome::TimedOut;
++        r.exit_code = Some(124);
++        assert_eq!(r.next_step().unwrap(), NextStep::ManualReconcile);
++        assert_eq!(r.outcome, Outcome::TimedOut);
++        r.stdout = OutputCapture::Truncated {
++            captured_bytes: 9,
++            total_bytes: 8,
++        };
++        assert!(r.validate().is_err());
++    }
++    #[test]
++    fn bad_version_identity_contradictory_exit_and_unknown_retry_are_rejected() {
++        let mut r = report(Outcome::Completed, Some(0));
++        r.version = 2;
++        assert!(r.validate().is_err());
++        r.version = 1;
++        r.exit_code = Some(1);
++        assert!(r.validate().is_err());
++        r.exit_code = Some(0);
++        r.termination = Termination::NotStarted;
++        assert!(r.validate().is_err());
++        assert!(RecoveryReport::unclassified_error(" op ".into()).is_err());
++        let mut v = serde_json::to_value(report(Outcome::Completed, Some(0))).unwrap();
++        v["automatic_retry"] = serde_json::json!("allowed");
++        assert!(serde_json::from_value::<RecoveryReport>(v).is_err());
++    }
++    #[test]
++    fn runner_constructors_preserve_counts_and_footer_without_automatic_retry() {
++        let r =
++            RecoveryReport::confirmed_result("op".into(), 0, false, false, 20, 8, 0, 0).unwrap();
++        assert_eq!(
++            r.stdout,
++            OutputCapture::Truncated {
++                captured_bytes: 8,
++                total_bytes: 20
++            }
++        );
++        let output = r
++            .attach(crate::agent::tool::ToolResult::ok("existing output"))
++            .unwrap();
++        assert!(output
++            .content
++            .starts_with("existing output\n\n[recovery_v1]\n"));
++        let json = output
++            .content
++            .split("[recovery_v1]\n")
++            .nth(1)
++            .unwrap()
++            .split("\n[/recovery_v1]")
++            .next()
++            .unwrap();
++        let saved: RecoveryReport = serde_json::from_str(json).unwrap();
++        assert_eq!(saved.next_step().unwrap(), NextStep::ReviewOutput);
++        assert!(!output.is_error);
++        assert!(RecoveryReport::confirmed_result("op".into(), 0, true, true, 0, 0, 0, 0).is_err());
++        assert!(
++            RecoveryReport::confirmed_result("op".into(), 0, false, false, 2, 3, 0, 0).is_err()
++        );
++    }
++    #[test]
++    fn unsupported_elevation_is_not_reported_as_uac_denial_and_plain_error_stays_unknown() {
++        let r = RecoveryReport::refused_elevation_before_launch("op".into()).unwrap();
++        assert_eq!(r.outcome, Outcome::ElevationUnsupported);
++        assert_eq!(r.termination, Termination::NotStarted);
++        assert_eq!(r.next_step().unwrap(), NextStep::ManualReconcile);
++        let r = RecoveryReport::refused_before_launch("op".into()).unwrap();
++        assert!(r.resources_confirmed().unwrap());
++        assert_eq!(r.outcome, Outcome::SetupFailed);
++        let r = RecoveryReport::unknown_failure("op".into()).unwrap();
++        assert!(!r.resources_confirmed().unwrap());
++        let output = r
++            .attach(crate::agent::tool::ToolResult::err("existing error"))
++            .unwrap();
++        assert!(output.is_error);
++        assert!(output.content.contains("\"termination\":\"unknown\""));
++    }
++    #[test]
++    fn presentation_omission_is_monotonic_without_rewriting_raw_counts() {
++        let mut r =
++            RecoveryReport::confirmed_result("op".into(), 0, false, false, 8, 8, 2, 2).unwrap();
++        r.note_presentation_truncation(true, false);
++        r.note_presentation_truncation(false, false);
++        assert_eq!(r.stdout, OutputCapture::Complete { captured_bytes: 8 });
++        assert_eq!(r.stderr, OutputCapture::Complete { captured_bytes: 2 });
++        assert_eq!(r.next_step().unwrap(), NextStep::ReviewOutput);
++        let mut v = serde_json::to_value(&r).unwrap();
++        v.as_object_mut()
++            .unwrap()
++            .remove("stdout_presentation_truncated");
++        v.as_object_mut()
++            .unwrap()
++            .remove("stderr_presentation_truncated");
++        let old: RecoveryReport = serde_json::from_value(v).unwrap();
++        assert!(!old.stdout_presentation_truncated);
++        assert!(!old.stderr_presentation_truncated);
++    }
++}

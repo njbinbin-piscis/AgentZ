@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-060",
+    "verified_state": "owned_pty_model_listener_watcher_extension_graph_snapshot_candidate",
+    "severity": "P1",
+    "finding": "The host exposes privacy-preserving PTY/Windows Job, local watcher, extension-host and graph-index counts; the CodeZ hook reads Monaco models and tracked listener balance. In-flight watcher start/unmount cleanup is sequenced; successful local watcher starts are counted by owner, with release and cache cleanup after the final stop. Late rebuild and incremental callbacks are rejected under the graph queue lock after watcher release. Queued and controlled in-progress graph workers release state after project close. A synthetic Rust project now runs the real graph generator and releases cached status after close; a large real repository and close during generation remain untested. Two real PTYs contending for one registry ID leave one owned session and reap the rejected shell. Seven native terminal-tree, seven graph-index, one local watcher-ownership and twelve scoped frontend fixtures pass; combined native cargo check passes. Desktop soak is unmeasured.",
+    "conclusion_proposal": "Keep pending until whole-resource census and frozen-budget soak acceptance.",
+    "next_action": "Exercise concurrent Tauri terminal-create command invocations and a real repository graph-build close, then run the two-hour close/restart soak against a frozen AZ-057 budget.",
+    "remaining_work": ["Concurrent Tauri create fixture", "Real repository graph-build close", "Two-hour close/restart soak against frozen AZ-057 budget"],
+    "verification_gaps": ["No native-window snapshot invocation", "No concurrent Tauri create invocation fixture", "No long resource soak"],
+    "evidence": ["docs/upgrade/evidence/AZ-060-2026-10-14/implementation.md", "docs/upgrade/evidence/AZ-060-pty-io-failure-2026-10-15.md", "docs/upgrade/evidence/AZ-060-terminal-resource-snapshot-2026-10-15.md"]
+  }
+]

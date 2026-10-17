@@ -1,0 +1,38 @@
+{
+  "task": "AZ-042",
+  "generated": "2026-10-11T12:27:15.116Z",
+  "files": [
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/lsp/client.rs",
+      "sha256": "88e3abc5e2df6509dc1bc482360cfbeff73242e932b44c0bf8418d2b1d04a5c4"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-ide-tools/src/lsp/manager.rs",
+      "sha256": "f4c747a94eed47889039e867e97c0aa54402e9fa1e61a9b0727ea132fd78ae51"
+    },
+    {
+      "path": "src/services/tauri/lsp.ts",
+      "sha256": "a9dbf9440d935c088300ee1ecdc176efef237fdaaf0ecea481adbf1f70fb74a2"
+    },
+    {
+      "path": "src/services/tauri/lspSession.ts",
+      "sha256": "02e7f98d83b3921ebc66fc7ec132d89e3d50bcea4f6920ecff94d0969d976699"
+    },
+    {
+      "path": "src/services/tauri/lsp.test.ts",
+      "sha256": "e2d0472cc786c8273ee03cef0008c6e1eab581f52cdd62c1a341d3a4ea4749d5"
+    },
+    {
+      "path": "src/services/tauri/lspSession.test.ts",
+      "sha256": "5bec14d8529f127e58af9d4bd41e483a12c4c71cc91c17382465a8ba1028d553"
+    },
+    {
+      "path": "src/workspaces/codez/CodeEditor.tsx",
+      "sha256": "9fa1a9d633c495420cc5f6dfaabaa44b09ab115cca79928bfe11cad869d7bc40"
+    },
+    {
+      "path": "src/workspaces/codez/InlineEdit.css",
+      "sha256": "6b80d0bab98ad809a7f0ea5998091663a59d48ba50c9ab0e8c6497f1f69875bc"
+    }
+  ]
+}

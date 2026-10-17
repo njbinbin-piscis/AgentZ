@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -32,9 +32,23 @@ pub const REMOTE_EVENT: &str = "agentz:remote";
 
 type Pending = Arc<std::sync::Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>>;
 
+fn current_generation(
+    generation: &std::sync::Mutex<u64>,
+    expected: u64,
+) -> Option<std::sync::MutexGuard<'_, u64>> {
+    let current = generation.lock().unwrap();
+    (*current == expected).then_some(current)
+}
+
 /// Shared lifecycle state for the (single) extension host process.
 #[derive(Default)]
 pub struct ExtHostManager {
+    lifecycle: Mutex<()>,
+    /// Reader callbacks and lifecycle invalidation share this lock so stale
+    /// responses/EOF cannot race into the next connection's pending requests.
+    generation: Arc<std::sync::Mutex<u64>>,
+    connected: Arc<AtomicBool>,
+    watch_operations: Mutex<()>,
     inner: Mutex<ExtHostInner>,
     /// Separate from `inner` so a host that stops reading (blocked pipe) can't
     /// freeze status queries and every other caller.
@@ -76,6 +90,45 @@ impl ExtHostManager {
         self.inner.lock().await.server.clone()
     }
 
+    pub(crate) async fn deployment_snapshot(
+        &self,
+    ) -> Result<(RemoteTarget, Option<DeployedServer>), String> {
+        let inner = self.inner.lock().await;
+        let _generation = self.generation.lock().unwrap();
+        if !self.connected.load(Ordering::Acquire) {
+            return Err("extension host is not connected".into());
+        }
+        let target = inner.target.clone().ok_or("extension host has no target")?;
+        Ok((target, inner.server.clone()))
+    }
+
+    pub(crate) async fn bind_authority(&self, authority: &str) -> Result<u64, String> {
+        let generation = *self.generation.lock().unwrap();
+        self.wait_for_authority(authority).await?;
+        let _current = current_generation(&self.generation, generation)
+            .ok_or("remote connection changed while resolving workspace")?;
+        if !self.connected.load(Ordering::Acquire) {
+            return Err("remote connection closed while resolving workspace".into());
+        }
+        Ok(generation)
+    }
+
+    pub(crate) async fn target_for_generation(
+        &self,
+        generation: u64,
+    ) -> Result<RemoteTarget, String> {
+        let target = self
+            .target()
+            .await
+            .ok_or("remote connection has no target")?;
+        let _current = current_generation(&self.generation, generation)
+            .ok_or("remote connection changed while capturing target")?;
+        if !self.connected.load(Ordering::Acquire) {
+            return Err("remote connection closed while capturing target".into());
+        }
+        Ok(target)
+    }
+
     /// Wait until `authority` is the connected target. Waits through an
     /// in-flight connect (deploys can take a minute on slow links) plus a short
     /// grace period for a connect the UI is about to start.
@@ -95,7 +148,9 @@ impl ExtHostManager {
                 .as_deref()
                 .is_some_and(|c| c.eq_ignore_ascii_case(authority));
             let elapsed = started.elapsed();
-            if (!in_flight && elapsed > Duration::from_secs(3)) || elapsed > Duration::from_secs(120) {
+            if (!in_flight && elapsed > Duration::from_secs(3))
+                || elapsed > Duration::from_secs(120)
+            {
                 return Err(format!(
                     "remote '{authority}' is not connected — reopen it from Settings → Extensions → Remote development"
                 ));
@@ -106,11 +161,24 @@ impl ExtHostManager {
 
     /// Call an agentz-server control method on whichever machine the host runs.
     pub async fn request(&self, method: &str, params: Value) -> Result<Value, String> {
+        let generation = *self.generation.lock().unwrap();
+        self.request_generation(method, params, generation).await
+    }
+
+    pub(crate) async fn request_generation(
+        &self,
+        method: &str,
+        params: Value,
+        generation: u64,
+    ) -> Result<Value, String> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed) + 1;
         let (tx, rx) = oneshot::channel();
         self.pending.lock().unwrap().insert(id, tx);
         let frame = json!({ "$agentz": "req", "id": id, "method": method, "params": params });
-        if let Err(e) = self.write_line(frame.to_string()).await {
+        if let Err(e) = self
+            .write_line_generation(frame.to_string(), generation)
+            .await
+        {
             self.pending.lock().unwrap().remove(&id);
             return Err(e);
         }
@@ -125,22 +193,36 @@ impl ExtHostManager {
     }
 
     pub async fn watch_remote(&self, token: &str, remote_path: &str) -> Result<(), String> {
+        let _operation = self.watch_operations.lock().await;
+        let uri = remote::vfs::parse(token).ok_or("invalid remote watch URI")?;
+        let generation = self.bind_authority(&uri.authority).await?;
         self.remote_watches
             .lock()
             .unwrap()
             .insert(token.to_string(), remote_path.to_string());
-        self.request("fs.watch", json!({ "path": remote_path, "token": token }))
-            .await
-            .map(|_| ())
+        self.request_generation(
+            "fs.watch",
+            json!({ "path": remote_path, "token": token }),
+            generation,
+        )
+        .await
+        .map(|_| ())
     }
 
     pub async fn unwatch_remote(&self, token: &str) {
+        let _operation = self.watch_operations.lock().await;
         if self.remote_watches.lock().unwrap().remove(token).is_some() {
-            let _ = self.request("fs.unwatch", json!({ "token": token })).await;
+            if let Some(uri) = remote::vfs::parse(token) {
+                if let Ok(generation) = self.bind_authority(&uri.authority).await {
+                    let _ = self
+                        .request_generation("fs.unwatch", json!({ "token": token }), generation)
+                        .await;
+                }
+            }
         }
     }
 
-    async fn rearm_watches(&self) {
+    async fn rearm_watches(&self, generation: u64, authority: String) {
         let watches: Vec<(String, String)> = self
             .remote_watches
             .lock()
@@ -149,7 +231,23 @@ impl ExtHostManager {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         for (token, path) in watches {
-            if let Err(e) = self.request("fs.watch", json!({ "path": path, "token": token })).await {
+            let _operation = self.watch_operations.lock().await;
+            if self.remote_watches.lock().unwrap().get(&token) != Some(&path) {
+                continue;
+            }
+            if !remote::vfs::parse(&token)
+                .is_some_and(|uri| uri.authority.eq_ignore_ascii_case(&authority))
+            {
+                continue;
+            }
+            if let Err(e) = self
+                .request_generation(
+                    "fs.watch",
+                    json!({ "path": path, "token": token }),
+                    generation,
+                )
+                .await
+            {
                 warn!("re-arming remote watch {token} failed: {e}");
             }
         }
@@ -157,15 +255,31 @@ impl ExtHostManager {
 
     /// A held lock means a write is in flight, i.e. the host is attached.
     fn has_stdin(&self) -> bool {
+        if !self.connected.load(Ordering::Acquire) {
+            return false;
+        }
         self.stdin.try_lock().map(|g| g.is_some()).unwrap_or(true)
     }
 
-    async fn write_line(&self, mut line: String) -> Result<(), String> {
+    async fn write_line(&self, line: String) -> Result<(), String> {
+        let generation = *self.generation.lock().unwrap();
+        self.write_line_generation(line, generation).await
+    }
+
+    async fn write_line_generation(&self, mut line: String, generation: u64) -> Result<(), String> {
         if !line.ends_with('\n') {
             line.push('\n');
         }
         let write = async {
             let mut guard = self.stdin.lock().await;
+            if current_generation(&self.generation, generation).is_none() {
+                return Err(
+                    "extension host connection changed; request was not replayed".to_string(),
+                );
+            }
+            if !self.connected.load(Ordering::Acquire) {
+                return Err("extension host connection closed".to_string());
+            }
             let stdin = guard.as_mut().ok_or("extension host is not running")?;
             stdin
                 .write_all(line.as_bytes())
@@ -189,7 +303,7 @@ impl ExtHostManager {
 }
 
 /// Route a control frame from the server; returns false for ordinary RPC lines.
-fn route_control(app: &AppHandle, pending: &Pending, line: &str) -> bool {
+fn route_control(app: &AppHandle, pending: &Pending, line: &str, generation: u64) -> bool {
     if !line.starts_with("{\"$agentz\"") {
         return false;
     }
@@ -198,7 +312,9 @@ fn route_control(app: &AppHandle, pending: &Pending, line: &str) -> bool {
     };
     match v.get("$agentz").and_then(|k| k.as_str()) {
         Some("res") => {
-            let Some(id) = v.get("id").and_then(|i| i.as_u64()) else { return true };
+            let Some(id) = v.get("id").and_then(|i| i.as_u64()) else {
+                return true;
+            };
             if let Some(tx) = pending.lock().unwrap().remove(&id) {
                 let res = match v.get("error") {
                     Some(err) if !err.is_null() => Err(err
@@ -223,7 +339,7 @@ fn route_control(app: &AppHandle, pending: &Pending, line: &str) -> bool {
                         "kind": v.get("kind"),
                     }),
                 );
-            } else if !remote::forward::on_server_event(&v) {
+            } else if !remote::forward::on_server_event_generation(&v, generation) {
                 let _ = app.emit(REMOTE_EVENT, v);
             }
         }
@@ -240,6 +356,32 @@ pub struct ExtHostStatus {
     pub target: Option<RemoteTarget>,
     pub authority: Option<String>,
     pub remote_home: Option<String>,
+}
+
+/// Counts only; no extension, project, or remote resource identifiers leave the host.
+#[derive(Debug, Serialize)]
+pub struct ExtHostResourceSnapshot {
+    pub child_present: bool,
+    pub connected: bool,
+    pub pending_requests: usize,
+    pub remote_watches: usize,
+}
+
+#[tauri::command]
+pub async fn ext_host_resource_snapshot(
+    state: State<'_, AppState>,
+) -> Result<ExtHostResourceSnapshot, String> {
+    let mgr = &state.ext_host;
+    let child_present = mgr.inner.lock().await.child.is_some();
+    let connected = mgr.connected.load(Ordering::Acquire);
+    let pending_requests = mgr.pending.lock().unwrap().len();
+    let remote_watches = mgr.remote_watches.lock().unwrap().len();
+    Ok(ExtHostResourceSnapshot {
+        child_present,
+        connected,
+        pending_requests,
+        remote_watches,
+    })
 }
 
 /// Directory holding the pinned Node runtimes (`npm run fetch-node`).
@@ -334,7 +476,13 @@ fn node_bin(app: &AppHandle) -> String {
     let exe = if cfg!(windows) { "node.exe" } else { "node" };
     if let Some(dir) = node_resources_dir(app) {
         let p = dir
-            .join(format!("{}-{}", std::env::consts::OS.replace("windows", "win32").replace("macos", "darwin"), node_arch()))
+            .join(format!(
+                "{}-{}",
+                std::env::consts::OS
+                    .replace("windows", "win32")
+                    .replace("macos", "darwin"),
+                node_arch()
+            ))
             .join(exe);
         if p.exists() {
             return p.display().to_string();
@@ -365,6 +513,13 @@ pub async fn ext_host_start(
 ) -> Result<ExtHostStatus, String> {
     let host_js_path = resolve_host_js(&app, host_js)?;
     let mgr = state.ext_host.clone();
+    let _lifecycle = mgr.lifecycle.lock().await;
+    let generation = {
+        let mut current = mgr.generation.lock().unwrap();
+        *current += 1;
+        mgr.connected.store(false, Ordering::Release);
+        *current
+    };
     let target = remote.unwrap_or(RemoteTarget::Local);
     *mgr.connecting.lock().unwrap() = Some(target.authority());
     let _connecting = ConnectingGuard(mgr.connecting.clone());
@@ -384,6 +539,7 @@ pub async fn ext_host_start(
     // breaks the pipe so it errors out and releases it.
     *mgr.stdin.lock().await = None;
     ExtHostManager::fail_pending(&mgr.pending, "extension host restarted");
+    remote::forward::begin_generation(generation);
 
     let (mut command, server) = if target.is_local() {
         let node = node_bin(&app);
@@ -395,7 +551,8 @@ pub async fn ext_host_start(
             EXT_HOST_EVENT,
             json!({ "channel": "log", "data": format!("[remote] deploying agentz-server to {}", target.authority()) }),
         );
-        let server = remote::deploy(&target, &host_js_path, node_resources_dir(&app).as_deref()).await?;
+        let server =
+            remote::deploy(&target, &host_js_path, node_resources_dir(&app).as_deref()).await?;
         let c = target.sh(&remote::launch_script(&server, &project_dir))?;
         (c, Some(server))
     };
@@ -406,7 +563,13 @@ pub async fn ext_host_start(
         .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
-        .map_err(|e| format!("failed to spawn extension host on {}: {}", target.authority(), e))?;
+        .map_err(|e| {
+            format!(
+                "failed to spawn extension host on {}: {}",
+                target.authority(),
+                e
+            )
+        })?;
 
     let stdin = child.stdin.take().ok_or("failed to take host stdin")?;
     let stdout = child.stdout.take().ok_or("failed to take host stdout")?;
@@ -415,12 +578,21 @@ pub async fn ext_host_start(
     // stdout → renderer (RPC frames, one JSON object per line).
     let app_out = app.clone();
     let pending = mgr.pending.clone();
+    let reader_generation = mgr.generation.clone();
+    let connected = mgr.connected.clone();
+    connected.store(true, Ordering::Release);
     tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
         loop {
-            match reader.next_line().await {
+            let result = reader.next_line().await;
+            let Some(_current) = current_generation(&reader_generation, generation) else {
+                break;
+            };
+            match result {
                 Ok(Some(line)) => {
-                    if line.trim().is_empty() || route_control(&app_out, &pending, &line) {
+                    if line.trim().is_empty()
+                        || route_control(&app_out, &pending, &line, generation)
+                    {
                         continue;
                     }
                     let _ = app_out.emit(
@@ -429,6 +601,8 @@ pub async fn ext_host_start(
                     );
                 }
                 Ok(None) => {
+                    connected.store(false, Ordering::Release);
+                    remote::forward::end_generation(generation);
                     ExtHostManager::fail_pending(&pending, "extension host exited");
                     let _ = app_out.emit(
                         EXT_HOST_EVENT,
@@ -437,6 +611,13 @@ pub async fn ext_host_start(
                     break;
                 }
                 Err(e) => {
+                    connected.store(false, Ordering::Release);
+                    remote::forward::end_generation(generation);
+                    ExtHostManager::fail_pending(&pending, "extension host stdout read failed");
+                    let _ = app_out.emit(
+                        EXT_HOST_EVENT,
+                        json!({ "channel": "exit", "data": "stdout read failed" }),
+                    );
                     warn!("ext-host stdout read error: {}", e);
                     break;
                 }
@@ -447,9 +628,13 @@ pub async fn ext_host_start(
     // stderr → renderer log channel (host diagnostics + extension errors).
     if let Some(stderr) = stderr {
         let app_err = app.clone();
+        let reader_generation = mgr.generation.clone();
         tokio::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
+                let Some(_current) = current_generation(&reader_generation, generation) else {
+                    break;
+                };
                 let _ = app_err.emit(EXT_HOST_EVENT, json!({ "channel": "log", "data": line }));
             }
         });
@@ -466,7 +651,8 @@ pub async fn ext_host_start(
 
     if !target.is_local() {
         let mgr = mgr.clone();
-        tokio::spawn(async move { mgr.rearm_watches().await });
+        let authority = target.authority();
+        tokio::spawn(async move { mgr.rearm_watches(generation, authority).await });
     }
 
     info!(
@@ -476,7 +662,7 @@ pub async fn ext_host_start(
         host_js_path.display()
     );
     Ok(ExtHostStatus {
-        running: true,
+        running: mgr.connected.load(Ordering::Acquire),
         project_dir: Some(project_dir),
         host_js: host_js_path.display().to_string(),
         authority: Some(target.authority()),
@@ -495,6 +681,13 @@ pub async fn ext_host_send(state: State<'_, AppState>, message: String) -> Resul
 #[tauri::command]
 pub async fn ext_host_stop(state: State<'_, AppState>) -> Result<(), String> {
     let mgr = state.ext_host.clone();
+    let _lifecycle = mgr.lifecycle.lock().await;
+    let generation = {
+        let mut current = mgr.generation.lock().unwrap();
+        *current += 1;
+        *current
+    };
+    mgr.connected.store(false, Ordering::Release);
     let mut inner = mgr.inner.lock().await;
     inner.child = None;
     inner.project_dir = None;
@@ -503,6 +696,8 @@ pub async fn ext_host_stop(state: State<'_, AppState>) -> Result<(), String> {
     drop(inner);
     *mgr.stdin.lock().await = None;
     remote::forward::stop_all();
+    remote::forward::begin_generation(generation);
+    remote::forward::end_generation(generation);
     remote::lsp::stop_all();
     ExtHostManager::fail_pending(&mgr.pending, "extension host stopped");
     info!("extension host stopped");
@@ -518,7 +713,7 @@ pub async fn ext_host_status(
     let mgr = state.ext_host.clone();
     let inner = mgr.inner.lock().await;
     Ok(ExtHostStatus {
-        running: inner.child.is_some(),
+        running: inner.child.is_some() && mgr.connected.load(Ordering::Acquire),
         project_dir: inner.project_dir.clone(),
         host_js: resolve_host_js(&app, None)
             .map(|p| p.display().to_string())
@@ -527,4 +722,178 @@ pub async fn ext_host_status(
         authority: inner.target.as_ref().map(|t| t.authority()),
         remote_home: inner.server.as_ref().map(|s| s.home.clone()),
     })
+}
+
+#[cfg(test)]
+mod connection_generation_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn stale_session_sends_no_frame_to_replacement_child() {
+        #[cfg(windows)]
+        let mut command = {
+            let mut cmd = tokio::process::Command::new("powershell");
+            cmd.args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "while ($null -ne ($line = [Console]::ReadLine())) { [Console]::WriteLine($line) }",
+            ]);
+            cmd
+        };
+        #[cfg(not(windows))]
+        let mut command = {
+            let mut cmd = tokio::process::Command::new("sh");
+            cmd.args([
+                "-c",
+                "while IFS= read -r line; do printf '%s\\n' \"$line\"; done",
+            ]);
+            cmd
+        };
+        let mut child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let mgr = Arc::new(ExtHostManager::new());
+        *mgr.generation.lock().unwrap() = 2;
+        mgr.connected.store(true, Ordering::Release);
+        *mgr.stdin.lock().await = child.stdin.take();
+        let mut lines = BufReader::new(child.stdout.take().unwrap()).lines();
+        mgr.write_line_generation("replacement-ready".into(), 2)
+            .await
+            .unwrap();
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(15), lines.next_line())
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap(),
+            "replacement-ready"
+        );
+        let session = remote::RemoteSession {
+            target: RemoteTarget::Ssh { host: "a".into() },
+            authority: "ssh-remote+a".into(),
+            path: "/workspace".into(),
+            generation: 1,
+            manager: mgr.clone(),
+        };
+        let result = session
+            .call("fs.writeFile", json!({"path":"/workspace/file"}))
+            .await;
+        assert!(result.unwrap_err().contains("request was not replayed"));
+        assert!(
+            tokio::time::timeout(Duration::from_millis(200), lines.next_line())
+                .await
+                .is_err()
+        );
+        assert!(mgr.pending.lock().unwrap().is_empty());
+        child.kill().await.unwrap();
+        let _ = child.wait().await;
+    }
+
+    #[tokio::test]
+    async fn bound_remote_call_rejects_connection_switch() {
+        let mgr = Arc::new(ExtHostManager::new());
+        *mgr.generation.lock().unwrap() = 1;
+        let session = remote::RemoteSession {
+            target: RemoteTarget::Ssh { host: "a".into() },
+            authority: "ssh-remote+a".into(),
+            path: "/workspace".into(),
+            generation: 1,
+            manager: mgr.clone(),
+        };
+        *mgr.generation.lock().unwrap() = 2;
+        mgr.connected.store(true, Ordering::Release);
+        let result = remote::with_session(
+            session,
+            remote::call(
+                "fs.writeFile",
+                json!({"path":"/workspace/file", "base64":""}),
+            ),
+        )
+        .await;
+        assert!(result.unwrap_err().contains("request was not replayed"));
+        assert!(mgr.pending.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn bound_resolution_rejects_other_authority() {
+        let session = remote::RemoteSession {
+            target: RemoteTarget::Ssh { host: "a".into() },
+            authority: "ssh-remote+a".into(),
+            path: "/workspace".into(),
+            generation: 1,
+            manager: Arc::new(ExtHostManager::new()),
+        };
+        remote::with_session(session, async {
+            assert_eq!(
+                remote::resolve("agentz-remote://ssh-remote+a/workspace")
+                    .await
+                    .unwrap(),
+                Some("/workspace".into())
+            );
+            assert!(remote::resolve("agentz-remote://ssh-remote+b/workspace")
+                .await
+                .unwrap_err()
+                .contains("authority differs"));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn stale_write_is_rejected_before_touching_new_pipe() {
+        let mgr = ExtHostManager::new();
+        *mgr.generation.lock().unwrap() = 2;
+        mgr.connected.store(true, Ordering::Release);
+        let error = mgr
+            .write_line_generation("frame".into(), 1)
+            .await
+            .unwrap_err();
+        assert!(error.contains("request was not replayed"));
+        assert!(mgr.pending.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn disconnected_host_rejects_writes_and_readiness() {
+        let mgr = ExtHostManager::new();
+        assert!(!mgr.has_stdin());
+        assert_eq!(
+            mgr.write_line("frame".into()).await.unwrap_err(),
+            "extension host connection closed"
+        );
+    }
+
+    #[test]
+    fn stale_exit_preserves_new_connection_request() {
+        let generation = std::sync::Mutex::new(2);
+        let pending: Pending = Default::default();
+        let (tx, mut rx) = oneshot::channel();
+        pending.lock().unwrap().insert(7, tx);
+        if let Some(_current) = current_generation(&generation, 1) {
+            ExtHostManager::fail_pending(&pending, "old host exited");
+        }
+        assert_eq!(pending.lock().unwrap().len(), 1);
+        assert!(matches!(
+            rx.try_recv(),
+            Err(oneshot::error::TryRecvError::Empty)
+        ));
+        if let Some(_current) = current_generation(&generation, 2) {
+            ExtHostManager::fail_pending(&pending, "current host exited");
+        }
+        assert_eq!(rx.try_recv().unwrap().unwrap_err(), "current host exited");
+        assert!(pending.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn callback_guard_excludes_lifecycle_invalidation() {
+        let generation = std::sync::Mutex::new(1);
+        let guard = current_generation(&generation, 1).unwrap();
+        assert!(generation.try_lock().is_err());
+        drop(guard);
+        *generation.lock().unwrap() = 2;
+        assert!(current_generation(&generation, 1).is_none());
+        assert!(current_generation(&generation, 2).is_some());
+    }
 }

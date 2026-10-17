@@ -15,8 +15,8 @@ const GRAPH_VERSION: &str = "1.0";
 const MAX_FILE_BYTES: u64 = 1_000_000;
 
 const CODE_EXTS: &[&str] = &[
-    "rs", "ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "go", "java", "c", "h", "cpp", "cc",
-    "cxx", "hpp", "cs", "rb", "php", "swift", "kt", "scala", "lua", "sh", "bash", "vue", "sql",
+    "rs", "ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "go", "java", "c", "h", "cpp", "cc", "cxx",
+    "hpp", "cs", "rb", "php", "swift", "kt", "scala", "lua", "sh", "bash", "vue", "sql",
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -290,7 +290,12 @@ fn extract_imports(content: &str, rel: &str) -> Vec<String> {
         match ext {
             "rs" => {
                 if let Some(rest) = trimmed.strip_prefix("use ") {
-                    let spec = rest.trim_end_matches(';').split('{').next().unwrap_or("").trim();
+                    let spec = rest
+                        .trim_end_matches(';')
+                        .split('{')
+                        .next()
+                        .unwrap_or("")
+                        .trim();
                     if spec.starts_with("crate::") {
                         out.push(spec.replace("crate::", "").to_string());
                     } else if spec.starts_with("super::")
@@ -331,7 +336,11 @@ fn extract_imports(content: &str, rel: &str) -> Vec<String> {
                         out.push(pkg.to_string());
                     }
                 } else if let Some(rest) = trimmed.strip_prefix("import ") {
-                    let pkg = rest.split_whitespace().next().unwrap_or("").trim_end_matches(';');
+                    let pkg = rest
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or("")
+                        .trim_end_matches(';');
                     if !pkg.is_empty() {
                         out.push(pkg.to_string());
                     }
@@ -349,7 +358,12 @@ fn extract_imports(content: &str, rel: &str) -> Vec<String> {
     out
 }
 
-fn resolve_import(_root: &Path, from_rel: &str, spec: &str, file_index: &HashMap<String, ()>) -> Option<String> {
+fn resolve_import(
+    _root: &Path,
+    from_rel: &str,
+    spec: &str,
+    file_index: &HashMap<String, ()>,
+) -> Option<String> {
     if spec.starts_with("mod:") {
         let name = spec.trim_start_matches("mod:");
         let base = parent_rel_path(from_rel);
@@ -514,7 +528,8 @@ impl BuildState {
 
         // Dedupe edges
         let mut seen = BTreeSet::new();
-        self.edges.retain(|e| seen.insert((e.from.clone(), e.to.clone(), e.kind.clone())));
+        self.edges
+            .retain(|e| seen.insert((e.from.clone(), e.to.clone(), e.kind.clone())));
     }
 
     fn module_stats(&self) -> Vec<ModuleStat> {
@@ -607,7 +622,9 @@ pub fn generate_tour(root: &Path) -> Result<TourDoc, String> {
         if from == to {
             continue;
         }
-        adj.entry(from.to_string()).or_default().insert(to.to_string());
+        adj.entry(from.to_string())
+            .or_default()
+            .insert(to.to_string());
         *in_degree.entry(to.to_string()).or_default() += 1;
         in_degree.entry(from.to_string()).or_default();
     }
@@ -712,6 +729,19 @@ pub fn schedule_patch(root: PathBuf, rel: String) {
         return;
     }
     crate::commands::graph_index::notify_file_change(root, rel);
+}
+
+/// Schedule a local watcher event only while that watcher is host-owned.
+pub fn schedule_patch_if_active(
+    root: PathBuf,
+    rel: String,
+    active: &std::sync::atomic::AtomicBool,
+) {
+    let rel = rel.replace('\\', "/");
+    if crate::path_filter::is_ignored_rel_path(&rel) || !is_code_file(Path::new(&rel)) {
+        return;
+    }
+    crate::commands::graph_index::notify_file_change_if_active(root, rel, active);
 }
 
 // ─── Tauri commands ────────────────────────────────────────────────────────

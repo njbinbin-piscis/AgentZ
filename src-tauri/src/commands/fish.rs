@@ -178,9 +178,7 @@ pub fn fish_id_for_skill_slug(slug: &str) -> String {
 /// User-defined anonymous agent derived from `slug`, if any.
 pub fn find_user_fish_for_skill(config_dir: &Path, slug: &str) -> Option<FishDef> {
     let id = fish_id_for_skill_slug(slug);
-    load_user_fish(config_dir)
-        .into_iter()
-        .find(|f| f.id == id)
+    load_user_fish(config_dir).into_iter().find(|f| f.id == id)
 }
 
 /// List all available Fish (for the settings/management UI).

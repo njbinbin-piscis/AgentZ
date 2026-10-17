@@ -1,0 +1,10 @@
+
+ RUN  v2.1.9 C:/Projects/AgentZ
+
+ ✓ src/workspaces/codez/firstRun.test.ts (14 tests) 38ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  03:38:58
+   Duration  4.87s (transform 222ms, setup 0ms, collect 245ms, tests 38ms, environment 3ms, prepare 846ms)
+

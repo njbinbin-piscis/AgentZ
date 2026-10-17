@@ -6,7 +6,9 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import { confirmDialog } from "../../services/tauri/confirm";
 import { ideApi, onTerminalOutput } from "../../services/tauri/ide";
+import { acquireTerminal, terminalBackendId } from "./terminalLifecycle";
 import { cssVar } from "./useAppTheme";
+import { perfCounters } from "../../utils/perfCounters";
 
 export interface TerminalTab {
   id: string;
@@ -40,6 +42,12 @@ interface TerminalSessionProps {
   onSendSelectionToChat?: (text: string) => void;
 }
 
+// Dock keyboard selection keeps focus on its tab until the user enters the pane.
+function dockTabOwnsFocus(container: HTMLDivElement | null): boolean {
+  const focused = document.activeElement;
+  return Boolean(focused?.closest('[role="tablist"]') && container?.closest(".ide-bottom-panel")?.contains(focused));
+}
+
 /** One PTY-backed xterm instance. Stays mounted while its tab exists. */
 function TerminalSession({
   terminalId,
@@ -54,6 +62,19 @@ function TerminalSession({
   const containerRef = useRef<HTMLDivElement>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
   const initializedRef = useRef(false);
+  const backendIdRef = useRef<string | null>(null);
+  const [activatedProject, setActivatedProject] = useState<string | null>(null);
+  const selectionCallbackRef = useRef(onSendSelectionToChat);
+  selectionCallbackRef.current = onSendSelectionToChat;
+  const visibilityRef = useRef({ active, panelVisible });
+  visibilityRef.current = { active, panelVisible };
+  const activationProjectRef = useRef(projectDir);
+  useEffect(() => {
+    const changed = activationProjectRef.current !== projectDir;
+    activationProjectRef.current = projectDir;
+    if (panelVisible && projectDir) setActivatedProject(projectDir);
+    else if (changed) setActivatedProject(null);
+  }, [panelVisible, projectDir]);
   const [selectionMenu, setSelectionMenu] = useState<{ x: number; y: number } | null>(null);
 
   const sendSelection = useCallback(() => {
@@ -72,16 +93,16 @@ function TerminalSession({
       const { cols, rows } = termRef.current;
       if (cols <= 0 || rows <= 0) return;
       if (cols === prevCols && rows === prevRows) return;
-      ideApi.terminalResize(terminalId, cols, rows).catch(() => {});
+      if (backendIdRef.current) ideApi.terminalResize(backendIdRef.current, cols, rows).catch(() => {});
     } catch {
       // Container may still be laying out.
     }
-  }, [terminalId]);
+  }, []);
 
   // Only spawn a PTY once the terminal panel is shown — avoids background
   // sessions that block project close/switch (confirm dialog) on folder open.
   useEffect(() => {
-    if (!projectDir || !panelVisible || initializedRef.current || !containerRef.current) return;
+    if (!projectDir || activatedProject !== projectDir || initializedRef.current || !containerRef.current) return;
     initializedRef.current = true;
 
     const term = new XTerm({
@@ -101,12 +122,15 @@ function TerminalSession({
     termRef.current = term;
     fitRef.current = fit;
 
+    const backendId = `ide-session-${crypto.randomUUID()}`;
+    backendIdRef.current = backendId;
     let cancelled = false;
+    let lease: ReturnType<typeof acquireTerminal> | undefined;
 
     void (async () => {
-      const unlisten = await onTerminalOutput((evt) => {
-        if (evt.id === terminalId) term.write(evt.data);
-      });
+      const unlisten = perfCounters.trackListener(await onTerminalOutput((evt) => {
+        if (!cancelled && evt.id === backendId) term.write(evt.data);
+      }));
       if (cancelled) {
         unlisten();
         term.dispose();
@@ -115,11 +139,11 @@ function TerminalSession({
       unlistenRef.current = unlisten;
 
       term.onData((data) => {
-        ideApi.terminalWrite(terminalId, data).catch(() => {});
+        ideApi.terminalWrite(backendId, data).catch(() => {});
       });
 
       term.onResize(({ cols, rows }) => {
-        ideApi.terminalResize(terminalId, cols, rows).catch(() => {});
+        ideApi.terminalResize(backendId, cols, rows).catch(() => {});
       });
 
       term.attachCustomKeyEventHandler((event) => {
@@ -130,39 +154,56 @@ function TerminalSession({
           event.key.toLowerCase() === "l"
         ) {
           const sel = term.getSelection();
-          if (sel.trim() && onSendSelectionToChat) {
-            onSendSelectionToChat(sel);
+          if (sel.trim() && selectionCallbackRef.current) {
+            selectionCallbackRef.current(sel);
             return false;
           }
         }
         return true;
       });
 
-      await ideApi.terminalCreate(terminalId, projectDir, term.cols || 80, term.rows || 24);
+      lease = acquireTerminal(terminalId,
+        async () => {
+          await ideApi.terminalCreate(backendId, projectDir, term.cols || 80, term.rows || 24);
+          perfCounters.resourceOpened("terminal");
+        },
+        async () => {
+          await ideApi.terminalDestroy(backendId);
+          perfCounters.resourceClosed("terminal");
+        }, backendId);
+      await lease.ready;
 
+      if (cancelled) {
+        await lease.dispose().catch(() => {});
+        return;
+      }
       requestAnimationFrame(() => {
+        if (cancelled) return;
         fitTerminal();
-        if (active && panelVisible) term.focus();
+        if (visibilityRef.current.active && visibilityRef.current.panelVisible && !dockTabOwnsFocus(containerRef.current)) term.focus();
       });
-    })();
+    })().catch((error: unknown) => {
+      if (!cancelled) term.write(`\r\n${String(error)}\r\n`);
+    });
 
     return () => {
       cancelled = true;
       unlistenRef.current?.();
       unlistenRef.current = null;
-      ideApi.terminalDestroy(terminalId).catch(() => {});
+      void lease?.dispose().catch(() => {});
       termRef.current?.dispose();
       termRef.current = null;
+      backendIdRef.current = null;
       fitRef.current = null;
       initializedRef.current = false;
     };
-  }, [terminalId, projectDir, panelVisible, fitTerminal, onSendSelectionToChat]);
+  }, [terminalId, projectDir, activatedProject, fitTerminal]);
 
   useEffect(() => {
     if (!active || !panelVisible) return;
     const timer = window.setTimeout(() => {
       fitTerminal();
-      termRef.current?.focus();
+      if (!dockTabOwnsFocus(containerRef.current)) termRef.current?.focus();
     }, 60);
     return () => window.clearTimeout(timer);
   }, [active, panelVisible, fitTerminal]);
@@ -266,6 +307,8 @@ export default function TerminalPanel({
   const seqRef = useRef(0);
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabId, setActiveTabId] = useState("");
+  const projectEpochRef = useRef({ projectDir });
+  if (projectEpochRef.current.projectDir !== projectDir) projectEpochRef.current = { projectDir };
 
   const allocTab = useCallback((): TerminalTab => {
     seqRef.current += 1;
@@ -278,14 +321,10 @@ export default function TerminalPanel({
 
   // Initialize / reset tabs when project opens or changes.
   useEffect(() => {
-    seqRef.current = 1;
-    const first: TerminalTab = {
-      id: newTerminalId(panelIdRef.current, 1),
-      seq: 1,
-    };
+    const first = allocTab();
     setTabs([first]);
     setActiveTabId(first.id);
-  }, [projectDir]);
+  }, [projectDir, allocTab]);
 
   const addTab = useCallback(() => {
     const tab = allocTab();
@@ -295,8 +334,10 @@ export default function TerminalPanel({
 
   const closeTab = useCallback(
     async (id: string) => {
+      const epoch = projectEpochRef.current;
       try {
-        const alive = await ideApi.terminalIsAlive(id);
+        const backendId = terminalBackendId(id);
+        const alive = backendId ? await ideApi.terminalIsAlive(backendId) : false;
         if (alive) {
           const ok = await confirmDialog(t("ide.terminalCloseTabConfirm"));
           if (!ok) return;
@@ -305,8 +346,9 @@ export default function TerminalPanel({
         const ok = await confirmDialog(t("ide.terminalCloseTabConfirm"));
         if (!ok) return;
       }
+      if (projectEpochRef.current !== epoch) return;
       setTabs((prev) => {
-        if (prev.length <= 1) return prev;
+        if (projectEpochRef.current !== epoch || prev.length <= 1 || !prev.some(tab => tab.id === id)) return prev;
         const next = prev.filter((tab) => tab.id !== id);
         if (activeTabId === id) {
           const idx = prev.findIndex((tab) => tab.id === id);
@@ -400,7 +442,7 @@ export async function confirmTerminalCloseOnProjectChange(
     if (count <= 0) return true;
     return confirmDialog(t("ide.terminalCloseProjectConfirm", { count }));
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -408,7 +450,12 @@ export async function confirmTerminalCloseOnProjectChange(
 export async function destroyAllTerminals(): Promise<void> {
   try {
     await ideApi.terminalDestroyAll();
-  } catch {
-    // Best-effort; React unmount will also try per-tab destroy.
+  } catch (error) {
+    // Fail closed: the caller must not switch or close the project while a shell may still run.
+    // Tell the user why the switch was cancelled, then keep the rejection so the caller aborts.
+    if (typeof window !== "undefined" && typeof window.alert === "function") {
+      window.alert("Could not stop all terminals, so the project change was cancelled. Close the remaining terminal(s) and try again.\n\n无法关闭所有终端，已取消项目切换。请关闭剩余终端后重试。");
+    }
+    throw error;
   }
 }

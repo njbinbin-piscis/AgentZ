@@ -1,0 +1,243 @@
+diff --git a/piscis-kernel/tests/az023_retry_http.rs b/piscis-kernel/tests/az023_retry_http.rs
+new file mode 100644
+index 0000000..6bbc5ee
+--- /dev/null
++++ b/piscis-kernel/tests/az023_retry_http.rs
+@@ -0,0 +1,237 @@
++//! Loopback HTTP fault matrix. No provider credentials, real tools or model execution.
++use piscis_kernel::{
++    agent::{
++        harness::LayeredBudget,
++        loop_::{confirm_flags_handle, AgentLoop, DefaultCompaction},
++        messages::AgentEvent,
++        tool::{ToolContext, ToolRegistry, ToolSettings},
++    },
++    llm::{openai::OpenAiClient, LlmMessage, MessageContent},
++    policy::PolicyGate,
++};
++use serde_json::{json, Value};
++use std::{
++    path::PathBuf,
++    sync::{
++        atomic::{AtomicBool, Ordering},
++        Arc, Mutex,
++    },
++    time::Duration,
++};
++use tokio::{
++    io::{AsyncReadExt, AsyncWriteExt},
++    net::TcpListener,
++    sync::mpsc,
++    task::JoinHandle,
++};
++
++struct Endpoint {
++    url: String,
++    models: Arc<Mutex<Vec<String>>>,
++    failure: Arc<Mutex<Option<String>>>,
++    server: JoinHandle<()>,
++}
++impl Drop for Endpoint {
++    fn drop(&mut self) {
++        self.server.abort();
++    }
++}
++impl Endpoint {
++    async fn start(status: u16, message: &'static str, cancel: Option<Arc<AtomicBool>>) -> Self {
++        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
++        let url = format!("http://{}/v1", listener.local_addr().unwrap());
++        let models = Arc::new(Mutex::new(Vec::new()));
++        let failure = Arc::new(Mutex::new(None));
++        let recorded = models.clone();
++        let faults = failure.clone();
++        let server = tokio::spawn(async move {
++            let result: Result<(), String> = async {
++                loop {
++                    let (mut socket, peer) = listener.accept().await.map_err(|e| e.to_string())?;
++                    if !peer.ip().is_loopback() { return Err("non-loopback request".into()); }
++                    let request: Vec<u8> = tokio::time::timeout(Duration::from_secs(5), async {
++                        let mut bytes = Vec::new();
++                        let mut chunk = [0u8; 4096];
++                        loop {
++                            let count = socket.read(&mut chunk).await.map_err(|e| e.to_string())?;
++                            if count == 0 { return Err("incomplete HTTP request".into()); }
++                            bytes.extend_from_slice(&chunk[..count]);
++                            if bytes.len() > 65536 { return Err("HTTP request exceeds fixture budget".into()); }
++                            if let Some(end) = bytes.windows(4).position(|part| part == b"\r\n\r\n") {
++                                let header = std::str::from_utf8(&bytes[..end]).map_err(|e| e.to_string())?;
++                                if !header.starts_with("POST /v1/chat/completions HTTP/1.1\r\n") { return Err("unexpected HTTP path".into()); }
++                                let length = header.lines().find_map(|line| {
++                                    let (name, value) = line.split_once(':')?;
++                                    name.eq_ignore_ascii_case("content-length").then(|| value.trim().parse::<usize>())
++                                }).ok_or("missing Content-Length")?.map_err(|e| e.to_string())?;
++                                if length > 65536 - end - 4 { return Err("declared body exceeds fixture budget".into()); }
++                                if bytes.len() >= end + 4 + length {
++                                    break Ok::<Vec<u8>, String>(bytes[end + 4..end + 4 + length].to_vec());
++                                }
++                            }
++                        }
++                    }).await.map_err(|_| "fixture HTTP request timeout".to_string())??;
++                    let payload: Value = serde_json::from_slice(&request).map_err(|e| e.to_string())?;
++                    if payload["stream"] != false { return Err("fixture expects non-streaming client".into()); }
++                    let model = payload["model"].as_str().ok_or("missing model")?.to_owned();
++                    let first = { let mut models = recorded.lock().unwrap(); models.push(model); models.len() == 1 };
++                    let body = json!({"error":{"message":message}}).to_string();
++                    let response = format!("HTTP/1.1 {status} Fixture Error\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
++                    socket.write_all(response.as_bytes()).await.map_err(|e| e.to_string())?;
++                    socket.shutdown().await.map_err(|e| e.to_string())?;
++                    if first {
++                        if let Some(cancel) = &cancel {
++                            // Response completed; cancellation arrives during the first backoff.
++                            tokio::time::sleep(Duration::from_millis(50)).await;
++                            cancel.store(true, Ordering::SeqCst);
++                        }
++                    }
++                }
++            }.await;
++            if let Err(error) = result {
++                *faults.lock().unwrap() = Some(error);
++            }
++        });
++        Self {
++            url,
++            models,
++            failure,
++            server,
++        }
++    }
++}
++
++async fn exercise(
++    status: u16,
++    message: &'static str,
++    cancel_in_backoff: bool,
++    expected_calls: usize,
++    expected_code: &str,
++) -> Duration {
++    let cancel = Arc::new(AtomicBool::new(false));
++    let endpoint =
++        Endpoint::start(status, message, cancel_in_backoff.then(|| cancel.clone())).await;
++    let agent = AgentLoop {
++        client: Box::new(OpenAiClient::with_timeout("fixture-key", &endpoint.url, 30)),
++        registry: Arc::new(ToolRegistry::new()),
++        policy: Arc::new(PolicyGate::new(PathBuf::from("."))),
++        system_prompt: "local HTTP retry fixture".into(),
++        model: "fixture-primary".into(),
++        max_tokens: 512,
++        context_window: 8192,
++        budget: LayeredBudget::from_context_window(8192, 512),
++        fallback_models: vec!["must-not-fallback".into()],
++        db: None,
++        plan_state: None,
++        confirmation_responses: None,
++        confirm_flags: confirm_flags_handle(false, false),
++        vision_override: Some(false),
++        vision_delegate: None,
++        vision_model: String::new(),
++        notification_rx: None,
++        auto_compact_input_tokens_threshold: 0,
++        enable_streaming: false,
++        hooks: None,
++        compaction_strategy: Arc::new(DefaultCompaction),
++        memory_plugin: None,
++        context_manager: None,
++        memory_retrieval_prompt: None,
++        loop_strategy: None,
++        same_model_transient_retries: 3,
++    };
++    let context = ToolContext {
++        session_id: "az023-http".into(),
++        workspace_root: PathBuf::from("."),
++        bypass_permissions: false,
++        settings: Arc::new(ToolSettings::default()),
++        max_iterations: Some(1),
++        memory_owner_id: "fixture".into(),
++        pool_session_id: None,
++        tool_use_id: None,
++        cancel: cancel.clone(),
++        loop_halt: None,
++    };
++    let (tx, mut rx) = mpsc::channel(64);
++    let drain = tokio::spawn(async move {
++        let mut events = Vec::new();
++        while let Some(event) = rx.recv().await {
++            events.push(event);
++        }
++        events
++    });
++    let started = std::time::Instant::now();
++    let result = tokio::time::timeout(
++        Duration::from_secs(10),
++        agent.run(
++            vec![LlmMessage {
++                role: "user".into(),
++                content: MessageContent::text("local fixture only"),
++            }],
++            tx,
++            cancel,
++            context,
++        ),
++    )
++    .await
++    .expect("local HTTP matrix must terminate");
++    let elapsed = started.elapsed();
++    if !cancel_in_backoff {
++        assert!(result.is_err());
++    }
++    let events = drain.await.unwrap();
++    assert_eq!(*endpoint.failure.lock().unwrap(), None);
++    let models = endpoint.models.lock().unwrap().clone();
++    assert_eq!(models.len(), expected_calls);
++    assert!(models.iter().all(|model| model == "fixture-primary"));
++    assert!(!events
++        .iter()
++        .any(|event| matches!(event, AgentEvent::ToolStart { .. })));
++    if !cancel_in_backoff {
++        assert!(events.iter().any(|event| matches!(event, AgentEvent::Error { code: Some(code), .. } if code == expected_code)));
++    }
++    elapsed
++}
++
++#[tokio::test]
++async fn http_auth_with_transient_body_stops_after_one_request() {
++    exercise(
++        401,
++        "connection timeout context length exceeded",
++        false,
++        1,
++        "auth_failed",
++    )
++    .await;
++}
++#[tokio::test]
++async fn http_quota_429_does_not_retry_or_fallback() {
++    exercise(
++        429,
++        "insufficient_quota connection timeout",
++        false,
++        1,
++        "quota_exceeded",
++    )
++    .await;
++}
++#[tokio::test]
++async fn http_500_and_504_retry_same_model_three_times() {
++    for status in [500, 504] {
++        exercise(status, "upstream failed", false, 3, "upstream_transient").await;
++    }
++}
++#[tokio::test]
++async fn http_transient_backoff_cancellation_starts_no_second_request() {
++    let elapsed = exercise(500, "upstream failed", true, 1, "upstream_transient").await;
++    // Lower bound: the fixture cancels >=50ms after the 500 response, so the run must have
++    // entered backoff; an immediate finish would be a false pass.
++    assert!(
++        elapsed >= Duration::from_millis(50),
++        "run finished before the backoff window was entered: {elapsed:?}"
++    );
++    // Upper bound: the first real backoff is one second; under 800ms means it was interrupted.
++    assert!(
++        elapsed < Duration::from_millis(800),
++        "cancelled HTTP backoff took {elapsed:?}"
++    );
++}

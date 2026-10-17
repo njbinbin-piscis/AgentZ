@@ -1,0 +1,12 @@
+
+C:\Projects\AgentZ\src\App.tsx
+  314:6  warning  React Hook useEffect has a missing dependency: 't'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Projects\AgentZ\src\workspaces\workz\index.tsx
+   552:6  warning  React Hook useEffect has missing dependencies: 'discardStreamDelta' and 'setPreviewPath'. Either include them or remove the dependency array    react-hooks/exhaustive-deps
+   746:5  warning  React Hook useCallback has a missing dependency: 't'. Either include it or remove the dependency array                                          react-hooks/exhaustive-deps
+  1032:6  warning  React Hook useCallback has a missing dependency: 'discardStreamDelta'. Either include it or remove the dependency array                         react-hooks/exhaustive-deps
+  1098:5  warning  React Hook useCallback has missing dependencies: 'discardStreamDelta' and 'setPreviewPath'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 5 problems (0 errors, 5 warnings)
+

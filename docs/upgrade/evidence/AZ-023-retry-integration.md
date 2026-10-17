@@ -1,0 +1,27 @@
+# AZ-023 错误分类与有界重试候选集成
+
+2026-10-08，两个Codex子代理分别独占source/vendor error_class与loop目标，源仓既有其他dirty未覆盖；本轮改动不包含已完成0.9.7-20261008安装器。
+
+候选分类新增quota_exceeded；明确鉴权/资金耗尽先于正文connection/overloaded等片段，500..599暂时错误，共享is_retryable/fallback判断。公共enum新增variant仅核对仓内消费兼容，第三方exhaustive Rust match可能需要适配；仍flattened字符串best-effort非结构化HTTP全保证。分类patch已有固定commit隔离apply/reverse及byte检查证据；分类测试主线程83160正在编译，未宣称通过。
+
+loop候选同模型attempt clamp1..5，模型候选去重最多4，每iteration主逻辑调用cap12共享corrective/overflow窗口；overflow一次，永久鉴权/余额立即停止，安全backoff最大8秒，保留取消200ms轮询等待。预算不含辅助摘要/视觉/客户端内部POST重发，不称全Run费用预算；没有自动重跑工具。现3fixture未实跑；继续补实际5次耗尽、共享cap和退避取消fixture。Tokio无test-util，不改Cargo，采用15秒有界真实定时假LLM夹具，非fakeclock/真实provider验收。
+
+生产source同步/patch和最终测试冻结尚在进行；GUI模型/平台和正式Gate未验收。
+
+主线程83160分类15测试实际通过exit0，覆盖auth/quota混合文案、HTTP5xx/permanent状态及wirecode；随后分类仅文档引用修正与loop追加fixture已冻结，两仓两目标hash实际一致。最终源主线程88621 loop全tests正在编译，将重跑最新分类与宿主编译后收尾。loop新增真实定时5次耗尽/退避取消/跨纠偏12次计数且ToolStart零条fixture；均未伪称已运行。两个目标固定commit patch隔离apply/reverse与字节比对证据已生成，主线程尚未接入重建脚本，不宣称已有候选重建链包含AZ023。
+
+主线程88621最终exit0：43个agent loop测试全部通过，15.05秒；包括真实5次耗尽、250ms内退避取消fixture、跨纠偏实际12次且无ToolStart、候选去重4次、auth/quota混合文案1次，以及既有overflow/纠偏/取消部分响应回归。不是外部provider HTTP端到端矩阵。主线程52839最新source分类15测试已通过，后续宿主writer编译在途。
+
+主线程源码独立核对main预算在corrective窗口外且调用前递减、永久分类早于overflow/fallback、指数退避安全封顶；另代理只读复核未发现新工具重跑或误成功路径。辅助模型请求/客户端内部重发仍不在本预算，取消未覆盖每个辅助await。固定基线重建链补丁接线独立包正在验证，不能称已完成。
+
+主线程52839最终exit0：最终15分类测试及完整宿主重编译后的writer4专项通过，1个opt-in性能fixture按默认ignored，未记为通过。代理98700固定七patch整链重建及124文件逆向恢复字节验证实际通过；主线程独立核对脚本仅增加两个patch与隔离换行配置，node --check/diff-check exit0，未重复运行archive。
+
+限定独立复核：auth/quota优先和HTTP5xx分类、有界候选/attempt/iteration主调用共享及取消等待符合本包契约；仓内消费编译通过。实际43loop+15class+4host唯一测试，重跑分类不重复累加。真实HTTP假端点原verification仍需补，不以fake LlmClient计数替代；真实provider/GUI/整Run辅助费用仍未验。当前新源未包含既有安装器。重建只覆盖显式patch链，不能覆盖整个当前vendor。
+
+HTTP补验主线程10585实际失败exit1：新独立test内部timeout async Result错误类型推断不明（E0283），尚未执行任何HTTP test。仅fixture需显式Result<Vec<u8>,String>；代理正修两仓test与独立patch，生产源不变。固定八patch最终重建需等待新testpatch冻结再验证，不以旧testpatch产物冒称最终完成。
+
+10585 E0283已修：timeout async成功返回明确Ok<Vec<u8>,String>，两仓HTTPfixture最新91d5ddf718857f11ca59c9fc149bfd3a18841b46e52f4551ea9d7ca9affd3e92。最新八patch整链重建70692与独立逆向124文件恢复34298实际通过，3目标source/vendor/reconstructed byte相等；先前旧testpatch重建未记为最终通过。主线程37286修复后真实HTTP矩阵编译测试在途，生产源未改，不重跑此前43/15/4无关用例。
+
+主线程37286最终exit0：真实OpenAiClient+AgentLoop连接仅127.0.0.1临时HTTP端点，4项matrix全部通过6.15秒。401混合transient正文/429余额各1次wire且拒fallback；500与504各3次同模型wire；首次500后退避取消只1次wire；无ToolStart。补足本包原假模型端点verification的限定矩阵，非真实provider或全部客户端wire预算，未跑GUI/跨平台。
+
+2026-10-09 AZ021新增通用工具调用完成receipt，调用正常返回包括Err只表示调用结束；Drop调用future标未确认，独立sandbox worker仍负责实际清理确认。原模型重试分类与调用上限未修改。当前专项54937编译中，不能把旧重试实跑当新增取消验证；限定复核供依赖消费，整体待补验。

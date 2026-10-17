@@ -1,0 +1,15 @@
+{
+    "task":  "AZ-042",
+    "revision":  "closure-r1",
+    "note":  "Current bytes of the restart-budget fix and its regression tests. The 2026-10-11 re-evaluation finding is stale: the reset is present in lspSession.ts and covered by lspSession.test.ts.",
+    "files":  [
+                  {
+                      "path":  "src/services/tauri/lspSession.ts",
+                      "sha256":  "02e7f98d83b3921ebc66fc7ec132d89e3d50bcea4f6920ecff94d0969d976699"
+                  },
+                  {
+                      "path":  "src/services/tauri/lspSession.test.ts",
+                      "sha256":  "5bec14d8529f127e58af9d4bd41e483a12c4c71cc91c17382465a8ba1028d553"
+                  }
+              ]
+}

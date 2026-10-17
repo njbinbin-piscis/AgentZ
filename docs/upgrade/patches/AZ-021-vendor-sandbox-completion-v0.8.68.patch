@@ -1,0 +1,64 @@
+--- a/piscis-kernel/src/tools/shell.rs
++++ b/piscis-kernel/src/tools/shell.rs
+@@ -217,8 +217,12 @@
+             let worker_workspace_root = workspace_root.clone();
+             let worker_cwd = cwd.clone();
+             let started = Instant::now();
++            let receipt = match ctx.owned_completion().register() {
++                Ok(receipt) => receipt,
++                Err(error) => return Ok(ToolResult::err(error)),
++            };
+             let result = tokio::task::spawn_blocking(move || {
+-                crate::proc::windows_sandbox::run_appcontainer_command(
++                let result = crate::proc::windows_sandbox::run_appcontainer_command(
+                     program.as_os_str(),
+                     &args,
+                     &worker_workspace_root,
+@@ -227,7 +231,14 @@
+                     cancel,
+                     &env_overrides,
+                     MAX_OUTPUT_BYTES,
+-                )
++                );
++                receipt.complete(
++                    result
++                        .as_ref()
++                        .map(|_| ())
++                        .map_err(|_| "sandbox cleanup unconfirmed".into()),
++                );
++                result
+             })
+             .await;
+             let duration_ms = started.elapsed().as_millis();
+--- a/piscis-kernel/src/tools/code_run.rs
++++ b/piscis-kernel/src/tools/code_run.rs
+@@ -165,8 +165,12 @@
+             let cancel = ctx.cancel.clone();
+             let worker_workspace_root = workspace_root.clone();
+             let start = Instant::now();
++            let receipt = match ctx.owned_completion().register() {
++                Ok(receipt) => receipt,
++                Err(error) => return Ok(ToolResult::err(error)),
++            };
+             let run_result = tokio::task::spawn_blocking(move || {
+-                crate::proc::windows_sandbox::run_appcontainer_command(
++                let result = crate::proc::windows_sandbox::run_appcontainer_command(
+                     program.as_os_str(),
+                     &args,
+                     &worker_workspace_root,
+@@ -175,7 +179,14 @@
+                     cancel,
+                     &env_overrides,
+                     MAX_STREAM_BYTES,
+-                )
++                );
++                receipt.complete(
++                    result
++                        .as_ref()
++                        .map(|_| ())
++                        .map_err(|_| "sandbox cleanup unconfirmed".into()),
++                );
++                result
+             })
+             .await;
+             let duration_ms = start.elapsed().as_millis() as u64;

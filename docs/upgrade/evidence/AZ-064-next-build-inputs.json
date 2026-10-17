@@ -1,0 +1,32 @@
+{
+  "frontend_session": 53861,
+  "published": false,
+  "release_ready": false,
+  "files": [
+    {
+      "sha256": "8f4ca4dfb20283c347c197fca432d7abf2a9b91928700a1f1ec146a3866de9c9",
+      "bytes": 784,
+      "path": "dist/index.html"
+    },
+    {
+      "sha256": "59aba2b5ca6fea94b9ffc83eee5d62db18bcb145767c89301c420dec3956a416",
+      "bytes": 99968,
+      "path": "extension-host/dist/host.js"
+    },
+    {
+      "sha256": "b1bcca9eea59524f5f49d97a4269b12b8693b7b9c6e4a9e34516fcc824669f59",
+      "bytes": 86616,
+      "path": "extension-host/dist/smoke.js"
+    },
+    {
+      "sha256": "2e1084e26beacf45f4c53c092fc210cbc5df903891bba267c1bfce2a09d8e2dd",
+      "bytes": 37,
+      "path": "target/upgrade-local-build.json"
+    },
+    {
+      "sha256": "1a5aee5d120917bee9f35fb06ecc6423d9e5d60d9fd11c61aa255a986aeb63a1",
+      "bytes": 85658,
+      "path": "docs/upgrade/evidence/AZ-064-next-source-snapshot.json"
+    }
+  ]
+}

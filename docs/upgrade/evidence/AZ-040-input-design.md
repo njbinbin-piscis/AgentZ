@@ -1,0 +1,27 @@
+# AZ-040 first-use input and running-state design
+
+This is a local-source design review, not a native desktop walkthrough or a five-user usability acceptance. No shared product source was modified.
+
+## Existing trustworthy inputs
+
+WorkZ `index.tsx` owns `goal`, `projectDir`, `isFree/freeCwd`, isolation `isolate/startMode/startBase`, registered `worktree`, task-bound mode locking, selected agent/team and scoped `modelId`. The main send path supplies `workspaceDir = wt.worktree_path ?? runCwd`, `requireTaskEnvironment`, selected model or host default, and plain WorkZ/team source. The existing isolate bar near line 1688 displays directory/isolation, base reference and agent/team controls together; the composer near 1825 is the primary goal entry. Team/pool modes need their own explicitly unsupported task-summary labels rather than applying single-agent state to them.
+
+CodeZ `AssistantPanel.tsx` owns input, `chatMode`, scoped model and selected skills/connectors. Its `chatSend` path near 777 supplies CodeZ source and selected/default model. `ChatComposer` already contains mode/model/skill/connector selectors. The actual permission request is delivered as a runtime `permission_request` event and passed to the existing card; `appSettings.policy_mode` is only configured policy, not a current exact-action grant. Do not present a selected policy as approval already granted.
+
+`TaskDetailsPanel` is already shared between CodeZ and plain WorkZ and uses opaque project scopes plus generation isolation. Its collapsed details show Run, plan progress, environment/events/artifacts source states and a non-atomic-snapshot disclosure. `taskDetails.ts` already models a possible observer budget snapshot with known usage and unknown-record counts; current panel text says enforcement is not connected and does not invent a balance. `RunHistoryPanel` offers verified historical execution state; actual current `permissionRequest`, busy/error and pending queue state remain separate live sources.
+
+## Minimal sequential implementation
+
+1. Add a small shared pure input-context presentation component. Keep the goal textarea and Send/Stop primary; show a compact always-visible summary immediately above it: configured project/workspace selection, selected/default model, configured permission policy, and current mode. Missing values must render Unknown/Not selected rather than a guessed path/model/grant. This summary is descriptive; the host still resolves fresh binding at send time. A registered task should show its host-resolved worktree when available and visibly distinguish authority project from execution directory.
+
+2. Move existing WorkZ base/start-mode, agent/team and less frequent options into a native `<details>` Advanced section without changing handlers, defaults, task-bound/busy disabling or send request fields. Keep free cwd/isolation summary visible. CodeZ can reuse the summary and fold existing skills/connectors controls through a small presentation wrapper; do not silently clear their selection when collapsed. Show a count of active optional choices in the summary, so collapsed controls do not hide behavior. Any team/workflow mode change remains explicit and retains existing mode locks.
+
+3. Add a concise running-state row sourced from existing local live state: busy/queued/permission waiting/error, with Stop and the existing permission-card action where relevant. Keep “waiting for approval” tied to an actual request, not inferred from a long-running tool or stale event. TaskDetails can expose a link/button to existing execution history and artifact/file viewers; these observations must not trigger model continuation. A “latest action” should derive from a validated current Run/Attempt event projection or the currently bound tool step and omit raw tool inputs/results. Without such a verified source, show Unknown instead of recycling a previous task's tool.
+
+4. Upgrade the budget subsection only when `sources.budget.status === available`: show known input/output and active-duration observations, plus counts of unknown usage/pricing records. Retain “observer only; enforcement not connected” unless the actual enforced-policy contract changes. Do not subtract known usage to claim remaining currency/token balance when records or pricing are unknown. Existing policy maxima and observed-limit flags can be displayed as observed facts, not guaranteed remaining allowance.
+
+## Review and acceptance needed
+
+Pure/component fixtures should cover unknown/default model, no project, direct versus isolated configured directory, busy/task-bound locks, collapsed controls preserving selected values, actual permission waiting versus ordinary running, and generation masking on task/scope changes. Budget fixtures must preserve unknown values and cancelled plans without false zero or success. A wrapper-level test should assert unchanged `chatSend` request fields before/after presentation changes. Real GUI keyboard focus, resize/scroll, first-run settings without a model, fresh permission interaction and direct/managed environment runs remain unexecuted acceptance items. Five-user walkthrough feedback is still absent and must not be fabricated from automated tests.
+
+The first implementation slice can therefore stay entirely presentational and reversible: shared context summary plus WorkZ Advanced grouping, followed by component fixtures and a single host-agnostic frontend validation queue. It does not require adding confirmation prompts or changing execution permission semantics.

@@ -1,0 +1,11 @@
+# AZ-018 运行中聊天事件追加候选
+
+仅独占run.rs与本证据。新增append_agent_event(&Binding,bare_stable_event_id,&Value,now_ms)→Event，Immediate事务内核对authoritative Run的task/env/currentattempt且Run/Attempt均Running、delivery=not_ready、时间元数据合法；binding.validate与项目canonical匹配。fresh环境由host持lease和捕获Binding负责，本API不授工具权、不恢复执行。
+
+event_id接收未prefixed稳定key，加一次agent.命名空间；已经agent.前缀拒绝以防双prefix。kind固定agent.event，payload任意JSON走events::append的单payload1MiB限制与序列/dedup逻辑。相同key/payload/time精确幂等，payload或time冲突拒绝。commit后返回Event（events::append的Cursor加原payload/身份），host才能发布。Run.updated_ms、delivery、execution完全不更新。
+
+新增open_existing_readwrite与readonly共享private现有库opener；READ_WRITE无CREATE，不mkdir/initialize/migrate，防try_exists后文件删除时普通open重新创建空库TOCTOU。既有legacy空event namespace可读，但append缺namespace明确失败，不自动初始化。
+
+新增3真实SQLite夹具未运行：running追加→精确dedup/冲突/namespace约束→readonly重开replay与Runupdated不变；queued/跨task-env-project/oversize事务不增长/terminal/旧retry拒而currentretry可追加；missingreadwrite不建库、legacy缺events追加拒且DBbytes不变。正常生命周期fixture不变，host另包接writer，root统一最新test/build。
+
+实际rustfmt与限定diff-check exit0，无Cargo/模型/台账。不存在自动恢复工具副作用，raw聊天事件与生命周期事务事件并存但不替代审批记录。

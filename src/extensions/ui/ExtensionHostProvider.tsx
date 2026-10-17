@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { extensionService } from "../extensionService";
 import { extensionUiStore } from "../extensionUiStore";
+import { debugController } from "../debug/debugController";
 import { composerDbg } from "../../utils/composerDebug";
 import MessageToasts from "./MessageToasts";
 import QuickInput from "./QuickInput";
@@ -26,6 +27,12 @@ export default function ExtensionHostProvider({
   enabled = true,
 }: Props) {
   const activeRef = useRef(false);
+
+  // A debug session belongs to the project it started for. This layout effect runs synchronously on commit,
+  // before the debounced extension-host restart, so no debug request can reach the old project afterwards.
+  useLayoutEffect(() => {
+    void debugController.stopIfProjectChanged(projectDir);
+  }, [projectDir]);
 
   useEffect(() => {
     let cancelled = false;

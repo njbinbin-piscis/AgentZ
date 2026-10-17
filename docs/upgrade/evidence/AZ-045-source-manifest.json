@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-07T05:16:51.834Z",
+  "task": {
+    "id": "AZ-045",
+    "status": "preparing",
+    "milestone": "M5",
+    "acceptanceCriteria": [
+      "断连不当成本地路径；主机密钥改变拒绝；重连不重复写入"
+    ]
+  },
+  "readOnly": true,
+  "runsTests": false,
+  "acceptancePassed": false,
+  "note": "Fingerprints identify current source, not tested binaries. Recorded statements are historical claims, not verification of this snapshot. No ledger or filesystem writes.",
+  "sources": [
+    {
+      "path": "src-tauri/src/commands/ext_host.rs",
+      "bytes": 30534,
+      "sha256": "94035ba296d9721e4d5f93c70cd2dc1c9bb512dcaf6ac876e4549177c5c4ee62"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_turn.rs",
+      "bytes": 102174,
+      "sha256": "0b42bb7c741c36d4626ef959431394dcf257c4c8a87fb9b57cb0e3ec271d6f93"
+    },
+    {
+      "path": "src-tauri/src/commands/ide.rs",
+      "bytes": 66190,
+      "sha256": "b35482ec332f484342310f31a00c448e5f21a6524dcc946e874c85cad7906a2d"
+    },
+    {
+      "path": "src-tauri/src/commands/remote.rs",
+      "bytes": 10178,
+      "sha256": "2b390a9e8b1f9966a2da491ea8a7d27d9a762500feed8105eb5bd4ee4ad7b309"
+    },
+    {
+      "path": "src-tauri/src/commands/git_workspace.rs",
+      "bytes": 12515,
+      "sha256": "5be5ae1721ab286c2d6303afc1f3c70094f8d59b00001498c9c1dc63211ddcb9"
+    },
+    {
+      "path": "src-tauri/src/remote/mod.rs",
+      "bytes": 26675,
+      "sha256": "e811b504da562eb2e163012ef37c8213f5e1f0dacccd1dc4227950cfc8f22f6a"
+    },
+    {
+      "path": "src-tauri/src/remote/vfs.rs",
+      "bytes": 3603,
+      "sha256": "b798547d696d3ee86188d99d28dc1f36ec612c3de4150de9191f05ace58126b8"
+    },
+    {
+      "path": "src-tauri/src/remote/forward.rs",
+      "bytes": 37985,
+      "sha256": "4eba84ca86eb610d496dd224928f659bc494d166ca7b3fc5e3197a803c0e43cd"
+    },
+    {
+      "path": "src-tauri/src/remote/lsp.rs",
+      "bytes": 15106,
+      "sha256": "4050823fddd2caf844b33928669f2d4dbe24719110308fbe85f75ad58fd5a139"
+    },
+    {
+      "path": "src-tauri/src/remote/mirror.rs",
+      "bytes": 14655,
+      "sha256": "f45082acb12069252027efff1ff12e41f86557f8c6517ea8006b0e32eceb364a"
+    },
+    {
+      "path": "src-tauri/src/remote/ssh_setup.rs",
+      "bytes": 5839,
+      "sha256": "27583334f27da0e3a723bcc6d01138fdc98a9dd9e25af0165f3da0da4a8cb4f6"
+    },
+    {
+      "path": "src-tauri/src/remote/live_tests.rs",
+      "bytes": 18134,
+      "sha256": "547080ae74f48689c8fab70bc70ce4e6449da8270eefa59df6cfc32ff52caa39"
+    },
+    {
+      "path": "src-tauri/src/tools/remote_fs.rs",
+      "bytes": 23112,
+      "sha256": "7264caa606127497c55e26c303b47bd12a114374989fa89b1adf1110607c8946"
+    },
+    {
+      "path": "scripts/upgrade-remote-candidate.mjs",
+      "bytes": 4804,
+      "sha256": "505e87ab9e4d47025130e2789927798c62a19e38c247b9182218ffbce2626c85"
+    },
+    {
+      "path": "scripts/upgrade-ssh-fixture.ps1",
+      "bytes": 8410,
+      "sha256": "30134c58291e9c0988b9eae03e89a0e090451b6e27e682a7b7e9a83bea05250f"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md",
+      "bytes": 15986,
+      "sha256": "b2292c2ee0fd18d0ddc0e8d610849c91e5439d746f882db3da278237a4847ff6",
+      "recordedStatements": [
+        "现有remote/live_tests要求AGENTZ_LIVE_HOST和既有密钥认证，默认ignored；本轮尚未执行真实SSH断网/重连/主机密钥测试，不读取或改变用户known_hosts、不连接未授权主机。先建立本地受控协议/路径夹具，再评估独立SSH测试环境。",
+        "验证：rustc --edition 2021 --test src-tauri/src/remote/vfs.rs，4 passed / 0 failed。包含Unicode相邻坏转义、Windows分隔符、混合大小写scheme及畸形authority。宿主cargo check -p agentz-desktop --lib启动，会话87632，结果待确认。",
+        "宿主首次check（87632）已完成，exit 0，耗时2m06s。进一步审查remote_fs发现工具参数中畸形remote URI被拼为普通远程相对路径；join改为Result，识别scheme后解析失败明确返回invalid remote file URI。已格式化该文件；针对后续变更重新启动宿主check（17326），仍运行，不能将首次check当作最后变更验证。连接世代修复尚未实施。",
+        "连接世代候选：ExtHostManager增加lifecycle异步锁，串行化start/stop；在拆除旧连接之前推进generation。stdout消息/响应/EOF/read error、stderr日志持有当前世代同步guard执行回调，旧世代回调丢弃；guard同时排除生命周期失效，避免单纯原子load后回调的竞态。当前reader错误现在fail pending并emit exit。尚未处理EOF后stdin健康标识及watch任务绑定，真实SSH仍未验收。",
+        "新增2项connection_generation_tests：旧世代EOF不清空新请求、当前世代退出结束请求；回调guard排除世代失效。本轮尚未运行这些测试。中途cargo check会话99423正在运行，不将其作为随后抽取helper/测试代码的最终验证。",
+        "2026-10-07回归结果：会话81733 cargo test -p agentz-desktop --lib connection_generation_tests已退出0，2 passed、0 failed（142 filtered）；证明旧世代回调保留新pending以及锁定回调排除世代失效，不代表真实SSH重连验收。",
+        "继续候选修复：connected原子健康标识在拆旧连接时置false、reader启动前置true，在当前世代EOF/read error置false；has_stdin与write_line检查该标识，避免已断开的管道仍被当作就绪。旧reader只有拿到当前世代guard后才能更改健康状态。针对该后续变更重新启动测试构建，会话32217，尚未完成；watch任务绑定和状态展示仍需补齐。",
+        "继续候选：request在进入时捕获generation，实际拿到stdin锁后重新检查；重连后的陈旧请求拒绝且不重放。rearm_watches绑定启动generation并按token中的remote authority筛选，避免旧监听恢复任务流入不同远程连接。status.running同时检查connected标识。新增异步回归测试：陈旧write在接触新pipe前拒绝，断连host拒绝write/readiness。注意这两项尚未运行，不能以此前2项通过代替。",
+        "32217健康标识版本2项测试通过（exit0）；后续4项测试重新构建会话17534，待结果。子代理发现原始authority未贯穿resolve到call的A/B切换风险、watch恢复快照与unwatch竞态，优先作为下一步修复，不以当前generation测试替代环境路由验收。",
+        "会话17534最终4项connection_generation_tests通过，exit0；不将此结果延伸至本轮watch/mirror后续修改或真实SSH验收。原始authority贯穿副作用执行的P1问题仍未解决，必须优先跟进。",
+        "会话99183镜像模块6项测试通过（含新增3项），exit0；真实SSH故障仍未验证。远程LSP子代理候选已完成并新增2项本地真实子进程生命周期测试，尚未构建。主线程与第三代理正在实现工具入口RemoteSession绑定：bind_authority在等待前后核对generation，后续task-local scope内remote::call使用固定generation，不再按调用时当前连接捕获。此API及工具包装仍待最终编译/验证。",
+        "已接收BoundTool候选并补resolve作用域语义：任务scope内解析必须匹配原始authority，不再重新等待当时的当前连接；call始终使用绑定generation。新增绑定调用跨世代拒绝、scope解析拒绝不同authority两项回归，尚未运行。LSP2项本地子进程测试构建会话97895已启动；新测试随后纳入统一验证。注意无scope的Git/终端/其他调用还未全面绑定，不将工具层修复宣称为全部远程入口完成。",
+        "会话97895 remote::lsp::tests已通过4项，包含2项真实本地自有子进程退出测试（客户端未接入与已接入），exit0；不等于真实SSH/桌面LSP验收。最新connection_generation_tests6项统一构建会话59029运行中，不能提前标记通过。",
+        "会话59029最新connection_generation_tests6项通过（exit0），含scope跨世代write拒绝与不同authority解析拒绝；仍不是实际A/B远程管道零帧验证。IDE文件入口绑定候选及镜像v2大小写隔离已接收。统一remote过滤测试构建会话73168启动，待结果；随后新增bound_session辅助API需下一轮最终验证。代理继续修复Git discard错误误判及Git helper保持已有session，主线程不覆盖其文件。",
+        "会话73168 remote过滤自动化已退出0：23 passed、0 failed、5 ignored。通过项涵盖镜像v2大小写隔离、完成标记故障、损坏归档、工具authority输入边界、IDE rename边界、本地LSP子进程EOF。5个真实远程用例ignored未跑，不能计入验收。",
+        "新增Git discard分类2项测试构建会话12979待完成。主线程继续补watch/unwatch按token authority绑定generation，代理处理终端目标快照；后续修改需再次验证，不将23项通过推广为最新全部入口已验收。",
+        "整合失败记录：会话12979因子代理已提交terminal使用session.target、主线程尚未补API，E0609缺字段而失败，未运行Git分类测试。本轮已补RemoteSession.target及target_for_generation：取target快照后核对generation/connected与authority，防止把A路径绑定B目标；更新测试构造字段。重新构建Git分类测试，待结果，不隐去首次失败。",
+        "会话21339 Git discard分类2项测试通过，exit0，证明NUL列表保留Unicode/新行和坏列表拒绝；不代表实际远程权限失败删除全流程验收。最新复审确认现有绑定入口的世代目标与watch取消竞态候选已解决，仍发现commands/remote.rs文件动作/list绕过session。本轮将该独占文件委派代理修复，主线程修复refresh_git_repos discovery改为绑定session.call。统一remote过滤测试重新启动（当前discovery变更版本），后续代理变更再验证。",
+        "会话60842 remote过滤23通过/0失败/5 ignored，覆盖此前版本。接收公共remote list/action session绑定候选及3项测试。新增真实本地替换子进程管道回归：先用当前世代发ready并接收echo确认管道可用，再对旧session请求写入，断言明确拒绝且替换管道200ms无任何帧；只kill自身child。该新测试构建尚未结束，不宣称真实SSH或实际A/B主机测试通过。",
+        "会话55905最新7项connection_generation_tests通过，exit0，含实际本地替换子进程管道准备帧成功、旧世代write拒绝且200ms未收到帧；只验证本地受控子进程，不是SSH断网。公共remote command3项rename边界测试也已运行通过，exit0。",
+        "已接收forward候选：缓存保留authority且检查child存活，start串行及stop epoch，SSH accept-new/ConnectTimeout15，隧道键(generation,id)与绑定请求，RAII资源清理/JoinSet子任务取消。新增5项回归统一构建会话77670运行中。git diff --check对主线程相关文件通过（仅CRLF提示）。仍有SSH监听仅800ms探测、stderr未持续drain、早到帧无界等未解决，不将candidate当完整恢复。",
+        "会话77670 forward5项测试已通过，exit0：世代同id隔离、旧guard保护替换channel、authority不同不复用、失败scope清理并abort下行、owned子进程退出不活跃。随后统一remote过滤回归会话82205，待最终结果。代理继续独占forward补20秒内真实本地监听ready检查、stderr尾部8KiB持续drain、早到帧容量失败关闭，未连接真实SSH。",
+        "会话82205最终结果：31 passed、0 failed、5 ignored，exit0（remote过滤，不包括全部世代/Git分类测试）；新增forward后续就绪/预算尚未纳入。五项ignored真实远程测试仍未跑。",
+        "forward第二批候选已接收：20秒deadline本地监听就绪探测、owned child退出失败、8KiB stderr尾部持续消费；早帧128连接/4MiB总payload/每连接128帧/单帧64KiB，超限整个世代失败关闭；新增6项测试待运行，结合前5项共11项统一构建会话13793。已要求代理只读复核注册后unbounded慢消费者与failed世代集合增长，构建期间不并行改该文件。真实SSH/主机密钥验收仍未运行。",
+        "会话13793 forward11项回归全部通过，exit0：含延迟owned本地监听就绪、超时拒绝、诊断持续drain超过容量、早帧字节/连接/空帧预算失败关闭；耗时9m42s构建。真实SSH并未运行。",
+        "已接收forward第三批候选并接线：start在不同target stop_all及旧pending清理之后begin_generation；当前reader EOF/read error匹配end_generation；stop先stop_all再begin新高水位并end，防旧回调污染。8槽注册队列/128连接上限、独立watch信号终止阻塞写、早帧重放失败关闭、世代O(1)状态新增6项测试，总17项统一构建待完成。该后续修改尚未验收，真实SSH未跑。",
+        "会话77267 forward17项全部通过；会话26686统一remote43 passed/0 failed/5 ignored，exit0（过滤范围，不含全部世代/Git分类）。最终审查发现budget fail后broker listener仍在缓存，start/list可能误报健康，已授权代理精确修复该缺口及回归，不扩展业务范围。最新该后续变更仍待验证。",
+        "会话43348最新forward19项回归通过，exit0，含budget fail后start/list不报告缓存成功。已生成13文件源码SHA256及验收矩阵AZ-045-source-manifest.json，不代表真实验收通过。最新全局tsc --noEmit会话79265待确认，统一remote会话19683待最终结果。AZ013代理已恢复其私有57596会话，确认ESLint exit0无诊断并持久写证据；父线程Unknown并非通过推断。另PR后端稳定任务/HEAD/运行租约缺口作为后续具体风险记录，未外发PR。",
+        "最终确认：19683 remote45 passed/0 failed/5 ignored，exit0；79265全局TypeScript noEmit exit0。复审发现chat上下文文件/规则读取、扩展target/server分开取快照、Git diff复合流程仍缺绑定；已委派chat和Git diff独占修复，主线程负责扩展快照。上述45项与tsc覆盖当前快照，不覆盖下一轮修复。",
+        "继续并行交付：chat上下文文件/规则入口scope和Git diff整复合session候选已接收，各新增2项边界测试未跑；主线程扩展部署改为同锁deployment_snapshot取得target/server，检查connected，避免A目标+B服务器home混合。统一remote构建会话41383正在运行，之后mirror继承scope补丁需再验证。",
+        "会话41383 remote49 passed/0 failed/5 ignored，exit0，覆盖chat2项及Git diff2项新增边界。随后mirror继承scope候选已接收，新remote构建会话93481待结果。"
+      ]
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-045-source-manifest.json",
+      "bytes": 18075,
+      "sha256": "95d46c632cf3d5f26d3a90b20f284be9c293384b66e27b4780a0a9cc6a75d5ab",
+      "recordedStatements": [
+        "        \"现有remote/live_tests要求AGENTZ_LIVE_HOST和既有密钥认证，默认ignored；本轮尚未执行真实SSH断网/重连/主机密钥测试，不读取或改变用户known_hosts、不连接未授权主机。先建立本地受控协议/路径夹具，再评估独立SSH测试环境。\",",
+        "        \"验证：rustc --edition 2021 --test src-tauri/src/remote/vfs.rs，4 passed / 0 failed。包含Unicode相邻坏转义、Windows分隔符、混合大小写scheme及畸形authority。宿主cargo check -p agentz-desktop --lib启动，会话87632，结果待确认。\",",
+        "        \"宿主首次check（87632）已完成，exit 0，耗时2m06s。进一步审查remote_fs发现工具参数中畸形remote URI被拼为普通远程相对路径；join改为Result，识别scheme后解析失败明确返回invalid remote file URI。已格式化该文件；针对后续变更重新启动宿主check（17326），仍运行，不能将首次check当作最后变更验证。连接世代修复尚未实施。\",",
+        "        \"连接世代候选：ExtHostManager增加lifecycle异步锁，串行化start/stop；在拆除旧连接之前推进generation。stdout消息/响应/EOF/read error、stderr日志持有当前世代同步guard执行回调，旧世代回调丢弃；guard同时排除生命周期失效，避免单纯原子load后回调的竞态。当前reader错误现在fail pending并emit exit。尚未处理EOF后stdin健康标识及watch任务绑定，真实SSH仍未验收。\",",
+        "        \"新增2项connection_generation_tests：旧世代EOF不清空新请求、当前世代退出结束请求；回调guard排除世代失效。本轮尚未运行这些测试。中途cargo check会话99423正在运行，不将其作为随后抽取helper/测试代码的最终验证。\",",
+        "        \"2026-10-07回归结果：会话81733 cargo test -p agentz-desktop --lib connection_generation_tests已退出0，2 passed、0 failed（142 filtered）；证明旧世代回调保留新pending以及锁定回调排除世代失效，不代表真实SSH重连验收。\",",
+        "        \"继续候选修复：connected原子健康标识在拆旧连接时置false、reader启动前置true，在当前世代EOF/read error置false；has_stdin与write_line检查该标识，避免已断开的管道仍被当作就绪。旧reader只有拿到当前世代guard后才能更改健康状态。针对该后续变更重新启动测试构建，会话32217，尚未完成；watch任务绑定和状态展示仍需补齐。\",",
+        "        \"继续候选：request在进入时捕获generation，实际拿到stdin锁后重新检查；重连后的陈旧请求拒绝且不重放。rearm_watches绑定启动generation并按token中的remote authority筛选，避免旧监听恢复任务流入不同远程连接。status.running同时检查connected标识。新增异步回归测试：陈旧write在接触新pipe前拒绝，断连host拒绝write/readiness。注意这两项尚未运行，不能以此前2项通过代替。\",",
+        "        \"32217健康标识版本2项测试通过（exit0）；后续4项测试重新构建会话17534，待结果。子代理发现原始authority未贯穿resolve到call的A/B切换风险、watch恢复快照与unwatch竞态，优先作为下一步修复，不以当前generation测试替代环境路由验收。\",",
+        "        \"会话17534最终4项connection_generation_tests通过，exit0；不将此结果延伸至本轮watch/mirror后续修改或真实SSH验收。原始authority贯穿副作用执行的P1问题仍未解决，必须优先跟进。\",",
+        "        \"会话99183镜像模块6项测试通过（含新增3项），exit0；真实SSH故障仍未验证。远程LSP子代理候选已完成并新增2项本地真实子进程生命周期测试，尚未构建。主线程与第三代理正在实现工具入口RemoteSession绑定：bind_authority在等待前后核对generation，后续task-local scope内remote::call使用固定generation，不再按调用时当前连接捕获。此API及工具包装仍待最终编译/验证。\",",
+        "        \"已接收BoundTool候选并补resolve作用域语义：任务scope内解析必须匹配原始authority，不再重新等待当时的当前连接；call始终使用绑定generation。新增绑定调用跨世代拒绝、scope解析拒绝不同authority两项回归，尚未运行。LSP2项本地子进程测试构建会话97895已启动；新测试随后纳入统一验证。注意无scope的Git/终端/其他调用还未全面绑定，不将工具层修复宣称为全部远程入口完成。\",",
+        "        \"会话97895 remote::lsp::tests已通过4项，包含2项真实本地自有子进程退出测试（客户端未接入与已接入），exit0；不等于真实SSH/桌面LSP验收。最新connection_generation_tests6项统一构建会话59029运行中，不能提前标记通过。\",",
+        "        \"会话59029最新connection_generation_tests6项通过（exit0），含scope跨世代write拒绝与不同authority解析拒绝；仍不是实际A/B远程管道零帧验证。IDE文件入口绑定候选及镜像v2大小写隔离已接收。统一remote过滤测试构建会话73168启动，待结果；随后新增bound_session辅助API需下一轮最终验证。代理继续修复Git discard错误误判及Git helper保持已有session，主线程不覆盖其文件。\",",
+        "        \"会话73168 remote过滤自动化已退出0：23 passed、0 failed、5 ignored。通过项涵盖镜像v2大小写隔离、完成标记故障、损坏归档、工具authority输入边界、IDE rename边界、本地LSP子进程EOF。5个真实远程用例ignored未跑，不能计入验收。\",",
+        "        \"新增Git discard分类2项测试构建会话12979待完成。主线程继续补watch/unwatch按token authority绑定generation，代理处理终端目标快照；后续修改需再次验证，不将23项通过推广为最新全部入口已验收。\",",
+        "        \"整合失败记录：会话12979因子代理已提交terminal使用session.target、主线程尚未补API，E0609缺字段而失败，未运行Git分类测试。本轮已补RemoteSession.target及target_for_generation：取target快照后核对generation/connected与authority，防止把A路径绑定B目标；更新测试构造字段。重新构建Git分类测试，待结果，不隐去首次失败。\",",
+        "        \"会话21339 Git discard分类2项测试通过，exit0，证明NUL列表保留Unicode/新行和坏列表拒绝；不代表实际远程权限失败删除全流程验收。最新复审确认现有绑定入口的世代目标与watch取消竞态候选已解决，仍发现commands/remote.rs文件动作/list绕过session。本轮将该独占文件委派代理修复，主线程修复refresh_git_repos discovery改为绑定session.call。统一remote过滤测试重新启动（当前discovery变更版本），后续代理变更再验证。\",",
+        "        \"会话60842 remote过滤23通过/0失败/5 ignored，覆盖此前版本。接收公共remote list/action session绑定候选及3项测试。新增真实本地替换子进程管道回归：先用当前世代发ready并接收echo确认管道可用，再对旧session请求写入，断言明确拒绝且替换管道200ms无任何帧；只kill自身child。该新测试构建尚未结束，不宣称真实SSH或实际A/B主机测试通过。\",",
+        "        \"会话55905最新7项connection_generation_tests通过，exit0，含实际本地替换子进程管道准备帧成功、旧世代write拒绝且200ms未收到帧；只验证本地受控子进程，不是SSH断网。公共remote command3项rename边界测试也已运行通过，exit0。\",",
+        "        \"已接收forward候选：缓存保留authority且检查child存活，start串行及stop epoch，SSH accept-new/ConnectTimeout15，隧道键(generation,id)与绑定请求，RAII资源清理/JoinSet子任务取消。新增5项回归统一构建会话77670运行中。git diff --check对主线程相关文件通过（仅CRLF提示）。仍有SSH监听仅800ms探测、stderr未持续drain、早到帧无界等未解决，不将candidate当完整恢复。\",",
+        "        \"会话77670 forward5项测试已通过，exit0：世代同id隔离、旧guard保护替换channel、authority不同不复用、失败scope清理并abort下行、owned子进程退出不活跃。随后统一remote过滤回归会话82205，待最终结果。代理继续独占forward补20秒内真实本地监听ready检查、stderr尾部8KiB持续drain、早到帧容量失败关闭，未连接真实SSH。\",",
+        "        \"会话82205最终结果：31 passed、0 failed、5 ignored，exit0（remote过滤，不包括全部世代/Git分类测试）；新增forward后续就绪/预算尚未纳入。五项ignored真实远程测试仍未跑。\",",
+        "        \"forward第二批候选已接收：20秒deadline本地监听就绪探测、owned child退出失败、8KiB stderr尾部持续消费；早帧128连接/4MiB总payload/每连接128帧/单帧64KiB，超限整个世代失败关闭；新增6项测试待运行，结合前5项共11项统一构建会话13793。已要求代理只读复核注册后unbounded慢消费者与failed世代集合增长，构建期间不并行改该文件。真实SSH/主机密钥验收仍未运行。\",",
+        "        \"会话13793 forward11项回归全部通过，exit0：含延迟owned本地监听就绪、超时拒绝、诊断持续drain超过容量、早帧字节/连接/空帧预算失败关闭；耗时9m42s构建。真实SSH并未运行。\",",
+        "        \"已接收forward第三批候选并接线：start在不同target stop_all及旧pending清理之后begin_generation；当前reader EOF/read error匹配end_generation；stop先stop_all再begin新高水位并end，防旧回调污染。8槽注册队列/128连接上限、独立watch信号终止阻塞写、早帧重放失败关闭、世代O(1)状态新增6项测试，总17项统一构建待完成。该后续修改尚未验收，真实SSH未跑。\",",
+        "        \"会话77267 forward17项全部通过；会话26686统一remote43 passed/0 failed/5 ignored，exit0（过滤范围，不含全部世代/Git分类）。最终审查发现budget fail后broker listener仍在缓存，start/list可能误报健康，已授权代理精确修复该缺口及回归，不扩展业务范围。最新该后续变更仍待验证。\"",
+        "        \"已运行 rustfmt（一次因Windows映射文件占用失败，重试成功）与 git diff --check（通过，既有CRLF提示）。未运行 cargo，未运行真实SSH、主机密钥变化、网络断连验收。\",",
+        "        \"主线程报告前5项测试已通过。本节新增实现尚未运行cargo：SSH不再固定等待800ms，而是在20秒deadline内探测localhost指定端口，child退出/检查失败/超时均返回错误；诊断管道自spawn起持续后台读取，环形尾部容量8KiB，句柄销毁会取消消费任务。探测产生一次本地TCP连接，能确认监听接受连接；不能证明远端目标服务可用，端口释放到SSH绑定间仍有既有竞争窗口。\",",
+        "        \"本节修复了前节800ms与stderr未消费、early无界三项限制；仍有注册后unbounded channel慢消费者可能积压、child退出仅查询时清理、全局停止epoch保守取消等限制，真实SSH验收仍未运行。\",",
+        "        \"主线程报告前11项forward测试已通过。本节独占实现未运行cargo：注册队列改为bounded 8槽，所有事件/早帧重放仅try_send；注册连接总数最多128，单个listener的已接入/等待连接也最多128。满队列、重放容量不足或注册连接超限会fail当前世代；使用独立watch关闭信号（不经过数据队列），即使queue满也能终止下行。下行在等待frame和write_all两处都优先监听关闭信号，阻塞本地写可被取消；超限不会静默丢字节后继续流。单帧64KiB限制保持，最大注册排队payload约64MiB，另有正在写的一帧/连接和早帧4MiB；没有无限数据队列。\",",
+        "        \"前节unbounded注册通道与同authority失败集合增长限制已解决；剩余child退出状态仍查询时更新、SSH本地端口竞争窗口、远端服务未就绪无法由本地监听证明、停止epoch保守取消，真实SSH验收仍未运行。\"",
+        "        \"新增2项测试：同authority活跃缓存在预算fail后不报告成功；list从原健康listener到失败后移除句柄。未运行cargo。rustfmt、git diff --check通过。原本43项remote过滤通过是主线程报告的此前快照，不能覆盖这两项后续改动。\",",
+        "        \"| 绑定session、旧write零帧 | 主线程会话55905 7项，本地owned替换子进程 | 历史本地通过，非SSH |\",",
+        "        \"| bounded/lifecycle集成 | 主线程报告remote过滤43通过/5 ignored | 此前快照通过；5个真实远程ignored未跑 |\",",
+        "        \"| failed broker缓存状态 | 本轮子代理新增2测试 | 尚未执行，由主线程统一构建 |\"",
+        "      \"evidence\": \"Real remote tests previously ignored; no controlled SSH failure acceptance\""
+      ]
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-045-isolated-ssh.md",
+      "bytes": 4720,
+      "sha256": "ad6d3e35e26a6262fad5fa37ee70d123a9010447d8344f451777af5dbfbf5bcd",
+      "recordedStatements": [
+        "运行 `scripts/upgrade-ssh-fixture.ps1`，工具会话38445，exit 0，结果 `passed-host-key-handshake-only`。本地Windows系统OpenSSH ssh/sshd/keygen已存在，未安装任何组件。脚本SHA-256：`30134c58291e9c0988b9eae03e89a0e090451b6e27e682a7b7e9a83bea05250f`。"
+      ]
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-045-forward-recovery.md",
+      "bytes": 6733,
+      "sha256": "e45d58137a190daf5b193efd76a23d74f24da3edca5709539eb4103a0b0fc2cf",
+      "recordedStatements": [
+        "已运行 rustfmt（一次因Windows映射文件占用失败，重试成功）与 git diff --check（通过，既有CRLF提示）。未运行 cargo，未运行真实SSH、主机密钥变化、网络断连验收。",
+        "主线程报告前5项测试已通过。本节新增实现尚未运行cargo：SSH不再固定等待800ms，而是在20秒deadline内探测localhost指定端口，child退出/检查失败/超时均返回错误；诊断管道自spawn起持续后台读取，环形尾部容量8KiB，句柄销毁会取消消费任务。探测产生一次本地TCP连接，能确认监听接受连接；不能证明远端目标服务可用，端口释放到SSH绑定间仍有既有竞争窗口。",
+        "本节修复了前节800ms与stderr未消费、early无界三项限制；仍有注册后unbounded channel慢消费者可能积压、child退出仅查询时清理、全局停止epoch保守取消等限制，真实SSH验收仍未运行。",
+        "主线程报告前11项forward测试已通过。本节独占实现未运行cargo：注册队列改为bounded 8槽，所有事件/早帧重放仅try_send；注册连接总数最多128，单个listener的已接入/等待连接也最多128。满队列、重放容量不足或注册连接超限会fail当前世代；使用独立watch关闭信号（不经过数据队列），即使queue满也能终止下行。下行在等待frame和write_all两处都优先监听关闭信号，阻塞本地写可被取消；超限不会静默丢字节后继续流。单帧64KiB限制保持，最大注册排队payload约64MiB，另有正在写的一帧/连接和早帧4MiB；没有无限数据队列。",
+        "前节unbounded注册通道与同authority失败集合增长限制已解决；剩余child退出状态仍查询时更新、SSH本地端口竞争窗口、远端服务未就绪无法由本地监听证明、停止epoch保守取消，真实SSH验收仍未运行。"
+      ]
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-045-final-audit.md",
+      "bytes": 7823,
+      "sha256": "861ba7615ddb0764cdc4c02a2ab887079ed15533d76517bbbba61f8068741803",
+      "recordedStatements": [
+        "新增2项测试：同authority活跃缓存在预算fail后不报告成功；list从原健康listener到失败后移除句柄。未运行cargo。rustfmt、git diff --check通过。原本43项remote过滤通过是主线程报告的此前快照，不能覆盖这两项后续改动。",
+        "| 绑定session、旧write零帧 | 主线程会话55905 7项，本地owned替换子进程 | 历史本地通过，非SSH |",
+        "| bounded/lifecycle集成 | 主线程报告remote过滤43通过/5 ignored | 此前快照通过；5个真实远程ignored未跑 |",
+        "| failed broker缓存状态 | 本轮子代理新增2测试 | 尚未执行，由主线程统一构建 |",
+        "### 最小验收方案（尚未执行）"
+      ]
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-045-chat-context-binding.md",
+      "bytes": 3794,
+      "sha256": "d0d6d7aeedb03930ae3ac22d7b0f24292e2633fd6ebc85512a24f8f868053f2b",
+      "recordedStatements": [
+        "Single-file rustfmt passed. Cargo compilation/tests were **not** run by this agent; the primary agent owns combined verification. No external model, SSH, desktop GUI, ledger update, or deployment occurred.",
+        "The same agent was subsequently authorized to edit `remote/mirror.rs`. Existing v2 case-sensitive identity, completion-marker invalidation, and extraction fixes were preserved. `sync` now obtains the enclosing bound session or binds once when called independently. It validates workspace authority, generation, and target before considering a cache hit, after acquiring the workspace sync lock, after transfer, and after pruning before completion publication. Transport always uses the retained target; it no longer selects the current manager target independently. Two new tests exercise a cross-authority scope and a disconnected session failing before cache/transport use. Single-file rustfmt passed; these tests and compilation remain unrun by this agent."
+      ]
+    }
+  ],
+  "matrix": [
+    {
+      "area": "VFS malformed URI / Unicode",
+      "status": "historical-local-evidence",
+      "evidence": "AZ-045-remote-recovery-candidate.md: rustc 4 tests"
+    },
+    {
+      "area": "Bound session / replacement process zero stale frames",
+      "status": "historical-local-evidence",
+      "evidence": "AZ-045-remote-recovery-candidate.md: session 55905, 7 tests"
+    },
+    {
+      "area": "Mirror / remote LSP / command boundaries",
+      "status": "historical-local-evidence",
+      "evidence": "AZ-045-remote-recovery-candidate.md: remote filtered test runs; source versions differ"
+    },
+    {
+      "area": "Forward readiness / diagnostics / budgets",
+      "status": "historical-local-evidence",
+      "evidence": "AZ-045-remote-recovery-candidate.md: session 13793, 11 tests; later candidate changes require rerun"
+    },
+    {
+      "area": "Forward generation lifecycle / bounded queue / failed cache",
+      "status": "latest-source-needs-verified-run",
+      "evidence": "AZ-045-forward-recovery.md and AZ-045-final-audit.md; this script never runs tests"
+    },
+    {
+      "area": "Real SSH disconnect / reconnect / duplicate write",
+      "status": "not-accepted",
+      "evidence": "Real remote tests previously ignored; no controlled SSH failure acceptance"
+    },
+    {
+      "area": "Changed SSH host key rejection",
+      "status": "isolated-client-handshake-passed-product-not-accepted",
+      "evidence": "AZ-045-isolated-ssh.md: owned localhost sshd and independent known_hosts positive/negative controls passed; authentication, execution and product entry points unaccepted"
+    },
+    {
+      "area": "Desktop file / LSP / terminal / Agent unified state",
+      "status": "not-accepted",
+      "evidence": "Desktop GUI and model journey not run; user deferred GUI"
+    }
+  ]
+}

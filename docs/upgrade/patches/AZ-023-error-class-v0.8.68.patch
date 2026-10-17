@@ -1,0 +1,227 @@
+diff --git a/piscis-kernel/src/llm/error_class.rs b/piscis-kernel/src/llm/error_class.rs
+index 2eb7417..1205178 100644
+--- a/piscis-kernel/src/llm/error_class.rs
++++ b/piscis-kernel/src/llm/error_class.rs
+@@ -1,6 +1,6 @@
+ //! Central classification of LLM/tool failures into a small, stable set of
+ //! machine-readable codes. Shared by:
+-//! - `agent::loop_::is_fallback_eligible_error` (decide whether to try the
++//! - `agent::loop_` (classify bounded retry/fallback decisions and select the
+ //!   next fallback model), and
+ //! - `AgentEvent::Error.code` (surfaced to the frontend so it can render a
+ //!   category-specific message instead of a raw upstream string).
+@@ -34,6 +34,8 @@ pub enum ErrorClass {
+     /// Authentication/authorization failure (bad/expired API key, etc.).
+     /// Not eligible for fallback — switching models won't help.
+     AuthFailed,
++    /// Account billing/credit exhaustion. Neither retries nor model fallback restore funds.
++    QuotaExceeded,
+     /// Transient upstream failure (timeout, connection reset, 5xx,
+     /// mid-stream disconnects). Should be retried with backoff on the same
+     /// model, not switched away from.
+@@ -56,12 +58,18 @@ impl ErrorClass {
+             Self::ProtocolError => "protocol_error",
+             Self::RateLimited => "rate_limited",
+             Self::AuthFailed => "auth_failed",
++            Self::QuotaExceeded => "quota_exceeded",
+             Self::UpstreamTransient => "upstream_transient",
+             Self::ReasoningReplayRequired => "reasoning_replay_required",
+             Self::Unknown => "unknown",
+         }
+     }
+ 
++    /// Only temporary upstream failures may retry the same model.
++    pub fn is_retryable(&self) -> bool {
++        matches!(self, Self::UpstreamTransient)
++    }
++
+     /// True if a caller should try the next configured fallback model
+     /// instead of retrying the same model or giving up outright.
+     ///
+@@ -98,6 +106,28 @@ pub fn classify_error(msg: &str) -> ErrorClass {
+     let lower = msg.to_lowercase();
+     let status = extract_http_status(&lower);
+ 
++    if lower.contains("auth_failed")
++        || lower.contains("unauthorized")
++        || lower.contains("invalid api key")
++        || lower.contains("incorrect api key")
++        || status == Some(401)
++        || status == Some(403)
++    {
++        return ErrorClass::AuthFailed;
++    }
++
++    if status == Some(402)
++        || lower.contains("insufficient_quota")
++        || lower.contains("billing_hard_limit_reached")
++        || lower.contains("insufficient_balance")
++        || lower.contains("insufficient balance")
++        || lower.contains("credit balance is too low")
++        || lower.contains("credits exhausted")
++        || lower.contains("payment_required")
++    {
++        return ErrorClass::QuotaExceeded;
++    }
++
+     if lower.contains("tool_args_invalid") {
+         return ErrorClass::ToolArgsInvalid;
+     }
+@@ -106,6 +136,11 @@ pub fn classify_error(msg: &str) -> ErrorClass {
+         return ErrorClass::ReasoningReplayRequired;
+     }
+ 
++    // Explicit HTTP status takes precedence over incidental model/transient words.
++    if status.is_some_and(|status| (500..=599).contains(&status)) {
++        return ErrorClass::UpstreamTransient;
++    }
++
+     if lower.contains("model_not_found")
+         || lower.contains("model not found")
+         || lower.contains("model_unavailable")
+@@ -122,16 +157,6 @@ pub fn classify_error(msg: &str) -> ErrorClass {
+         return ErrorClass::RateLimited;
+     }
+ 
+-    if lower.contains("auth_failed")
+-        || lower.contains("unauthorized")
+-        || lower.contains("invalid api key")
+-        || lower.contains("incorrect api key")
+-        || status == Some(401)
+-        || status == Some(403)
+-    {
+-        return ErrorClass::AuthFailed;
+-    }
+-
+     if lower.contains("protocol_error")
+         || lower.contains("missing 'choices'")
+         || lower.contains("returned empty choices")
+@@ -141,12 +166,15 @@ pub fn classify_error(msg: &str) -> ErrorClass {
+         return ErrorClass::ProtocolError;
+     }
+ 
++    // Other HTTP failures are permanent/unknown here; incidental body text must
++    // not turn a 400/404 into a transient network failure.
++    if status.is_some() {
++        return ErrorClass::Unknown;
++    }
++
+     if lower.contains("timeout")
+         || lower.contains("connection")
+         || lower.contains("overloaded")
+-        || lower.contains("502")
+-        || lower.contains("503")
+-        || lower.contains("529")
+         || lower.contains("error decoding response body")
+         || lower.contains("incomplete message")
+         || lower.contains("unexpected eof")
+@@ -162,6 +190,85 @@ pub fn classify_error(msg: &str) -> ErrorClass {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn permanent_auth_dominates_mixed_retry_and_fallback_words() {
++        for msg in [
++            "OpenAI API error 401 Unauthorized: connection timeout rate_limit model_not_found",
++            "OpenAI API error 403 Forbidden: overloaded 503",
++            "invalid API key: connection rejected",
++            "OpenAI API error 429: auth_failed, retry after timeout",
++            "OpenAI API error 500: incorrect api key",
++        ] {
++            let class = classify_error(msg);
++            assert_eq!(class, ErrorClass::AuthFailed, "{msg}");
++            assert!(!class.is_retryable());
++            assert!(!class.is_fallback_eligible());
++        }
++    }
++
++    #[test]
++    fn account_exhaustion_dominates_rate_limits_and_transient_words() {
++        for msg in [
++            "OpenAI API error 429: insufficient_quota, timeout rate_limit",
++            "OpenAI API error 402 Payment Required: overloaded",
++            "OpenAI API error 503: billing_hard_limit_reached",
++            "insufficient balance: connection unavailable",
++            "credit balance is too low",
++            "credits exhausted",
++        ] {
++            let class = classify_error(msg);
++            assert_eq!(class, ErrorClass::QuotaExceeded, "{msg}");
++            assert!(!class.is_retryable());
++            assert!(!class.is_fallback_eligible());
++        }
++        // A periodic rate quota is not evidence of exhausted account funds.
++        assert_eq!(
++            classify_error("OpenAI API error 429: per-minute quota exceeded"),
++            ErrorClass::RateLimited
++        );
++    }
++
++    #[test]
++    fn http_server_errors_retry_but_permanent_status_bodies_do_not() {
++        for status in [500, 502, 503, 504, 529, 599] {
++            let class = classify_error(&format!("OpenAI API error {status}: temporary failure"));
++            assert_eq!(class, ErrorClass::UpstreamTransient);
++            assert!(class.is_retryable());
++            assert!(!class.is_fallback_eligible());
++        }
++        for msg in [
++            "OpenAI API error 400 Bad Request: connection timeout happened earlier 503",
++            "OpenAI API error 404: route missing, connection unavailable 502",
++            "Unexpected identifier 502 in response",
++        ] {
++            assert_eq!(classify_error(msg), ErrorClass::Unknown, "{msg}");
++            assert!(!classify_error(msg).is_retryable());
++        }
++        assert!(classify_error("CONNECTION RESET BY PEER").is_retryable());
++    }
++
++    #[test]
++    fn quota_wire_code_is_additive_and_old_codes_round_trip() {
++        let class = ErrorClass::QuotaExceeded;
++        assert_eq!(class.code(), "quota_exceeded");
++        assert_eq!(serde_json::to_string(&class).unwrap(), "\"quota_exceeded\"");
++        assert_eq!(
++            serde_json::from_str::<ErrorClass>("\"quota_exceeded\"").unwrap(),
++            class
++        );
++        for class in [
++            ErrorClass::AuthFailed,
++            ErrorClass::RateLimited,
++            ErrorClass::ToolArgsInvalid,
++            ErrorClass::Unknown,
++        ] {
++            assert_eq!(
++                serde_json::from_str::<ErrorClass>(&format!("\"{}\"", class.code())).unwrap(),
++                class
++            );
++        }
++    }
++
+     #[test]
+     fn classifies_group_404_as_model_unavailable() {
+         // Real-world sample reported by a user via a compatible-API proxy group.
+@@ -209,7 +316,10 @@ mod tests {
+ 
+     #[test]
+     fn classifies_rate_limit_variants() {
+-        assert_eq!(classify_error("rate_limit_exceeded"), ErrorClass::RateLimited);
++        assert_eq!(
++            classify_error("rate_limit_exceeded"),
++            ErrorClass::RateLimited
++        );
+         assert_eq!(
+             classify_error("You have hit the rate limit, slow down"),
+             ErrorClass::RateLimited
+@@ -256,7 +366,10 @@ mod tests {
+ 
+     #[test]
+     fn unknown_falls_through() {
+-        assert_eq!(classify_error("something totally unexpected"), ErrorClass::Unknown);
++        assert_eq!(
++            classify_error("something totally unexpected"),
++            ErrorClass::Unknown
++        );
+         assert!(!classify_error("something totally unexpected").is_fallback_eligible());
+     }
+ 

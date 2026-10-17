@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-059",
+    "verified_state": "code_map_lazy_chunk_minified_build_unreviewed",
+    "severity": "P1",
+    "finding": "CodeMapPanel now loads on demand; typecheck and default esbuild-minified production Vite build pass. The generated entry does not preload the graph chunk, and its same-source output is 42.4% smaller than without minification.",
+    "conclusion_proposal": "Keep blocked until controlled before/after startup and offline/native functional acceptance are resolved.",
+    "next_action": "Measure controlled initial load and graph-open load, then run native offline journey after AZ-040 review.",
+    "remaining_work": ["Controlled before/after startup and graph-open measurement", "Native offline feature check", "AZ-040 dependency and unified review"],
+    "verification_gaps": ["No controlled before/after startup measurement", "No native desktop run", "Earlier minifier failure root cause unproven"],
+    "evidence": ["docs/upgrade/evidence/AZ-059-2026-10-14/implementation.md", "docs/upgrade/evidence/AZ-059-2026-10-14/minified-build.log"]
+  }
+]

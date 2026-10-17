@@ -5,6 +5,7 @@ import "./IdeSidePanel.css";
 
 interface IdeSidePanelProps {
   projectDir: string | null;
+  onOpenFolder: () => void;
   insertRequest?: { paths: string[]; nonce: number } | null;
   insertElementRequest?: { element: PickedElement; nonce: number } | null;
   insertTerminalRequest?: { snippetId: string; text: string; nonce: number } | null;
@@ -14,6 +15,7 @@ interface IdeSidePanelProps {
 
 export default function IdeSidePanel({
   projectDir,
+  onOpenFolder,
   insertRequest,
   insertElementRequest,
   insertTerminalRequest,
@@ -24,6 +26,7 @@ export default function IdeSidePanel({
     <div className="ide-side-panel">
       <AssistantPanel
         projectDir={projectDir}
+        onOpenFolder={onOpenFolder}
         insertRequest={insertRequest}
         insertElementRequest={insertElementRequest}
         insertTerminalRequest={insertTerminalRequest}

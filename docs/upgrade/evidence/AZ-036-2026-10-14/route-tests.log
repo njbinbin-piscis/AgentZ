@@ -1,0 +1,12 @@
+
+ RUN  v2.1.9 C:/Projects/AgentZ
+
+ ✓ src/services/tauri/taskFiles.test.ts (4 tests) 23ms
+ ✓ src/workspaces/codez/TaskFileViewer.test.tsx (5 tests) 62ms
+ ✓ src/services/tauri/taskView.test.ts (3 tests) 17ms
+
+ Test Files  3 passed (3)
+      Tests  12 passed (12)
+   Start at  03:26:22
+   Duration  3.17s (transform 329ms, setup 0ms, collect 553ms, tests 102ms, environment 1ms, prepare 795ms)
+

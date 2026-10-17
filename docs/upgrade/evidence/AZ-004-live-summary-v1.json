@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "scope": "real kernel synthetic tools, not host/GUI/OS sandbox or priced settlement",
+  "spec_sha256": "f57dc7bcaf7a667d42ba4eeceff2b258c3c62c661eb98105b83e2cbccc04e7a3",
+  "fixture_source_sha256": "1a9243308dd564364e91ccbdbe46a727cc2cc5f8ad0ed5abfd43a5654977ad7e",
+  "model": "deepseek-flash",
+  "endpoint": "https://api.deepseek.com",
+  "planned_unique_tasks": 12,
+  "repeats": 3,
+  "planned_samples": 36,
+  "attempted_samples": 36,
+  "unattempted_samples": 0,
+  "passed_samples": 33,
+  "failed_samples": 3,
+  "observed_success_ratio": 0.9166666666666666,
+  "all_planned_samples_passed": false,
+  "statuses": {
+    "passed": 33,
+    "artifact_failed": 3
+  },
+  "by_task": {
+    "J1-01": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J1-02": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J1-03": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J1-04": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J2-01": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J2-02": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J2-03": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J2-04": {
+      "attempted": 3,
+      "passed": 0,
+      "failed": 3
+    },
+    "J3-01": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J3-02": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J3-03": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "J3-04": {
+      "attempted": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "elapsed_ms": {
+    "p50": 3271,
+    "p95": 4468
+  },
+  "logical_calls": 108,
+  "recorded_input_tokens_known_samples": 45599,
+  "recorded_output_tokens_known_samples": 8175,
+  "unknown_usage_samples": 0,
+  "pricing_source": "https://api-docs.deepseek.com/quick_start/pricing/",
+  "pricing_checked": "2026-10-09",
+  "recorded_usage_peak_rate_estimate_usd": 0.0234897,
+  "total_billed_cost_usd": null,
+  "billing_verified": false,
+  "wire_request_count_verified": false,
+  "manual_interventions_in_samples": 0,
+  "stopped": null,
+  "unverified": [
+    "host",
+    "GUI",
+    "native sandbox",
+    "priced settlement",
+    "cross-platform",
+    "true session continuation"
+  ],
+  "limitations": [
+    "Synthetic artifact oracle; substring checks are not full semantic correctness",
+    "Fixed order and repeated tasks are not an independent random sample",
+    "Latency is kernel task latency, not desktop startup or UI response",
+    "Recorded usage estimate is not provider invoice or a verified whole-run fee"
+  ]
+}

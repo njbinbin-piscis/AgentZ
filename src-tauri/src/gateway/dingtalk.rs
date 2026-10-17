@@ -89,10 +89,7 @@ impl DingtalkChannel {
         let token = body["accessToken"]
             .as_str()
             .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Missing accessToken in DingTalk response: {:?}. Check appKey/appSecret.",
-                    body
-                )
+                anyhow::anyhow!("Missing accessToken in DingTalk response. Check appKey/appSecret.")
             })?
             .to_string();
         let expires_in = body["expireIn"].as_u64().unwrap_or(7200);
@@ -483,18 +480,11 @@ async fn ensure_dingtalk_send_ok(resp: reqwest::Response) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Invalid JSON from DingTalk send API: {}", e))?;
 
     if !status.is_success() {
-        return Err(anyhow::anyhow!("DingTalk send HTTP {}: {}", status, body));
+        return Err(anyhow::anyhow!("DingTalk send HTTP {}", status));
     }
     if let Some(code) = body["errcode"].as_i64().or(body["code"].as_i64()) {
         if code != 0 {
-            return Err(anyhow::anyhow!(
-                "DingTalk send error {}: {}",
-                code,
-                body["errmsg"]
-                    .as_str()
-                    .or(body["message"].as_str())
-                    .unwrap_or("unknown")
-            ));
+            return Err(anyhow::anyhow!("DingTalk send error {}", code));
         }
     }
     Ok(())
@@ -542,11 +532,11 @@ async fn get_stream_connection(http: &Client, config: &DingtalkConfig) -> Result
 
     let endpoint = body["endpoint"]
         .as_str()
-        .ok_or_else(|| anyhow::anyhow!("Missing endpoint in DingTalk Stream response: {:?}", body))?
+        .ok_or_else(|| anyhow::anyhow!("Missing endpoint in DingTalk Stream response"))?
         .to_string();
     let ticket = body["ticket"]
         .as_str()
-        .ok_or_else(|| anyhow::anyhow!("Missing ticket in DingTalk Stream response: {:?}", body))?
+        .ok_or_else(|| anyhow::anyhow!("Missing ticket in DingTalk Stream response"))?
         .to_string();
 
     Ok((endpoint, ticket))

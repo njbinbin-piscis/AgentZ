@@ -8,6 +8,7 @@ import {
   monacoLanguageForFile,
   registerLspProviders,
   type LspProvidersRegistration,
+  type LspHealth,
 } from "../../services/tauri/lsp";
 import { acquireLspSession } from "../../services/tauri/lspSession";
 import { fileUriString } from "../../services/tauri/editorUri";
@@ -77,6 +78,7 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
   // providers/markers after `onMount` has fired (which happens only once).
   const monacoRef = useRef<typeof Monaco | null>(null);
   const [monacoReady, setMonacoReady] = useState(false);
+  const [lspHealth, setLspHealth] = useState<LspHealth>("idle");
   const didChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bpDisposeRef = useRef<any>(null);
@@ -585,6 +587,8 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
     let registration: LspProvidersRegistration | null = null;
     let release: (() => void) | null = null;
     let client: import("../../services/tauri/lsp").LspClient | null = null;
+    let unsubscribeHealth: (() => void) | null = null;
+    setLspHealth("connecting");
 
     acquireLspSession(projectDir, lang)
       .then((handle) => {
@@ -593,6 +597,9 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
           return;
         }
         client = handle.client;
+        unsubscribeHealth = client.subscribeHealth((health) => {
+          if (!disposed && generation === lspGenerationRef.current) setLspHealth(health);
+        });
         release = handle.release;
         lspClientRef.current = handle.client;
         registration = registerLspProviders(monaco, handle.client, fullPath);
@@ -602,12 +609,14 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
         void handle.client.requestDiagnostics(fullPath);
       })
       .catch((e) => {
+        if (!disposed && generation === lspGenerationRef.current) setLspHealth("unavailable");
         // LSP server may not be installed — degrade silently.
         console.debug("[LSP] unavailable for", lang, ":", e);
       });
 
     return () => {
       disposed = true;
+      unsubscribeHealth?.();
       registration?.dispose();
       lspRef.current = null;
       if (client) client.closeDocument(fullPath);
@@ -675,6 +684,11 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
 
   return (
     <div className="agentz-editor-wrap">
+      {lspHealth !== "idle" && lspHealth !== "ready" && (
+        <span className="agentz-lsp-health" role="status">
+          {lspHealth === "recovering" ? "语言服务恢复中…" : lspHealth === "connecting" ? "语言服务连接中…" : "语言服务不可用"}
+        </span>
+      )}
       <Editor
         height="100%"
         theme={editorTheme}

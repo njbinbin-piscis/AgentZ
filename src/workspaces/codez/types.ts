@@ -17,6 +17,8 @@ export interface FileContent {
   size: number;
   language: string | null;
   preview_data?: string | null;
+  /** Digest of the on-disk bytes this content was read from (local files only). */
+  sha256?: string | null;
 }
 
 export interface SearchResult {

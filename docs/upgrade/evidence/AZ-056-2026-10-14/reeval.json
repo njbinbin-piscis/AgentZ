@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-056",
+    "verified_state": "isolated_kernel_lifecycle_gate_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "An isolated two-task Git lifecycle fixture and fail-closed candidate-workflow test step now exist with a retained local log and result record. Current-source fixture checks each task's review change list and file bytes through the product domain API after reopening stores; 1/1 targeted Windows test passed.",
+    "conclusion_proposal": "Keep blocked until native A/B and review UI journey, actual workflow run and unified acceptance are evidenced.",
+    "next_action": "Run the candidate workflow after resource preflight is satisfied; add host/native A/B, review/file-list and recovery receipts before acceptance.",
+    "remaining_work": ["Actual candidate workflow run", "Native A/B and review/file-list journey", "Host restart and recovery validation", "Unified acceptance"],
+    "verification_gaps": ["No workflow dispatch", "No native GUI", "No model or host process restart"],
+    "evidence": ["docs/upgrade/evidence/AZ-056-2026-10-14/implementation.md", "docs/upgrade/evidence/AZ-056-2026-10-14/result.json", "docs/upgrade/evidence/AZ-056-2026-10-14/lifecycle-test.log"]
+  }
+]

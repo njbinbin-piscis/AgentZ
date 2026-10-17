@@ -14,6 +14,22 @@ export interface InstalledSkill {
   locked?: boolean;
   pinned?: boolean;
   quadrant?: string;
+  source?: string | null;
+  source_url?: string | null;
+  version?: string | null;
+  registry_version?: string | null;
+  content_sha256?: string | null;
+  content_hash_matches?: boolean | null;
+  requested_tools?: string[];
+  install_history?: Array<{
+    action: string;
+    at: string;
+    version?: string | null;
+    registry_version?: string | null;
+    content_sha256: string;
+    added_tools: string[];
+    removed_tools: string[];
+  }>;
 }
 
 export interface RuleFile {

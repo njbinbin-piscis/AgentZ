@@ -1,0 +1,16 @@
+{
+  "published": false,
+  "path": "C:\\Projects\\AgentZ\\target\\release\\candidate-0.9.7-20261008\\AgentZ_0.9.7_x64-setup.exe",
+  "source_snapshot": "docs/upgrade/evidence/AZ-064-current-source-snapshot.json",
+  "build_session": 17529,
+  "limits": [
+    "Unsigned local candidate; no native/model/install/rollback acceptance",
+    "AZ023 changes not included; implementation begins after this build"
+  ],
+  "build_exit_code": 0,
+  "installed": false,
+  "sha256": "623ed5710ec0ea954c63976aa9c323564bb5ed06ad7098a679387c6d19e3ad11",
+  "signature_status": "NotSigned",
+  "bytes": 98648395,
+  "release_ready": false
+}

@@ -7,6 +7,8 @@ import {
   listSessions,
   SESSION_SOURCE_WORKZ,
   SESSION_SOURCE_WORKZ_TEAM,
+  SESSION_SOURCE_CODEZ,
+  SESSION_SOURCES_PROJECT_SHARED,
   getMessages,
   deleteSession,
   journalListChanges,
@@ -24,6 +26,10 @@ import { useAtMention, CODEBASE_MENTION, GRAPH_MENTION } from "../../hooks/useAt
 import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { agentTaskApi, type AgentTaskInfo } from "../../services/tauri/agentTask";
+import {
+  MISSING_TASK_ENVIRONMENT,
+  resolveTaskWorktree,
+} from "../../services/tauri/taskEnvironment";
 import { generateRepoWiki } from "../../services/tauri/repoWiki";
 import { requestGraphIndex } from "../../services/tauri/graphIndex";
 import AgentTaskReview from "./AgentTaskReview";
@@ -39,7 +45,17 @@ import {
   dataUrlToBase64,
 } from "../../components/chatComposerUtils";
 import { visionCapable } from "../../components/visionUtils";
-import TaskPanel, { mergePlanItems, parsePlanFromToolInput } from "../../components/TaskPanel";
+import TaskPanel from "../../components/TaskPanel";
+import TaskReminderPanel from "../../components/TaskReminderPanel";
+import DurablePlanActions from "../codez/DurablePlanActions";
+import RunHistoryPanel from "../codez/RunHistoryPanel";
+import TaskDetailsPanel from "../codez/TaskDetailsPanel";
+import TaskFileViewer from "../codez/TaskFileViewer";
+import TaskArtifactViewer from "../codez/TaskArtifactViewer";
+import InputContextSummary from "../../components/chat/InputContextSummary";
+import DeliveryReviewPanel from "../codez/DeliveryReviewPanel";
+import type { DurablePlan } from "../../services/tauri/chatPlan";
+import { createProjectlessSession, lookupProjectlessSession, getProjectScope, pickProjectScope, restoreProjectScope } from "../../services/tauri/projectScope";
 import ToolTrace, { interleaveTools } from "../../components/ToolTrace";
 import Markdown from "../codez/Markdown";
 import InteractiveCard from "../../components/chat/InteractiveCard";
@@ -81,9 +97,14 @@ export type WikiBuildAction = "overview" | "graph";
 
 interface WorkZWorkspaceProps {
   projectDir: string | null;
+  openTaskRequest?: { projectDir: string; taskId: string; nonce: number } | null;
   onOpenFolder: () => void;
   /** Switch the CodeZ project to `dir` and show CodeZ. */
   onOpenProjectInCodeZ?: (dir: string) => void;
+  /** Show a host-authorized, read-only task file view in CodeZ. */
+  onOpenTaskFilesInCodeZ?: (authorityProject: string, sessionId: string) => void;
+  /** Open a project's CodeZ-origin session in CodeZ (its home view) instead of continuing it here. */
+  onOpenSessionInCodeZ?: (projectDir: string, sessionId: string, source: string) => void;
   /** Increment from title bar to trigger repo wiki generation. */
   wikiBuildNonce?: number;
   wikiBuildAction?: WikiBuildAction;
@@ -160,7 +181,10 @@ function readRecentCwds(): string[] {
 
 export default function WorkZWorkspace({
   projectDir: appProjectDir,
+  openTaskRequest,
   onOpenProjectInCodeZ,
+  onOpenTaskFilesInCodeZ,
+  onOpenSessionInCodeZ,
   wikiBuildNonce = 0,
   wikiBuildAction = "overview",
   onWikiBusyChange,
@@ -185,11 +209,22 @@ export default function WorkZWorkspace({
   const [dragOver, setDragOver] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [planItems, setPlanItems] = useState<PlanTodoItem[]>([]);
+  const applyPersistedPlan = useCallback((plan: DurablePlan) => {
+    setPlanItems(plan.status === "cancelled" || plan.status === "replaced" ? [] : plan.items.map((item) => ({
+      id: item.id,
+      content: item.description,
+      status: item.state === "done" ? "completed" : item.state,
+    })));
+  }, []);
   const [taskPanelOpen, setTaskPanelOpen] = useState(false);
+  const [fileViewKey, setFileViewKey] = useState<string | null>(null);
+  const [artifactViewKey, setArtifactViewKey] = useState<string | null>(null);
   const [isolate, setIsolate] = useState(
     () => localStorage.getItem("agentz-workz-isolate") === "1",
   );
   const [worktree, setWorktree] = useState<AgentTaskInfo | null>(null);
+  const [startMode, setStartMode] = useState<"commit" | "working">("working");
+  const [startBase, setStartBase] = useState("");
   const [reviewTask, setReviewTask] = useState<AgentTaskInfo | null>(null);
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [activeTeam, setActiveTeam] = useState<string>("");
@@ -224,7 +259,8 @@ export default function WorkZWorkspace({
   });
 
   /** All WorkZ user tasks — sidebar lists single-agent and team sessions together. */
-  const workzTaskSources = useMemo(() => [SESSION_SOURCE_WORKZ, SESSION_SOURCE_WORKZ_TEAM], []);
+  // Same project database as CodeZ: list the shared sources so both views show the same sessions.
+  const workzTaskSources = useMemo(() => SESSION_SOURCES_PROJECT_SHARED, []);
   const activePoolRef = useRef<string | null>(null);
   activePoolRef.current = activePoolId;
 
@@ -234,12 +270,35 @@ export default function WorkZWorkspace({
   const [groupErrors, setGroupErrors] = useState<Record<string, string>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(readCollapsed);
   const [cwd, setCwd] = useState<string | null>(null);
+  const [managedWorkspace, setManagedWorkspace] = useState<string | null>(null);
   const [recentCwds, setRecentCwds] = useState<string[]>(readRecentCwds);
   const isFree = scope.kind === "free";
   /** Session database / project root: a registered project, or the internal free-session folder. */
   const projectDir: string | null = isFree ? (overview?.free_dir ?? null) : scope.dir;
   /** Where the agent actually works for plain sessions. */
   const freeCwd = cwd ?? overview?.default_work_dir ?? null;
+  const freeTaskWorkspace = managedWorkspace ?? freeCwd;
+  const [planProject, setPlanProject] = useState<{ selected: string; canonical: string } | null>(null);
+  const projectPickerBusy = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    setPlanProject(null);
+    if (!projectDir || !overview) return;
+    const selected = projectDir;
+    const existing = getProjectScope(selected);
+    if (existing) {
+      setPlanProject({ selected, canonical: existing.project_dir });
+      return;
+    }
+    // The database root is host-known; cwd/worktree never mint project authority.
+    void restoreProjectScope(isFree ? "workz_free" : "workz_project", isFree ? undefined : selected)
+      .then((opened) => {
+        if (!cancelled) setPlanProject({ selected, canonical: opened.project_dir });
+      }).catch(() => {
+        // Editing/chat remain available, but no plan authority is fabricated.
+      });
+    return () => { cancelled = true; };
+  }, [projectDir, isFree, overview]);
 
   useEffect(() => {
     workzOverview()
@@ -264,7 +323,10 @@ export default function WorkZWorkspace({
 
   const refreshGroups = useCallback(() => {
     if (!overview) return;
-    const dirs = [...overview.projects.filter((p) => p.exists).map((p) => p.path), overview.free_dir];
+    const dirs = [
+      ...overview.projects.filter((p) => p.exists).map((p) => p.path),
+      overview.free_dir,
+    ];
     workzListAllSessions(dirs, workzTaskSources)
       .then((list) => {
         const g: Record<string, SessionMeta[]> = {};
@@ -300,8 +362,6 @@ export default function WorkZWorkspace({
   const [runningIds, setRunningIds] = useState<string[]>([]);
 
   const sessionRef = useRef<string | null>(null);
-  const worktreeRef = useRef<AgentTaskInfo | null>(null);
-  worktreeRef.current = worktree;
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const { slash, slashMatches, pickSlash, slashLabel, detectSlash, handleSlashKeyDown } =
@@ -364,6 +424,7 @@ export default function WorkZWorkspace({
   const foregroundTaskKeyRef = useRef<string | null>(null);
   const runningSessionsRef = useRef<Set<string>>(new Set());
   const taskKeyBySessionRef = useRef<Map<string, string>>(new Map());
+  const openTaskRequestRef = useRef(0);
 
   const markRunning = useCallback((id: string | null, on: boolean) => {
     if (!id) return;
@@ -480,6 +541,7 @@ export default function WorkZWorkspace({
 
   useEffect(() => {
     sessionRef.current = null;
+    openTaskRequestRef.current += 1;
     setSelectedId(null);
     setSteps([]);
     setTasks([]);
@@ -497,6 +559,7 @@ export default function WorkZWorkspace({
     restoredTaskForRef.current = null;
     setBusy(false);
     setCwd(null);
+    setManagedWorkspace(null);
     clearCards();
   }, [projectDir, clearAttachment, clearCards]);
 
@@ -584,8 +647,7 @@ export default function WorkZWorkspace({
         if (isFg && fin.ok) autoResumeRef.current = 0;
         // A wall-clock turn timeout is not a failure: the run loop restarts the
         // turn itself once this one has fully wound down.
-        const willResume =
-          isFg && !!fin.timed_out && autoResumeRef.current < MAX_AUTO_RESUMES;
+        const willResume = isFg && !!fin.timed_out && autoResumeRef.current < MAX_AUTO_RESUMES;
         if (willResume) {
           autoResumeRef.current += 1;
           pendingResumeRef.current = true;
@@ -621,6 +683,7 @@ export default function WorkZWorkspace({
           toolName: evt.tool_name,
           toolInput: evt.tool_input,
           description: evt.description,
+          approval: evt.approval,
         });
         return;
       }
@@ -652,13 +715,6 @@ export default function WorkZWorkspace({
           }
           break;
         case "tool_start":
-          if (evt.name === "plan_todo") {
-            const updates = parsePlanFromToolInput(evt.input);
-            if (updates.length > 0) {
-              const merge = Boolean((evt.input as { merge?: boolean })?.merge);
-              setPlanItems((prev) => (merge ? mergePlanItems(prev, updates) : updates));
-            }
-          }
           setSteps((prev) => {
             if (prev.length === 0) return prev;
             const copy = prev.slice();
@@ -719,9 +775,34 @@ export default function WorkZWorkspace({
 
   const autoResumeRef = useRef(0);
   const pendingResumeRef = useRef(false);
+  const creatingProjectlessRef = useRef(false);
 
   runRef.current = async (text: string, att: ChatAttachment | null) => {
+    if (isFree && !sessionRef.current && !selectedId && creatingProjectlessRef.current) return;
+    const request = ++openTaskRequestRef.current;
     setError(null);
+    const startSession = sessionRef.current ?? selectedId;
+    let managedDirectory: string | null = null;
+    let effectiveSessionId = startSession;
+    if (isFree && !startSession) {
+      if (creatingProjectlessRef.current) return;
+      creatingProjectlessRef.current = true;
+      try {
+        const created = await createProjectlessSession();
+        if (created.session_project_dir !== projectDir) {
+          throw new Error("Projectless session authority changed during creation");
+        }
+        if (request !== openTaskRequestRef.current) return;
+        effectiveSessionId = created.session_id;
+        managedDirectory = created.directory.scope.project_dir;
+        setManagedWorkspace(managedDirectory);
+      } catch (e) {
+        if (request === openTaskRequestRef.current) setError(String(e));
+        return;
+      } finally {
+        creatingProjectlessRef.current = false;
+      }
+    }
     const displayText =
       att && !text.trim()
         ? `📎 ${att.filename ?? att.path ?? t("chat.attachment")}`
@@ -733,14 +814,12 @@ export default function WorkZWorkspace({
       { role: "user", text: displayText, tools: [] },
       { role: "assistant", text: "", tools: [] },
     ]);
-    setPlanItems([]);
     setBusy(true);
 
     // Each turn gets a unique task key so Stop and the concurrency queue can
     // target it independently of any sibling task running in the background.
     const taskKey = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     // Continue the open task's session — never spawn a sibling row on follow-up.
-    const startSession = sessionRef.current ?? selectedId;
     if (startSession) {
       sessionRef.current = startSession;
     }
@@ -749,7 +828,7 @@ export default function WorkZWorkspace({
     // stream can be filtered to *this* session immediately — otherwise
     // member-Koi turns sharing the event channel leak into the view while the
     // turn is session-less. The backend honours a client-provided id.
-    const effectiveSessionId = startSession ?? crypto.randomUUID();
+    effectiveSessionId ??= crypto.randomUUID();
     liveRef.current = true;
     foregroundSessionRef.current = effectiveSessionId;
     foregroundTaskKeyRef.current = taskKey;
@@ -777,23 +856,20 @@ export default function WorkZWorkspace({
     }
 
     const isForeground = () => foregroundTaskKeyRef.current === taskKey;
+    let environmentResolved = false;
 
     try {
-      // Isolated run: create a dedicated worktree + branch on first turn, then
-      // keep the agent working inside it for the rest of the task.
-      let wt = worktreeRef.current;
-      if (isolate && !isFree && !wt) {
-        try {
-          const taskId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-          wt = await agentTaskApi.create(projectDir!, taskId);
-          setWorktree(wt);
-        } catch (e) {
-          setError(String(e));
-          setBusy(false);
-          liveRef.current = false;
-          return;
-        }
-      }
+      const wt = await resolveTaskWorktree({
+        projectDir: projectDir!,
+        taskId: effectiveSessionId,
+        isolate,
+        isFree,
+        resuming: !!startSession,
+        startMode,
+        base: startMode === "commit" ? startBase.trim() || undefined : undefined,
+      });
+      environmentResolved = true;
+      if (isForeground()) setWorktree(wt);
       // Team mode: ensure a Pool exists for the selected team, then instruct the
       // agent to orchestrate its members via the pool tools.
       let effectivePrompt = text;
@@ -822,15 +898,17 @@ export default function WorkZWorkspace({
           setError(String(e));
         }
       }
-      const runCwd = isFree ? freeCwd : null;
+      const runCwd = managedDirectory ?? (isFree ? freeTaskWorkspace : null);
       const res = await chatSend({
         prompt: effectivePrompt,
         displayPrompt: text,
         sessionId: effectiveSessionId,
         projectDir: projectDir!,
         workspaceDir: wt?.worktree_path ?? runCwd,
+        requireTaskEnvironment: !!wt || (isolate && !isFree),
         attachment: att,
         chatMode: "agent",
+        clearPlan: false,
         modelId: showModelSelector ? modelId || null : null,
         taskKey,
         // Single-agent mode: run as the chosen persona. Team mode uses the
@@ -845,7 +923,7 @@ export default function WorkZWorkspace({
       });
       // The backend echoes the (pre-generated) session id; keep the maps in
       // sync in case it ever differs, then fold in the final assistant text.
-      if (isFree && !startSession && runCwd) {
+      if (isFree && !startSession && runCwd && !managedDirectory) {
         void chatSetSessionCwd(projectDir!, res.session_id, runCwd).catch(() => {});
         rememberCwd(runCwd);
         if (isForeground()) setCwd(runCwd);
@@ -888,7 +966,19 @@ export default function WorkZWorkspace({
         }
       }
     } catch (e) {
-      if (isForeground()) setError(String(e));
+      if (!startSession && !environmentResolved && isForeground()) {
+        sessionRef.current = null;
+        foregroundSessionRef.current = null;
+        setSelectedId(null);
+        rememberLastTask(projectDir, null);
+        setTasks((previous) => previous.filter((item) => item.id !== effectiveSessionId));
+      }
+      if (isForeground())
+        setError(
+          String(e).includes(MISSING_TASK_ENVIRONMENT)
+            ? t("agent.taskEnvironmentMissing")
+            : String(e),
+        );
     } finally {
       // Clear the running flag for *this* run's own session — never the
       // session the user may have navigated to in the meantime.
@@ -966,6 +1056,8 @@ export default function WorkZWorkspace({
     clearAttachment();
     setWorktree(null);
     setCwd(null);
+    setManagedWorkspace(null);
+    openTaskRequestRef.current += 1;
     // Land on the main chat so a fresh task is visibly empty (instead of the
     // previous run's Koi chatroom / coordination view lingering).
     setSwarmMainTab("main");
@@ -986,10 +1078,30 @@ export default function WorkZWorkspace({
         return;
       }
       try {
+        const request = ++openTaskRequestRef.current;
+        setFileViewKey(null);
+        setArtifactViewKey(null);
         const meta = tasks.find((task) => task.id === id);
         applyTaskModeBinding(meta);
         setCwd(meta?.cwd ?? null);
-        const history = await getMessages(id, projectDir);
+        const [historyResult, environmentResult, managedResult] = await Promise.allSettled([
+          getMessages(id, projectDir),
+          agentTaskApi.get(projectDir, id),
+          isFree ? lookupProjectlessSession(id) : Promise.resolve(null),
+        ]);
+        if (request !== openTaskRequestRef.current) return;
+        if (historyResult.status === "rejected") throw historyResult.reason;
+        const history = historyResult.value;
+        if (managedResult.status === "rejected") throw managedResult.reason;
+        const managed = managedResult.value;
+        if (managed && managed.session_project_dir !== projectDir) {
+          throw new Error("Projectless session authority changed during reopen");
+        }
+        setManagedWorkspace(managed?.directory.scope.project_dir ?? null);
+        const restoredEnvironment =
+          environmentResult.status === "fulfilled" ? environmentResult.value : null;
+        setWorktree(restoredEnvironment);
+        if (restoredEnvironment) setIsolate(true);
         // Switching to a different task detaches live streaming from the
         // previous foreground run (it keeps going in the background). We show
         // the opened task's persisted history; if it is itself running, its
@@ -1018,7 +1130,7 @@ export default function WorkZWorkspace({
           })),
         );
         setPlanItems([]);
-        setError(null);
+        setError(environmentResult.status === "rejected" ? String(environmentResult.reason) : null);
         setPreviewPath(null);
         refreshGitChanges();
         clearCards();
@@ -1026,7 +1138,7 @@ export default function WorkZWorkspace({
         setError(String(e));
       }
     },
-    [projectDir, refreshGitChanges, tasks, applyTaskModeBinding, clearCards],
+    [projectDir, isFree, refreshGitChanges, tasks, applyTaskModeBinding, clearCards],
   );
 
   // After a restart, reopen the task that was active when the app closed.
@@ -1116,6 +1228,13 @@ export default function WorkZWorkspace({
 
   const openSession = useCallback(
     (dir: string, id: string) => {
+      // CodeZ-origin chats keep their CodeZ UI; WorkZ opens them in CodeZ rather than
+      // continuing them with WorkZ task semantics (worktree / isolation).
+      const source = Object.values(groups).flat().find((s) => s.id === id)?.source;
+      if (source === SESSION_SOURCE_CODEZ && onOpenSessionInCodeZ) {
+        onOpenSessionInCodeZ(dir, id, source);
+        return;
+      }
       if (sameScope(dir)) {
         void openTask(id);
         return;
@@ -1123,8 +1242,15 @@ export default function WorkZWorkspace({
       rememberLastTask(dir, id);
       setScope(scopeForDir(dir));
     },
-    [sameScope, openTask, scopeForDir],
+    [groups, onOpenSessionInCodeZ, sameScope, openTask, scopeForDir],
   );
+
+  const lastInboxRequest = useRef<number | null>(null);
+  useEffect(() => {
+    if (!openTaskRequest || lastInboxRequest.current === openTaskRequest.nonce) return;
+    lastInboxRequest.current = openTaskRequest.nonce;
+    openSession(openTaskRequest.projectDir, openTaskRequest.taskId);
+  }, [openTaskRequest, openSession]);
 
   const newSessionIn = useCallback(
     (dir: string) => {
@@ -1152,22 +1278,30 @@ export default function WorkZWorkspace({
   );
 
   const addProject = useCallback(async () => {
+    if (projectPickerBusy.current) return;
+    projectPickerBusy.current = true;
     try {
-      const dir = await openFolderDialog(appProjectDir);
-      if (!dir) return;
+      const opened = await pickProjectScope();
+      if (!opened) return;
+      const dir = opened.project_dir;
       const ov = await workzProjectAdd(dir);
       setOverview(ov);
-      const added = ov.projects.find((p) => p.path.replace(/[\\/]+$/, "") === dir.replace(/[\\/]+$/, ""));
+      const added = ov.projects.find(
+        (p) => p.path.replace(/[\\/]+$/, "") === dir.replace(/[\\/]+$/, ""),
+      );
       const key = added?.path ?? dir;
       rememberLastTask(key, null);
       setScope({ kind: "project", dir: key });
     } catch (e) {
       setError(String(e));
+    } finally {
+      projectPickerBusy.current = false;
     }
-  }, [appProjectDir]);
+  }, []);
 
   const removeProject = useCallback(
     async (dir: string) => {
+      if (managedWorkspace) return;
       try {
         const ov = await workzProjectRemove(dir);
         setOverview(ov);
@@ -1209,7 +1343,7 @@ export default function WorkZWorkspace({
         }
       }
     },
-    [freeCwd, rememberCwd, selectedId, projectDir],
+    [freeCwd, managedWorkspace, rememberCwd, selectedId, projectDir],
   );
 
   const cwdOptions = useMemo((): DropdownOption[] => {
@@ -1220,9 +1354,10 @@ export default function WorkZWorkspace({
       if (d !== def) opts.push({ id: d, label: d });
     }
     if (freeCwd && !opts.some((o) => o.id === freeCwd)) opts.push({ id: freeCwd, label: freeCwd });
+    if (managedWorkspace && !opts.some((o) => o.id === managedWorkspace)) opts.push({ id: managedWorkspace, label: managedWorkspace });
     opts.push({ id: "__pick__", label: t("workz.cwdPick") });
     return opts;
-  }, [overview, recentCwds, freeCwd, t]);
+  }, [overview, recentCwds, freeCwd, managedWorkspace, t]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
@@ -1495,7 +1630,7 @@ export default function WorkZWorkspace({
                     <div className="agentz-workz-title">{t("agent.title")}</div>
                     <p className="agentz-workz-sub">
                       {isFree
-                        ? t("workz.freeSubtitle", { dir: freeCwd ?? "…" })
+                        ? t("workz.freeSubtitle", { dir: freeTaskWorkspace ?? "…" })
                         : t("agent.subtitle", {
                             project: projectDir || t("agent.openProjectFallback"),
                           })}
@@ -1571,7 +1706,7 @@ export default function WorkZWorkspace({
             <AgentFilePreview
               projectDir={projectDir}
               path={previewPath}
-              workspaceDir={worktree?.worktree_path ?? (isFree ? freeCwd : null)}
+              workspaceDir={worktree?.worktree_path ?? (isFree ? freeTaskWorkspace : null)}
               onClose={() => setPreviewPath(null)}
             />
           )}
@@ -1586,6 +1721,41 @@ export default function WorkZWorkspace({
           open={taskPanelOpen}
           onOpenChange={setTaskPanelOpen}
         />
+        {!activeTeam && !activePoolId && <DurablePlanActions
+          projectDir={planProject?.selected === projectDir ? planProject.canonical : null}
+          sessionId={sessionRef.current} busy={busy} onPlanChanged={applyPersistedPlan} />}
+        {!activeTeam && !activePoolId && <RunHistoryPanel
+          projectDir={planProject?.selected === projectDir ? planProject.canonical : null}
+          sessionId={sessionRef.current} busy={busy} />}
+        {!activeTeam && !activePoolId && <TaskDetailsPanel
+          projectDir={planProject?.selected === projectDir ? planProject.canonical : null}
+          sessionId={sessionRef.current} busy={busy} />}
+        {!activeTeam && !activePoolId && planProject?.selected === projectDir && sessionRef.current && <>
+          {!isFree && <TaskReminderPanel key={`${planProject.canonical}:${sessionRef.current}`}
+            projectDir={planProject.canonical} taskId={sessionRef.current}
+            chinese={(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh")} />}
+          {onOpenTaskFilesInCodeZ && <button type="button" onClick={() => {
+            const sessionId = sessionRef.current;
+            if (sessionId) onOpenTaskFilesInCodeZ(planProject.canonical, sessionId);
+          }}>
+            {(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh") ? "在 CodeZ 查看任务文件（只读）" : "View task files in CodeZ (read-only)"}
+          </button>}
+          <DeliveryReviewPanel projectDir={planProject.canonical} sessionId={sessionRef.current}
+            onReviewChanges={!busy && worktree?.id === sessionRef.current ? () => setReviewTask(worktree) : undefined}
+            onOpenArtifacts={() => setArtifactViewKey(JSON.stringify([planProject.canonical, sessionRef.current]))} />
+          <button type="button" onClick={() => setFileViewKey(JSON.stringify([planProject.canonical, sessionRef.current]))}>
+            {(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh") ? "查看任务文件（只读）" : "View task files (read-only)"}
+          </button>
+          {fileViewKey === JSON.stringify([planProject.canonical, sessionRef.current]) && <TaskFileViewer
+            key={fileViewKey} projectDir={planProject.canonical} sessionId={sessionRef.current}
+            onClose={() => setFileViewKey(null)} />}
+          <button type="button" onClick={() => setArtifactViewKey(JSON.stringify([planProject.canonical, sessionRef.current]))}>
+            {(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh") ? "任务产物版本" : "Task artifact versions"}
+          </button>
+          {artifactViewKey === JSON.stringify([planProject.canonical, sessionRef.current]) && <TaskArtifactViewer
+            key={artifactViewKey} projectDir={planProject.canonical} sessionId={sessionRef.current}
+            onClose={() => setArtifactViewKey(null)} />}
+        </>}
 
         <div className="agentz-workz-isolate-bar">
           <div className="agentz-workz-bar-left">
@@ -1595,9 +1765,9 @@ export default function WorkZWorkspace({
                 <DropdownSelect
                   variant="pill"
                   placement="up"
-                  value={freeCwd ?? ""}
+                  value={freeTaskWorkspace ?? ""}
                   options={cwdOptions}
-                  disabled={busy}
+                  disabled={busy || !!managedWorkspace}
                   onChange={(v) => void changeCwd(v)}
                 />
               </div>
@@ -1616,6 +1786,34 @@ export default function WorkZWorkspace({
               </label>
             )}
 
+            <details>
+              <summary>{(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh") ? "高级选项" : "Advanced options"}</summary>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {isolate && !isFree && !taskBound && (
+              <div className="agentz-workz-pill-menu" title={t("agent.startSourceHint")}>
+                <DropdownSelect
+                  variant="pill"
+                  placement="up"
+                  value={startMode}
+                  disabled={busy}
+                  options={[
+                    { id: "working", label: t("agent.startWorking") },
+                    { id: "commit", label: t("agent.startCommit") },
+                  ]}
+                  onChange={(value) => setStartMode(value as "commit" | "working")}
+                />
+                {startMode === "commit" && (
+                  <input
+                    aria-label={t("agent.startReference")}
+                    placeholder="HEAD"
+                    value={startBase}
+                    disabled={busy}
+                    onChange={(event) => setStartBase(event.target.value)}
+                    style={{ width: 120 }}
+                  />
+                )}
+              </div>
+            )}
             {teams.length > 0 && (
               <div
                 className={`agentz-workz-pill-menu${taskBound ? " is-locked" : ""}`}
@@ -1657,6 +1855,8 @@ export default function WorkZWorkspace({
                 />
               </div>
             )}
+              </div>
+            </details>
           </div>
 
           <div className="agentz-workz-bar-right">
@@ -1702,6 +1902,16 @@ export default function WorkZWorkspace({
           </div>
         </div>
 
+        <InputContextSummary
+          authorityProject={planProject?.selected === projectDir ? planProject.canonical : projectDir}
+          workspace={(worktree?.id === sessionRef.current ? worktree.worktree_path : null) ?? (activeTeam || activeAgentId ? null : isFree ? freeTaskWorkspace : isolate ? null : projectDir)}
+          model={showModelSelector ? modelId || defaultModelLabel || null : null}
+          modelSource={!showModelSelector ? "unknown" : modelId ? "selected" : defaultModelLabel ? "default" : "unknown"}
+          policy={appSettings?.policy_mode ?? null}
+          mode={activeTeam ? "WorkZ team" : activeAgentId ? "WorkZ agent" : "WorkZ"}
+          state={busy ? "running" : error ? "error" : "idle"}
+          optionalCount={showGenericComposerTools ? enabledSkills.length + enabledConnectors.length : 0}
+        />
         <ChatComposer
           value={goal}
           onChange={(value, caret) => {

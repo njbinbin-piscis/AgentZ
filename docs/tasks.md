@@ -16,6 +16,7 @@ Use this file to track multi-step work across sessions. Keep it in sync with git
 | ID | Title | Status | Owner | Notes |
 |----|-------|--------|-------|-------|
 | task-1 | Example: Explorer create-in-folder fix | done | — | Reference only |
+| upgrade-plan | 产品成熟化路线图与原子执行台账 | done | Codex | [路线图](upgrade/README.md)、[78项台账](upgrade/tasks.md)及本地CLI已交付；validate/render/门禁自检通过；实施项全部pending，状态权威在upgrade/plan.json。 |
 
 Add rows as work begins. Remove or move to **Completed** when finished.
 

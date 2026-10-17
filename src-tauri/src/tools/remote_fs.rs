@@ -14,7 +14,14 @@ use crate::remote::{self, shell_quote};
 const MAX_READ_LINES: usize = 2000;
 const MAX_OUTPUT_CHARS: usize = 60_000;
 
-pub const REPLACED_TOOLS: &[&str] = &["file_read", "file_write", "file_edit", "file_list", "file_search", "shell"];
+pub const REPLACED_TOOLS: &[&str] = &[
+    "file_read",
+    "file_write",
+    "file_edit",
+    "file_list",
+    "file_search",
+    "shell",
+];
 
 /// Swap the kernel file/shell tools for remote ones when `workspace_root` is
 /// a remote URI. Tools that were disabled (plan mode, allowlists) stay absent;
@@ -33,7 +40,11 @@ pub fn install_if_remote(registry: &mut ToolRegistry, workspace_root: &str) {
         .copied()
         .filter(|n| registry.get(n).is_some())
         .collect();
-    for name in REPLACED_TOOLS.iter().chain(LOCAL_ONLY_TOOLS).chain(MIRRORED_TOOLS) {
+    for name in REPLACED_TOOLS
+        .iter()
+        .chain(LOCAL_ONLY_TOOLS)
+        .chain(MIRRORED_TOOLS)
+    {
         registry.unregister(name);
     }
     for name in mirrored {
@@ -55,12 +66,56 @@ pub fn install_if_remote(registry: &mut ToolRegistry, workspace_root: &str) {
             "file_search" => Box::new(RemoteFileSearch),
             _ => Box::new(RemoteShell),
         };
-        registry.register(tool);
+        registry.register(Box::new(BoundTool { inner: tool }));
+    }
+}
+
+/// Keep every request of a compound tool on the connection selected at entry.
+/// In particular, an edit must never read from one connection and write to its
+/// replacement after a disconnect.
+struct BoundTool {
+    inner: Box<dyn Tool>,
+}
+
+#[async_trait]
+impl Tool for BoundTool {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+    fn input_schema(&self) -> Value {
+        self.inner.input_schema()
+    }
+    fn description_minimal(&self) -> std::borrow::Cow<'_, str> {
+        self.inner.description_minimal()
+    }
+    fn input_schema_minimal(&self) -> Value {
+        self.inner.input_schema_minimal()
+    }
+    fn is_read_only(&self) -> bool {
+        self.inner.is_read_only()
+    }
+    fn needs_confirmation(&self, input: &Value) -> bool {
+        self.inner.needs_confirmation(input)
+    }
+    async fn call(&self, input: Value, ctx: &ToolContext) -> anyhow::Result<ToolResult> {
+        let session = remote::bind(&ctx.workspace_root.to_string_lossy())
+            .await
+            .map_err(anyhow::Error::msg)?;
+        remote::with_session(session, self.inner.call(input, ctx)).await
     }
 }
 
 /// Index tools that run against the local mirror (`remote::mirror`).
-const MIRRORED_TOOLS: &[&str] = &["codebase_search", "graph_search", "graph_explore", "symbol_search", "impact"];
+const MIRRORED_TOOLS: &[&str] = &[
+    "codebase_search",
+    "graph_search",
+    "graph_explore",
+    "symbol_search",
+    "impact",
+];
 
 /// Runs an index tool with `workspace_root` pointed at the synced local
 /// mirror; reported paths are workspace-relative, so they hold on the remote.
@@ -95,12 +150,7 @@ impl Tool for MirroredTool {
 }
 
 /// Tools backed by local language servers / local execution.
-const LOCAL_ONLY_TOOLS: &[&str] = &[
-    "lsp",
-    "read_lints",
-    "code_run",
-    "file_diff",
-];
+const LOCAL_ONLY_TOOLS: &[&str] = &["lsp", "read_lints", "code_run", "file_diff"];
 
 async fn remote_root(ctx: &ToolContext) -> anyhow::Result<String> {
     remote::resolve(&ctx.workspace_root.to_string_lossy())
@@ -109,21 +159,69 @@ async fn remote_root(ctx: &ToolContext) -> anyhow::Result<String> {
         .ok_or_else(|| anyhow::anyhow!("workspace is not remote"))
 }
 
-fn join(root: &str, p: &str) -> String {
-    if p.is_empty() || p == "." {
+fn join(root: &str, authority: &str, p: &str) -> anyhow::Result<String> {
+    if remote::vfs::has_scheme(p) {
+        let uri =
+            remote::vfs::parse(p).ok_or_else(|| anyhow::anyhow!("invalid remote file URI"))?;
+        anyhow::ensure!(
+            uri.authority.eq_ignore_ascii_case(authority),
+            "remote file URI belongs to a different authority"
+        );
+        return Ok(uri.path);
+    }
+    Ok(if p.is_empty() || p == "." {
         root.to_string()
     } else if p.starts_with('/') {
         p.to_string()
     } else if let Some(parsed) = remote::vfs::parse(p) {
         parsed.path
     } else {
-        format!("{}/{}", root.trim_end_matches('/'), p.trim_start_matches("./"))
-    }
+        format!(
+            "{}/{}",
+            root.trim_end_matches('/'),
+            p.trim_start_matches("./")
+        )
+    })
 }
 
 async fn resolve_path(ctx: &ToolContext, input: &Value, key: &str) -> anyhow::Result<String> {
+    let workspace = ctx.workspace_root.to_string_lossy();
+    let uri = remote::vfs::parse(&workspace)
+        .ok_or_else(|| anyhow::anyhow!("invalid remote workspace URI"))?;
     let root = remote_root(ctx).await?;
-    Ok(join(&root, input[key].as_str().unwrap_or("")))
+    join(&root, &uri.authority, input[key].as_str().unwrap_or(""))
+}
+
+#[cfg(test)]
+mod tool_binding_tests {
+    use super::join;
+
+    #[test]
+    fn remote_input_cannot_silently_change_authority() {
+        assert!(join(
+            "/repo",
+            "dev@host-a",
+            "agentz-remote://dev@host-b/repo/file"
+        )
+        .is_err());
+        assert_eq!(
+            join(
+                "/repo",
+                "dev@host-a",
+                "agentz-remote://dev@HOST-A/repo/file"
+            )
+            .unwrap(),
+            "/repo/file"
+        );
+        assert!(join("/repo", "dev@host-a", "agentz-remote:///repo/file").is_err());
+    }
+
+    #[test]
+    fn ordinary_paths_keep_remote_workspace_semantics() {
+        assert_eq!(join("/repo", "host", "src/a.rs").unwrap(), "/repo/src/a.rs");
+        assert_eq!(join("/repo", "host", ".").unwrap(), "/repo");
+        assert_eq!(join("/repo", "host", "/tmp/a").unwrap(), "/tmp/a");
+    }
 }
 
 async fn read_text(path: &str) -> anyhow::Result<String> {
@@ -131,14 +229,18 @@ async fn read_text(path: &str) -> anyhow::Result<String> {
         .await
         .map_err(anyhow::Error::msg)?;
     let bytes = STANDARD.decode(v["base64"].as_str().unwrap_or_default())?;
-    String::from_utf8(bytes).map_err(|_| anyhow::anyhow!("{path} is not UTF-8 text; use shell to inspect it"))
+    String::from_utf8(bytes)
+        .map_err(|_| anyhow::anyhow!("{path} is not UTF-8 text; use shell to inspect it"))
 }
 
 async fn write_text(path: &str, text: &str) -> anyhow::Result<()> {
-    remote::call("fs.writeFile", json!({ "path": path, "base64": STANDARD.encode(text) }))
-        .await
-        .map(|_| ())
-        .map_err(anyhow::Error::msg)
+    remote::call(
+        "fs.writeFile",
+        json!({ "path": path, "base64": STANDARD.encode(text) }),
+    )
+    .await
+    .map(|_| ())
+    .map_err(anyhow::Error::msg)
 }
 
 struct ExecOut {
@@ -205,7 +307,10 @@ impl Tool for RemoteFileRead {
             Err(e) => return Ok(ToolResult::err(format!("{path}: {e}"))),
         };
         let offset = input["offset"].as_u64().unwrap_or(1).max(1) as usize;
-        let limit = input["limit"].as_u64().map(|n| n as usize).unwrap_or(MAX_READ_LINES);
+        let limit = input["limit"]
+            .as_u64()
+            .map(|n| n as usize)
+            .unwrap_or(MAX_READ_LINES);
         let lines: Vec<&str> = text.lines().collect();
         let end = (offset - 1 + limit).min(lines.len());
         let mut out = format!("--- {path} ({} lines) ---\n", lines.len());
@@ -213,7 +318,11 @@ impl Tool for RemoteFileRead {
             out.push_str(&format!("{:>6}|{}\n", i + 1, line));
         }
         if end < lines.len() {
-            out.push_str(&format!("… {} more lines (use offset={})\n", lines.len() - end, end + 1));
+            out.push_str(&format!(
+                "… {} more lines (use offset={})\n",
+                lines.len() - end,
+                end + 1
+            ));
         }
         Ok(ToolResult::ok(truncate(out)))
     }
@@ -249,7 +358,10 @@ impl Tool for RemoteFileWrite {
         };
         let path = resolve_path(ctx, &input, "path").await?;
         write_text(&path, content).await?;
-        Ok(ToolResult::ok(format!("Wrote {} bytes to {path}", content.len())))
+        Ok(ToolResult::ok(format!(
+            "Wrote {} bytes to {path}",
+            content.len()
+        )))
     }
 }
 
@@ -300,7 +412,9 @@ impl Tool for RemoteFileEdit {
                     e["new_string"].as_str().unwrap_or_default().to_string(),
                 ));
             }
-        } else if let (Some(o), Some(n)) = (input["old_string"].as_str(), input["new_string"].as_str()) {
+        } else if let (Some(o), Some(n)) =
+            (input["old_string"].as_str(), input["new_string"].as_str())
+        {
             edits.push((o.to_string(), n.to_string()));
         }
         if edits.is_empty() {
@@ -313,12 +427,25 @@ impl Tool for RemoteFileEdit {
         for (i, (old, new)) in edits.iter().enumerate() {
             match text.matches(old.as_str()).count() {
                 1 => text = text.replacen(old.as_str(), new, 1),
-                0 => return Ok(ToolResult::err(format!("edit {}: old_string not found in {path}", i + 1))),
-                n => return Ok(ToolResult::err(format!("edit {}: old_string appears {n} times in {path}; add context", i + 1))),
+                0 => {
+                    return Ok(ToolResult::err(format!(
+                        "edit {}: old_string not found in {path}",
+                        i + 1
+                    )))
+                }
+                n => {
+                    return Ok(ToolResult::err(format!(
+                        "edit {}: old_string appears {n} times in {path}; add context",
+                        i + 1
+                    )))
+                }
             }
         }
         write_text(&path, &text).await?;
-        Ok(ToolResult::ok(format!("Applied {} edit(s) to {path}", edits.len())))
+        Ok(ToolResult::ok(format!(
+            "Applied {} edit(s) to {path}",
+            edits.len()
+        )))
     }
 }
 
@@ -374,7 +501,10 @@ impl Tool for RemoteFileList {
         if out.code != 0 && out.stdout.is_empty() {
             return Ok(ToolResult::err(format!("{path}: {}", out.stderr.trim())));
         }
-        Ok(ToolResult::ok(truncate(format!("--- {path} ---\n{}", out.stdout))))
+        Ok(ToolResult::ok(truncate(format!(
+            "--- {path} ---\n{}",
+            out.stdout
+        ))))
     }
 }
 
@@ -413,7 +543,12 @@ impl Tool for RemoteFileSearch {
         let max = input["max_results"].as_u64().unwrap_or(50).clamp(1, 500) as usize;
         let mut globs: Vec<String> = input["file_extensions"]
             .as_array()
-            .map(|a| a.iter().filter_map(|e| e.as_str()).map(|e| format!("*.{}", e.trim_start_matches('.'))).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|e| e.as_str())
+                    .map(|e| format!("*.{}", e.trim_start_matches('.')))
+                    .collect()
+            })
             .unwrap_or_default();
         if let Some(inc) = input["include"].as_str().filter(|s| !s.is_empty()) {
             globs.push(inc.to_string());
@@ -448,7 +583,9 @@ impl Tool for RemoteFileSearch {
         .map_err(anyhow::Error::msg)?;
         let hits = v.as_array().cloned().unwrap_or_default();
         if hits.is_empty() {
-            return Ok(ToolResult::ok(format!("No matches for /{pattern}/ under {root}")));
+            return Ok(ToolResult::ok(format!(
+                "No matches for /{pattern}/ under {root}"
+            )));
         }
         let mut out = String::new();
         for h in &hits {
@@ -498,7 +635,10 @@ impl Tool for RemoteShell {
         if let Some(env) = input["env"].as_object() {
             for (k, v) in env {
                 if k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-                    script.push_str(&format!("export {k}={}; ", shell_quote(v.as_str().unwrap_or_default())));
+                    script.push_str(&format!(
+                        "export {k}={}; ",
+                        shell_quote(v.as_str().unwrap_or_default())
+                    ));
                 }
             }
         }
@@ -512,6 +652,10 @@ impl Tool for RemoteShell {
         }
         text.push_str(&format!("\n[exit code: {}]", out.code));
         let text = truncate(text);
-        Ok(if out.code == 0 { ToolResult::ok(text) } else { ToolResult::err(text) })
+        Ok(if out.code == 0 {
+            ToolResult::ok(text)
+        } else {
+            ToolResult::err(text)
+        })
     }
 }

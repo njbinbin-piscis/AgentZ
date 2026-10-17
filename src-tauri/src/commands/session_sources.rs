@@ -25,8 +25,19 @@ pub fn normalize_source(source: &str) -> &str {
     }
 }
 
+/// Sources whose history is shared across the CodeZ and WorkZ views of one project.
+/// Team sessions stay bound to their WorkZ team and are read-only elsewhere.
+pub fn is_shared_project_source(source: &str) -> bool {
+    matches!(normalize_source(source), SOURCE_CODEZ | SOURCE_WORKZ)
+}
+
+/// A turn expecting `expected` may continue a session stored as `existing` when both are the
+/// same namespace, or both are shared project sources (CodeZ chat <-> WorkZ single-agent task).
+/// The stored source keeps governing the session's behaviour; the view only selects it.
 pub fn sources_compatible(expected: &str, existing: &str) -> bool {
-    normalize_source(expected) == normalize_source(existing)
+    let e = normalize_source(expected);
+    let x = normalize_source(existing);
+    e == x || (is_shared_project_source(e) && is_shared_project_source(x))
 }
 
 /// Returns true when `session_source` should appear in a list filtered by `allowed`.
@@ -130,6 +141,18 @@ mod tests {
         let filter = vec![SOURCE_WORKZ.to_string(), SOURCE_WORKZ_TEAM.to_string()];
         assert!(!source_matches_filter(SOURCE_POOL, &filter));
         assert!(excluded_from_workz_task_list(SOURCE_POOL));
+    }
+
+    #[test]
+    fn codez_and_workz_share_continuation_but_team_stays_exclusive() {
+        assert!(sources_compatible(SOURCE_CODEZ, SOURCE_WORKZ));
+        assert!(sources_compatible(SOURCE_WORKZ, SOURCE_CODEZ));
+        assert!(sources_compatible(SOURCE_CODEZ, SOURCE_LEGACY));
+        assert!(!sources_compatible(SOURCE_CODEZ, SOURCE_WORKZ_TEAM));
+        assert!(!sources_compatible(SOURCE_WORKZ, SOURCE_WORKZ_TEAM));
+        assert!(!sources_compatible(SOURCE_WORKZ_TEAM, SOURCE_CODEZ));
+        assert!(!sources_compatible(SOURCE_POOL, SOURCE_CODEZ));
+        assert!(sources_compatible(SOURCE_WORKZ_TEAM, SOURCE_WORKZ_TEAM));
     }
 
     #[test]

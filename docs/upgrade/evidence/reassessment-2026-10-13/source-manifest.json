@@ -1,0 +1,598 @@
+{
+  "date": "2026-10-13",
+  "scope": "Paths inspected by task reviewers plus current plan tooling and pinned dependency files. This is a source snapshot, not complete repository attestation.",
+  "files": [
+    {
+      "path": ".github/workflows/candidate.yml",
+      "sha256": "4ad3653e81f11dd14e576bfdbab6a2378bb2dce6f8cfc97cecdb6e25820d3b7a"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "924f8e246ba52e790d6a3a127d653beecbdb00bfa58f29cdda303a3f4c0ac0e4"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "3e228ad4823d16da82b7c3fcacb601d8c84e6cac178d4973354b6d8a37695901"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "a3b57f390cb3dd2d6a1d189a3eb1643c3fc3e189e7c932847f5f0b63f3d081b6"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "0849722f98bcd1e96a264197f3aed86bbb67ea5bef2fac055065830464b1d852"
+    },
+    {
+      "path": "README.md",
+      "sha256": "b6ff56e248c8606d173080dcf164cb7197ea73ffd3796f75e50dd3074b5800a7"
+    },
+    {
+      "path": "RELEASE.md",
+      "sha256": "75ae6f3a391580d393957db4866beb15b4f6d02bfdfacf109212fca434fc3b77"
+    },
+    {
+      "path": "crates/agentz-task-state/src/approval.rs",
+      "sha256": "61cc69ba37a802e0ba278533aaef4bfc0cd655b750287f62b15089cef2a523c4"
+    },
+    {
+      "path": "crates/agentz-task-state/src/artifacts.rs",
+      "sha256": "f92e6beb36accac70f4a08160432824386c807e5ed424c6a8d112125fcfdf304"
+    },
+    {
+      "path": "crates/agentz-task-state/src/external_action.rs",
+      "sha256": "2f078b14d753304d08dc2b200ca3d131382d96a64f56a255fd728e0d83ce3a16"
+    },
+    {
+      "path": "crates/agentz-task-state/src/lib.rs",
+      "sha256": "ba73a74324b07960b853780e797af76d34929047c03f9008505385e0fb2acc73"
+    },
+    {
+      "path": "crates/agentz-task-state/src/projectless.rs",
+      "sha256": "5e8d788f394f554fad6d80f2ace122b29ac96d0dc1025576082ceaed24975654"
+    },
+    {
+      "path": "crates/agentz-task-state/src/task_details.rs",
+      "sha256": "6a264c7d7f8f89a569c614234a60f4b56606deabeb5f4dee7872312952644169"
+    },
+    {
+      "path": "docs/agentz-product-maturity-review-2026-10-04.md",
+      "sha256": "5cd3ec0f62ff38339ff996e4d27e40203b7023f51917de21707f0d2b60a1193a"
+    },
+    {
+      "path": "docs/known-issues.md",
+      "sha256": "060b2d69ba693d373bad92cb205a40039150ab2890b1d8b2c47beb6a119f11d0"
+    },
+    {
+      "path": "docs/upgrade/contracts/signing-evidence.schema.json",
+      "sha256": "34f4aa7cf708c86d64fa2a6bf272e83e80fb2ab48a14e199f7524e68f67f702d"
+    },
+    {
+      "path": "docs/upgrade/evidence/ADR-004-protected-downgrade.md",
+      "sha256": "10b2f07fb7f8b0867080bf9ef73f72c2d0217aa05bf732c1a5a78dba62719e85"
+    },
+    {
+      "path": "docs/upgrade/evidence/ADR-008-gui-blanket-waiver.md",
+      "sha256": "0ca3005206e03b066ff744be66a5e7b98ce287e10aef9ee00927e238312761f9"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-004-live-summary-v1.json",
+      "sha256": "f30dd9ebfa9513b655facf16773197f83815ab37568ac6d00fee2e960b9ebe1b"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-005-support-matrix.md",
+      "sha256": "4e853b951bd7bb26a4b5b99c884fd9be3338c820783825bd6bf9f891a91b8b1e"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-027-permission-contract.md",
+      "sha256": "d57da0d2d25cad2d33a2867b2e924b87cad2572c9d9a964ff0d95c5a83ab41f4"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-028-acceptance-review-2026-10-06.md",
+      "sha256": "4797fb815e69dd19f9a4bd530725498704541f6eb4a7bb6808568b40a063b749"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-030-windows-key-protection.md",
+      "sha256": "70a31e0f9831359cd8b2c98a92a6424f6f6e21c3caa5ca5b0cafde341b820c26"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-032-parallel-review.md",
+      "sha256": "4936057d196056ef09ac75a9c5b78814ffc0ec3804c853c6047c2da87e53eef5"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-033-skill-provenance-authorization.md",
+      "sha256": "525d2170d4bc9ae8e80810c3ce4e42158dbc9a59d79e3d56ff5aa2b603bbff5c"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-034-acceptance-review-2026-10-06.md",
+      "sha256": "9378c182d0dd6cbfdc74b8a63da49e622faaaab8588b2395e08aa964e3472807"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-042-closure-evidence.md",
+      "sha256": "3e9c7c124e26495d6b83afe6e92a70fec27ebefdd17532ea3fee41ef68e863f1"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-045-isolated-ssh.md",
+      "sha256": "ad6d3e35e26a6262fad5fa37ee70d123a9010447d8344f451777af5dbfbf5bcd"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-048-directory-checkpoint.md",
+      "sha256": "1022fdef69a11c4c2aa617a738ecaba21fae6c66f31ecabe2f0ce61ccf71ca31"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-064-workflows-installer.json",
+      "sha256": "adaf40f32b4ac78667a0e8682484903f8785b1bfb55c633e6c7868614119384d"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-077-keychain-adapter.md",
+      "sha256": "1c80a7b94d6a44e7316f8d9d5b24cd3f0b2fb2e3127a6b3a5b4a657ed4a72664"
+    },
+    {
+      "path": "docs/upgrade/evidence/AZ-078-secret-service-adapter.md",
+      "sha256": "33fccb2c773ab08633f584c32628cc29d95d30a5dab7809ee1288107fd48b1ca"
+    },
+    {
+      "path": "docs/upgrade/evidence/reassessment-2026-10-13-core.json",
+      "sha256": "0471c752147c6ed23d72a7d0d98ae81df39b9745a5ef686e8cc43f3c7fdf051e"
+    },
+    {
+      "path": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
+      "sha256": "f7d023326bf25bd2a4cf207d0eb8a05d558a5ff3dc522df997e79e6c40bcc787"
+    },
+    {
+      "path": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
+      "sha256": "bdd7e5315d1c0761e3ece63c56d017931ebf5d97fbe36e4c705b6363cad17172"
+    },
+    {
+      "path": "docs/upgrade/plan.json",
+      "sha256": "78ad0b2ccb64e4fdcfc44744c1cf68151e68b81760bda9f54514857c341fc878"
+    },
+    {
+      "path": "docs/upgrade/release-checklist-0.9.7.md",
+      "sha256": "f9881a716a4466e4d62b52b78a91350e6f34f938b8071431a0361e57b091a5bd"
+    },
+    {
+      "path": "docs/upgrade/release-notes-0.9.7.md",
+      "sha256": "e25ad12160d038427a9975187067481b8f509d61f5a637ed1ec732a361f7b4ba"
+    },
+    {
+      "path": "docs/upgrade/review-template.md",
+      "sha256": "0d26aff71d7b26a6832c891238e23b53c39bd0624d476d307c7804e1b22c189e"
+    },
+    {
+      "path": "extension-host/src/host/apiFactory.ts",
+      "sha256": "d800693597d4729f0e5acc492de2baa4d3dcd97de3fe282529842ee956cc2a15"
+    },
+    {
+      "path": "package.json",
+      "sha256": "79cae4f6acc0b5fb953ae08e2c2c3da92e7437efacd7528f3a0c989e73d16aed"
+    },
+    {
+      "path": "scripts/upgrade-candidate-workflow.verify.mjs",
+      "sha256": "eb417b3dfb9d2af02fb2ffc4e5b7302045ccdace6b18fe0a365e7b61c7d5a28b"
+    },
+    {
+      "path": "scripts/upgrade-eval-trend.mjs",
+      "sha256": "06b57f2b2416b692b4f3512d73602c119644978969e06df25ef3607415994821"
+    },
+    {
+      "path": "scripts/upgrade-eval-trend.verify.mjs",
+      "sha256": "67063accf5e627bde057a1d022d75c7e95cb0c717e8f499061d5d8252484436b"
+    },
+    {
+      "path": "scripts/upgrade-model-baseline-report.mjs",
+      "sha256": "c22bcc8afc337469ea4118913d2a34fa0b119801d98077367b55dbb1abda5a3b"
+    },
+    {
+      "path": "scripts/upgrade-model-baseline.mjs",
+      "sha256": "85a916c4257f430c08ddfae5547de60d255180b908eab9a645e6b6ae4c6ff225"
+    },
+    {
+      "path": "scripts/upgrade-plan.mjs",
+      "sha256": "12e3d7c1d1c26045cedc55260d1be23e094fea28d6a4db80c837cc0ca74304a5"
+    },
+    {
+      "path": "scripts/upgrade-plan.verify.mjs",
+      "sha256": "189536bf5b39afe118e63567f588a350f8fd46b6787a4b3418a654c2226c6ec2"
+    },
+    {
+      "path": "scripts/upgrade-release-preflight.mjs",
+      "sha256": "423ec3cb8694b7511c31835476deba8cee8e59233ceec98db5a5ea16a424b280"
+    },
+    {
+      "path": "scripts/upgrade-signing-evidence.mjs",
+      "sha256": "f1f07f38ea2f01f8e31dc0bba2d69805c5cce86e3068620e58dca0ff0d83ae7b"
+    },
+    {
+      "path": "src-tauri/Cargo.toml",
+      "sha256": "a24ce0101fe616c99b5e0c26f5615762543a44d69b59764bde8b6ed59b80572a"
+    },
+    {
+      "path": "src-tauri/src/browser/activity.rs",
+      "sha256": "9fe6c7a736d058830318a965b68ccdab0040d0c88f1fbb094d362c0c742feb6c"
+    },
+    {
+      "path": "src-tauri/src/browser/mod.rs",
+      "sha256": "316aa388408f17d1e27b200a07d8d2f0726987286ccee61302bbd2db22869ed2"
+    },
+    {
+      "path": "src-tauri/src/commands/agent_task.rs",
+      "sha256": "98680d2dac8fda246e56a7b746ba3ef93e7ad084b7e8fe399eba620356dcc380"
+    },
+    {
+      "path": "src-tauri/src/commands/browser.rs",
+      "sha256": "79db07e84c42199f64c8a264213fb43fc98fdfc77a2645275d5133b2bb2162a7"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_events.rs",
+      "sha256": "c86837f4a6fbf45cc7ff7e632b01973e924f24feaa409f4215a66b1f3102c9a6"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_turn.rs",
+      "sha256": "ed2adeafe0e828b091abab268bcf3652b881241342fef57fb4c06eb2c8658c52"
+    },
+    {
+      "path": "src-tauri/src/commands/connectors.rs",
+      "sha256": "eb01dd39a39b84aa4142b17f9edd54f1c1b78bac8ce64c9f58e3462fdc92bb0b"
+    },
+    {
+      "path": "src-tauri/src/commands/dap.rs",
+      "sha256": "09e37361914cbdda3dc8c1d21e31927fc44e5498b829eb78c55926b2265ca899"
+    },
+    {
+      "path": "src-tauri/src/commands/dap_frame.rs",
+      "sha256": "35ac101ac0035f66ce7c1a0f145132a5c34298ed8dca0ed65d8870a9c9eac1ea"
+    },
+    {
+      "path": "src-tauri/src/commands/devenv.rs",
+      "sha256": "6e5294bd8c8d6083ea185219841ccc3b074db5eca30676f90f7ccf717ec4896e"
+    },
+    {
+      "path": "src-tauri/src/commands/diagnostics.rs",
+      "sha256": "d20d8ec1bebb91242307a3b8a7db28f34d5140dd94c297c035f74e70b6c31b79"
+    },
+    {
+      "path": "src-tauri/src/commands/gateway.rs",
+      "sha256": "951ab1da7d848f8c70d7ad14a6a9b10b76123c3d81fff0daab8c0617d648dc0e"
+    },
+    {
+      "path": "src-tauri/src/commands/ide.rs",
+      "sha256": "8b96aa2813fc321fa8e2726b05602b88b56ae509401169b89f4e63a374e8b2df"
+    },
+    {
+      "path": "src-tauri/src/commands/project_scope.rs",
+      "sha256": "f7105cf101031002b44de1af9c51d184133288f23f605ca270b336fe40384fa3"
+    },
+    {
+      "path": "src-tauri/src/commands/task_artifacts.rs",
+      "sha256": "f1539f1ac2777997ae992a672a4e982a2a0a0404e3b77b5e9cadc19a629bc509"
+    },
+    {
+      "path": "src-tauri/src/commands/task_view.rs",
+      "sha256": "18fbfe84c79ea825c0d4a9da8036b63436bdbc3acf80c6ecb4fedc1ae15970cf"
+    },
+    {
+      "path": "src-tauri/src/commands/task_view_read.rs",
+      "sha256": "8a38d539c9c3e3db9924169e158d348b84cd1fe6c3d03bdbf90f547489e1657a"
+    },
+    {
+      "path": "src-tauri/src/commands/teams.rs",
+      "sha256": "e557842d950ae3ca3adf8768ca0786b2b356c90ea6e4d00c3fdacb57528bbadf"
+    },
+    {
+      "path": "src-tauri/src/commands/workflow.rs",
+      "sha256": "721d0a04eadba3780a0a955183c14342ddc3296cc81eee162eff8fb1ba377d25"
+    },
+    {
+      "path": "src-tauri/src/commands/workspace.rs",
+      "sha256": "257188326a412557079df0ad494b58d3bac2195e165d5767280c35cd9236ae2d"
+    },
+    {
+      "path": "src-tauri/src/diagnostics.rs",
+      "sha256": "24927467032265cfda1c5a423dc6bf2e0b90f3fe0d55b04bf1e4cc37d3503dac"
+    },
+    {
+      "path": "src-tauri/src/remote/forward.rs",
+      "sha256": "4eba84ca86eb610d496dd224928f659bc494d166ca7b3fc5e3197a803c0e43cd"
+    },
+    {
+      "path": "src-tauri/src/remote/mod.rs",
+      "sha256": "6fa3f504ac3558e4df423f841b5a70ccde33b510526a03ced8baca0b427d60ac"
+    },
+    {
+      "path": "src-tauri/src/remote/ssh_setup.rs",
+      "sha256": "27583334f27da0e3a723bcc6d01138fdc98a9dd9e25af0165f3da0da4a8cb4f6"
+    },
+    {
+      "path": "src-tauri/src/runtime/approval.rs",
+      "sha256": "99776b3feeb3344e2b5acdb04657f277bb78b6ced22f2fa612216781799c718a"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_stream.rs",
+      "sha256": "07299c200f118046f39e3b22a0844479f854f58f8ee89e180b5c41cb4b8f362c"
+    },
+    {
+      "path": "src-tauri/src/runtime/heartbeat.rs",
+      "sha256": "fbb2a618eef0002c700bac4df3160a0f8b7a15e6f510d910d63ab142afcf8f26"
+    },
+    {
+      "path": "src-tauri/src/runtime/koi.rs",
+      "sha256": "ca7167383257b300fed8c8658924bdb6717e3428ab41d9d78594f65a0b9f65b0"
+    },
+    {
+      "path": "src-tauri/src/runtime/owner_lease.rs",
+      "sha256": "82785bccf05f9b59d1e060214f2836f3a9a61fc7dd6055e78091edcd4299bd1d"
+    },
+    {
+      "path": "src-tauri/src/runtime/task_budget.rs",
+      "sha256": "aeda96cb6daa1e6ef1c84cba684765f787d5be3396d87d8134f516bab3dbc7b2"
+    },
+    {
+      "path": "src-tauri/src/runtime/task_details.rs",
+      "sha256": "804d7f72eb28a2425b98102bede9f77c5c0fad3ea13e4591f3a265c8a878408b"
+    },
+    {
+      "path": "src-tauri/src/runtime/workflow.rs",
+      "sha256": "01d90c269ea0ef348549f1aaecb48bf54482a1a8c7ad03f8a4a46f937e375596"
+    },
+    {
+      "path": "src-tauri/src/skills/provenance.rs",
+      "sha256": "1136531bdde539c7b4abd8ef972f82d4b3d9780358a294407376e4baeee51a83"
+    },
+    {
+      "path": "src-tauri/src/skills/service.rs",
+      "sha256": "61af296900a4c8a26a7b9ebee77af48298910e288f51756d4c908c065a869601"
+    },
+    {
+      "path": "src-tauri/src/state.rs",
+      "sha256": "a4807688db349867b5b3b791a52e44e87a76cf318299e01b5f0c78e7ed648f22"
+    },
+    {
+      "path": "src-tauri/src/tools/api_connector.rs",
+      "sha256": "fd6b039a871320c801cf46c4588f6bed710b644c6357cf402397947daca27c5c"
+    },
+    {
+      "path": "src-tauri/src/tools/app_control.rs",
+      "sha256": "47bdbfa84536db7f8b630b3d6c7ca7d9b3601569cee2119aa785dfb9079c509f"
+    },
+    {
+      "path": "src-tauri/src/tools/call_fish.rs",
+      "sha256": "2d88a4c42b94bd089d51750240f6da91460f088f593f97d90943cb644945dd1a"
+    },
+    {
+      "path": "src-tauri/src/tools/delegate.rs",
+      "sha256": "50909c463b4205a31d43c715a1bb322c774ffbf2e51f2f23050edcdf3034a4b5"
+    },
+    {
+      "path": "src-tauri/src/tools/durable_plan_todo.rs",
+      "sha256": "9c1e5e3eb1e93a49a1cc395dd6c8203d8ad8c9814c39c5f605cc52f1cafcfff7"
+    },
+    {
+      "path": "src-tauri/src/tools/remote_fs.rs",
+      "sha256": "7264caa606127497c55e26c303b47bd12a114374989fa89b1adf1110607c8946"
+    },
+    {
+      "path": "src-tauri/src/tools/settings_catalog.rs",
+      "sha256": "9724bb399964a090f7a6fb19043ead79375a280c852613d2ae4d72a928de4c87"
+    },
+    {
+      "path": "src-tauri/tauri.conf.json",
+      "sha256": "510c6b939a58f1fffea46fd02e0c6bc4fbe45409e0ca21b33c75973476471d78"
+    },
+    {
+      "path": "src/App.tsx",
+      "sha256": "a760ef588f54b4c5b7d39da42289b4128f59acc57ee3594cce48ab5c4dbd1507"
+    },
+    {
+      "path": "src/components/chat/InputContextSummary.tsx",
+      "sha256": "10ab6a5753f3874655cb2c9636c4b146afc0d8b63f68b3e024ab0f282e1c5847"
+    },
+    {
+      "path": "src/components/chat/PermissionCard.tsx",
+      "sha256": "49dafce5c17b0d3cfa32ae6be064334b03fbe4a82e6d0157c302eced3a5fc92b"
+    },
+    {
+      "path": "src/extensions/debug/dapClient.ts",
+      "sha256": "acb362b4ddbea5cf7eb8af2707463ae0897ae4109e7da896cb4f6b0fc904d509"
+    },
+    {
+      "path": "src/extensions/debug/debugController.ts",
+      "sha256": "d7c93510179793583a3fc1f00dd8d99176e47a4a6efb18f3f8bbca6cdc82652e"
+    },
+    {
+      "path": "src/extensions/extensionService.ts",
+      "sha256": "44aa2886c5be52ad5f8734fa119ff9f552248638b1ea25b9b4e7cef41f6687b6"
+    },
+    {
+      "path": "src/extensions/ui/DebugView.tsx",
+      "sha256": "bb4255dee2635a499088314217a70d423d301b5a08eb80165d9173ecfff4652a"
+    },
+    {
+      "path": "src/extensions/ui/WebviewHost.tsx",
+      "sha256": "08237e18b6acab0ccefde78b6068a0aeedd75d2e537736c4c30f21b270b4e4be"
+    },
+    {
+      "path": "src/extensions/ui/webviewSecurity.ts",
+      "sha256": "8955a70c0ae2b15172bd98193166113504067afe03e689f71da0172456dcf274"
+    },
+    {
+      "path": "src/hooks/useAppSettings.ts",
+      "sha256": "049af4eb41826f465fc407645840670ae2f0c77a2dbc81f431cb84f22b1ccc43"
+    },
+    {
+      "path": "src/services/tauri/connectors.ts",
+      "sha256": "754310dac0de0f14483e4ef5bfba8ca17e719a4c45dcbe597c0eec1fcd4b6864"
+    },
+    {
+      "path": "src/services/tauri/lsp.ts",
+      "sha256": "a9dbf9440d935c088300ee1ecdc176efef237fdaaf0ecea481adbf1f70fb74a2"
+    },
+    {
+      "path": "src/services/tauri/lspSession.test.ts",
+      "sha256": "5bec14d8529f127e58af9d4bd41e483a12c4c71cc91c17382465a8ba1028d553"
+    },
+    {
+      "path": "src/services/tauri/lspSession.ts",
+      "sha256": "02e7f98d83b3921ebc66fc7ec132d89e3d50bcea4f6920ecff94d0969d976699"
+    },
+    {
+      "path": "src/services/tauri/projectScope.ts",
+      "sha256": "155e1954ac4a7b8314c6c0505fbc0f4b65a5473b95b6b41d6263170dd518f2ff"
+    },
+    {
+      "path": "src/services/tauri/runEventNotice.ts",
+      "sha256": "a307512750024f37bf18487b67449533a379468372f0292b1785f87d48a0c139"
+    },
+    {
+      "path": "src/services/tauri/taskArtifacts.ts",
+      "sha256": "1320d9063caf20ce0a4cb5a982b26e4ceaac70e74a8e6feb15844ff52fb2ea7d"
+    },
+    {
+      "path": "src/services/tauri/taskDetails.ts",
+      "sha256": "c3de3066755f8512d6b89c79eda751d79f06871ba8b070babfd617cb33f00824"
+    },
+    {
+      "path": "src/services/tauri/workflow.test.ts",
+      "sha256": "29c9a9fa42c8cb453672764b248c9d186d071e6ef13729dd86c0aac5793be6cc"
+    },
+    {
+      "path": "src/services/tauri/workflow.ts",
+      "sha256": "776a5ec624716ca8af8cd17d0cae4cdfd434316f3f84318fc35da6468de6a884"
+    },
+    {
+      "path": "src/services/workspaceNavigation.ts",
+      "sha256": "716fc3d3a3ff945aa3b25b62a3eb1f42b02fba804347c609c1030e492ce681bf"
+    },
+    {
+      "path": "src/utils/perfCounters.test.ts",
+      "sha256": "58782b95c3ecbefac111740b045965120eb145ecc5b2207853859acf76721e38"
+    },
+    {
+      "path": "src/utils/perfCounters.ts",
+      "sha256": "b9c4bffc29b30c62d2e416bcf715a972483e046b7404e64b2855d0021a473ded"
+    },
+    {
+      "path": "src/workspaces/codez/AssistantPanel.tsx",
+      "sha256": "845fd71eff60b3240e27de17355dd41dbd68f30489ae298e1553409619531fbb"
+    },
+    {
+      "path": "src/workspaces/codez/BottomPanel.keyboard.test.tsx",
+      "sha256": "710f722953e9e621a99dd56352812219034a1a2f01c4b137886ada53ed221bda"
+    },
+    {
+      "path": "src/workspaces/codez/BottomPanel.tsx",
+      "sha256": "4fd8851d7ca7bbab11c53b8c08162161b914ee78e15fda8bfbd24db4808d1247"
+    },
+    {
+      "path": "src/workspaces/codez/BudgetObservation.tsx",
+      "sha256": "567d6defee4616872f05a7995420e52d0cafdddc0b0a8ec24db8ad001878fa7c"
+    },
+    {
+      "path": "src/workspaces/codez/CodeMap/layout.ts",
+      "sha256": "f965dddf9fcaf4c370669e8cbea885cb86beda2daea01c3f750f7ecd2a3f5c94"
+    },
+    {
+      "path": "src/workspaces/codez/DeliveryReviewPanel.tsx",
+      "sha256": "237c6d2c2310fda3379729fc29acbbbf3f401b2294cceb5d37949ab6c8681458"
+    },
+    {
+      "path": "src/workspaces/codez/DeliverySummary.tsx",
+      "sha256": "504f8776ef6ccc20c18b7d6dd84c0f263f299452336cafbb236d1c05b6cbb4df"
+    },
+    {
+      "path": "src/workspaces/codez/MarkdownPreview.tsx",
+      "sha256": "8151a2461aaefd1ef0f002e9e0ddc1ad7902b50a22cfcf4765f3fcc382aefb9e"
+    },
+    {
+      "path": "src/workspaces/codez/RunHistoryPanel.tsx",
+      "sha256": "94510d765fdd4dbd25fe33505e8678e2959b2f6a324162c34a97e0520d25c47e"
+    },
+    {
+      "path": "src/workspaces/codez/SettingsPanel.tsx",
+      "sha256": "9127687b49e5ae8c2e150548bf14679590c8217cd75963062aad743ed2cc7d1b"
+    },
+    {
+      "path": "src/workspaces/codez/TaskArtifactViewer.tsx",
+      "sha256": "aae9cbe061a5b0bb9945fff0ca5b451ea2720c9f9c911579d8d3965b432e9044"
+    },
+    {
+      "path": "src/workspaces/codez/TaskDetailsPanel.tsx",
+      "sha256": "8b925d75fb02697050ad3bc910999dfe5348cdf88a209bf3ee7b0f1bd9ad1a6d"
+    },
+    {
+      "path": "src/workspaces/codez/TaskFileViewer.tsx",
+      "sha256": "b3913a6fba9419721254bbfe5c1c60ea7deb8ecf0a1a9b6eaa11f098bf41b1f1"
+    },
+    {
+      "path": "src/workspaces/codez/Terminal.tsx",
+      "sha256": "9fe99af71d3fe1dcafdbefac796be365e91c8ccfe71409d193483030807a1c09"
+    },
+    {
+      "path": "src/workspaces/codez/editorConflict.ts",
+      "sha256": "18913faf070f34c48c1ffef4496aed0cba018f1f2b34400a7f0143e6beadf8a0"
+    },
+    {
+      "path": "src/workspaces/codez/editorRecovery.integration.test.ts",
+      "sha256": "b252966ab7da5f4367501cd14e3123be65653709c54ca86d9a30f2b86be92446"
+    },
+    {
+      "path": "src/workspaces/codez/editorRecovery.ts",
+      "sha256": "25ff29527254b07dd159f2952902557ac56c0d645a43beae8bf3f7cb030d7968"
+    },
+    {
+      "path": "src/workspaces/codez/index.tsx",
+      "sha256": "3bc354eb78d4d71285b3c874c5ab09c3d28a40066483e618e3089fc1a81019ac"
+    },
+    {
+      "path": "src/workspaces/codez/mermaidSafe.ts",
+      "sha256": "3e023eb202492dee9ff32523c289ebc9a17b5882a59542fbe97cd846f8017bb7"
+    },
+    {
+      "path": "src/workspaces/codez/tabNavigation.ts",
+      "sha256": "5bb9a2abc43d341f0b44904a8bd139ecb31f10ffe4dbeb5f52fccff80ae421fe"
+    },
+    {
+      "path": "src/workspaces/codez/terminalLifecycle.ts",
+      "sha256": "60d7e6eab42c4dceea6d120c6dfc66a381b08031193cc66c846a77548f1acd53"
+    },
+    {
+      "path": "src/workspaces/workz/index.tsx",
+      "sha256": "472d401fd2bf8b543162f2ffe30a00b4e7aab145fd94a81a224d9b68a20cb866"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/proc_windows_sandbox.rs",
+      "sha256": "e169ed6de0649400cfc40fec732e8300a01ba11319738f427fb09ca89dcb00d6"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/scheduler/cron.rs",
+      "sha256": "f6f29899d91219dbf09ad90b322441f90cafbc053526969bb25055da185fb17e"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/security/linux_keyring.rs",
+      "sha256": "b81db6dde01397d72969d5e15c24c2e53cce86c9026c7f8e61c4d6d182b7791b"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/security/macos_keychain.rs",
+      "sha256": "8c56d9f9ca66cb664b207f6e89147f3602b97eff9b8c35003d227c9eedb9d3e1"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/security/secrets.rs",
+      "sha256": "b6f1cdcff4398478ef7aa82f6c79ec08a0ef735b4d0869be065ac702103b8660"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/store/db.rs",
+      "sha256": "e02c365feeeeca5f8ab01f39b0bed4805259ecd2b8c83cdbbf36a144d35a9295"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/store/settings.rs",
+      "sha256": "9984b99abb9cbdc91b2f0b4a903f9951d556d6ceb73c7af660b10a817177954f"
+    },
+    {
+      "path": "vendor/secret-service/src/util.rs",
+      "sha256": "7b5234e82413b3c6db2e02fa3dfbe33d128fc0d73dfb2bd46284c700e290ede7"
+    },
+    {
+      "path": "vite.config.ts",
+      "sha256": "deea754a350ea6f03a24cb21080a86532d0796b5aa2e1d0505bdf9957279bb17"
+    }
+  ]
+}

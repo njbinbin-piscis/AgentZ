@@ -1,0 +1,105 @@
+{
+  "files": [
+    {
+      "path": "crates/agentz-task-state/src/task_details.rs",
+      "sha256": "d3b98918c3f49d7cfcb0a7568044d33ff3d13d1820f9a01d7743f02a294c3af6"
+    },
+    {
+      "path": "crates/agentz-task-state/src/plan.rs",
+      "sha256": "2ffe34629d8af12a05df3a527e599b38389fb780bd28b9d5bf00ce99156c334e"
+    },
+    {
+      "path": "crates/agentz-task-state/src/run.rs",
+      "sha256": "ea4b9f4e701e2d623c690d6356a43cb9d0c9b20d6a0daa9c9b91a3ae936c01d6"
+    },
+    {
+      "path": "crates/agentz-task-state/src/budget.rs",
+      "sha256": "4ce684ae5a01a9ab41d2003cc342eb4446b8e60a0e17749171dd09b89cf24178"
+    },
+    {
+      "path": "crates/agentz-task-state/src/lib.rs",
+      "sha256": "be80ac835872c052676752b35c6927265094a415c4921080d90c8511a57ab46d"
+    },
+    {
+      "path": "src-tauri/src/runtime/task_details.rs",
+      "sha256": "f1dd7e7c84f2dbda08276278628a5a25ce8f88e89269c9e303e2f483b4a22c42"
+    },
+    {
+      "path": "src-tauri/src/runtime/mod.rs",
+      "sha256": "0d23952e65855dbdadb1bb33cced46774786b8c1251a7ade0c736fdc06d6d10e"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_events.rs",
+      "sha256": "c86837f4a6fbf45cc7ff7e632b01973e924f24feaa409f4215a66b1f3102c9a6"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_plan.rs",
+      "sha256": "2392747b2def2b915e115159629cda076b8865ee62abcc90271a62cc5348f4a5"
+    },
+    {
+      "path": "src-tauri/src/commands/session_metadata.rs",
+      "sha256": "1d9adfbdc8263e12a37f1a58fa767e008b28a3f884cec200243c39de23e192c6"
+    },
+    {
+      "path": "src-tauri/src/commands/project_scope.rs",
+      "sha256": "7f59d63dca0390d4a24aa02b2850696ee05c667ae9e4d9adabe78651501932b4"
+    },
+    {
+      "path": "src-tauri/src/runtime/project_scope.rs",
+      "sha256": "3bbf91b8af83010753cc720c8b61a8dd252465dcb49ec4842237c4de1394cba0"
+    },
+    {
+      "path": "src-tauri/src/runtime/approval.rs",
+      "sha256": "99776b3feeb3344e2b5acdb04657f277bb78b6ced22f2fa612216781799c718a"
+    },
+    {
+      "path": "src-tauri/src/commands/agent_task.rs",
+      "sha256": "98680d2dac8fda246e56a7b746ba3ef93e7ad084b7e8fe399eba620356dcc380"
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "sha256": "2516371b7cbeff732ca7747e90f00eee7addcc62848a769fbdca139b91dd3c81"
+    },
+    {
+      "path": "src/services/tauri/taskDetails.ts",
+      "sha256": "c3de3066755f8512d6b89c79eda751d79f06871ba8b070babfd617cb33f00824"
+    },
+    {
+      "path": "src/services/tauri/taskDetails.test.ts",
+      "sha256": "c7c0864121564f84d1731b43b5a70b2d7eb9fad581dbcbdc3f21602eadf7e259"
+    },
+    {
+      "path": "src/services/tauri/chatPlan.ts",
+      "sha256": "abad80ed0289e34fe221b70bfcb962d1f3ea4467d30bce4691d3ca072a123595"
+    },
+    {
+      "path": "src/services/tauri/runDiscovery.ts",
+      "sha256": "16cb337bda7210ca2a670bc9f10525d839a3d3d16c3cf42793fef8b7a7b3a1eb"
+    },
+    {
+      "path": "src/services/tauri/runEvents.ts",
+      "sha256": "d8e2bf8b5a9f8ebcc4379ff66fb3131c6d82c4488eee5b0a7eccecc4b4537f40"
+    },
+    {
+      "path": "src/services/tauri/projectScope.ts",
+      "sha256": "a30baadd0f77ce84fa0d8c026abae4e8c1a6a411edf7b69082a2f8559bf83e80"
+    },
+    {
+      "path": "src/workspaces/codez/TaskDetailsPanel.tsx",
+      "sha256": "8b925d75fb02697050ad3bc910999dfe5348cdf88a209bf3ee7b0f1bd9ad1a6d"
+    },
+    {
+      "path": "src/workspaces/codez/TaskDetailsPanel.test.tsx",
+      "sha256": "e4369d130b6e59eab85dbfb640ed20c8453e1c3b8f44fe2ddab8b747de9ee423"
+    },
+    {
+      "path": "src/workspaces/codez/AssistantPanel.tsx",
+      "sha256": "ab469eb32e479f537b7819a2e95311821398f091c6243a8393a2dfc755874673"
+    },
+    {
+      "path": "src/workspaces/workz/index.tsx",
+      "sha256": "472d401fd2bf8b543162f2ffe30a00b4e7aab145fd94a81a224d9b68a20cb866"
+    }
+  ],
+  "captured_at": "2026-10-09T23:03:38.701Z"
+}

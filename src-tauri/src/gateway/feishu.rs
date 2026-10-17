@@ -119,20 +119,16 @@ impl FeishuChannel {
 
         if let Some(code) = body["code"].as_i64() {
             if code != 0 {
-                let msg = body["msg"].as_str().unwrap_or("unknown error");
                 return Err(anyhow::anyhow!(
-                    "Feishu auth failed (code {}): {}. Check App ID and App Secret.",
-                    code,
-                    msg
+                    "Feishu auth failed (code {}). Check App ID and App Secret.",
+                    code
                 ));
             }
         }
 
         let token = body["tenant_access_token"]
             .as_str()
-            .ok_or_else(|| {
-                anyhow::anyhow!("Missing tenant_access_token in Feishu response: {:?}", body)
-            })?
+            .ok_or_else(|| anyhow::anyhow!("Missing tenant_access_token in Feishu response"))?
             .to_string();
         let expires_in = body["expire"].as_u64().unwrap_or(7200);
 
@@ -182,10 +178,9 @@ impl FeishuChannel {
         let body: serde_json::Value = resp.json().await.unwrap_or_default();
         if !status.is_success() || body["code"].as_i64().unwrap_or(0) != 0 {
             anyhow::bail!(
-                "Feishu upload_image failed: HTTP {} code={} msg={}",
+                "Feishu upload_image failed: HTTP {} code={}",
                 status,
-                body["code"],
-                body["msg"].as_str().unwrap_or("unknown")
+                body["code"].as_i64().unwrap_or(-1)
             );
         }
 
@@ -239,10 +234,9 @@ impl FeishuChannel {
         let resp_json: serde_json::Value = resp.json().await.unwrap_or_default();
         if !status.is_success() || resp_json["code"].as_i64().unwrap_or(0) != 0 {
             anyhow::bail!(
-                "Feishu send_image failed: HTTP {} code={} msg={}",
+                "Feishu send_image failed: HTTP {} code={}",
                 status,
-                resp_json["code"],
-                resp_json["msg"].as_str().unwrap_or("unknown")
+                resp_json["code"].as_i64().unwrap_or(-1)
             );
         }
 
@@ -279,10 +273,9 @@ impl FeishuChannel {
         let body: serde_json::Value = resp.json().await.unwrap_or_default();
         if !status.is_success() || body["code"].as_i64().unwrap_or(0) != 0 {
             anyhow::bail!(
-                "Feishu upload_file failed: HTTP {} code={} msg={}",
+                "Feishu upload_file failed: HTTP {} code={}",
                 status,
-                body["code"],
-                body["msg"].as_str().unwrap_or("unknown")
+                body["code"].as_i64().unwrap_or(-1)
             );
         }
 
@@ -339,10 +332,9 @@ impl FeishuChannel {
         let resp_json: serde_json::Value = resp.json().await.unwrap_or_default();
         if !status.is_success() || resp_json["code"].as_i64().unwrap_or(0) != 0 {
             anyhow::bail!(
-                "Feishu send_file failed: HTTP {} code={} msg={}",
+                "Feishu send_file failed: HTTP {} code={}",
                 status,
-                resp_json["code"],
-                resp_json["msg"].as_str().unwrap_or("unknown")
+                resp_json["code"].as_i64().unwrap_or(-1)
             );
         }
 
@@ -391,16 +383,14 @@ impl FeishuChannel {
 
         let status = resp.status();
         if !status.is_success() {
-            let body_text = resp.text().await.unwrap_or_default();
-            anyhow::bail!("Feishu send_text failed: HTTP {} — {}", status, body_text);
+            anyhow::bail!("Feishu send_text failed: HTTP {}", status);
         }
 
         let resp_json: serde_json::Value = resp.json().await.unwrap_or_default();
         if resp_json["code"].as_i64().unwrap_or(0) != 0 {
             anyhow::bail!(
-                "Feishu send_text API error: code={} msg={}",
-                resp_json["code"],
-                resp_json["msg"].as_str().unwrap_or("unknown")
+                "Feishu send_text API error: code={}",
+                resp_json["code"].as_i64().unwrap_or(-1)
             );
         }
 
@@ -574,11 +564,7 @@ impl Channel for FeishuChannel {
                     Ok(body) => {
                         let code = body["code"].as_i64().unwrap_or(-1);
                         if code != 0 {
-                            warn!(
-                                "Feishu WS endpoint error (code {}): {}",
-                                code,
-                                body["msg"].as_str().unwrap_or("unknown")
-                            );
+                            warn!("Feishu WS endpoint error (code {})", code);
                             tokio::time::sleep(backoff).await;
                             backoff = (backoff * 2).min(MAX_BACKOFF);
                             continue;
@@ -593,10 +579,7 @@ impl Channel for FeishuChannel {
                                 (u.to_string(), ping_secs)
                             }
                             None => {
-                                warn!(
-                                    "Feishu WS endpoint: missing data.URL in response: {:?}",
-                                    body
-                                );
+                                warn!("Feishu WS endpoint: missing data.URL in response");
                                 tokio::time::sleep(backoff).await;
                                 backoff = (backoff * 2).min(MAX_BACKOFF);
                                 continue;

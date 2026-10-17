@@ -301,7 +301,7 @@ async fn run_in_process_koi_turn(
     }
 
     let sink: Arc<dyn EventSink> = Arc::new(PoolTurnEventSink { app: app.clone() });
-    let registry = build_koi_registry(&app, db.clone(), settings.clone(), sink.clone()).await;
+    let mut registry = build_koi_registry(&app, db.clone(), settings.clone(), sink.clone()).await;
 
     // Inject org_spec / assemble the member system prompt. Todo turns use the
     // kernel 6-layer contract (Stop Gate last); workflow agent nodes keep a
@@ -412,6 +412,7 @@ async fn run_in_process_koi_turn(
         ..Default::default()
     };
 
+    crate::runtime::approval::restrict_unapproved_background(&mut registry);
     let mut deps = HeadlessDeps::new(db, settings, registry, sink);
     if let Some(secs) = request.task_timeout_secs.filter(|s| *s > 0) {
         deps.default_timeout = Duration::from_secs(u64::from(secs));

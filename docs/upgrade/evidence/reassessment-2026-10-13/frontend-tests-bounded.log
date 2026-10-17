@@ -1,0 +1,216 @@
+
+ RUN  v2.1.9 C:/Projects/AgentZ
+
+stdout | src/services/tauri/lsp.test.ts > LSP transport > sends bare JSON, never Content-Length framing
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+
+stdout | src/services/tauri/lsp.test.ts > LSP transport > keeps multi-byte characters intact (UTF-8 safe, no length header)
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+
+stdout | src/services/tauri/lsp.test.ts > LSP transport > completes the handshake against the bridge's canned initialize (id 0)
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+
+stdout | src/services/tauri/lsp.test.ts > LSP lifecycle robustness > retries a failed handshake with a new socket rather than reusing the rejected promise
+[LSP] Connected to ws://127.0.0.1:5432 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lsp.test.ts > LSP lifecycle robustness > reopens current unsaved documents on a new bridge and omits closed files
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:5432 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lsp.test.ts > LSP lifecycle robustness > clears crashed diagnostics and ignores callbacks from the previous socket
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lsp.test.ts > LSP lifecycle robustness > fails in-flight requests when the socket closes
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lsp.test.ts > LSP lifecycle robustness > resolves read-only requests to null on timeout (no hang)
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+
+stdout | src/services/tauri/lsp.test.ts > document lifecycle > tracks per-document versions monotonically across A→B→A
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+
+stdout | src/services/tauri/lsp.test.ts > document lifecycle > emits didClose for the closed document
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+
+stdout | src/services/tauri/lsp.test.ts > diagnostics routing > does not return a pull result issued before the latest edit
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lsp.test.ts > diagnostics routing > rejects diagnostics for a prior document version after an edit
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lsp.test.ts > diagnostics routing > only notifies listeners of the matching URI
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+
+stdout | src/services/tauri/lsp.test.ts > Monaco provider wiring > routes markers to the matching model and skips when it is absent
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+
+stderr | src/services/tauri/lsp.test.ts > Monaco provider wiring > routes markers to the matching model and skips when it is absent
+[LSP] no model for file:///proj/a.ts
+
+stdout | src/services/tauri/lsp.test.ts > Monaco provider wiring > computes the completion range from the word under the cursor
+[LSP] Connected to ws://127.0.0.1:4321 for typescript
+
+ ✓ src/services/tauri/lsp.test.ts (17 tests) 97ms
+ ✓ src/workspaces/codez/RunHistoryPanel.test.tsx (19 tests) 1051ms
+   ✓ passive scoped execution history > enforces the byte budget across the verified prefix and an incremental batch 500ms
+   ✓ passive scoped execution history > stops oversized history before reading another page or showing partial content 308ms
+ ✓ src/workspaces/workz/AgentTaskReview.test.tsx (17 tests) 415ms
+ ✓ src/extensions/debug/debugController.test.ts (13 tests) 56ms
+ ✓ src/components/chat/PermissionCard.test.tsx (17 tests) 181ms
+ ✓ src/services/tauri/projectScope.test.ts (11 tests) 177ms
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > bounds failed automatic restarts instead of looping indefinitely
+[LSP] Connected to ws://127.0.0.1:9999 for rust
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > recovers on a fresh bridge without replacing the shared client and stops after release
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > recovers on a fresh bridge without replacing the shared client and stops after release
+[LSP] Connected to ws://127.0.0.1:10001 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > resets the restart budget after each healthy restart so later crashes recover
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > resets the restart budget after each healthy restart so later crashes recover
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > resets the restart budget after each healthy restart so later crashes recover
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > resets the restart budget after each healthy restart so later crashes recover
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > stops a true crash loop at the restart cap after healthy restarts
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > stops a start-then-crash loop at the per-window recovery cap
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > stops a start-then-crash loop at the per-window recovery cap
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > stops a start-then-crash loop at the per-window recovery cap
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > stops a start-then-crash loop at the per-window recovery cap
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > stops a start-then-crash loop at the per-window recovery cap
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > stops a start-then-crash loop at the per-window recovery cap
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > stops a start-then-crash loop at the per-window recovery cap
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > shares one connection for the same project+language
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > keeps the backend session alive while another consumer holds it
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > disconnects the client when the last consumer releases
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > drops a failed session so a later acquire can retry
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] WebSocket closed
+
+stdout | src/services/tauri/lspSession.test.ts > LSP session pool > isolates sessions by language
+[LSP] Connected to ws://127.0.0.1:9999 for typescript
+[LSP] Connected to ws://127.0.0.1:9999 for python
+[LSP] WebSocket closed
+[LSP] WebSocket closed
+
+ ✓ src/services/tauri/lspSession.test.ts (10 tests) 142ms
+ ✓ src/workspaces/codez/TaskArtifactViewer.test.tsx (6 tests) 166ms
+ ✓ src/workspaces/codez/editorConflict.test.ts (12 tests) 36ms
+ ✓ src/services/tauri/runEventProjection.test.ts (6 tests) 44ms
+ ✓ src/extensions/debug/dapClient.test.ts (9 tests) 102ms
+ ✓ src/extensions/ui/webviewSecurity.test.ts (13 tests) 37ms
+ ✓ src/services/tauri/taskArtifacts.test.ts (7 tests) 49ms
+ ✓ src/workspaces/codez/Terminal.lifecycle.test.tsx (6 tests) 130ms
+ ✓ src/services/tauri/runEvents.test.ts (7 tests) 63ms
+ ✓ src/workspaces/codez/TaskFileViewer.test.tsx (5 tests) 108ms
+ ✓ src/services/tauri/runEventNotice.test.ts (7 tests) 89ms
+ ✓ src/workspaces/codez/DeliverySummary.test.tsx (6 tests) 79ms
+ ✓ src/workspaces/codez/DeliveryReviewPanel.test.tsx (4 tests) 124ms
+ ✓ src/workspaces/codez/TaskDetailsPanel.test.tsx (5 tests) 105ms
+ ✓ src/workspaces/codez/DeliveryReviewPanel.integration.test.tsx (3 tests) 87ms
+ ✓ src/services/tauri/taskDetails.test.ts (6 tests) 42ms
+ ✓ src/services/tauri/runDiscovery.test.ts (6 tests) 41ms
+ ✓ src/services/workspaceNavigation.test.ts (6 tests) 33ms
+ ✓ src/workspaces/codez/terminalLifecycle.test.ts (6 tests) 38ms
+ ✓ src/workspaces/codez/editorRecovery.integration.test.ts (4 tests) 36ms
+ ✓ src/services/tauri/workflow.test.ts (8 tests) 28ms
+ ✓ src/services/tauri/taskEnvironment.test.ts (7 tests) 49ms
+ ✓ src/components/chat/InputContextSummary.test.tsx (5 tests) 83ms
+ ✓ src/workspaces/codez/BudgetObservation.test.tsx (7 tests) 85ms
+ ✓ src/workspaces/codez/BottomPanel.keyboard.test.tsx (1 test) 80ms
+ ✓ src/services/tauri/taskFiles.test.ts (4 tests) 33ms
+ ✓ src/workspaces/codez/firstRun.test.ts (14 tests) 17ms
+ ✓ src/services/tauri/workflowExpr.test.ts (4 tests) 53ms
+ ✓ src/utils/perfCounters.test.ts (4 tests) 23ms
+ ✓ extension-host/src/host/webviewResourceUri.test.ts (3 tests) 15ms
+ ✓ src/extensions/ui/DebugView.test.tsx (1 test) 63ms
+ ✓ src/services/tauri/taskView.test.ts (3 tests) 30ms
+ ✓ src/services/tauri/chat.test.ts (3 tests) 33ms
+ ✓ src/services/tauri/chatPlan.test.ts (3 tests) 30ms
+ ✓ src/extensions/extensionUiStore.test.ts (2 tests) 69ms
+ ✓ src/utils/pathFilter.test.ts (5 tests) 16ms
+ ✓ src/i18n/i18n.test.ts (2 tests) 41ms
+ ✓ src/workspaces/codez/saveBlock.test.ts (4 tests) 16ms
+ ✓ src/workspaces/codez/tabNavigation.test.ts (2 tests) 17ms
+
+ Test Files  45 passed (45)
+      Tests  310 passed (310)
+   Start at  13:58:27
+   Duration  34.32s (transform 3.89s, setup 0ms, collect 9.56s, tests 4.31s, environment 41ms, prepare 19.62s)
+

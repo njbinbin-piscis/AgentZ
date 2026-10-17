@@ -6,9 +6,11 @@
 //! the IDE workspace: file I/O, git, search, a PTY terminal, a filesystem
 //! watcher, and the LSP ↔ WebSocket bridge.
 
+mod bounded_read;
 pub mod browser;
 pub mod commands;
 pub mod context_assembly;
+pub mod diagnostics;
 pub mod gateway;
 mod index_worker;
 pub mod journal;
@@ -18,9 +20,9 @@ pub mod remote;
 pub mod runtime;
 pub mod skills;
 pub mod state;
-pub mod tools;
+pub mod task_environment;
 mod terminal_log;
-mod bounded_read;
+pub mod tools;
 
 use state::AppState;
 use std::sync::OnceLock;
@@ -61,9 +63,30 @@ fn init_logging(app: &tauri::AppHandle) {
 /// Build and run the AgentZ desktop application.
 pub fn run() {
     tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol(
+            "agentz-resource",
+            |context, request, responder| {
+                let roots = context
+                    .app_handle()
+                    .state::<AppState>()
+                    .webview_resource_roots
+                    .clone();
+                tauri::async_runtime::spawn(async move {
+                    let response = tauri::async_runtime::spawn_blocking(move || {
+                        commands::webview_resources::handle_protocol_request(&roots, &request)
+                    })
+                    .await
+                    .unwrap_or_else(|_| {
+                        commands::webview_resources::protocol_error_response()
+                    });
+                    responder.respond(response);
+                });
+            },
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
+            commands::project_scope::install_main_lifecycle(app.handle())?;
             init_logging(app.handle());
             let previous_hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |info| {
@@ -103,6 +126,33 @@ pub fn run() {
         })
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
+            commands::project_scope::project_scope_pick,
+            commands::project_scope::project_scope_restore,
+            commands::project_scope::project_scope_revoke,
+            commands::project_scope::projectless_directory_create,
+            commands::project_scope::projectless_directory_reopen,
+            commands::project_scope::projectless_session_create,
+            commands::project_scope::projectless_session_reopen,
+            commands::project_scope::projectless_session_lookup,
+            commands::chat_plan::chat_plan_query,
+            commands::chat_plan::chat_plan_apply,
+            commands::chat_events::chat_run_events,
+            commands::chat_events::chat_current_run,
+            commands::notification_inbox::notification_inbox_list,
+            commands::notification_inbox::notification_inbox_mark_read,
+            commands::automation_reminder::automation_reminder_status,
+            commands::automation_reminder::automation_reminder_set,
+            commands::automation_reminder::automation_reminder_disable,
+            commands::automation_reminder::automation_reminder_poll,
+            commands::chat_events::chat_task_details,
+            commands::task_view::task_view_resolve,
+            commands::task_artifacts::task_artifact_capture,
+            commands::task_artifacts::task_artifact_save_text,
+            commands::task_artifacts::task_artifact_list,
+            commands::task_artifacts::task_artifact_read,
+            commands::task_artifacts::task_artifact_delete,
+            commands::task_view_read::task_view_list,
+            commands::task_view_read::task_view_read,
             // file tree + I/O
             commands::ide::ide_list_files,
             commands::ide::ide_read_file,
@@ -129,6 +179,7 @@ pub fn run() {
             commands::ide::ide_terminal_resize,
             commands::ide::ide_terminal_destroy,
             commands::ide::ide_terminal_count,
+            commands::ide::ide_terminal_resource_snapshot,
             commands::ide::ide_terminal_destroy_all,
             commands::ide::ide_terminal_is_alive,
             commands::ide::ide_terminal_read,
@@ -136,6 +187,7 @@ pub fn run() {
             // file-change watcher
             commands::ide::ide_start_watcher,
             commands::ide::ide_stop_watcher,
+            commands::ide::ide_watcher_count,
             // LSP bridge
             commands::ide::ide_lsp_list_languages,
             commands::ide::ide_lsp_start,
@@ -148,6 +200,8 @@ pub fn run() {
             // AI chat (agent turn on the piscis-engine kernel)
             commands::chat::chat_send,
             commands::chat::chat_cancel,
+            commands::diagnostics::diagnostics_export_logs,
+            commands::diagnostics::diagnostics_preview_logs,
             commands::chat::chat_running_count,
             commands::chat::chat_cancel_all,
             // Cmd-K inline edit + Tab completion (ghost text)
@@ -159,10 +213,16 @@ pub fn run() {
             commands::codebase::codebase_search,
             // Isolated Agent tasks: worktree + diff review + merge/PR (M4)
             commands::agent_task::agent_task_create,
+            commands::agent_task::agent_task_archive_snapshot,
+            commands::agent_task::agent_task_restore_snapshot,
             commands::agent_task::agent_task_list,
+            commands::agent_task::agent_task_get,
             commands::agent_task::agent_task_changed_files,
+            commands::agent_task::agent_task_change_set,
+            commands::agent_task::agent_task_file_view,
             commands::agent_task::agent_task_file_diff,
             commands::agent_task::agent_task_merge,
+            commands::agent_task::agent_task_merge_preview,
             commands::agent_task::agent_task_discard,
             commands::agent_task::agent_task_open_pr,
             // Embedded browser panel (CDP via chromiumoxide)
@@ -187,6 +247,7 @@ pub fn run() {
             // Knowledge graph — background index (CodeGraph-style)
             commands::graph::graph_index_rebuild,
             commands::graph::graph_index_status,
+            commands::graph_index::graph_index_resource_snapshot,
             commands::code_map::code_map_data,
             commands::projects::workz_overview,
             commands::projects::workz_project_add,
@@ -211,6 +272,7 @@ pub fn run() {
             commands::ext_host::ext_host_send,
             commands::ext_host::ext_host_stop,
             commands::ext_host::ext_host_status,
+            commands::ext_host::ext_host_resource_snapshot,
             commands::remote::remote_list_targets,
             commands::remote::remote_probe,
             commands::remote::remote_ssh_setup_key,
@@ -239,7 +301,11 @@ pub fn run() {
             // LLM / kernel settings
             commands::settings::get_settings,
             commands::settings::save_settings,
+            commands::settings::save_settings_with_secrets,
             commands::settings::is_configured,
+            commands::settings::settings_secret_exists,
+            commands::settings::settings_secret_replace,
+            commands::settings::settings_secret_delete,
             // Flash (small/fast) model selection for sub-agents (Fish)
             commands::flash::flash_get,
             commands::flash::flash_set,
@@ -268,6 +334,8 @@ pub fn run() {
             commands::connectors::connectors_set_enabled,
             commands::connectors::connectors_save_credentials,
             commands::connectors::connectors_get_credentials,
+        commands::connectors::connectors_oauth_start,
+        commands::connectors::connectors_oauth_refresh,
             commands::connectors::connectors_create_api,
             // Agents (Phase 2): installable single-Koi personas + kois sync
             commands::agents::agents_list,
@@ -318,6 +386,8 @@ pub fn run() {
             // Workbench management: installed skills, project rules, hooks
             commands::workbench::skills_list_installed,
             commands::workbench::skills_uninstall,
+            commands::webview_resources::webview_resources_register,
+            commands::webview_resources::webview_resources_unregister,
             // Skill evolution (v0.5.0)
             commands::skill_evolution::promote_skill,
             commands::skill_evolution::discard_draft_skill,
@@ -353,6 +423,7 @@ pub fn run() {
             // Interactive UI (chat_ui tool)
             commands::interactive::respond_interactive_ui,
             commands::interactive::respond_permission_request,
+            commands::interactive::get_permission_preview,
             // File journal — Review / Undo of a turn's edits
             commands::journal::journal_list_changes,
             commands::journal::journal_get_turn_diffs,

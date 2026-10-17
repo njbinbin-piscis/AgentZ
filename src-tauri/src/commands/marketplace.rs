@@ -156,7 +156,10 @@ fn cloud_kind_for_category(category: &str) -> Option<&'static str> {
     }
 }
 
-async fn fetch_cloud_asset_payload(asset_id: &str, channel: &str) -> Result<serde_json::Value, String> {
+async fn fetch_cloud_asset_payload(
+    asset_id: &str,
+    channel: &str,
+) -> Result<serde_json::Value, String> {
     let url = cloud_asset_url(asset_id)?;
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
@@ -196,8 +199,7 @@ fn canonical_json(value: &serde_json::Value) -> Result<String, String> {
             Ok(out)
         }
         serde_json::Value::Array(arr) => {
-            let parts: Result<Vec<String>, String> =
-                arr.iter().map(canonical_json).collect();
+            let parts: Result<Vec<String>, String> = arr.iter().map(canonical_json).collect();
             Ok(format!("[{}]", parts?.join(",")))
         }
         other => serde_json::to_string(other).map_err(|e| e.to_string()),
@@ -228,9 +230,15 @@ fn verify_cloud_signature(payload: &serde_json::Value, signature: &str) -> Resul
     Ok(())
 }
 
-async fn fetch_cloud_assets(category: &str, query: &str, channel: &str) -> Result<Vec<CloudAssetSummary>, String> {
-    let base = cloud_base_url().ok_or_else(|| "cloud marketplace URL not configured".to_string())?;
-    let kind = cloud_kind_for_category(category).ok_or_else(|| format!("no cloud kind for {category}"))?;
+async fn fetch_cloud_assets(
+    category: &str,
+    query: &str,
+    channel: &str,
+) -> Result<Vec<CloudAssetSummary>, String> {
+    let base =
+        cloud_base_url().ok_or_else(|| "cloud marketplace URL not configured".to_string())?;
+    let kind =
+        cloud_kind_for_category(category).ok_or_else(|| format!("no cloud kind for {category}"))?;
     let profile = client_profile_query(channel);
     let url = format!(
         "{}/api/marketplace/assets?kind={kind}&{profile}",
@@ -251,7 +259,8 @@ async fn fetch_cloud_assets(category: &str, query: &str, channel: &str) -> Resul
 }
 
 fn cloud_asset_url(asset_id: &str) -> Result<String, String> {
-    let base = cloud_base_url().ok_or_else(|| "cloud marketplace URL not configured".to_string())?;
+    let base =
+        cloud_base_url().ok_or_else(|| "cloud marketplace URL not configured".to_string())?;
     Ok(format!(
         "{}/api/marketplace/asset/{}",
         base.trim_end_matches('/'),
@@ -261,10 +270,7 @@ fn cloud_asset_url(asset_id: &str) -> Result<String, String> {
 
 async fn remote_install_connector(app: &AppHandle, asset_id: &str) -> Result<(), String> {
     let payload = fetch_cloud_asset_payload(asset_id, "stable").await?;
-    let connector = payload
-        .get("connector")
-        .cloned()
-        .unwrap_or(payload.clone());
+    let connector = payload.get("connector").cloned().unwrap_or(payload.clone());
     let pretty = serde_json::to_string_pretty(&connector).map_err(|e| e.to_string())?;
     let tmp = std::env::temp_dir().join(format!(
         "agentz-connector-{}.json",
@@ -327,8 +333,7 @@ async fn remote_install_skill(app: &AppHandle, asset_id: &str) -> Result<(), Str
         return Err("cloud skill payload missing skill_md".into());
     }
     let config_dir = crate::commands::data_scope::resolve_global_config_dir(app)?;
-    let skills_root =
-        crate::skills::service::skills_root_from_config_dir(&config_dir);
+    let skills_root = crate::skills::service::skills_root_from_config_dir(&config_dir);
     crate::skills::provenance::ensure_evolution_dirs(&skills_root).map_err(|e| e.to_string())?;
     let (global_db, _) =
         crate::commands::data_scope::open_global_kernel_state(app).map_err(|e| e.to_string())?;
@@ -339,6 +344,10 @@ async fn remote_install_skill(app: &AppHandle, asset_id: &str) -> Result<(), Str
         skill_md,
         "official",
         Some(asset_id.to_string()),
+        payload
+            .get("version")
+            .and_then(|value| value.as_str())
+            .map(str::to_string),
         None,
     )
     .map_err(|e| e.to_string())?;
@@ -431,11 +440,9 @@ pub async fn marketplace_install(
             .map(|_| ()),
         ("agent", _) => agents::agents_install(app, identifier).await.map(|_| ()),
         ("team", _) => teams::teams_install(app, identifier).await.map(|_| ()),
-        ("connector", "local") => {
-            connectors::connectors_install(app, identifier)
-                .await
-                .map(|_| ())
-        }
+        ("connector", "local") => connectors::connectors_install(app, identifier)
+            .await
+            .map(|_| ()),
         ("connector", "remote") => remote_install_connector(&app, &identifier).await,
         ("connector", _) => {
             // Built-in (already-installed) connectors: "install" = enable.
@@ -490,7 +497,8 @@ async fn search_skills(app: AppHandle, query: String) -> Result<Vec<MarketItem>,
         .collect();
 
     if let Ok(remote) = fetch_cloud_assets("skill", &query, "stable").await {
-        let listed: std::collections::HashSet<String> = items.iter().map(|i| i.id.clone()).collect();
+        let listed: std::collections::HashSet<String> =
+            items.iter().map(|i| i.id.clone()).collect();
         for a in remote {
             if !query.is_empty()
                 && !a.name.to_lowercase().contains(&query.to_lowercase())
@@ -576,16 +584,10 @@ where
 
 async fn remote_install_tool(app: AppHandle, asset_id: &str) -> Result<(), String> {
     let payload = fetch_cloud_asset_payload(asset_id, "stable").await?;
-    let is_slash = payload
-        .get("agentz_kind")
-        .and_then(|v| v.as_str())
-        == Some("slash_command")
+    let is_slash = payload.get("agentz_kind").and_then(|v| v.as_str()) == Some("slash_command")
         || payload.get("slash_command").is_some();
     if is_slash {
-        let cmd = payload
-            .get("slash_command")
-            .cloned()
-            .unwrap_or(payload);
+        let cmd = payload.get("slash_command").cloned().unwrap_or(payload);
         let pretty = serde_json::to_string_pretty(&cmd).map_err(|e| e.to_string())?;
         return crate::commands::slash_commands::slash_commands_install(app.clone(), pretty)
             .await

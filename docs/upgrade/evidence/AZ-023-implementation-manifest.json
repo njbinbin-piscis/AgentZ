@@ -1,0 +1,32 @@
+{
+  "files": [
+    {
+      "sha256": "2517c81c22e7bdf3a65590e83cb3bf9cb5d9f5e5a5021c15f000599cb8c43621",
+      "path": "vendor/piscis-engine/piscis-kernel/src/llm/error_class.rs"
+    },
+    {
+      "sha256": "32f68e24181f1f6b63f43af27485c56ff7a5be1d0c5bd6b12a3c3c68cdd17280",
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs"
+    },
+    {
+      "sha256": "91d5ddf718857f11ca59c9fc149bfd3a18841b46e52f4551ea9d7ca9affd3e92",
+      "path": "vendor/piscis-engine/piscis-kernel/tests/az023_retry_http.rs"
+    },
+    {
+      "sha256": "eb98aad1a0730a5a510eb5cbcfdca15ce836e317e51dc645a77ef64386d70699",
+      "path": "scripts/upgrade-kernel-candidate.mjs"
+    },
+    {
+      "sha256": "4d4ecc3ca917391901d357f7c77922f572fcb25272dd2b6dd1a064a2f554cf22",
+      "path": "docs/upgrade/patches/AZ-023-error-class-v0.8.68.patch"
+    },
+    {
+      "sha256": "5b1307b6eb8409aed56647e40947aa71fc9b65be9636a75e61b994198c710902",
+      "path": "docs/upgrade/patches/AZ-023-loop-v0.8.68.patch"
+    },
+    {
+      "sha256": "0bfac48dd8d8c6fd50d3ead8bf849dfa63975abd6aa3b905eb91552e3b93d1a4",
+      "path": "docs/upgrade/patches/AZ-023-http-fixture-v0.8.68.patch"
+    }
+  ]
+}

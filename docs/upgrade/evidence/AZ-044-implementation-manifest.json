@@ -1,0 +1,22 @@
+{
+  "captured_at": "2026-10-10T11:59:38.819Z",
+  "scope": "Limited renderer terminal lifecycle, identity and navigation failure propagation; no native PTY/process-tree acceptance",
+  "files": [
+    {
+      "path": "src/workspaces/codez/Terminal.tsx",
+      "sha256": "fe130f8463b4f261c426f9065d779a18ed769ae173190fc1bf23fd49e03cb55e"
+    },
+    {
+      "path": "src/workspaces/codez/terminalLifecycle.ts",
+      "sha256": "60d7e6eab42c4dceea6d120c6dfc66a381b08031193cc66c846a77548f1acd53"
+    },
+    {
+      "path": "src/workspaces/codez/terminalLifecycle.test.ts",
+      "sha256": "812140fc9ffd182478416adc351c70bab9f285eeac5d5d04e5bd028659b017e5"
+    },
+    {
+      "path": "src/workspaces/codez/Terminal.lifecycle.test.tsx",
+      "sha256": "08fac00a9f1b23cb98275f3fadd2833f7549236d7761cdff012ee9259cfec4f3"
+    }
+  ]
+}

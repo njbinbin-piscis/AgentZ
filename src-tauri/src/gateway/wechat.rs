@@ -414,8 +414,7 @@ async fn listen_ilink_updates(
             },
             Ok(resp) => {
                 let status = resp.status();
-                let text = resp.text().await.unwrap_or_default();
-                warn!("WeChat getupdates HTTP {}: {}", status, text);
+                warn!("WeChat getupdates HTTP {}", status);
                 tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                 continue;
             }
@@ -798,8 +797,7 @@ async fn post_sendmessage(
         }
         Ok(resp) => {
             let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
-            let msg = format!("WeChat sendmessage HTTP {}: {}", status, text);
+            let msg = format!("WeChat sendmessage HTTP {}", status);
             warn!("{}", msg);
             Err(anyhow::anyhow!(msg))
         }
@@ -928,12 +926,7 @@ async fn request_wechat_upload_url(
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(anyhow::anyhow!(
-            "WeChat getuploadurl HTTP {}: {}",
-            status,
-            text
-        ));
+        return Err(anyhow::anyhow!("WeChat getuploadurl HTTP {}", status));
     }
 
     let payload: Value = resp
@@ -1015,24 +1008,14 @@ async fn upload_encrypted_media_to_cdn(
             }
             Ok(resp) if resp.status().is_client_error() => {
                 let status = resp.status();
-                let text = resp.text().await.unwrap_or_default();
-                return Err(anyhow::anyhow!(
-                    "WeChat CDN upload client error {}: {}",
-                    status,
-                    text
-                ));
+                return Err(anyhow::anyhow!("WeChat CDN upload client error {}", status));
             }
             Ok(resp) => {
                 let status = resp.status();
-                let text = resp.text().await.unwrap_or_default();
-                last_error = Some(anyhow::anyhow!(
-                    "WeChat CDN upload server error {}: {}",
-                    status,
-                    text
-                ));
+                last_error = Some(anyhow::anyhow!("WeChat CDN upload server error {}", status));
             }
-            Err(e) => {
-                last_error = Some(anyhow::anyhow!("WeChat CDN upload error: {}", e));
+            Err(_) => {
+                last_error = Some(anyhow::anyhow!("WeChat CDN upload transport error"));
             }
         }
 
@@ -1552,16 +1535,11 @@ async fn download_wechat_cdn_media(
         .timeout(std::time::Duration::from_secs(60))
         .send()
         .await
-        .map_err(|e| anyhow::anyhow!("WeChat CDN download error: {}", e))?;
+        .map_err(|_| anyhow::anyhow!("WeChat CDN download transport error"))?;
 
     if !response.status().is_success() {
         let status = response.status();
-        let text = response.text().await.unwrap_or_default();
-        return Err(anyhow::anyhow!(
-            "WeChat CDN download HTTP {}: {}",
-            status,
-            text
-        ));
+        return Err(anyhow::anyhow!("WeChat CDN download HTTP {}", status));
     }
 
     let ciphertext = response
@@ -1757,6 +1735,17 @@ fn build_wechat_uin() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn cdn_transport_error_does_not_echo_signed_url() {
+        let marker = "AZ061_SECRET_CDN_QUERY";
+        let url = format!("invalid-url?encrypted_query_param={marker}");
+        let error = upload_encrypted_media_to_cdn(&reqwest::Client::new(), &url, vec![1])
+            .await
+            .unwrap_err();
+        assert!(!error.to_string().contains(marker));
+        assert!(error.to_string().contains("transport error"));
+    }
 
     #[test]
     fn extracts_inbound_messages_from_getupdates_payload() {

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "model": "deepseek-flash",
+  "endpoint": "https://api.deepseek.com",
+  "thinking": "unspecified",
+  "scope": "real kernel synthetic tools, not host/GUI/OS sandbox or priced settlement",
+  "spec_sha256": "f57dc7bcaf7a667d42ba4eeceff2b258c3c62c661eb98105b83e2cbccc04e7a3",
+  "fixture_source_sha256": "1a9243308dd564364e91ccbdbe46a727cc2cc5f8ad0ed5abfd43a5654977ad7e",
+  "baseline_success_ratio": 0.9166666666666666,
+  "allowed_drop": 0.05,
+  "max_missing_samples": 0
+}

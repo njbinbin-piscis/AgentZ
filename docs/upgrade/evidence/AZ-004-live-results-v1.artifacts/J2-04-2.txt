@@ -1,0 +1,4 @@
+Observed: timeout (source: trace.md).
+Cause: unknown (source: trace.md).
+
+Note: trace.md records cause=unknown. No network failure or other cause is asserted here, since the source does not identify one.

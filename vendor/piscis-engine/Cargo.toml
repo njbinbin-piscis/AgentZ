@@ -1,0 +1,45 @@
+[workspace]
+members = ["piscis-core", "piscis-kernel", "piscis-cli", "piscis-ide-tools"]
+resolver = "2"
+
+# Workspace-wide lint policy. `cargo clippy --workspace` will treat all of
+# the rust warnings and the selected clippy lints below as hard errors, so
+# dead code / unused imports / obvious bugs can never sneak back in without
+# an explicit `#[allow(...)]` annotation at the call site.
+[workspace.lints.rust]
+warnings = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+needless_return = "allow"
+module_inception = "allow"
+too_many_arguments = "allow"
+
+[workspace.dependencies]
+# Shared across workspace members
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+anyhow = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["full"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Engine crates (path deps so external consumers — openpiscis, codez — can
+# point at this workspace and pick up the same versions).
+piscis-core = { path = "piscis-core" }
+piscis-kernel = { path = "piscis-kernel" }
+piscis-cli = { path = "piscis-cli" }
+piscis-ide-tools = { path = "piscis-ide-tools" }
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

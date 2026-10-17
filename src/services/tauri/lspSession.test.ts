@@ -78,6 +78,110 @@ afterEach(() => {
 });
 
 describe("LSP session pool", () => {
+  it("bounds failed automatic restarts instead of looping indefinitely", async () => {
+    vi.useFakeTimers();
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const handle = await acquireLspSession("/exhausted-project", "rust");
+      const health = vi.fn();
+      const unsubscribe = handle.client.subscribeHealth(health);
+      startMock.mockRejectedValue(new Error("server unavailable"));
+      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].close();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(startMock).toHaveBeenCalledTimes(4);
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(startMock).toHaveBeenCalledTimes(4);
+      expect(warning).toHaveBeenCalledOnce();
+      expect(health).toHaveBeenCalledWith("recovering");
+      expect(health).toHaveBeenLastCalledWith("unavailable");
+      unsubscribe();
+      handle.release();
+    } finally { warning.mockRestore(); vi.useRealTimers(); }
+  });
+  it("recovers on a fresh bridge without replacing the shared client and stops after release", async () => {
+    vi.useFakeTimers();
+    try {
+      const handle = await acquireLspSession("/recovery-project", "typescript");
+      const original = handle.client;
+      const health = vi.fn();
+      original.subscribeHealth(health);
+      const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+      startMock.mockResolvedValue(10001);
+      socket.close();
+      await vi.advanceTimersByTimeAsync(100);
+      const recovered = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+      expect(recovered).not.toBe(socket);
+      expect(recovered.url).toBe("ws://127.0.0.1:10001");
+      expect(health).toHaveBeenCalledWith("recovering");
+      expect(health).toHaveBeenLastCalledWith("ready");
+      const second = await acquireLspSession("/recovery-project", "typescript");
+      expect(second.client).toBe(original);
+      recovered.close();
+      handle.release();
+      second.release();
+      const starts = startMock.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(startMock).toHaveBeenCalledTimes(starts);
+    } finally { vi.useRealTimers(); }
+  });
+  it("resets the restart budget after each healthy restart so later crashes recover", async () => {
+    vi.useFakeTimers();
+    try {
+      const handle = await acquireLspSession("/budget-project", "typescript");
+      const health = vi.fn();
+      handle.client.subscribeHealth(health);
+      // Seven crashes, each followed by a healthy reconnect. The 4th+ crashes
+      // previously exhausted the lifetime-per-session budget and were not restarted.
+      for (let crash = 1; crash <= 7; crash++) {
+        const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+        const starts = startMock.mock.calls.length;
+        socket.close();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(startMock).toHaveBeenCalledTimes(starts + 1);
+        expect(FakeWebSocket.instances[FakeWebSocket.instances.length - 1]).not.toBe(socket);
+        expect(health).toHaveBeenLastCalledWith("ready");
+      }
+      handle.release();
+    } finally { vi.useRealTimers(); }
+  });
+  it("stops a true crash loop at the restart cap after healthy restarts", async () => {
+    vi.useFakeTimers();
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const handle = await acquireLspSession("/loop-after-health", "typescript");
+      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].close();
+      await vi.advanceTimersByTimeAsync(1000);
+      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].close();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(startMock).toHaveBeenCalledTimes(3);
+
+      startMock.mockRejectedValue(new Error("server unavailable"));
+      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].close();
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(startMock).toHaveBeenCalledTimes(3 + 3);
+      handle.release();
+    } finally { warning.mockRestore(); vi.useRealTimers(); }
+  });
+  it("stops a start-then-crash loop at the per-window recovery cap", async () => {
+    vi.useFakeTimers();
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const handle = await acquireLspSession("/flap-project", "typescript");
+      const health = vi.fn();
+      handle.client.subscribeHealth(health);
+      // Each reconnect succeeds, so the per-crash budget never trips; the window cap must.
+      for (let crash = 0; crash < 10; crash++) {
+        FakeWebSocket.instances[FakeWebSocket.instances.length - 1].close();
+        await vi.advanceTimersByTimeAsync(1000);
+      }
+      expect(startMock).toHaveBeenCalledTimes(11);
+      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].close();
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(startMock).toHaveBeenCalledTimes(11);
+      expect(health).toHaveBeenLastCalledWith("unavailable");
+      handle.release();
+    } finally { warning.mockRestore(); vi.useRealTimers(); }
+  });
   it("shares one connection for the same project+language", async () => {
     const a = await acquireLspSession("/proj-a", "typescript");
     const b = await acquireLspSession("/proj-a", "typescript");

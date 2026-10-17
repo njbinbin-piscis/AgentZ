@@ -1,0 +1,501 @@
+diff --git a/piscis-kernel/Cargo.toml b/piscis-kernel/Cargo.toml
+--- a/piscis-kernel/Cargo.toml
++++ b/piscis-kernel/Cargo.toml
+@@ -62,6 +62,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
+ [target.'cfg(target_os = "windows")'.dependencies]
+ windows = { version = "0.58", features = [
+     "Win32_Foundation",
++    "Win32_Security_Cryptography",
+     "Win32_UI_Shell",
+     "Win32_UI_WindowsAndMessaging",
+ ] }
+diff --git a/piscis-kernel/src/security/secrets.rs b/piscis-kernel/src/security/secrets.rs
+--- a/piscis-kernel/src/security/secrets.rs
++++ b/piscis-kernel/src/security/secrets.rs
+@@ -6,6 +6,7 @@ use chacha20poly1305::{
+ use std::path::Path;
+ 
+ const KEY_FILE: &str = ".secret_key";
++const PROTECTED_KEY_MAGIC: &[u8] = b"AGENTZ-KEY-V1:DPAPI\0";
+ 
+ pub struct SecretStore {
+     key: [u8; 32],
+@@ -19,33 +20,52 @@ impl SecretStore {
+     fn new_with_random(
+         app_dir: &Path,
+         random: impl FnOnce(&mut [u8]) -> Result<()>,
++    ) -> Result<Self> {
++        Self::new_with_protection(app_dir, random, protect_key, unprotect_key)
++    }
++
++    fn new_with_protection(
++        app_dir: &Path,
++        random: impl FnOnce(&mut [u8]) -> Result<()>,
++        protect: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
++        unprotect: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
+     ) -> Result<Self> {
+         let key_path = app_dir.join(KEY_FILE);
+         let key = if key_path.exists() {
+             let data = std::fs::read(&key_path)?;
+-            if data.len() != 32 {
+-                return Err(anyhow::anyhow!("Invalid secret key file"));
++            if let Some(blob) = data.strip_prefix(PROTECTED_KEY_MAGIC) {
++                let decoded = unprotect(blob)?;
++                return Ok(Self {
++                    key: decoded
++                        .try_into()
++                        .map_err(|_| anyhow::anyhow!("Invalid protected secret key length"))?,
++                });
+             }
+-            let mut key = [0u8; 32];
+-            key.copy_from_slice(&data);
++            let key: [u8; 32] = data
++                .try_into()
++                .map_err(|_| anyhow::anyhow!("Invalid or unsupported secret key file"))?;
++            // Keep the same encryption key, and publish the OS-protected form
++            // atomically. Failure preserves the legacy key and its ciphertext.
++            let protected = protect(&key)?;
++            persist_protected_key(app_dir, &key_path, &protected, false)?;
+             key
+         } else {
+-            use std::io::Write;
+             let mut key = [0u8; 32];
+             random(&mut key)?;
++            let protected = protect(&key)?;
+             if let Some(parent) = key_path.parent() {
+                 std::fs::create_dir_all(parent)?;
+             }
+-            // Publish only a complete key, never overwrite another writer's key.
+-            let mut file = tempfile::NamedTempFile::new_in(app_dir)?;
+-            file.write_all(&key)?;
+-            file.as_file().sync_all()?;
+-            match file.persist_noclobber(&key_path) {
+-                Ok(_) => key,
+-                Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
+-                    return Self::new(app_dir);
++            match persist_protected_key(app_dir, &key_path, &protected, true) {
++                Ok(()) => key,
++                Err(error)
++                    if error
++                        .downcast_ref::<std::io::Error>()
++                        .is_some_and(|error| error.kind() == std::io::ErrorKind::AlreadyExists) =>
++                {
++                    return Self::new(app_dir)
+                 }
+-                Err(error) => return Err(error.error.into()),
++                Err(error) => return Err(error),
+             }
+         };
+         Ok(Self { key })
+@@ -107,6 +127,101 @@ impl SecretStore {
+     }
+ }
+ 
++fn persist_protected_key(
++    app_dir: &Path,
++    path: &Path,
++    protected: &[u8],
++    no_clobber: bool,
++) -> Result<()> {
++    use std::io::Write;
++    let mut file = tempfile::NamedTempFile::new_in(app_dir)?;
++    file.write_all(PROTECTED_KEY_MAGIC)?;
++    file.write_all(protected)?;
++    file.as_file().sync_all()?;
++    if no_clobber {
++        file.persist_noclobber(path).map_err(|error| error.error)?;
++    } else {
++        file.persist(path).map_err(|error| error.error)?;
++    }
++    Ok(())
++}
++
++#[cfg(windows)]
++fn protect_key(key: &[u8]) -> Result<Vec<u8>> {
++    dpapi_transform(key, true)
++}
++#[cfg(windows)]
++fn unprotect_key(blob: &[u8]) -> Result<Vec<u8>> {
++    dpapi_transform(blob, false)
++}
++#[cfg(windows)]
++fn dpapi_transform(input: &[u8], protect: bool) -> Result<Vec<u8>> {
++    use windows::{
++        core::PCWSTR,
++        Win32::{
++            Foundation::{LocalFree, HLOCAL},
++            Security::Cryptography::{
++                CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
++            },
++        },
++    };
++    struct Output(CRYPT_INTEGER_BLOB);
++    impl Drop for Output {
++        fn drop(&mut self) {
++            if !self.0.pbData.is_null() {
++                unsafe {
++                    let _ = LocalFree(HLOCAL(self.0.pbData.cast()));
++                }
++            }
++        }
++    }
++    let source = CRYPT_INTEGER_BLOB {
++        cbData: input.len().try_into()?,
++        pbData: input.as_ptr().cast_mut(),
++    };
++    let mut output = Output(CRYPT_INTEGER_BLOB::default());
++    // No machine-wide flag: DPAPI binds the blob to the current Windows user.
++    unsafe {
++        let result = if protect {
++            CryptProtectData(
++                &source,
++                PCWSTR::null(),
++                None,
++                None,
++                None,
++                CRYPTPROTECT_UI_FORBIDDEN,
++                &mut output.0,
++            )
++        } else {
++            CryptUnprotectData(
++                &source,
++                None,
++                None,
++                None,
++                None,
++                CRYPTPROTECT_UI_FORBIDDEN,
++                &mut output.0,
++            )
++        };
++        result.map_err(|error| {
++            anyhow::anyhow!("Windows credential protection unavailable: {error}")
++        })?;
++        if output.0.pbData.is_null() || output.0.cbData == 0 {
++            anyhow::bail!("Windows credential protection returned an empty result");
++        }
++        Ok(std::slice::from_raw_parts(output.0.pbData, output.0.cbData as usize).to_vec())
++    }
++}
++
++#[cfg(not(windows))]
++fn protect_key(_: &[u8]) -> Result<Vec<u8>> {
++    anyhow::bail!("System credential protection is not implemented for this platform")
++}
++#[cfg(not(windows))]
++fn unprotect_key(_: &[u8]) -> Result<Vec<u8>> {
++    anyhow::bail!("Windows protected credentials cannot be opened on this platform")
++}
++
+ fn random_bytes(bytes: &mut [u8]) -> Result<()> {
+     getrandom::getrandom(bytes)
+         .map_err(|error| anyhow::anyhow!("Secure random source failed: {}", error))
+@@ -116,6 +231,92 @@ fn random_bytes(bytes: &mut [u8]) -> Result<()> {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn secrets_protection_failure_preserves_legacy_key() {
++        let directory = tempfile::tempdir().unwrap();
++        let key = [73u8; 32];
++        let key_path = directory.path().join(KEY_FILE);
++        std::fs::write(&key_path, key).unwrap();
++        assert!(SecretStore::new_with_protection(
++            directory.path(),
++            random_bytes,
++            |_| anyhow::bail!("Injected protection failure"),
++            |_| unreachable!()
++        )
++        .is_err());
++        assert_eq!(std::fs::read(&key_path).unwrap(), key);
++        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
++        std::fs::remove_file(&key_path).unwrap();
++        assert!(SecretStore::new_with_protection(
++            directory.path(),
++            random_bytes,
++            |_| anyhow::bail!("Injected protection failure"),
++            |_| unreachable!()
++        )
++        .is_err());
++        assert!(!key_path.exists());
++    }
++
++    #[cfg(windows)]
++    #[test]
++    fn secrets_dpapi_migration_preserves_ciphertext_and_reopens() {
++        let directory = tempfile::tempdir().unwrap();
++        let key = [61u8; 32];
++        let ciphertext = SecretStore { key }
++            .encrypt("fixture-migrated-secret")
++            .unwrap();
++        let key_path = directory.path().join(KEY_FILE);
++        std::fs::write(&key_path, key).unwrap();
++        let migrated = SecretStore::new(directory.path()).unwrap();
++        let bytes = std::fs::read(&key_path).unwrap();
++        assert!(bytes.starts_with(PROTECTED_KEY_MAGIC));
++        assert!(!bytes.windows(key.len()).any(|window| window == key));
++        assert_eq!(
++            migrated.decrypt(&ciphertext).unwrap(),
++            "fixture-migrated-secret"
++        );
++        assert_eq!(
++            SecretStore::new(directory.path())
++                .unwrap()
++                .decrypt(&ciphertext)
++                .unwrap(),
++            "fixture-migrated-secret"
++        );
++        let mut damaged = bytes.clone();
++        damaged.truncate(PROTECTED_KEY_MAGIC.len() + 3);
++        std::fs::write(&key_path, &damaged).unwrap();
++        assert!(SecretStore::new(directory.path()).is_err());
++        assert_eq!(std::fs::read(&key_path).unwrap(), damaged);
++        std::fs::write(&key_path, bytes).unwrap();
++        assert_eq!(
++            SecretStore::new(directory.path())
++                .unwrap()
++                .decrypt(&ciphertext)
++                .unwrap(),
++            "fixture-migrated-secret"
++        );
++    }
++
++    #[cfg(windows)]
++    #[test]
++    fn secrets_locked_legacy_key_migration_preserves_original() {
++        use std::os::windows::fs::OpenOptionsExt;
++        let directory = tempfile::tempdir().unwrap();
++        let key_path = directory.path().join(KEY_FILE);
++        let key = [42u8; 32];
++        std::fs::write(&key_path, key).unwrap();
++        let lock = std::fs::OpenOptions::new()
++            .read(true)
++            .share_mode(1)
++            .open(&key_path)
++            .unwrap();
++        assert!(SecretStore::new(directory.path()).is_err());
++        assert_eq!(std::fs::read(&key_path).unwrap(), key);
++        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
++        drop(lock);
++        assert!(SecretStore::new(directory.path()).is_ok());
++    }
++
+     #[test]
+     fn secrets_random_failure_publishes_neither_key_nor_ciphertext() {
+         let directory = tempfile::tempdir().unwrap();
+diff --git a/piscis-kernel/src/store/settings.rs b/piscis-kernel/src/store/settings.rs
+--- a/piscis-kernel/src/store/settings.rs
++++ b/piscis-kernel/src/store/settings.rs
+@@ -889,59 +889,63 @@ impl Default for Settings {
+ 
+ impl Settings {
+     pub fn load(path: &Path) -> Result<Self> {
++        let mut strict_secrets = false;
+         let mut settings = if path.exists() {
+             let content = std::fs::read_to_string(path)?;
+-            match serde_json::from_str::<Settings>(&content) {
+-                Ok(s) => s,
+-                Err(e) => {
+-                    // Log the parse error and keep the broken file as a backup
+-                    tracing::error!(
+-                        "Failed to parse settings file at '{}': {}. \
+-                         Falling back to defaults. Original file preserved.",
+-                        path.display(),
+-                        e
++            let value: serde_json::Value = serde_json::from_str(&content)?;
++            if let Some(version) = value.get("agentz_secret_format") {
++                if version.as_u64() != Some(1) {
++                    anyhow::bail!(
++                        "Unsupported settings secret format; compatible recovery is required"
+                     );
+-                    // Rename broken file so it isn't overwritten silently
+-                    let backup = path.with_extension("json.bak");
+-                    let _ = std::fs::copy(path, &backup);
+-                    Settings::default()
+                 }
++                strict_secrets = true;
+             }
++            serde_json::from_value::<Settings>(value)?
+         } else {
+             Settings::default()
+         };
+         settings.config_path = path.to_path_buf();
+ 
++        if strict_secrets
++            && !path
++                .parent()
++                .is_some_and(|parent| parent.join(".secret_key").is_file())
++        {
++            anyhow::bail!("Protected settings key is missing; compatible recovery is required");
++        }
++
+         // Decrypt API keys (hex-encoded ciphertext on disk).
+         // If decryption fails the value is likely still plaintext (pre-migration);
+         // keep it as-is and the next save() will encrypt it.
+-        if let Some(store) = Self::secret_store(path) {
+-            Self::try_decrypt_field(&store, &mut settings.anthropic_api_key);
+-            Self::try_decrypt_field(&store, &mut settings.openai_api_key);
+-            Self::try_decrypt_field(&store, &mut settings.deepseek_api_key);
+-            Self::try_decrypt_field(&store, &mut settings.qwen_api_key);
+-            Self::try_decrypt_field(&store, &mut settings.minimax_api_key);
+-            Self::try_decrypt_field(&store, &mut settings.zhipu_api_key);
+-            Self::try_decrypt_field(&store, &mut settings.kimi_api_key);
+-            Self::try_decrypt_field(&store, &mut settings.feishu_app_secret);
+-            Self::try_decrypt_field(&store, &mut settings.wecom_bot_secret);
+-            Self::try_decrypt_field(&store, &mut settings.dingtalk_app_secret);
+-            Self::try_decrypt_field(&store, &mut settings.dingtalk_robot_code);
+-            Self::try_decrypt_field(&store, &mut settings.telegram_bot_token);
+-            Self::try_decrypt_field(&store, &mut settings.matrix_access_token);
+-            Self::try_decrypt_field(&store, &mut settings.webhook_auth_token);
+-            Self::try_decrypt_field(&store, &mut settings.wechat_gateway_token);
+-            Self::try_decrypt_field(&store, &mut settings.wechat_bot_token);
+-            Self::try_decrypt_field(&store, &mut settings.smtp_password);
+-            Self::try_decrypt_field(&store, &mut settings.vision_api_key);
++        {
++            let store = Self::secret_store(path)?;
++            Self::try_decrypt_field(&store, &mut settings.anthropic_api_key, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.openai_api_key, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.deepseek_api_key, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.qwen_api_key, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.minimax_api_key, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.zhipu_api_key, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.kimi_api_key, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.feishu_app_secret, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.wecom_bot_secret, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.dingtalk_app_secret, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.dingtalk_robot_code, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.telegram_bot_token, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.matrix_access_token, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.webhook_auth_token, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.wechat_gateway_token, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.wechat_bot_token, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.smtp_password, strict_secrets)?;
++            Self::try_decrypt_field(&store, &mut settings.vision_api_key, strict_secrets)?;
+             // Decrypt SSH server credentials
+             for srv in &mut settings.ssh_servers {
+-                Self::try_decrypt_field(&store, &mut srv.password);
+-                Self::try_decrypt_field(&store, &mut srv.private_key);
++                Self::try_decrypt_field(&store, &mut srv.password, strict_secrets)?;
++                Self::try_decrypt_field(&store, &mut srv.private_key, strict_secrets)?;
+             }
+             // Decrypt named LLM provider API keys
+             for p in &mut settings.llm_providers {
+-                Self::try_decrypt_field(&store, &mut p.api_key);
++                Self::try_decrypt_field(&store, &mut p.api_key, strict_secrets)?;
+             }
+         }
+         Ok(settings)
+@@ -995,7 +999,9 @@ impl Settings {
+                 Self::encrypt_field(&store, &mut p.api_key, &mut encrypt)?;
+             }
+         }
+-        let json = serde_json::to_string_pretty(&clone)?;
++        let mut value = serde_json::to_value(&clone)?;
++        value["agentz_secret_format"] = serde_json::json!(1);
++        let json = serde_json::to_string_pretty(&value)?;
+         // Same-directory atomic replacement: failure leaves the old config intact.
+         use std::io::Write;
+         let mut file = tempfile::NamedTempFile::new_in(directory)?;
+@@ -1006,10 +1012,12 @@ impl Settings {
+         Ok(())
+     }
+ 
+-    fn secret_store(config_path: &Path) -> Option<crate::security::secrets::SecretStore> {
+-        config_path
++    fn secret_store(config_path: &Path) -> Result<crate::security::secrets::SecretStore> {
++        let directory = config_path
+             .parent()
+-            .and_then(|dir| crate::security::secrets::SecretStore::new(dir).ok())
++            .filter(|path| !path.as_os_str().is_empty())
++            .ok_or_else(|| anyhow::anyhow!("Settings require an explicit parent directory"))?;
++        crate::security::secrets::SecretStore::new(directory)
+     }
+ 
+     fn encrypt_field(
+@@ -1023,14 +1031,23 @@ impl Settings {
+         Ok(())
+     }
+ 
+-    fn try_decrypt_field(store: &crate::security::secrets::SecretStore, field: &mut String) {
++    fn try_decrypt_field(
++        store: &crate::security::secrets::SecretStore,
++        field: &mut String,
++        strict: bool,
++    ) -> Result<()> {
+         if field.is_empty() {
+-            return;
++            return Ok(());
+         }
+-        if let Ok(decrypted) = store.decrypt_hex(field) {
+-            *field = decrypted;
++        match store.decrypt_hex(field) {
++            Ok(decrypted) => *field = decrypted,
++            Err(_) if strict => anyhow::bail!(
++                "Cannot decrypt settings credential; compatible key recovery is required"
++            ),
++            Err(_) => {}
+         }
+-        // If decrypt fails, the field is probably still plaintext (legacy) — keep as-is
++        // Untagged legacy configurations can contain plaintext fields.
++        Ok(())
+     }
+ 
+     /// Returns true if at least one API key is configured
+@@ -1160,6 +1177,58 @@ mod tests {
+         assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
+     }
+ 
++    #[test]
++    fn secrets_protected_load_failure_preserves_config_and_does_not_generate_a_key() {
++        let (directory, settings) = fixture();
++        settings.save().unwrap();
++        let original = std::fs::read(&settings.config_path).unwrap();
++        let key_path = directory.path().join(".secret_key");
++        let protected_key = std::fs::read(&key_path).unwrap();
++        std::fs::remove_file(&key_path).unwrap();
++        assert!(Settings::load(&settings.config_path).is_err());
++        assert!(!key_path.exists());
++        std::fs::write(&key_path, &protected_key).unwrap();
++        let mut invalid_config: serde_json::Value = serde_json::from_slice(&original).unwrap();
++        invalid_config["openai_api_key"] = serde_json::json!("corrupted-ciphertext");
++        let damaged = serde_json::to_vec(&invalid_config).unwrap();
++        std::fs::write(&settings.config_path, &damaged).unwrap();
++        assert!(Settings::load(&settings.config_path).is_err());
++        assert_eq!(std::fs::read(&settings.config_path).unwrap(), damaged);
++        std::fs::write(&settings.config_path, &original).unwrap();
++        assert_eq!(
++            Settings::load(&settings.config_path)
++                .unwrap()
++                .openai_api_key,
++            settings.openai_api_key
++        );
++    }
++
++    #[test]
++    fn secrets_legacy_config_migrates_without_changing_ciphertext() {
++        let (directory, settings) = fixture();
++        let store = crate::security::secrets::SecretStore::new(directory.path()).unwrap();
++        let mut legacy = serde_json::to_value(&settings).unwrap();
++        legacy["openai_api_key"] =
++            serde_json::json!(store.encrypt_hex(&settings.openai_api_key).unwrap());
++        legacy["vision_api_key"] = serde_json::json!(settings.vision_api_key.clone());
++        let original = serde_json::to_vec(&legacy).unwrap();
++        std::fs::write(&settings.config_path, &original).unwrap();
++        let loaded = Settings::load(&settings.config_path).unwrap();
++        assert_eq!(loaded.openai_api_key, settings.openai_api_key);
++        assert_eq!(loaded.vision_api_key, settings.vision_api_key);
++        assert_eq!(std::fs::read(&settings.config_path).unwrap(), original);
++        loaded.save().unwrap();
++        let migrated: serde_json::Value =
++            serde_json::from_slice(&std::fs::read(&settings.config_path).unwrap()).unwrap();
++        assert_eq!(migrated["agentz_secret_format"], 1);
++        assert_eq!(
++            Settings::load(&settings.config_path)
++                .unwrap()
++                .vision_api_key,
++            settings.vision_api_key
++        );
++    }
++
+     #[test]
+     fn secrets_encryption_failure_after_first_field_preserves_old_config() {
+         let (directory, settings) = fixture();

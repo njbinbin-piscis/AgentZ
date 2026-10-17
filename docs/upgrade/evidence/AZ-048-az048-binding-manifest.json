@@ -1,0 +1,29 @@
+{
+  "scope": "Fixed appdata owned directory catalog, main-window host APIs and validated opaque-scope client only; UI/session/archive and full acceptance outstanding",
+  "files": [
+    {
+      "path": "crates/agentz-task-state/src/projectless.rs",
+      "sha256": "bf97f7d9fd7fdf2225530d42b760b771dcca11be0dca1959906d5c9b5b734280"
+    },
+    {
+      "path": "crates/agentz-task-state/src/lib.rs",
+      "sha256": "ba73a74324b07960b853780e797af76d34929047c03f9008505385e0fb2acc73"
+    },
+    {
+      "path": "src-tauri/src/commands/project_scope.rs",
+      "sha256": "c472df3bc613aff46eaefe3758b35381b4a1b2f02d0aea9238c9649f5218b4af"
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "sha256": "f815518c4cc82c8ff91ee8d3fc0834b7112d6d8205467c21dfef747203543cc3"
+    },
+    {
+      "path": "src/services/tauri/projectScope.ts",
+      "sha256": "155e1954ac4a7b8314c6c0505fbc0f4b65a5473b95b6b41d6263170dd518f2ff"
+    },
+    {
+      "path": "src/services/tauri/projectScope.test.ts",
+      "sha256": "3cc6ed94a99f6b02d931c7e1122af89bb7adcc07c9c13be6aa867da3b49be3f9"
+    }
+  ]
+}

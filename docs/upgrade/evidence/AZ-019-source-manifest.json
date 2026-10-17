@@ -1,0 +1,21 @@
+{
+  "files": [
+    {
+      "sha256": "c420a768911ee951076c656f0613cd841737b27d6df4e70977700287cca45c91",
+      "path": "crates/agentz-task-state/src/recovery.rs"
+    },
+    {
+      "sha256": "ea4b9f4e701e2d623c690d6356a43cb9d0c9b20d6a0daa9c9b91a3ae936c01d6",
+      "path": "crates/agentz-task-state/src/run.rs"
+    },
+    {
+      "sha256": "7fcfa29dc35ab483caa641d86a6b702de09b155fcebd01b6c68f4e7db7c5fe98",
+      "path": "crates/agentz-task-state/src/events.rs"
+    },
+    {
+      "sha256": "be80ac835872c052676752b35c6927265094a415c4921080d90c8511a57ab46d",
+      "path": "crates/agentz-task-state/src/lib.rs"
+    }
+  ],
+  "captured_at": "2026-10-09T17:33:44.935Z"
+}

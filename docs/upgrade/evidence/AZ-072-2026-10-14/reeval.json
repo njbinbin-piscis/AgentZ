@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-072",
+    "verified_state": "durable_trigger_claim_domain_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "An isolated SQLite trigger/occurrence ledger supports idempotent registration, generation-based disable, explicit missed-window policy, single due-slot claim, immutable terminal outcomes, unresolved-claim inspection and stable AZ-025 action keys. Eight deterministic tests and a separate-process restart fixture pass. A bounded verified-scope host reminder source now claims due intervals and posts local inbox notices (never model or external actions); its clock-jump/duplicate/disable and concurrent-poll deduplication fixtures pass 2/2, as do two frontend-client tests, frontend typecheck and production build. WorkZ exposes hour/day/week controls for repository tasks, and the title bar polls while the project is open. Full task automation, actual OS sleep/resume and native product acceptance are incomplete.",
+    "conclusion_proposal": "Keep pending until a controlled task execution adapter, AZ-025 permits for external actions, actual sleep/resume and native product acceptance are integrated.",
+    "next_action": "Extend the verified-scope reminder source to controlled task execution with AZ-025 permits and budgets; exercise real sleep/resume and native disable/click journeys.",
+    "remaining_work": ["Controlled task execution adapter", "AZ-025 permit binding for external actions", "Actual OS sleep/resume fixture", "Native UI and unified review"],
+    "verification_gaps": ["Only local reminder dispatch, no automated task execution", "No actual OS sleep/resume or native journey test", "M2/M3/M4/M7 gates unmet"],
+    "evidence": ["docs/upgrade/evidence/AZ-072-2026-10-14/implementation.md"]
+  }
+]

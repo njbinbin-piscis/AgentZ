@@ -1,0 +1,34 @@
+{
+  "captured_at": "2026-10-10T05:59:27.990Z",
+  "scope": "Owned lifecycle and bounded transport only; native adapter/GUI/remote tree/exception/navigation unverified",
+  "files": [
+    {
+      "path": "src-tauri/src/commands/dap.rs",
+      "sha256": "09e37361914cbdda3dc8c1d21e31927fc44e5498b829eb78c55926b2265ca899"
+    },
+    {
+      "path": "src-tauri/src/commands/dap_frame.rs",
+      "sha256": "35ac101ac0035f66ce7c1a0f145132a5c34298ed8dca0ed65d8870a9c9eac1ea"
+    },
+    {
+      "path": "src/extensions/debug/dapClient.ts",
+      "sha256": "acb362b4ddbea5cf7eb8af2707463ae0897ae4109e7da896cb4f6b0fc904d509"
+    },
+    {
+      "path": "src/extensions/debug/dapClient.test.ts",
+      "sha256": "f5dd7872dc2c8bef200daef4447522a38e9c505f6897deb25128e4c8c403e7d3"
+    },
+    {
+      "path": "src/extensions/debug/debugController.ts",
+      "sha256": "e533c74a33ca200271a6ff37a8dd11bcff5a80186da2a184fb0e647a4bbe9877"
+    },
+    {
+      "path": "src/extensions/debug/debugController.test.ts",
+      "sha256": "2da0c3ea1ac5ae4c06834f104cb544300d4a09350401c2bf9ec67ffae757bcb7"
+    },
+    {
+      "path": "src/extensions/debug/debugStore.ts",
+      "sha256": "e4d581446d5d9a961ae6b65f9887cd986d7511540ffe45a066e043aa29ffffc6"
+    }
+  ]
+}

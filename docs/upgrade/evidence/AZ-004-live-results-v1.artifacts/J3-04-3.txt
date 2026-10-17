@@ -1,0 +1,14 @@
+Goal: offline guide.
+Completed: overview.
+Open: backup instructions.
+
+Overview
+This guide covers working offline. It explains the setup and the core workflow, and it is meant to be followed in order.
+
+Backup instructions
+1. Identify what to back up: configuration files, working data, and any local notes.
+2. Choose a destination: an external drive or a separate local folder.
+3. Copy the files to the destination, keeping the original folder structure.
+4. Verify the copy by comparing file counts and sizes against the source.
+5. Record the date of the backup so you know when it was last taken.
+6. Repeat on a regular schedule, and keep at least one previous backup until the new one is verified.

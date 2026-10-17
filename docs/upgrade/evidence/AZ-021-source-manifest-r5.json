@@ -1,0 +1,58 @@
+{
+  "task": "AZ-021",
+  "generated": "2026-10-11T14:45:32.671Z",
+  "files": [
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/tool_completion.rs",
+      "sha256": "410cf09ca388a927c7394aaf2192ffe7bf5df3c43dd51eec4ae95affeddd8622"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/tool.rs",
+      "sha256": "7a5ad41c1f1c47c31aefee00d00da9aceb95620b60b52da8cfee1723d9c6d4fa"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/mod.rs",
+      "sha256": "245e7169f40e7e77eade00d119f277e4532cbc275df77b246881856e6009204e"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs",
+      "sha256": "d0bdb53ace441cab183e8cf4765d19466ab00253645be3736e4a45ccd20f171a"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/shell.rs",
+      "sha256": "32505ce2869c1ee7ddf2577089b03af5aa6b25ca0253065d9c7c3c2f9f263a9a"
+    },
+    {
+      "path": "vendor/piscis-engine/piscis-kernel/src/tools/code_run.rs",
+      "sha256": "f8fb17c19f34d332702aadb8f2f1aa9cb362b83428bca5fae7997723f847344b"
+    },
+    {
+      "path": "src-tauri/src/runtime/cancel_completion.rs",
+      "sha256": "07ae936228a26f207c732a0a6034dc1beeeafd522fe97c7ee575f61136231127"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_run.rs",
+      "sha256": "746de6430baac1becb12c581d8c9e6277bb3fb66af4dd29941c5808aec068611"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_turn.rs",
+      "sha256": "b6a9d13b7093af4645c3e7e049f3e4e9fd82e52784c7198381aae656d09a5851"
+    },
+    {
+      "path": "docs/upgrade/patches/AZ-021-owned-completion-v0.8.68.patch",
+      "sha256": "2bdd34accf117febe680477e4c4ebf1512654c8ef31bfeaa6d3a68de64523dda"
+    },
+    {
+      "path": "docs/upgrade/patches/AZ-021-vendor-sandbox-completion-v0.8.68.patch",
+      "sha256": "ec0ae6ddacaf48225e3d04c6f90c0846dc4a7a49cef43cbde4ee9bb902815566"
+    },
+    {
+      "path": "docs/upgrade/patches/AZ-021-invocation-completion-v0.8.68.patch",
+      "sha256": "b5e054e5e15999239824571e39f802b7641c0ba44a4faaa5591e80f405211592"
+    },
+    {
+      "path": "docs/upgrade/patches/AZ-021-cancel-grace-v0.8.68.patch",
+      "sha256": "a728c6973da2b46c67868d415719215bef1b8f2d27dd9321eb5b7210e12e2c58"
+    }
+  ]
+}

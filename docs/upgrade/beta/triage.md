@@ -1,0 +1,9 @@
+# Beta triage protocol (preparation only)
+
+No cohort or distribution is authorized by this document. Before a Beta starts, record a named owner, consented cohort, supported OS/build and signed package hash, feedback window, diagnostic-retention policy, rollback owner and communication channel. Leave these fields unresolved until a human selects them. The Beta requires the core lifecycle, platform, diagnostics, trusted update and first-task prerequisites in the roadmap.
+
+Each intake record uses an opaque ID, receipt time, build/package hash, OS and workspace kind, task type, severity, suspected attribution (`unknown`, `product/host`, `model`, `external`, `environment`), reproducible steps, expected/actual behavior, redacted evidence locator, affected data, recovery state, owner, decision and closure evidence. Keep attribution provisional until a reproduction or diagnostic correlation supports it. Do not store API keys or private prompt/file contents in this ledger.
+
+Severity P0 means data loss, write into another environment, secret exposure or inability to recover a protected backup. On any P0 report, stop cohort expansion and distribution immediately, preserve the failing build and redacted evidence, assign an incident owner, and require a documented fix plus recovery verification before resuming. A P1 core-task or recovery blocker pauses affected scenarios until triaged; repeated P1 incidents trigger the same expansion stop. Unknown attribution never downgrades severity.
+
+The triage ledger is a private, versioned table maintained only after authorized Beta intake. Required columns: `id`, `received_at`, `build_sha256`, `scenario`, `platform`, `severity`, `attribution`, `repro_status`, `impact`, `evidence_locator`, `owner`, `state`, `decision_at`, `closure_evidence`. States: `new`, `triaging`, `reproduced`, `mitigated`, `verified`, `closed`. A report may close only with a reason and evidence; duplicates point to the canonical record.

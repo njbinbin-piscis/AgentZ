@@ -1,0 +1,33 @@
+{
+  "total": 83,
+  "historical_done": 37,
+  "historical_remaining": 46,
+  "by_status": {
+    "done": 37,
+    "preparing": 10,
+    "blocked": 11,
+    "review": 1,
+    "deferred": 14,
+    "pending": 10
+  },
+  "review_records": [
+    {
+      "name": "core",
+      "count": 31,
+      "path": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+    },
+    {
+      "name": "product",
+      "count": 22,
+      "path": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+    },
+    {
+      "name": "integrations",
+      "count": 30,
+      "path": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+    }
+  ],
+  "git_head": "a787b6d",
+  "dirty_path_count": 235,
+  "manifest_count": 148
+}

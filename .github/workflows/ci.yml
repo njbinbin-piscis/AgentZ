@@ -26,6 +26,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: node scripts/upgrade-version-check.mjs
       - run: npm run verify:preinstall
       - run: npm run lint:preinstall -- --strict
       - run: npm run lint

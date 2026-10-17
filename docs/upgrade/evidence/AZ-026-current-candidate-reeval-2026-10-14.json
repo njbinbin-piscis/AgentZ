@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-026",
+    "verified_state": "new_local_freeze_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "Five files drifted from the historically reviewed AZ-026 manifest. A new local candidate passed byte reconstruction and relocation checks; root kernel lib 393 passed/1 ignored, host integration 5/5, four targeted cancellation fixtures and retry HTTP 4/4 passed. Root metadata resolves all product kernel packages under AgentZ vendor. The new manifest is retained but changed-file semantic and independent review remain pending.",
+    "conclusion_proposal": "Keep preparing; do not promote old independent review or M2 to the changed candidate.",
+    "next_action": "Review five changed files semantically, then independent current-candidate review and formal M2 decision.",
+    "remaining_work": ["Changed-file semantic review", "Independent candidate review", "Formal M2 decision"],
+    "verification_gaps": ["Old reviewer fingerprints do not cover current source", "Real-DB evaluation ignored; no cross-platform or release acceptance"],
+    "evidence": ["docs/upgrade/evidence/AZ-026-current-candidate-2026-10-14.md", "docs/upgrade/evidence/AZ-026-current-candidate-manifest-2026-10-14.json"]
+  }
+]

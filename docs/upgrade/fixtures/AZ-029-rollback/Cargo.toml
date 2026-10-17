@@ -1,0 +1,11 @@
+[package]
+name = "agentz-secret-rollback-review"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+old_kernel = { package = "piscis-kernel", git = "https://github.com/njbinbin-piscis/piscis-engine.git", rev = "v0.8.68" }
+candidate_kernel = { package = "piscis-kernel", path = "C:/Projects/piscis-engine/piscis-kernel" }
+tempfile = "3"

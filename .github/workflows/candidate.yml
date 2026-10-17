@@ -1,0 +1,75 @@
+name: Unsigned Windows x64 candidate (artifacts only)
+
+# Manual engineering candidate; no platform support or release acceptance claim.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unsigned-windows-x64:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Static policy and resource integrity preflight
+        run: |
+          node scripts/upgrade-candidate-workflow.verify.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/upgrade-candidate-workflow.verify.mjs --preflight
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install locked JavaScript dependencies
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix extension-host ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Isolated two-task lifecycle gate
+        id: lifecycle
+        shell: pwsh
+        run: |
+          $logDir = Join-Path $env:RUNNER_TEMP 'agentz-lifecycle'
+          New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+          & cargo test -p agentz-task-state --locked --test lifecycle_gate -- --nocapture 2>&1 | Tee-Object -FilePath (Join-Path $logDir 'test.log')
+          $testExit = $LASTEXITCODE
+          @{ test = 'lifecycle_gate'; exit_code = $testExit; native_gui = 'not_run' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $logDir 'result.json') -Encoding utf8
+          if ($testExit -ne 0) { exit $testExit }
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && steps.lifecycle.outcome != 'skipped' }}
+        with:
+          name: agentz-lifecycle-gate-log
+          path: ${{ runner.temp }}/agentz-lifecycle/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Build unsigned engineering candidate
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: >-
+          npm run tauri -- build --bundles nsis --config
+          '{"build":{"beforeBuildCommand":"npm --prefix extension-host run build && npm run build"}}'
+      - name: Require candidate installer and record unverified signature
+        run: node scripts/upgrade-candidate-workflow.verify.mjs --artifacts
+      - name: Inspect offline candidate inputs and write unverified manifest
+        shell: pwsh
+        run: |
+          $artifactDir = [System.IO.Path]::GetFullPath((Join-Path $env:GITHUB_WORKSPACE 'target/release/bundle/nsis'))
+          $manifest = & node scripts/upgrade-release-preflight.mjs --platform windows --arch x64 --channel candidate --artifact-dir $artifactDir
+          $preflightExit = $LASTEXITCODE
+          $manifest | Set-Content -LiteralPath (Join-Path $artifactDir 'candidate-manifest.json') -Encoding utf8
+          if ($preflightExit -ne 0) { exit $preflightExit }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentz-unsigned-windows-x64-candidate
+          path: |
+            target/release/bundle/nsis/*.exe
+            target/release/bundle/nsis/candidate-status.json
+            target/release/bundle/nsis/candidate-manifest.json
+          if-no-files-found: error
+          retention-days: 7

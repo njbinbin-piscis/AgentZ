@@ -1,0 +1,9 @@
+{
+  "preflight_exit": 0,
+  "path": "C:\\Projects\\AgentZ\\target\\release\\bundle\\nsis\\AgentZ_0.9.6_x64-setup.exe",
+  "bytes": 98527524,
+  "sha256": "99A7F939DE2C1EC7AABB31FDB355C524AE65B2781E5D2519308F54E97FDE776C",
+  "authenticode": "NotSigned",
+  "installed": false,
+  "published": false
+}

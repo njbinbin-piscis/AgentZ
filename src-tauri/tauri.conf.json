@@ -23,7 +23,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: blob: https: http:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:* https:"
+      "csp": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' agentz-resource: http://agentz-resource.localhost; img-src 'self' asset: data: blob: https: http: agentz-resource: http://agentz-resource.localhost; font-src 'self' data: agentz-resource: http://agentz-resource.localhost; media-src agentz-resource: http://agentz-resource.localhost; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:* https:",
+      "devCsp": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'self'; script-src 'self' 'nonce-agentz-webview-dev-nonce'; style-src 'self' 'unsafe-inline' 'nonce-agentz-webview-dev-nonce' agentz-resource: http://agentz-resource.localhost; img-src 'self' asset: data: blob: https: http: agentz-resource: http://agentz-resource.localhost; font-src 'self' data: agentz-resource: http://agentz-resource.localhost; media-src agentz-resource: http://agentz-resource.localhost; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:* https:"
     }
   },
   "bundle": {

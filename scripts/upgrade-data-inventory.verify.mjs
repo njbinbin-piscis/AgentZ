@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const script = fileURLToPath(new URL('./upgrade-data-inventory.mjs', import.meta.url));
+const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'agentz-data-inventory-'));
+try {
+  const config = path.join(fixture, 'config');
+  const project = path.join(fixture, 'project');
+  fs.mkdirSync(config);
+  fs.mkdirSync(path.join(project, '.agentz'), { recursive: true });
+  fs.writeFileSync(path.join(config, 'config.json'), '{"secret":"synthetic-private-marker"}');
+  fs.writeFileSync(path.join(config, '.secret_key'), 'synthetic-key-marker');
+  fs.writeFileSync(path.join(project, '.agentz', 'runs.db'), 'synthetic-run-marker');
+  fs.writeFileSync(path.join(project, '.agentz', 'runs.db-wal'), 'synthetic-wal-marker');
+  const output = execFileSync(process.execPath, [script, '--config-dir', config, '--project-dir', project], { encoding: 'utf8' });
+  const report = JSON.parse(output);
+  assert.equal(report.schema_version, 1);
+  assert.equal(report.protected_backup, false);
+  assert.equal(report.snapshot_consistent, false);
+  assert.equal(report.config_key_pair_present, true);
+  assert.equal(report.total_files, 4);
+  assert.deepEqual(report.roots.map(root => root.role), ['global-config', 'project-1']);
+  assert.deepEqual(report.roots[1].files.map(file => file.path), ['runs.db', 'runs.db-wal']);
+  assert.equal(report.requires_quiesced_database_copy, true);
+  assert.deepEqual(report.sqlite_sidecars, [{ role: 'project-1', path: 'runs.db-wal' }]);
+  assert.ok(report.roots[0].files.every(file => /^[a-f0-9]{64}$/.test(file.sha256)));
+  assert.ok(!output.includes('synthetic-private-marker'));
+  assert.ok(!output.includes('synthetic-key-marker'));
+  assert.ok(!output.includes('synthetic-run-marker'));
+  assert.ok(!output.includes('synthetic-wal-marker'));
+  fs.writeFileSync(path.join(project, '.agentz', 'runs.db'), 'changed-run-marker');
+  const changed = JSON.parse(execFileSync(process.execPath, [script, '--config-dir', config, '--project-dir', project], { encoding: 'utf8' }));
+  assert.notEqual(changed.roots[1].files[0].sha256, report.roots[1].files[0].sha256);
+  const overlapping = spawnSync(process.execPath, [script, '--config-dir', project, '--project-dir', project], { encoding: 'utf8' });
+  assert.notEqual(overlapping.status, 0);
+  assert.match(overlapping.stderr, /Overlapping inventory roots/);
+  console.log('upgrade-data-inventory: synthetic config/key/project inventory passed');
+} finally {
+  fs.rmSync(fixture, { recursive: true, force: true });
+}

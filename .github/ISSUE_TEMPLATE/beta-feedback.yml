@@ -1,0 +1,61 @@
+name: AgentZ Beta feedback
+description: Local template for a future authorized Beta; do not include credentials or private file contents.
+title: "[Beta] "
+labels: ["beta-feedback"]
+body:
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - P0 - data loss, cross-environment write, or credential exposure
+        - P1 - core task blocked or unrecoverable
+        - P2 - recoverable defect or degraded workflow
+        - P3 - usability or documentation
+    validations:
+      required: true
+  - type: dropdown
+    id: attribution
+    attributes:
+      label: Suspected source (can be unknown)
+      options:
+        - Unknown
+        - Product / host
+        - Model response
+        - External tool or service
+        - Environment / installer
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: Build version and package hash
+      placeholder: Version, commit and SHA-256 if available
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and task type
+      description: OS/version, install type, task type, workspace kind; use opaque task ID only.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps and expected/actual result
+      description: Include whether it reproduces after restart. Redact paths, prompts and logs before attaching.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and recovery
+      description: State data affected, backup availability, workaround, and whether work should stop.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence locator
+      description: Diagnostic trace ID, time window, screenshot or log location. Never paste API keys or unredacted private data.

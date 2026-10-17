@@ -1,0 +1,379 @@
+{
+  "review_date": "2026-10-13",
+  "reviewer": "Codex/current_source_review",
+  "scope": "AZ001-026 and AZ079-083 independent source/evidence reassessment; no tests executed",
+  "tasks": [
+    {
+      "id": "AZ-001",
+      "verified_state": "document_complete",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "document_complete",
+      "current_finding": "契约定义三旅程；不是产品旅程实测。",
+      "remaining_work": [
+        "版本化契约与当前发布范围对齐"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-002",
+      "verified_state": "document_complete",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "document_complete",
+      "current_finding": "身份ADR明确独立登记；当前隔离身份验证读到，旧任务不可猜测绑定。",
+      "remaining_work": [
+        "审阅实际迁移与重开边界"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-003",
+      "verified_state": "historical_baseline",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "historical_baseline",
+      "current_finding": "复现基线是旧版本人口；当前工作区修复不能由旧基线证明。",
+      "remaining_work": [
+        "按当前源码重新运行确认缺陷回归集"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-004",
+      "verified_state": "historical_limited_measurement",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "historical_limited_measurement",
+      "current_finding": "36样本旧真实kernel/provider合成基线；33自动成功与36语义裁定分别保留，账单未知。",
+      "remaining_work": [
+        "新版本重采样；真实桌面/复杂仓库任务另验收"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-005",
+      "verified_state": "document_complete",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "document_complete",
+      "current_finding": "支持矩阵限制跨平台；不是macOS/Linux实测。",
+      "remaining_work": [
+        "同步当前版本与实际支持范围"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-006",
+      "verified_state": "document_complete",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "document_complete",
+      "current_finding": "容量文档有并行授权修订；历史排期不能当当前完成预测。",
+      "remaining_work": [
+        "按当前剩余工作量重排依赖和容量"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-007",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "lib.rs持久注册与load；desktop仅re-export，未本轮验证真实DB损坏/重启。",
+      "remaining_work": [
+        "当前精确版本登记/幂等/迁移测试"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-008",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "resolve_task_workspace验证已绑定Git公共目录/branch/登记；无binding时允许本地fallback，require_binding由调用方决定。",
+      "remaining_work": [
+        "复核全部执行入口require_binding传播并测丢失绑定"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-009",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "WorkZ resolveTaskWorktree和任务前景key保护已读；真实桌面A/B/重启GUI由ADR007豁免，不能说实测通过。",
+      "remaining_work": [
+        "补可执行宿主A/B恢复证据；保留GUI豁免声明"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-010",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "start.create拒绝非Git/无commit，commit排除本地修改需ack；working模式限定HEAD。",
+      "remaining_work": [
+        "新版本dirty/specialpath/非Git回归"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-011",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "changes模块有结构化ChangeSet/ChangeError，host注册change_set/file_view；未逐类型复跑。",
+      "remaining_work": [
+        "完整工作树类型矩阵当前复跑"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-012",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "三个journal IPC统一open_task_journal→resolve_task_workspace并持execution lease。",
+      "remaining_work": [
+        "当前隔离journal路由/undo跨任务用例"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-013",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "Review使用changeSet/fileView；catch呈现错误，任务变化cleanup阻止旧响应；openPr不在范围。",
+      "remaining_work": [
+        "当前UI测试及端到端review版本检查"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-014",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "archive/create/restore宿主接线存在；不把source存在等同恢复字节完整性。",
+      "remaining_work": [
+        "当前恢复/故障/ignored文件矩阵"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-015",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "discard要求task_id和cleanup lease，调用retain_task；domain保留搬移而非递归删除。",
+      "remaining_work": [
+        "当前身份错配/分步故障/恢复测试"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-016",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "merge预检拒绝双侧dirty、重复版本检查；receipt+archive保留恢复；host有repository key串行入口。",
+      "remaining_work": [
+        "当前事务中断与恢复/并行冲突回归"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-017",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "permits状态图与Run/Attempt CAS及retry事务已实读；三个source pins失配。",
+      "remaining_work": [
+        "评审当前共享变动并重冻manifest后执行状态矩阵"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-018",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "DurableStream校验Run/Attempt与Running状态，local单agent限制；两个pins失配。",
+      "remaining_work": [
+        "当前断流去重游标/持久事件故障测试；不要扩到team"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-019",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "open_project_kernel_state调用owner reconciliation；OS lock描述保留活owner，无lease不可判死。",
+      "remaining_work": [
+        "当前Windows kill/reopen试验，复核runtime/lock变动"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-020",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "clear_plan=true宿主明确拒绝；源码pins匹配但没有当前测试。",
+      "remaining_work": [
+        "当前续聊/merge/replacement持久计划用例"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-021",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "worker completion register/seal拒绝已取消启动；三个共享pins失配；未证明所有工具和后代取消。",
+      "remaining_work": [
+        "当前queue/run/grace/uncooperative回归"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-022",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "Windows Job在首次执行前assign；终止后wait job empty；仅源码检查非native验证。",
+      "remaining_work": [
+        "当前native shell/code timeout/cancel清理与恢复"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-023",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "ErrorClass只有UpstreamTransient可same-model retry；分类依赖扁平字符串启发式。",
+      "remaining_work": [
+        "当前HTTP/cancelbackoff用例及分类边界"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-024",
+      "verified_state": "partial",
+      "severity": "P1",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "partial",
+      "current_finding": "task_budget begin/bind/store/policy错误明确fail-open运行unbudgeted；预算不能承诺失效时强制上限。",
+      "remaining_work": [
+        "限制已配置预算时fail-closed；故障注入及未知费用语义；review chat_turn drift"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-025",
+      "verified_state": "domain_only",
+      "severity": "P1",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "domain_only",
+      "current_finding": "ExternalActionStore在domain存在；src-tauri未搜到ExternalActionStore/external_action接线，limited scope不可代替provider动作幂等。",
+      "remaining_work": [
+        "明确接入宿主/实际外部动作并测丢响应，禁止自动重发"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-026",
+      "verified_state": "integrity_drift",
+      "severity": "P1",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "integrity_drift",
+      "current_finding": "完整vendor freeze脚本存在；167 source pins中5失配，旧完整冻结不是当前完整冻结。",
+      "remaining_work": [
+        "复审差异并重冻manifest；当前host/kernel契约测试"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-079",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "file_journal undo按id ASC选择earliest applied snapshot并每path一次；实际当前bytes/新建删除未复跑。",
+      "remaining_work": [
+        "当前重复写/新建再改/失败undone回归"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-080",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "approval有有界链接扫描及provider前复验历史证据；路径名provider仍有最终TOCTOU窗口。",
+      "remaining_work": [
+        "当前junction时序fixture复跑；句柄no-follow另立范围"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-081",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "file_search共享忽略目录常量，approval复用；未证明所有后台入口和递归边界。",
+      "remaining_work": [
+        "当前忽略canary与预检一致性测试"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-082",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "LSP格式化前递归结构过滤uri/targetUri/changes键，canonical现存本地文件限定。",
+      "remaining_work": [
+        "当前嵌套URI/rename/edit/异常scheme fixture；live LSP另测"
+      ],
+      "tests_run_this_review": false
+    },
+    {
+      "id": "AZ-083",
+      "verified_state": "bounded_source_review",
+      "severity": "P2",
+      "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+      "implementation_state": "bounded_source_review",
+      "current_finding": "旧ready/release握手证据保留；当前生产Job等待已读但没有当前native复验。",
+      "remaining_work": [
+        "当前Windows handshake连续回归，保留失败与超时断言"
+      ],
+      "tests_run_this_review": false
+    }
+  ]
+}

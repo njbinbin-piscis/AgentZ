@@ -1,0 +1,48 @@
+    Checking agentz-task-state v0.1.0 (C:\Projects\AgentZ\crates\agentz-task-state)
+    Checking agentz-desktop v0.9.7 (C:\Projects\AgentZ\src-tauri)
+error: function `random_hex_token` is never used
+   --> src-tauri\src\commands\connectors.rs:258:4
+    |
+258 | fn random_hex_token() -> String {
+    |    ^^^^^^^^^^^^^^^^
+    |
+    = note: `-D dead-code` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: function `new_pkce_verifier` is never used
+   --> src-tauri\src\commands\connectors.rs:268:15
+    |
+268 | pub(crate) fn new_pkce_verifier() -> String {
+    |               ^^^^^^^^^^^^^^^^^
+
+error: function `new_oauth_state` is never used
+   --> src-tauri\src\commands\connectors.rs:273:15
+    |
+273 | pub(crate) fn new_oauth_state() -> String {
+    |               ^^^^^^^^^^^^^^^
+
+error: function `pkce_challenge` is never used
+   --> src-tauri\src\commands\connectors.rs:278:15
+    |
+278 | pub(crate) fn pkce_challenge(verifier: &str) -> String {
+    |               ^^^^^^^^^^^^^^
+
+error: function `oauth_state_matches` is never used
+   --> src-tauri\src\commands\connectors.rs:285:15
+    |
+285 | pub(crate) fn oauth_state_matches(expected: &str, received: &str) -> bool {
+    |               ^^^^^^^^^^^^^^^^^^^
+
+error: function `oauth_authorize_url` is never used
+   --> src-tauri\src\commands\connectors.rs:298:15
+    |
+298 | pub(crate) fn oauth_authorize_url(
+    |               ^^^^^^^^^^^^^^^^^^^
+
+error: function `store_oauth_tokens` is never used
+   --> src-tauri\src\commands\connectors.rs:324:15
+    |
+324 | pub(crate) fn store_oauth_tokens(
+    |               ^^^^^^^^^^^^^^^^^^
+
+error: could not compile `agentz-desktop` (lib) due to 7 previous errors

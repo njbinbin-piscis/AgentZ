@@ -90,6 +90,7 @@ pub async fn run_background_skill_review(
     model: String,
     max_tokens: u32,
     memory_owner_id: String,
+    budget: crate::runtime::task_budget::BudgetScope,
 ) {
     let evo: SkillEvolutionSettings = {
         let s = global.settings.lock().await;
@@ -140,7 +141,12 @@ Tool calls this turn: {}
         evo.create_skill_min_tool_calls, summary, tool_calls
     );
 
-    let client = build_client_with_timeout(&provider, &api_key, base_url.as_deref(), 90);
+    let client = budget.guard(build_client_with_timeout(
+        &provider,
+        &api_key,
+        base_url.as_deref(),
+        90,
+    ));
     let req = LlmRequest {
         messages: vec![LlmMessage {
             role: "user".to_string(),

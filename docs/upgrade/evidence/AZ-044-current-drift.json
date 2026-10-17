@@ -1,0 +1,50 @@
+[
+  {
+    "task": "AZ-017",
+    "path": "src/App.tsx",
+    "expected": "79fd684ddaad63cb573db8740358aff68a3a08a818f573325a8d41361db2f465",
+    "actual": "81d99ad3755dfaff43bd74343ba2bf0cc21bf2e9df5960358745646bba78f471"
+  },
+  {
+    "task": "AZ-017",
+    "path": "src/i18n/en.ts",
+    "expected": "c718a52cd27c3b1f6e2dc0950fd6c4d3992ab6af9ae8d6b5837592670d69493e",
+    "actual": "95c75f1c919cf60a40217959be3d4710968b3329ddb4aaa6de80d9f578ec893b"
+  },
+  {
+    "task": "AZ-017",
+    "path": "src/i18n/zh.ts",
+    "expected": "bbca86c830405bc983d8297bf000d34dfeea9975f85e6693ac22f2be739f8984",
+    "actual": "14fdeba7b7caedb92907893010532009b716a5b94e6b30fa200a83b2027e3e29"
+  },
+  {
+    "task": "AZ-036",
+    "path": "src/App.tsx",
+    "expected": "79fd684ddaad63cb573db8740358aff68a3a08a818f573325a8d41361db2f465",
+    "actual": "81d99ad3755dfaff43bd74343ba2bf0cc21bf2e9df5960358745646bba78f471"
+  },
+  {
+    "task": "AZ-036",
+    "path": "src/i18n/en.ts",
+    "expected": "c718a52cd27c3b1f6e2dc0950fd6c4d3992ab6af9ae8d6b5837592670d69493e",
+    "actual": "95c75f1c919cf60a40217959be3d4710968b3329ddb4aaa6de80d9f578ec893b"
+  },
+  {
+    "task": "AZ-036",
+    "path": "src/i18n/zh.ts",
+    "expected": "bbca86c830405bc983d8297bf000d34dfeea9975f85e6693ac22f2be739f8984",
+    "actual": "14fdeba7b7caedb92907893010532009b716a5b94e6b30fa200a83b2027e3e29"
+  },
+  {
+    "task": "AZ-036",
+    "path": "src/workspaces/codez/index.tsx",
+    "expected": "4885b81cc033d4a9499f41088255f58524a74aec719fd2f1eea85b7792e96785",
+    "actual": "306ad89024ce5071bdc6d2c678f969d3fb0e8e8b40cf645555802d3a8997f84e"
+  },
+  {
+    "task": "AZ-041",
+    "path": "src/workspaces/codez/index.tsx",
+    "expected": "4885b81cc033d4a9499f41088255f58524a74aec719fd2f1eea85b7792e96785",
+    "actual": "306ad89024ce5071bdc6d2c678f969d3fb0e8e8b40cf645555802d3a8997f84e"
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-060",
+    "verified_state": "pty_reader_writer_and_registration_race_fixtures_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "PTY spawn and reader/writer setup failures tear down the new process tree without replacing an existing session; teardown failures are surfaced. CodeZ releases retained Monaco models on pane unmount. Current Windows PTY fixtures cover setup faults, duplicate registration, a two-contender registration race and descendant teardown; 7/7 targeted tests passed offline and locked.",
+    "conclusion_proposal": "Keep pending until concurrent Tauri command invocation, owned-resource census, AZ-057 baseline and measured close/restart soak are available.",
+    "next_action": "Exercise concurrent Tauri terminal-create command invocations and a real repository graph-build close, then run the two-hour close/restart soak against a frozen AZ-057 budget.",
+    "remaining_work": ["Concurrent Tauri command duplicate-create proof", "Listener/model/PTY/index census after close", "Two-hour resource slope against AZ-057 budget", "Unified review"],
+    "verification_gaps": ["Registry race fixture does not invoke the Tauri command boundary", "No two-hour soak", "AZ-057 dependency unmet"],
+    "evidence": ["docs/upgrade/evidence/AZ-060-2026-10-14/implementation.md"]
+  }
+]

@@ -32,6 +32,14 @@ pub struct InstalledSkill {
     pub pinned: bool,
     #[serde(default)]
     pub quadrant: String,
+    pub source: Option<String>,
+    pub source_url: Option<String>,
+    pub version: Option<String>,
+    pub registry_version: Option<String>,
+    pub content_sha256: Option<String>,
+    pub content_hash_matches: Option<bool>,
+    pub requested_tools: Vec<String>,
+    pub install_history: Vec<crate::skills::provenance::SkillInstallRecord>,
 }
 
 fn sanitize_slug(slug: &str) -> Result<String, String> {
@@ -68,6 +76,11 @@ pub async fn skills_list_installed(app: AppHandle) -> Result<Vec<InstalledSkill>
                 locked: skill.locked,
                 ..Default::default()
             });
+        let content_hash_matches = meta.content_sha256.as_ref().map(|expected| {
+            std::fs::read_to_string(skill.source_path.join("SKILL.md"))
+                .map(|content| crate::skills::provenance::content_sha256(&content) == *expected)
+                .unwrap_or(false)
+        });
         let quadrant = match skill.lifecycle.as_str() {
             crate::skills::provenance::LIFECYCLE_DRAFT => "draft",
             crate::skills::provenance::LIFECYCLE_LEARNED => "learned",
@@ -84,6 +97,14 @@ pub async fn skills_list_installed(app: AppHandle) -> Result<Vec<InstalledSkill>
             locked: meta.locked,
             pinned: meta.pinned,
             quadrant: quadrant.to_string(),
+            source: meta.source,
+            source_url: meta.source_url,
+            version: meta.version,
+            registry_version: meta.registry_version,
+            content_sha256: meta.content_sha256,
+            content_hash_matches,
+            requested_tools: meta.requested_tools,
+            install_history: meta.install_history,
         });
     }
     out.sort_by_key(|a| a.name.to_lowercase());
@@ -107,16 +128,8 @@ pub async fn skills_uninstall(app: AppHandle, slug: String) -> Result<(), String
     }
     let ctx = crate::commands::skill_evolution_ctx::SkillEvolutionCtx::open(&app)?;
     let root = ctx.skills_root();
-    if let Some(path) = crate::skills::provenance::find_skill_md(&root, &slug) {
-        if let Some(dir) = path.parent() {
-            std::fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
-        }
-    } else {
-        return Err(format!("skill not found: {slug}"));
-    }
     let db = ctx.db.lock().await;
-    let _ = db.delete_skill(&slug);
-    Ok(())
+    crate::skills::service::uninstall_installed(&db, &root, &slug).map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------

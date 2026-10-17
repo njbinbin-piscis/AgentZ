@@ -10,6 +10,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use base64::Engine;
 use tokio::sync::{mpsc, Mutex};
+use tracing::Instrument;
 
 use piscis_core::host::{EventSink, HeadlessCliMode, HeadlessCliRequest, HeadlessCliResponse};
 use piscis_kernel::agent::harness::config::{CompactionSettings, HarnessConfig};
@@ -38,8 +39,9 @@ use super::session::{
 };
 use super::session_sources::{default_channel_for, SOURCE_CODEZ};
 use super::system_prompt::{
-    active_todo_context, agent_active_plan_context, agent_system_prompt, plan_mode_context, session_plan_rel_path,
-    subagent_system_prompt, swarm_coordinator_append, swarm_coordinator_followup_reminder,
+    active_todo_context, agent_active_plan_context, agent_system_prompt, plan_mode_context,
+    session_plan_rel_path, subagent_system_prompt, swarm_coordinator_append,
+    swarm_coordinator_followup_reminder,
 };
 use super::teams::TeamManifest;
 
@@ -203,6 +205,7 @@ async fn maybe_llm_rename_session_title(
     settings: &Arc<Mutex<Settings>>,
     session_id: &str,
     event_sink: &Arc<dyn EventSink>,
+    budget: crate::runtime::task_budget::BudgetScope,
 ) -> Result<()> {
     let (user_text, assistant_text) = {
         let guard = db.lock().await;
@@ -231,6 +234,8 @@ async fn maybe_llm_rename_session_title(
         },
         read_timeout,
     );
+    // Title generation is charged to the session's task when it is bound (AZ-024).
+    let client = budget.guard(client);
 
     let user = format!(
         "User message:\n{}\n\nAssistant reply:\n{}\n\nTitle:",
@@ -700,12 +705,8 @@ fn graph_context_block(raw: &str, workspace_root: &str) -> Option<String> {
         .filter(|w| !w.starts_with('@'))
         .collect::<Vec<_>>()
         .join(" ");
-    let text = crate::commands::graph_db::explore_graph(
-        std::path::Path::new(root),
-        &query,
-        12,
-    )
-    .ok()?;
+    let text =
+        crate::commands::graph_db::explore_graph(std::path::Path::new(root), &query, 12).ok()?;
     if text.contains("No matches") {
         return None;
     }
@@ -868,6 +869,21 @@ async fn expand_file_refs_remote(raw: &str, workspace_root: &str) -> String {
     if refs.is_empty() {
         return raw.to_string();
     }
+    let Ok(session) = crate::remote::bind(workspace_root).await else {
+        return raw.to_string();
+    };
+    crate::remote::with_session(
+        session,
+        expand_file_refs_remote_bound(raw, workspace_root, refs),
+    )
+    .await
+}
+
+async fn expand_file_refs_remote_bound(
+    raw: &str,
+    workspace_root: &str,
+    refs: Vec<String>,
+) -> String {
     let Ok(Some(root)) = crate::remote::resolve(workspace_root).await else {
         return raw.to_string();
     };
@@ -880,14 +896,24 @@ async fn expand_file_refs_remote(raw: &str, workspace_root: &str) -> String {
             ));
             break;
         }
-        let full = format!("{}/{}", root.trim_end_matches('/'), ref_path.trim_start_matches(['/', '\\']));
-        let Some(content) = remote_read_text(&full).await else { continue };
+        let full = format!(
+            "{}/{}",
+            root.trim_end_matches('/'),
+            ref_path.trim_start_matches(['/', '\\'])
+        );
+        let Some(content) = remote_read_text(&full).await else {
+            continue;
+        };
         let body = if content.len() > MAX_FILE_REF_CHARS {
             let mut cut = MAX_FILE_REF_CHARS;
             while !content.is_char_boundary(cut) {
                 cut -= 1;
             }
-            format!("{}\n… [truncated, {} chars omitted]", &content[..cut], content.len() - cut)
+            format!(
+                "{}\n… [truncated, {} chars omitted]",
+                &content[..cut],
+                content.len() - cut
+            )
         } else {
             content
         };
@@ -919,15 +945,26 @@ async fn expand_file_refs_remote(raw: &str, workspace_root: &str) -> String {
     if blocks.is_empty() {
         return raw.to_string();
     }
-    format!("Context from referenced files:\n\n{}\n\n---\n\n{}", blocks.join("\n\n"), raw)
+    format!(
+        "Context from referenced files:\n\n{}\n\n---\n\n{}",
+        blocks.join("\n\n"),
+        raw
+    )
 }
 
 /// Project rules (`.agentz/rules`, `.cursor/rules`) read from a remote workspace.
 async fn project_rules_context_remote(workspace_root: &str) -> Option<String> {
+    let session = crate::remote::bind(workspace_root).await.ok()?;
+    crate::remote::with_session(session, project_rules_context_remote_bound(workspace_root)).await
+}
+
+async fn project_rules_context_remote_bound(workspace_root: &str) -> Option<String> {
     let root = crate::remote::resolve(workspace_root).await.ok()??;
     for dir in [".agentz/rules", ".cursor/rules"] {
         let dir_path = format!("{}/{dir}", root.trim_end_matches('/'));
-        let Ok(entries) = crate::remote::call("fs.readDir", serde_json::json!({ "path": dir_path })).await else {
+        let Ok(entries) =
+            crate::remote::call("fs.readDir", serde_json::json!({ "path": dir_path })).await
+        else {
             continue;
         };
         let mut names: Vec<String> = entries
@@ -951,6 +988,43 @@ async fn project_rules_context_remote(workspace_root: &str) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod remote_context_binding_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn prompt_without_file_refs_needs_no_remote_connection() {
+        let prompt = "Explain the architecture";
+        assert_eq!(
+            expand_file_refs_remote(prompt, "agentz-remote://box/work").await,
+            prompt
+        );
+    }
+
+    #[tokio::test]
+    async fn context_rejects_a_workspace_outside_its_bound_authority() {
+        let session = crate::remote::RemoteSession {
+            target: crate::remote::RemoteTarget::Ssh { host: "a".into() },
+            authority: "ssh-remote+a".into(),
+            path: "/work".into(),
+            generation: 0,
+            manager: Arc::new(crate::commands::ext_host::ExtHostManager::new()),
+        };
+        crate::remote::with_session(session, async {
+            let workspace = "agentz-remote://ssh-remote+b/work";
+            let prompt = "Explain @file.rs";
+            assert_eq!(
+                expand_file_refs_remote_bound(prompt, workspace, vec!["file.rs".into()]).await,
+                prompt
+            );
+            assert!(project_rules_context_remote_bound(workspace)
+                .await
+                .is_none());
+        })
+        .await;
+    }
 }
 
 fn expand_file_refs(raw: &str, workspace_root: &str) -> String {
@@ -1023,6 +1097,18 @@ fn expand_file_refs(raw: &str, workspace_root: &str) -> String {
     out
 }
 
+fn turn_devenv_tool() -> crate::tools::devenv::DevEnvTool {
+    crate::tools::devenv::DevEnvTool::environment_only()
+}
+
+#[cfg(test)]
+mod durable_devenv_wiring_tests {
+    #[test]
+    fn turn_constructor_has_no_legacy_plan_mutation_capability() {
+        assert!(!super::turn_devenv_tool().updates_legacy_plan());
+    }
+}
+
 fn build_tool_registry(
     app: tauri::AppHandle,
     db: Arc<Mutex<piscis_kernel::store::db::Database>>,
@@ -1041,6 +1127,7 @@ fn build_tool_registry(
     loop_halt: Arc<std::sync::atomic::AtomicBool>,
     api_connector_allowlist: Option<Vec<String>>,
     slash_tool_allowlist: Option<Vec<String>>,
+    budget_scope: crate::runtime::task_budget::BudgetScope,
 ) -> ToolRegistry {
     let mut builtin_tool_enabled = None;
     if chat_mode == "plan" {
@@ -1085,8 +1172,6 @@ fn build_tool_registry(
     // runtime + event sink) so `pool_org` / `pool_chat` register and team
     // (Pool) collaboration can fan out to member Koi. Sub-agent / plan
     // registries pass `enable_pool = false` to avoid recursion.
-    let devenv_sink = event_sink.clone();
-    let devenv_plan = plan_store.clone();
     let (subagent_runtime, pool_event_sink) = if enable_pool {
         let (rt, sink) = crate::runtime::koi::pool_wiring(&app);
         (Some(rt), Some(sink))
@@ -1153,6 +1238,7 @@ fn build_tool_registry(
                 plan_for_delegate.clone(),
             ) {
                 registry.register(Box::new(crate::tools::delegate::DelegateTool {
+                    budget: budget_scope.clone(),
                     db,
                     settings,
                     plan_store: plan,
@@ -1166,6 +1252,7 @@ fn build_tool_registry(
                 (db_for_delegate, settings_for_delegate, plan_for_delegate)
             {
                 registry.register(Box::new(crate::tools::delegate::DelegateTool {
+                    budget: budget_scope.clone(),
                     db: db.clone(),
                     settings: settings.clone(),
                     plan_store: plan.clone(),
@@ -1175,6 +1262,7 @@ fn build_tool_registry(
                 // Named, stateless Fish workers (Phase B). Like `delegate`, only
                 // the main agent gets `call_fish`; sub-agents omit it.
                 registry.register(Box::new(crate::tools::call_fish::CallFishTool {
+                    budget: budget_scope.clone(),
                     db,
                     settings,
                     plan_store: plan,
@@ -1192,10 +1280,7 @@ fn build_tool_registry(
                     terminals: app.state::<crate::state::AppState>().terminals.clone(),
                 }));
             }
-            registry.register(Box::new(crate::tools::devenv::DevEnvTool {
-                plan_store: devenv_plan,
-                event_sink: devenv_sink,
-            }));
+            registry.register(Box::new(turn_devenv_tool()));
             // App self-management: update settings, create assistants & teams.
             registry.register(Box::new(crate::tools::app_control::AppControlTool { app }));
             if enable_skill_manage {
@@ -1251,6 +1336,7 @@ fn build_subagent_registry(
         Arc::new(std::sync::atomic::AtomicBool::new(false)),
         None,
         None,
+        crate::runtime::task_budget::BudgetScope::default(),
     )
 }
 
@@ -1267,6 +1353,7 @@ pub(crate) async fn run_subagent_research(
     workspace_root: String,
     task: String,
     cancel: Arc<AtomicBool>,
+    budget: crate::runtime::task_budget::BudgetScope,
 ) -> Result<String> {
     let system_prompt = subagent_system_prompt(&workspace_root);
     run_subagent_with_prompt(
@@ -1279,6 +1366,7 @@ pub(crate) async fn run_subagent_research(
         system_prompt,
         task,
         cancel,
+        budget,
     )
     .await
 }
@@ -1297,6 +1385,7 @@ pub(crate) async fn run_subagent_with_prompt(
     system_prompt: String,
     task: String,
     cancel: Arc<AtomicBool>,
+    budget: crate::runtime::task_budget::BudgetScope,
 ) -> Result<String> {
     // Prefer the global "flash" provider for sub-agents when configured and
     // still present; otherwise fall back to the main provider.
@@ -1321,6 +1410,10 @@ pub(crate) async fn run_subagent_with_prompt(
     );
     crate::tools::remote_fs::install_if_remote(&mut registry, &workspace_root);
 
+    crate::runtime::approval::restrict_background_with_read_roots(
+        &mut registry,
+        dependency_source_roots(),
+    );
     let (
         context_window,
         read_timeout,
@@ -1356,18 +1449,15 @@ pub(crate) async fn run_subagent_with_prompt(
         },
         read_timeout,
     );
+    // Sub-agent model calls are charged to the parent task's budget (AZ-024).
+    let client = budget.guard(client);
 
     // Research sub-agents have a read-only tool surface, so they may read
     // dependency sources (cargo checkouts / registry) that the engine and its
     // crates live in — otherwise upstream investigation is impossible.
     let policy = Arc::new(
-        PolicyGate::with_profile_and_flags(
-            &workspace_root,
-            &policy_mode,
-            rate,
-            allow_outside,
-        )
-        .with_extra_read_roots(dependency_source_roots()),
+        PolicyGate::with_profile_and_flags(&workspace_root, &policy_mode, rate, allow_outside)
+            .with_extra_read_roots(dependency_source_roots()),
     );
 
     let harness = HarnessConfig::for_scheduler(
@@ -1683,6 +1773,16 @@ fn active_plan_excerpt(workspace_root: &str, session_id: &str) -> Option<(String
     Some((rel, excerpt))
 }
 
+#[tracing::instrument(
+    name = "agent_turn",
+    skip_all,
+    fields(
+        app_version = crate::diagnostics::APP_VERSION,
+        run_id = tracing::field::Empty,
+        task_id = tracing::field::Empty,
+        environment_id = tracing::field::Empty,
+    )
+)]
 pub async fn run_agentz_turn(
     app: tauri::AppHandle,
     mut request: HeadlessCliRequest,
@@ -1690,6 +1790,7 @@ pub async fn run_agentz_turn(
     event_sink: Arc<dyn EventSink>,
     plan_store: PlanStore,
     confirmation_responses: Option<piscis_kernel::agent::loop_::ConfirmationResponseMap>,
+    approval_project_dir: String,
     cancel: Arc<AtomicBool>,
     model_id: Option<String>,
     chat_mode: String,
@@ -1706,7 +1807,13 @@ pub async fn run_agentz_turn(
     workz_team_id: Option<String>,
     workz_pool_id: Option<String>,
     prefer_zh: bool,
+    queued_run: Option<crate::runtime::durable_run::ManagedRun>,
 ) -> Result<HeadlessCliResponse> {
+    if clear_plan {
+        return Err(anyhow!(
+            "clearPlan=true 已废弃；普通续聊保留计划，新目标须使用显式接口"
+        ));
+    }
     if !matches!(request.mode, HeadlessCliMode::Piscis) {
         return Err(anyhow!("AgentZ chat only supports mode=piscis"));
     }
@@ -1832,6 +1939,8 @@ pub async fn run_agentz_turn(
     }
 
     let loop_halt = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    // Shared with delegated sub-agents; bound to this turn's task once its binding exists.
+    let budget_scope = crate::runtime::task_budget::BudgetScope::default();
     let api_connector_allowlist = enabled_connectors.clone();
     let mut registry = build_tool_registry(
         app.clone(),
@@ -1851,6 +1960,7 @@ pub async fn run_agentz_turn(
         loop_halt.clone(),
         api_connector_allowlist,
         slash_tool_allowlist.clone(),
+        budget_scope.clone(),
     );
     // Register MCP server tools (M6) from settings.mcp_servers — async because
     // it connects to stdio/SSE servers. Plan mode keeps them (read-context).
@@ -1893,10 +2003,8 @@ pub async fn run_agentz_turn(
             }
             if let Some(agent) = agent.as_ref() {
                 if !agent.connectors.is_empty() {
-                    let already: std::collections::HashSet<String> = connector_configs
-                        .iter()
-                        .map(|c| c.name.clone())
-                        .collect();
+                    let already: std::collections::HashSet<String> =
+                        connector_configs.iter().map(|c| c.name.clone()).collect();
                     let agent_connectors: Vec<piscis_kernel::store::settings::McpServerConfig> =
                         crate::commands::connectors::resolve_named_connector_mcp_configs(
                             &config_dir,
@@ -1928,6 +2036,33 @@ pub async fn run_agentz_turn(
     } else {
         workspace_root
     };
+    // Freeze the same resolved local root used by approvals into ToolContext.
+    let mut workspace_root =
+        agentz_task_state::canonical_root(std::path::Path::new(&workspace_root))
+            .map_err(anyhow::Error::msg)?;
+    // Bind before prompt/file-reference expansion. A renderer-provided CWD must never
+    // decide which files a managed projectless session reads into its model context.
+    if let Some(session_id) = request.session_id.as_deref().filter(|id| !id.is_empty()) {
+        let project = agentz_task_state::canonical_root(Path::new(&approval_project_dir))
+            .map_err(anyhow::Error::msg)?;
+        let free =
+            agentz_task_state::canonical_root(&super::projects::free_sessions_path(&config_dir))
+                .ok();
+        if free.as_deref() == Some(project.as_str()) {
+            use tauri::Manager as _;
+            let app_data = app.path().app_data_dir().map_err(|e| anyhow!(e))?;
+            if let Some(directory) = super::project_scope::projectless_session_directory(
+                &app_data,
+                Path::new(&project),
+                session_id,
+            )
+            .map_err(anyhow::Error::msg)?
+            {
+                workspace_root =
+                    agentz_task_state::canonical_root(&directory).map_err(anyhow::Error::msg)?;
+            }
+        }
+    }
     crate::tools::remote_fs::install_if_remote(&mut registry, &workspace_root);
 
     let display_for_db = display_prompt
@@ -2012,10 +2147,148 @@ pub async fn run_agentz_turn(
         .map_err(|e| anyhow!(e))?;
     }
 
-    if clear_plan {
-        let mut plans = plan_store.lock().await;
-        plans.remove(&session_id);
+    // Host-owned identities and Running lifecycle precede plan capability issuance.
+    let (run_id, attempt_id) = queued_run
+        .as_ref()
+        .map(|run| {
+            let (run, attempt) = run.identity();
+            (run.to_owned(), attempt.to_owned())
+        })
+        .unwrap_or_else(|| {
+            (
+                uuid::Uuid::new_v4().to_string(),
+                uuid::Uuid::new_v4().to_string(),
+            )
+        });
+    tracing::Span::current().record("run_id", run_id.as_str());
+    if let Some((task_id, environment_id)) = queued_run.as_ref().and_then(|run| run.task_binding())
+    {
+        tracing::Span::current().record("task_id", task_id);
+        tracing::Span::current().record("environment_id", environment_id);
     }
+    let approval_project_dir = agentz_task_state::canonical_root(Path::new(&approval_project_dir))
+        .map_err(anyhow::Error::msg)?;
+    // A projectless session (its project is the shared free-sessions root) runs in the managed
+    // directory bound to it. A bound session that cannot be resolved refuses the turn; it never
+    // falls back to the shared root.
+    let (workspace_root, projectless_app_data) = {
+        let free_root =
+            agentz_task_state::canonical_root(&super::projects::free_sessions_path(&config_dir))
+                .ok();
+        if free_root.as_deref() == Some(approval_project_dir.as_str()) {
+            use tauri::Manager as _;
+            let app_data = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| anyhow!("projectless app data unavailable: {e}"))?;
+            match super::project_scope::projectless_session_directory(
+                &app_data,
+                Path::new(&approval_project_dir),
+                &session_id,
+            )
+            .map_err(anyhow::Error::msg)?
+            {
+                Some(directory) => (
+                    agentz_task_state::canonical_root(&directory).map_err(anyhow::Error::msg)?,
+                    Some(app_data),
+                ),
+                None => (workspace_root, None),
+            }
+        } else {
+            (workspace_root, None)
+        }
+    };
+    let require_binding = workspace_root != approval_project_dir
+        || agentz_task_state::load(Path::new(&approval_project_dir), &session_id)
+            .map_err(anyhow::Error::msg)?
+            .is_some();
+    let mut early_binding = crate::runtime::approval::resolve_binding_for_mode(
+        Path::new(&approval_project_dir),
+        Path::new(&workspace_root),
+        &session_id,
+        &run_id,
+        require_binding,
+        projectless_app_data.as_deref(),
+    )
+    .await
+    .map_err(anyhow::Error::msg)?;
+    early_binding.attempt_id = attempt_id.clone();
+    early_binding.validate().map_err(anyhow::Error::msg)?;
+    if projectless_app_data.is_some() {
+        let guard = db.lock().await;
+        let saved = guard
+            .get_session(&session_id)
+            .map_err(|e| anyhow!("projectless session metadata unavailable: {e}"))?
+            .ok_or_else(|| anyhow!("projectless session disappeared"))?
+            .workspace_root;
+        if let Some(saved) = saved {
+            if agentz_task_state::canonical_root(Path::new(&saved)).map_err(anyhow::Error::msg)?
+                != workspace_root
+            {
+                return Err(anyhow!(
+                    "projectless session workspace changed after binding"
+                ));
+            }
+        } else {
+            guard
+                .set_session_workspace(&session_id, Some(&workspace_root))
+                .map_err(|e| anyhow!("persist projectless session workspace failed: {e}"))?;
+        }
+    }
+    let mut durable_run = if let Some(mut run) = queued_run {
+        run.start_bound(&early_binding)
+            .map_err(anyhow::Error::msg)?;
+        Some(run)
+    } else {
+        Some(
+            crate::runtime::durable_run::ManagedRun::begin_bound(
+                Path::new(&approval_project_dir),
+                &early_binding,
+            )
+            .map_err(anyhow::Error::msg)?,
+        )
+    };
+    let mut plan_attempt_guard = None;
+    let durable_plan_enabled = registry.get("plan_todo").is_some()
+        && confirmation_responses.is_some()
+        && !crate::remote::is_remote(&workspace_root);
+    if durable_plan_enabled {
+        let (guard, capability) =
+            crate::tools::durable_plan_todo::ActiveAttemptGuard::acquire(early_binding.clone())
+                .map_err(anyhow::Error::msg)?;
+        let tool = crate::tools::durable_plan_todo::DurablePlanTodoTool::new(
+            PathBuf::from(&approval_project_dir),
+            PathBuf::from(&workspace_root),
+            early_binding.clone(),
+            require_binding,
+            display_for_db.clone(),
+            agentz_task_state::plan::PlanStore::open(Path::new(&approval_project_dir))
+                .map_err(anyhow::Error::msg)?,
+            cancel.clone(),
+            plan_store.clone(),
+            event_sink.clone(),
+            capability,
+        )
+        .map_err(anyhow::Error::msg)?;
+        tool.publish_recovered_projection()
+            .await
+            .map_err(anyhow::Error::msg)?;
+        // Registry::register appends; remove all same-name tools before the final override.
+        registry.unregister("plan_todo");
+        registry.register(Box::new(tool));
+        plan_attempt_guard = Some(guard);
+    } else {
+        // Remote/background plans are not integrated into local plans.db. No legacy fallback.
+        registry.unregister("plan_todo");
+        tracing::debug!(session_id = %session_id, "durable plan tool omitted: scope is restricted, noninteractive or remote");
+    }
+    // Unsupported/restricted turns do not consume stale legacy session projections.
+    // Keep the shared cache intact; this turn's harness receives an empty disposable view.
+    let plan_store = if durable_plan_enabled {
+        plan_store
+    } else {
+        piscis_kernel::agent::plan::new_plan_store()
+    };
 
     {
         let db = db.lock().await;
@@ -2045,7 +2318,9 @@ pub async fn run_agentz_turn(
                 let todos = guard.list_koi_todos(None).unwrap_or_default();
                 let mut open = 0u32;
                 let mut blocked = 0u32;
-                for t in todos.iter().filter(|t| t.pool_session_id.as_deref() == Some(pool_id))
+                for t in todos
+                    .iter()
+                    .filter(|t| t.pool_session_id.as_deref() == Some(pool_id))
                 {
                     match t.status.as_str() {
                         "blocked" => blocked += 1,
@@ -2214,14 +2489,9 @@ pub async fn run_agentz_turn(
         extra_sections.push(agent_active_plan_context(&plan_path, Some(&excerpt)));
     }
     if chat_mode == "agent" {
-        if let Some(hint) = crate::commands::devenv::context_for_turn(
-            std::path::Path::new(&workspace_root),
-            &session_id,
-            &plan_store,
-            &event_sink,
-            prefer_zh,
-        )
-        .await
+        if let Some(hint) =
+            crate::commands::devenv::context_hint_for_turn(std::path::Path::new(&workspace_root))
+                .await
         {
             extra_sections.push(hint);
         }
@@ -2229,9 +2499,10 @@ pub async fn run_agentz_turn(
             let plans = plan_store.lock().await;
             plans.get(&session_id).cloned().unwrap_or_default()
         };
-        if retained_todos
-            .iter()
-            .any(|item| item.status == "pending" || item.status == "in_progress")
+        if durable_plan_enabled
+            && retained_todos
+                .iter()
+                .any(|item| item.status == "pending" || item.status == "in_progress")
         {
             extra_sections.push(active_todo_context(&retained_todos));
         }
@@ -2279,12 +2550,38 @@ pub async fn run_agentz_turn(
     ));
 
     let vision_override = vision_capable || vision_enabled_setting;
+    let registry = Arc::new(registry);
     let hooks: Arc<dyn piscis_kernel::agent::hooks::AgentHooks> =
         Arc::new(crate::runtime::journal_hooks::JournalWithIdeNotify::new(
             journal.clone(),
             app.clone(),
             Some(db.clone()),
         ));
+    let approval_hooks = Arc::new(
+        crate::runtime::approval::ApprovalHooks::new_with_identity_scope(
+            PathBuf::from(&approval_project_dir),
+            PathBuf::from(&workspace_root),
+            &session_id,
+            app.state::<crate::state::AppState>()
+                .approval_broker
+                .clone(),
+            event_sink.clone(),
+            hooks,
+            registry.clone(),
+            cancel.clone(),
+            confirmation_responses.is_some(),
+            (&run_id, &attempt_id),
+            projectless_app_data,
+        )
+        .await
+        .map_err(|e| anyhow!(e))?,
+    );
+    if approval_hooks.binding() != &early_binding {
+        return Err(anyhow!(
+            "task environment binding changed after plan recovery; restart turn"
+        ));
+    }
+    let hooks: Arc<dyn piscis_kernel::agent::hooks::AgentHooks> = approval_hooks;
     // This is the interactive desktop chat, not a background scheduler. The
     // main-chat harness carries the shared PlanStore, so a text-only model
     // response cannot silently finish while visible todos remain active.
@@ -2295,7 +2592,7 @@ pub async fn run_agentz_turn(
     let harness = HarnessConfig::for_main_chat(
         runtime.model.clone(),
         fallback_models,
-        Arc::new(registry),
+        registry,
         policy,
         system_prompt,
         runtime.max_tokens,
@@ -2311,7 +2608,19 @@ pub async fn run_agentz_turn(
     )
     .with_hooks(hooks)
     .with_streaming(enable_streaming);
-    let agent = harness.into_agent_loop(client, None, confirmation_responses);
+    // AZ-024: refuse the turn if its task budget cannot be loaded or bound.
+    let budget_limits =
+        crate::runtime::task_budget::load_limits_for_app(&app).map_err(|e| anyhow!(e))?;
+    budget_scope
+        .bind(
+            Path::new(&approval_project_dir),
+            &early_binding,
+            &budget_limits,
+        )
+        .map_err(|e| anyhow!(e))?;
+    let client = budget_scope.guard(client);
+    // Durable host hooks replace the legacy warning bool approval in this runner.
+    let agent = harness.into_agent_loop(client, None, None);
 
     // Open a journal turn so before/after-tool hooks group this turn's file
     // snapshots together for Undo / replay.
@@ -2325,14 +2634,31 @@ pub async fn run_agentz_turn(
         settings: tool_settings,
         max_iterations: Some(max_iterations),
         memory_owner_id: "piscis".to_string(),
-        pool_session_id: workz_pool_id
-            .clone()
-            .filter(|s| !s.trim().is_empty()),
+        pool_session_id: workz_pool_id.clone().filter(|s| !s.trim().is_empty()),
         tool_use_id: None,
         cancel: cancel.clone(),
         loop_halt: Some(loop_halt),
     };
 
+    // Only the actual captured local single-agent execution authorizes this writer.
+    let cancellation_completion =
+        crate::runtime::cancel_completion::CancellationCompletion::capture(&early_binding, &cancel)
+            .map_err(anyhow::Error::msg)?;
+    let mut durable_stream = if !crate::remote::is_remote(&workspace_root)
+        && workz_team_id.is_none()
+        && workz_pool_id.is_none()
+    {
+        Some(
+            crate::runtime::durable_stream::DurableStreamWriter::open(
+                Path::new(&approval_project_dir),
+                &early_binding,
+            )
+            .map_err(anyhow::Error::msg)?,
+        )
+    } else {
+        None
+    };
+    let collector_cancel = cancel.clone();
     let (tx, mut rx) = mpsc::channel::<AgentEvent>(1024);
     let collector_sink = event_sink.clone();
     let collector_session = session_id.clone();
@@ -2343,110 +2669,183 @@ pub async fn run_agentz_turn(
         "agent_lifecycle",
         serde_json::json!({"state": "executing", "max_iterations": max_iterations}),
     );
-    let collector = tokio::spawn(async move {
-        let mut text = String::new();
-        // Text streamed since the last tool call / new LLM response. The kernel
-        // persists a response only when it completes, so on error this tail is
-        // the part that would otherwise be lost.
-        let mut tail = String::new();
-        let mut errored: Option<String> = None;
-        let mut tool_calls = 0usize;
-        let mut tool_errors = 0usize;
-        let mut iterations = 0u32;
-        let mut waited_for_permission = false;
-        let mut tool_inputs: std::collections::HashMap<String, serde_json::Value> =
-            std::collections::HashMap::new();
-        while let Some(event) = rx.recv().await {
-            if let AgentEvent::ToolStart {
-                ref id, ref input, ..
-            } = event
-            {
-                tool_calls += 1;
-                tool_inputs.insert(id.clone(), input.clone());
-            }
-            // Bridge file-modifying tools → ide-file-changed with the real path
-            // so the frontend reloads only affected tabs (watcher may lag).
-            if let AgentEvent::ToolEnd {
-                ref id,
-                ref name,
-                is_error,
-                ..
-            } = event
-            {
-                if is_error {
-                    tool_errors += 1;
+    let collector = tokio::spawn(
+        async move {
+            let mut text = String::new();
+            // Text streamed since the last tool call / new LLM response. The kernel
+            // persists a response only when it completes, so on error this tail is
+            // the part that would otherwise be lost.
+            let mut tail = String::new();
+            let mut errored: Option<String> = None;
+            let mut tool_calls = 0usize;
+            let mut tool_errors = 0usize;
+            let mut iterations = 0u32;
+            let mut waited_for_permission = false;
+            let mut durability_failed = false;
+            let mut tool_inputs: std::collections::HashMap<String, serde_json::Value> =
+                std::collections::HashMap::new();
+            while let Some(event) = rx.recv().await {
+                let payload = match serde_json::to_value(&event) {
+                    Ok(payload) => payload,
+                    Err(error) => {
+                        durability_failed = true;
+                        collector_cancel.store(true, Ordering::SeqCst);
+                        let message = format!("Cannot record agent event: {error}");
+                        collector_sink.emit_session(
+                            &collector_session,
+                            "agent_lifecycle",
+                            serde_json::json!({"state":"failed","error":message}),
+                        );
+                        errored = Some(message);
+                        break;
+                    }
+                };
+                let mut published_durably = false;
+                if let Some(writer) = durable_stream.as_mut() {
+                    let recorded = writer.record_before_publish(&payload, |committed| {
+                        collector_sink.emit_session(
+                            &collector_session,
+                            "agent_event",
+                            committed.clone(),
+                        );
+                    });
+                    let committed_event = match recorded {
+                        Ok(event) => event,
+                        Err(error) => {
+                            durability_failed = true;
+                            collector_cancel.store(true, Ordering::SeqCst);
+                            let message = format!(
+                                "Execution history could not be saved; execution stopped: {error}"
+                            );
+                            collector_sink.emit_session(
+                                &collector_session,
+                                "agent_lifecycle",
+                                serde_json::json!({"state":"failed","error":message}),
+                            );
+                            errored = Some(message);
+                            break;
+                        }
+                    };
+                    // Event consists only of validated identities, integers and an
+                    // existing JSON Value. Publish its durable cursor separately so
+                    // legacy consumers retain the original AgentEvent payload.
+                    collector_sink.emit_session(
+                        &collector_session,
+                        "agent_event_committed",
+                        serde_json::json!(committed_event),
+                    );
+                    published_durably = true;
                 }
-                if matches!(name.as_str(), "file_write" | "file_edit") {
-                    if let Some(input) = tool_inputs.remove(id) {
-                        if let Some(path) = input.get("path").and_then(|v| v.as_str()) {
-                            let path_norm = path.replace('\\', "/");
-                            if !path_norm.is_empty()
-                                && path_norm != "."
-                                && crate::path_filter::should_watch_path(&path_norm)
-                            {
-                                let _ = collector_app.emit(
-                                    "ide-file-changed",
-                                    serde_json::json!({
-                                        "project_dir": collector_workspace,
-                                        "path": path_norm,
-                                        "kind": "modified",
-                                    }),
-                                );
+                if let AgentEvent::ToolStart {
+                    ref id, ref input, ..
+                } = event
+                {
+                    tool_calls += 1;
+                    tool_inputs.insert(id.clone(), input.clone());
+                }
+                // Bridge file-modifying tools → ide-file-changed with the real path
+                // so the frontend reloads only affected tabs (watcher may lag).
+                if let AgentEvent::ToolEnd {
+                    ref id,
+                    ref name,
+                    is_error,
+                    ..
+                } = event
+                {
+                    if is_error {
+                        tool_errors += 1;
+                        let safe_tool_name = if name.len() <= 64
+                            && name
+                                .bytes()
+                                .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+                        {
+                            name.as_str()
+                        } else {
+                            "unknown"
+                        };
+                        tracing::warn!(tool_name = safe_tool_name, "tool execution failed");
+                    }
+                    if matches!(name.as_str(), "file_write" | "file_edit") {
+                        if let Some(input) = tool_inputs.remove(id) {
+                            if let Some(path) = input.get("path").and_then(|v| v.as_str()) {
+                                let path_norm = path.replace('\\', "/");
+                                if !path_norm.is_empty()
+                                    && path_norm != "."
+                                    && crate::path_filter::should_watch_path(&path_norm)
+                                {
+                                    let _ = collector_app.emit(
+                                        "ide-file-changed",
+                                        serde_json::json!({
+                                            "project_dir": collector_workspace,
+                                            "path": path_norm,
+                                            "kind": "modified",
+                                        }),
+                                    );
+                                }
                             }
                         }
+                    } else if name.as_str() == "browser" && !is_error {
+                        if let Some(input) = tool_inputs.remove(id) {
+                            let state = collector_app.state::<crate::state::AppState>();
+                            state.browser_activity.mark_browser_tool().await;
+                            crate::browser::events::emit_browser_changed(
+                                &collector_app,
+                                &input,
+                                Some(collector_session.as_str()),
+                            );
+                        }
+                    } else {
+                        tool_inputs.remove(id);
                     }
-                } else if name.as_str() == "browser" && !is_error {
-                    if let Some(input) = tool_inputs.remove(id) {
-                        let state = collector_app.state::<crate::state::AppState>();
-                        state.browser_activity.mark_browser_tool().await;
-                        crate::browser::events::emit_browser_changed(
-                            &collector_app,
-                            &input,
-                            Some(collector_session.as_str()),
-                        );
+                }
+                if matches!(event, AgentEvent::TextSegmentStart { .. }) {
+                    iterations += 1;
+                }
+                if matches!(event, AgentEvent::PermissionRequest { .. }) {
+                    waited_for_permission = true;
+                    collector_sink.emit_session(
+                        &collector_session,
+                        "agent_lifecycle",
+                        serde_json::json!({"state": "waiting_permission"}),
+                    );
+                } else if waited_for_permission && matches!(event, AgentEvent::ToolEnd { .. }) {
+                    collector_sink.emit_session(
+                        &collector_session,
+                        "agent_lifecycle",
+                        serde_json::json!({"state": "executing"}),
+                    );
+                }
+                if !published_durably {
+                    collector_sink.emit_session(&collector_session, "agent_event", payload);
+                }
+                match event {
+                    AgentEvent::TextDelta { delta } => {
+                        text.push_str(&delta);
+                        tail.push_str(&delta);
                     }
-                } else {
-                    tool_inputs.remove(id);
+                    AgentEvent::ToolStart { .. } | AgentEvent::TextSegmentStart { .. } => {
+                        tail.clear();
+                    }
+                    AgentEvent::Error { message, .. } => {
+                        errored = Some(message);
+                        break;
+                    }
+                    AgentEvent::Done { .. } => break,
+                    _ => {}
                 }
             }
-            if matches!(event, AgentEvent::TextSegmentStart { .. }) {
-                iterations += 1;
-            }
-            if matches!(event, AgentEvent::PermissionRequest { .. }) {
-                waited_for_permission = true;
-                collector_sink.emit_session(
-                    &collector_session,
-                    "agent_lifecycle",
-                    serde_json::json!({"state": "waiting_permission"}),
-                );
-            } else if waited_for_permission && matches!(event, AgentEvent::ToolEnd { .. }) {
-                collector_sink.emit_session(
-                    &collector_session,
-                    "agent_lifecycle",
-                    serde_json::json!({"state": "executing"}),
-                );
-            }
-            if let Ok(payload) = serde_json::to_value(&event) {
-                collector_sink.emit_session(&collector_session, "agent_event", payload);
-            }
-            match event {
-                AgentEvent::TextDelta { delta } => {
-                    text.push_str(&delta);
-                    tail.push_str(&delta);
-                }
-                AgentEvent::ToolStart { .. } | AgentEvent::TextSegmentStart { .. } => {
-                    tail.clear();
-                }
-                AgentEvent::Error { message, .. } => {
-                    errored = Some(message);
-                    break;
-                }
-                AgentEvent::Done { .. } => break,
-                _ => {}
-            }
+            (
+                text,
+                errored,
+                tool_calls,
+                tool_errors,
+                iterations,
+                tail,
+                durability_failed,
+            )
         }
-        (text, errored, tool_calls, tool_errors, iterations, tail)
-    });
+        .instrument(tracing::Span::current()),
+    );
 
     // No wall-clock limit unless the agent/team explicitly configures one:
     // long-running coding tasks must be able to run until done or until the
@@ -2473,8 +2872,29 @@ pub async fn run_agentz_turn(
         }
     };
 
-    let (streamed_text, stream_error, tool_calls, tool_errors, iterations, unsaved_tail) =
-        collector.await.unwrap_or_default();
+    let (
+        streamed_text,
+        stream_error,
+        tool_calls,
+        tool_errors,
+        iterations,
+        unsaved_tail,
+        durability_failed,
+    ) = match collector.await {
+        Ok(output) => output,
+        Err(error) => {
+            cancel.store(true, Ordering::SeqCst);
+            (
+                String::new(),
+                Some(format!("Execution event collector failed: {error}")),
+                0,
+                0,
+                0,
+                String::new(),
+                true,
+            )
+        }
+    };
 
     // Agent loop already persists via harness persistence; do not append
     // `new_messages` again or every turn is duplicated in the DB.
@@ -2493,7 +2913,24 @@ pub async fn run_agentz_turn(
             })
             .unwrap_or(0)
     };
-    let turn_failed = error_msg.is_some() || stream_error.is_some();
+    // One captured decision controls drain and terminal state. A late Stop cannot
+    // turn an undrained completion into a falsely confirmed cancellation.
+    let cancellation_requested = cancel.load(Ordering::SeqCst);
+    let cancellation_unconfirmed = if cancellation_requested {
+        if let Some(run) = durable_run.as_mut() {
+            run.request_cancelling().map_err(anyhow::Error::msg)?;
+        }
+        !cancellation_completion
+            .wait_requested(&early_binding, std::time::Duration::from_secs(10))
+            .await
+            .map_err(anyhow::Error::msg)?
+            .may_finalize_cancelled()
+    } else {
+        false
+    };
+    let turn_failed = error_msg.is_some() || stream_error.is_some() || cancellation_unconfirmed;
+    // A recording failure retains its cause even if the agent deadline also expired.
+    let effective_timeout = turn_timeout_secs.filter(|_| !durability_failed);
 
     // An interrupted turn (error / timeout / user stop) must not lose the reply
     // that was streaming: persist the unsaved tail so a reload or the next turn
@@ -2514,9 +2951,21 @@ pub async fn run_agentz_turn(
             }
         }
     }
-    let lifecycle_state = if turn_timeout_secs.is_some() {
+    // Revoke plan writes before making the durable Attempt terminal.
+    drop(plan_attempt_guard);
+    if let Some(run) = durable_run {
+        run.finish(
+            cancellation_requested && !durability_failed && !cancellation_unconfirmed,
+            turn_failed,
+            effective_timeout.is_some() || cancellation_unconfirmed,
+        )
+        .map_err(|e| anyhow!("failed to persist run terminal state: {e}"))?;
+    }
+    let lifecycle_state = if cancellation_unconfirmed {
+        "interrupted"
+    } else if effective_timeout.is_some() {
         "timed_out"
-    } else if cancel.load(Ordering::SeqCst) {
+    } else if cancellation_requested && !durability_failed {
         "cancelled"
     } else if turn_failed {
         "failed"
@@ -2531,6 +2980,8 @@ pub async fn run_agentz_turn(
     tracing::info!(
         session_id = %session_id,
         lifecycle_state,
+        run_id = %run_id,
+        attempt_id = %attempt_id,
         tool_calls,
         tool_errors,
         iterations,
@@ -2548,10 +2999,15 @@ pub async fn run_agentz_turn(
             "open_todos": open_todo_count,
         }),
     );
-    if let Some(err) = error_msg.as_deref().or(stream_error.as_deref()) {
+    let final_error = if durability_failed {
+        stream_error.as_deref().or(error_msg.as_deref())
+    } else {
+        error_msg.as_deref().or(stream_error.as_deref())
+    };
+    if let Some(err) = final_error {
         // Keep the timeout notice calm and actionable — the turn stopped, but
         // nothing was lost and the user can simply continue.
-        let message = match turn_timeout_secs {
+        let message = match effective_timeout {
             Some(secs) => format!("Turn exceeded its {secs}s limit."),
             None => err.to_string(),
         };
@@ -2561,7 +3017,7 @@ pub async fn run_agentz_turn(
             serde_json::json!({
                 "ok": false,
                 "error": message,
-                "timed_out": turn_timeout_secs.is_some(),
+                "timed_out": effective_timeout.is_some(),
                 "open_todos": open_todo_count,
             }),
         );
@@ -2583,10 +3039,17 @@ pub async fn run_agentz_turn(
         let app_bg = app.clone();
         let session_bg = session_id.clone();
         let sink_bg = event_sink.clone();
+        let budget_title = budget_scope.clone();
         tokio::spawn(async move {
-            if let Err(e) =
-                maybe_llm_rename_session_title(&app_bg, &db_bg, &settings_bg, &session_bg, &sink_bg)
-                    .await
+            if let Err(e) = maybe_llm_rename_session_title(
+                &app_bg,
+                &db_bg,
+                &settings_bg,
+                &session_bg,
+                &sink_bg,
+                budget_title,
+            )
+            .await
             {
                 tracing::debug!("session title summarize skipped: {e}");
             }
@@ -2605,6 +3068,7 @@ pub async fn run_agentz_turn(
         };
         let model_ev = runtime.model.clone();
         let max_tokens_ev = runtime.max_tokens;
+        let budget_post = budget_scope.clone();
         tokio::spawn(async move {
             crate::commands::post_turn::run_post_turn_hooks(
                 &app_ev,
@@ -2616,6 +3080,7 @@ pub async fn run_agentz_turn(
                 base_url_ev,
                 model_ev,
                 max_tokens_ev,
+                budget_post,
             )
             .await;
         });
@@ -2637,11 +3102,16 @@ pub async fn run_agentz_turn(
             .unwrap_or_default()
     };
 
-    if let Some(err) = error_msg {
+    let response_error = if durability_failed {
+        stream_error.or(error_msg)
+    } else {
+        error_msg
+    };
+    if let Some(err) = response_error {
         // A turn-level timeout is recoverable: the session keeps its streamed
         // text and retained todos, and the next turn is re-prompted with them.
         // Only a genuine agent error aborts the whole call.
-        if turn_timeout_secs.is_some() {
+        if effective_timeout.is_some() {
             tracing::warn!(session_id = %session_id, %err, "turn timed out; returning partial result");
             return Ok(HeadlessCliResponse {
                 ok: false,
@@ -2657,7 +3127,7 @@ pub async fn run_agentz_turn(
     }
 
     Ok(HeadlessCliResponse {
-        ok,
+        ok: ok && !turn_failed,
         mode: HeadlessCliMode::Piscis.as_str().to_string(),
         session_id,
         pool_id: None,

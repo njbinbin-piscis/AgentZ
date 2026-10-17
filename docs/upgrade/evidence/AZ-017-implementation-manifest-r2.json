@@ -1,0 +1,178 @@
+{
+  "captured_at": "2026-10-10T19:21:52.529Z",
+  "scope": "AZ-017 Run/Attempt state machine; r2 adds execution_transition_table_is_exhaustive to crates/agentz-task-state/src/run.rs (test only)",
+  "files": [
+    {
+      "path": "crates/agentz-task-state/src/run.rs",
+      "sha256": "e0438b6affa9b22a5dbe5d58da1d4e885e07c41a043b0a9d222ac432a505970c"
+    },
+    {
+      "path": "crates/agentz-task-state/src/approval.rs",
+      "sha256": "61cc69ba37a802e0ba278533aaef4bfc0cd655b750287f62b15089cef2a523c4"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_run.rs",
+      "sha256": "746de6430baac1becb12c581d8c9e6277bb3fb66af4dd29941c5808aec068611"
+    },
+    {
+      "path": "src-tauri/src/runtime/approval.rs",
+      "sha256": "99776b3feeb3344e2b5acdb04657f277bb78b6ced22f2fa612216781799c718a"
+    },
+    {
+      "path": "src-tauri/src/commands/chat.rs",
+      "sha256": "9ce9bde671207cac42a41be71cbeb439cc7d64bb2e23c034caddaf502820a16b"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_turn.rs",
+      "sha256": "b6a9d13b7093af4645c3e7e049f3e4e9fd82e52784c7198381aae656d09a5851"
+    },
+    {
+      "path": "src-tauri/src/runtime/chat_cancel.rs",
+      "sha256": "b472bedf141fd25faa3b96332b74c3d5dd19dc0e62621c7921dd7f68ddaab995"
+    },
+    {
+      "path": "crates/agentz-task-state/src/events.rs",
+      "sha256": "7fcfa29dc35ab483caa641d86a6b702de09b155fcebd01b6c68f4e7db7c5fe98"
+    },
+    {
+      "path": "crates/agentz-task-state/src/lib.rs",
+      "sha256": "ba73a74324b07960b853780e797af76d34929047c03f9008505385e0fb2acc73"
+    },
+    {
+      "path": "src-tauri/src/runtime/heartbeat.rs",
+      "sha256": "fbb2a618eef0002c700bac4df3160a0f8b7a15e6f510d910d63ab142afcf8f26"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_plan.rs",
+      "sha256": "5177480c08b2f7f58dfa858432a9e2d15fd7e6ba6de9e13a36ca00432b45245a"
+    },
+    {
+      "path": "src-tauri/src/tools/durable_plan_todo.rs",
+      "sha256": "c622df9bac349c3e7d1ab87bb5cc22fbb9a6d81f2e75129388c6a7f5351bf52d"
+    },
+    {
+      "path": "src-tauri/src/tools/devenv.rs",
+      "sha256": "f024800146f4beba5faff26371e0ceb51debe0b50089a1a03bd596c5a3d09ce9"
+    },
+    {
+      "path": "src-tauri/src/commands/devenv.rs",
+      "sha256": "6e5294bd8c8d6083ea185219841ccc3b074db5eca30676f90f7ccf717ec4896e"
+    },
+    {
+      "path": "crates/agentz-task-state/src/plan.rs",
+      "sha256": "2ffe34629d8af12a05df3a527e599b38389fb780bd28b9d5bf00ce99156c334e"
+    },
+    {
+      "path": "src-tauri/src/state.rs",
+      "sha256": "a4807688db349867b5b3b791a52e44e87a76cf318299e01b5f0c78e7ed648f22"
+    },
+    {
+      "path": "src-tauri/src/runtime/mod.rs",
+      "sha256": "0d23952e65855dbdadb1bb33cced46774786b8c1251a7ade0c736fdc06d6d10e"
+    },
+    {
+      "path": "src-tauri/src/runtime/task_activity.rs",
+      "sha256": "1b45b66071f3f8820d98429864a5f4470bd91598a19697c02ba302a5ec6c85fe"
+    },
+    {
+      "path": "src-tauri/src/runtime/plan_intent.rs",
+      "sha256": "6c1bf00ae2dbab5e58ca397f24040f6d15731de290148d85eac36819e788614e"
+    },
+    {
+      "path": "src-tauri/src/runtime/project_scope.rs",
+      "sha256": "3bbf91b8af83010753cc720c8b61a8dd252465dcb49ec4842237c4de1394cba0"
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "sha256": "f815518c4cc82c8ff91ee8d3fc0834b7112d6d8205467c21dfef747203543cc3"
+    },
+    {
+      "path": "src-tauri/src/commands/mod.rs",
+      "sha256": "e3bdaa6d8a1f793d6c64c3c9a9326c5000a75f442d1378a062b519165829ad33"
+    },
+    {
+      "path": "src-tauri/src/commands/project_scope.rs",
+      "sha256": "c472df3bc613aff46eaefe3758b35381b4a1b2f02d0aea9238c9649f5218b4af"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_plan.rs",
+      "sha256": "2392747b2def2b915e115159629cda076b8865ee62abcc90271a62cc5348f4a5"
+    },
+    {
+      "path": "src/services/tauri/projectScope.ts",
+      "sha256": "155e1954ac4a7b8314c6c0505fbc0f4b65a5473b95b6b41d6263170dd518f2ff"
+    },
+    {
+      "path": "src/services/tauri/chatPlan.ts",
+      "sha256": "abad80ed0289e34fe221b70bfcb962d1f3ea4467d30bce4691d3ca072a123595"
+    },
+    {
+      "path": "src/workspaces/codez/DurablePlanActions.tsx",
+      "sha256": "9f676fb9948227f9271136b3b610aa7c82ead266c4b1759d65ca92c007da4105"
+    },
+    {
+      "path": "src/workspaces/codez/AssistantPanel.tsx",
+      "sha256": "ab469eb32e479f537b7819a2e95311821398f091c6243a8393a2dfc755874673"
+    },
+    {
+      "path": "src/workspaces/workz/index.tsx",
+      "sha256": "472d401fd2bf8b543162f2ffe30a00b4e7aab145fd94a81a224d9b68a20cb866"
+    },
+    {
+      "path": "src/App.tsx",
+      "sha256": "81d99ad3755dfaff43bd74343ba2bf0cc21bf2e9df5960358745646bba78f471"
+    },
+    {
+      "path": "src/i18n/en.ts",
+      "sha256": "95c75f1c919cf60a40217959be3d4710968b3329ddb4aaa6de80d9f578ec893b"
+    },
+    {
+      "path": "src/i18n/zh.ts",
+      "sha256": "14fdeba7b7caedb92907893010532009b716a5b94e6b30fa200a83b2027e3e29"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_events.rs",
+      "sha256": "c86837f4a6fbf45cc7ff7e632b01973e924f24feaa409f4215a66b1f3102c9a6"
+    },
+    {
+      "path": "src-tauri/src/runtime/event_replay.rs",
+      "sha256": "706f3c6944751fd07508fa787c6f133b50c91ae5423667facbebeb6f16889219"
+    },
+    {
+      "path": "src/services/tauri/runEvents.ts",
+      "sha256": "d8e2bf8b5a9f8ebcc4379ff66fb3131c6d82c4488eee5b0a7eccecc4b4537f40"
+    },
+    {
+      "path": "src/services/tauri/runDiscovery.ts",
+      "sha256": "16cb337bda7210ca2a670bc9f10525d839a3d3d16c3cf42793fef8b7a7b3a1eb"
+    },
+    {
+      "path": "src/workspaces/codez/RunHistoryPanel.tsx",
+      "sha256": "94510d765fdd4dbd25fe33505e8678e2959b2f6a324162c34a97e0520d25c47e"
+    },
+    {
+      "path": "src/workspaces/codez/RunHistoryPanel.css",
+      "sha256": "1095b98826d92de65e20a63e64886529fa0e0705e1f1a9ddcf2d4a1cf75c451c"
+    },
+    {
+      "path": "src-tauri/src/commands/session_metadata.rs",
+      "sha256": "1d9adfbdc8263e12a37f1a58fa767e008b28a3f884cec200243c39de23e192c6"
+    },
+    {
+      "path": "src-tauri/src/commands/projects.rs",
+      "sha256": "4c8bc890996ff7359ea135064c5b775e1beee88766a44295ec8fe6d92b89cc5e"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_stream.rs",
+      "sha256": "07299c200f118046f39e3b22a0844479f854f58f8ee89e180b5c41cb4b8f362c"
+    },
+    {
+      "path": "src/services/tauri/runEventProjection.ts",
+      "sha256": "d87912ef77fef6af8d7b7e64cf04134a279fbd721c66bb1f944b20e89a6e45ab"
+    },
+    {
+      "path": "src/services/tauri/runEventNotice.ts",
+      "sha256": "a307512750024f37bf18487b67449533a379468372f0292b1785f87d48a0c139"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+VALID: 83 tasks, 11 milestones; dependencies and records consistent
+WARNINGS (64 distinct; not blocking, fix when the task moves to review/done):
+  - AZ-013: reviewer "Codex (remote_tests current independent review)" is the same actor as owner "Codex"
+  - AZ-017: fingerprint changed: crates/agentz-task-state/src/run.rs
+  - AZ-017: fingerprint changed: src-tauri/src/runtime/durable_run.rs
+  - AZ-017: fingerprint changed: src-tauri/src/commands/chat_turn.rs
+  - AZ-018: fingerprint changed: crates/agentz-task-state/src/run.rs
+  - AZ-018: fingerprint changed: src-tauri/src/commands/chat_turn.rs
+  - AZ-019: fingerprint changed: crates/agentz-task-state/src/run.rs
+  - AZ-019: fingerprint changed: src-tauri/src/runtime/mod.rs
+  - AZ-019: fingerprint changed: Cargo.lock
+  - AZ-021: fingerprint changed: vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs
+  - AZ-021: fingerprint changed: src-tauri/src/runtime/durable_run.rs
+  - AZ-021: fingerprint changed: src-tauri/src/commands/chat_turn.rs
+  - AZ-024: fingerprint changed: src-tauri/src/runtime/task_budget.rs
+  - AZ-024: fingerprint changed: src-tauri/src/commands/chat_turn.rs
+  - AZ-025: fingerprint changed: crates/agentz-task-state/src/run.rs
+  - AZ-026: reviewer "Codex (remote_tests独立复核)" is the same actor as owner "Codex (内核固定交付)"
+  - AZ-026: fingerprint changed: vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs
+  - AZ-026: fingerprint changed: vendor/piscis-engine/piscis-kernel/tests/az023_retry_http.rs
+  - AZ-026: fingerprint changed: Cargo.lock
+  - AZ-026: fingerprint changed: src-tauri/Cargo.toml
+  - AZ-026: fingerprint changed: crates/agentz-host/Cargo.toml
+  - AZ-035: reviewer "Codex current_source_review independent session binding" is the same actor as owner "Codex (任务详情)"
+  - AZ-035: fingerprint changed: crates/agentz-task-state/src/task_details.rs
+  - AZ-035: fingerprint changed: crates/agentz-task-state/src/run.rs
+  - AZ-035: fingerprint changed: crates/agentz-task-state/src/budget.rs
+  - AZ-035: fingerprint changed: src-tauri/src/runtime/task_details.rs
+  - AZ-035: fingerprint changed: src-tauri/src/runtime/mod.rs
+  - AZ-035: fingerprint changed: src-tauri/src/commands/project_scope.rs
+  - AZ-035: fingerprint changed: src-tauri/src/lib.rs
+  - AZ-035: fingerprint changed: src/services/tauri/taskDetails.ts
+  - AZ-035: fingerprint changed: src/services/tauri/taskDetails.test.ts
+  - AZ-035: fingerprint changed: src/workspaces/codez/AssistantPanel.tsx
+  - AZ-035: fingerprint changed: src/workspaces/workz/index.tsx
+  - AZ-036: fingerprint changed: src/App.tsx
+  - AZ-036: fingerprint changed: src/i18n/en.ts
+  - AZ-036: fingerprint changed: src/i18n/zh.ts
+  - AZ-036: fingerprint changed: src/workspaces/codez/index.tsx
+  - AZ-036: fingerprint changed: src/workspaces/workz/index.tsx
+  - AZ-036: fingerprint changed: src-tauri/src/commands/mod.rs
+  - AZ-036: fingerprint changed: src-tauri/src/lib.rs
+  - AZ-038: reviewer "Codex current_source_review independent session binding" is the same actor as owner "Codex"
+  - AZ-038: fingerprint changed: crates/agentz-task-state/src/artifacts.rs
+  - AZ-038: fingerprint changed: src-tauri/src/commands/task_artifacts.rs
+  - AZ-038: fingerprint changed: src-tauri/src/commands/mod.rs
+  - AZ-038: fingerprint changed: src-tauri/src/lib.rs
+  - AZ-038: fingerprint changed: src/workspaces/workz/index.tsx
+  - AZ-039: reviewer "Codex (remote_tests independent delivery review)" is the same actor as owner "Codex"
+  - AZ-039: fingerprint changed: src/workspaces/workz/index.tsx
+  - AZ-039: fingerprint changed: src/workspaces/codez/AssistantPanel.tsx
+  - AZ-040: reviewer "Codex (remote_tests independent delivery wiring review)" is the same actor as owner "Codex"
+  - AZ-040: fingerprint changed: src/workspaces/codez/AssistantPanel.tsx
+  - AZ-040: fingerprint changed: src/workspaces/workz/index.tsx
+  - AZ-041: reviewer "Codex current_source_review (independent current consumers)" is the same actor as owner "Codex (编辑器保护)"
+  - AZ-041: fingerprint changed: src/workspaces/codez/index.tsx
+  - AZ-044: fingerprint changed: src/workspaces/codez/Terminal.tsx
+  - AZ-044: fingerprint changed: src-tauri/src/commands/ide.rs
+  - AZ-044: fingerprint changed: src-tauri/Cargo.toml
+  - AZ-047: reviewer "Codex current_source_review independent keyboard review" is the same actor as owner "Codex (交互一致性)"
+  - AZ-047: fingerprint changed: src/workspaces/codez/BottomPanel.tsx
+  - AZ-047: fingerprint changed: src/workspaces/codez/Terminal.tsx
+  - AZ-048: reviewer "Codex current_source_review independent session binding" is the same actor as owner "Codex (无仓库目录)"
+  - AZ-048: fingerprint changed: crates/agentz-task-state/src/projectless.rs
+  - AZ-048: fingerprint changed: src-tauri/src/commands/project_scope.rs
+  - AZ-048: fingerprint changed: src-tauri/src/lib.rs

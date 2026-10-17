@@ -1,0 +1,15 @@
+        Info Looking up installed tauri packages to check mismatched versions...
+   Compiling agentz-desktop v0.9.7 (C:\Projects\AgentZ\src-tauri)
+    Finished `release` profile [optimized] target(s) in 44m 05s
+       Built application at: C:\Projects\AgentZ\target\release\agentz-desktop.exe
+        Info Patching C:\Projects\AgentZ\target\release\agentz-desktop.exe with bundle type information: nsis
+        Info Target: x64
+     Running makensis to produce C:\Projects\AgentZ\target\release\bundle\nsis\AgentZ_0.9.7_x64-setup.exe
+    Finished 1 bundle at:
+        C:\Projects\AgentZ\target\release\bundle\nsis\AgentZ_0.9.7_x64-setup.exe
+
+npm notice
+npm notice New major version of npm available! 11.17.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

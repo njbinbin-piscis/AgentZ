@@ -25,6 +25,8 @@ pub struct DelegateTool {
     pub plan_store: PlanStore,
     pub lsp_manager: Arc<LspManager>,
     pub app: tauri::AppHandle,
+    /// The parent task's budget, so delegated model calls count against the same total.
+    pub budget: crate::runtime::task_budget::BudgetScope,
 }
 
 #[async_trait]
@@ -88,6 +90,7 @@ impl Tool for DelegateTool {
             workspace,
             task,
             ctx.cancel.clone(),
+            self.budget.clone(),
         )
         .await;
 

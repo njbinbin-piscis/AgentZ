@@ -1,0 +1,11 @@
+# AZ-020 CodeZ existing-session计划IPC候选
+
+新增且仅修改 `commands/chat_plan.rs`，主线程/ssh代理负责mod/lib注册。两个命令：chat_plan_query(scope_handle,session_id)→PlanQuery；chat_plan_apply(scope_handle,session_id,expected,intent)→Plan。无rendererproject/workspace/run路径参数，无ensure/create session，无模型执行。
+
+全程environment.execution租约；project仅经main window可信opaque scope.lookup解析。打开已选项目会话DB后get_session必须存在且is_codez_source，WorkZ明确拒绝（legacy CodeZ alias按既有函数兼容）。workspace仅取既有session.workspace_root或登记环境/project；resolve_task_workspace验证managed登记，异于project无登记要求binding而拒绝，不支持自由路径猜测。
+
+fresh resolve_binding使用host生成metadata-only UUID满足现有resolver的Binding形状，随后from_execution只保留PlanBinding四项；不queue/start/创建Run、不用于工具授权。existing任务scope状态在全部async完成后以with_verified_scope重新lookup，stdregistry锁同步覆盖query或apply_under_task_gate→Runactivecheck→PlanStoreCAS，防scope撤权在commit前插入；锁无await。query不写计划cache、不清历史。
+
+apply使用真实taskgate及persisted active Run检查，expectedID/revision为CAS条件不是授权。Replace/Cancel不等同Run取消，busy显式拒绝，WorkZ未支持，前端新目标UI另包。
+
+新增真实Database memory fixture：缺失session拒绝且不创建、现存CodeZ接受、空白改变sessionID拒绝、WorkZ拒绝、legacy alias接受。未执行Cargo/GUI。已实际rustfmt和限定diff-check exit0，root统一编译及targetedfixture；可信scope主窗口/撤权fixture由scope模块另行验证，不以本fixture替代IPC安全验收。

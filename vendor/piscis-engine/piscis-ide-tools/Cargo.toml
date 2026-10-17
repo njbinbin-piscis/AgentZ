@@ -1,0 +1,23 @@
+[package]
+workspace = ".."
+name = "piscis-ide-tools"
+version = "0.1.0"
+edition = "2021"
+description = "Shared IDE-coupled agent tools (LSP, read_lints) for AgentZ and openpiscis hosts"
+license = "Apache-2.0"
+
+[dependencies]
+piscis-kernel = { workspace = true }
+async-trait = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = "0.1"
+futures = "0.3"
+futures-util = "0.3"
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots", "connect"], default-features = false }
+tungstenite = "0.24"
+
+[lints]
+workspace = true

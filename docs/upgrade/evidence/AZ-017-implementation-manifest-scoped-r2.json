@@ -1,0 +1,22 @@
+{
+  "captured_at": "2026-10-10T19:24:22.410Z",
+  "scope": "AZ-017 Run/Attempt state machine only: run.rs state table and CAS transition, durable run wiring, chat turn consumption, and integration test tests/execution_transitions.rs. Other working-tree files belong to other tasks and are excluded.",
+  "files": [
+    {
+      "path": "crates/agentz-task-state/src/run.rs",
+      "sha256": "ea4b9f4e701e2d623c690d6356a43cb9d0c9b20d6a0daa9c9b91a3ae936c01d6"
+    },
+    {
+      "path": "src-tauri/src/runtime/durable_run.rs",
+      "sha256": "746de6430baac1becb12c581d8c9e6277bb3fb66af4dd29941c5808aec068611"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_turn.rs",
+      "sha256": "b6a9d13b7093af4645c3e7e049f3e4e9fd82e52784c7198381aae656d09a5851"
+    },
+    {
+      "path": "crates/agentz-task-state/tests/execution_transitions.rs",
+      "sha256": "fca7580f44f4bb0cf35edff878e0e8385d57c1bb4ba55026e40cf3b17f7c9078"
+    }
+  ]
+}

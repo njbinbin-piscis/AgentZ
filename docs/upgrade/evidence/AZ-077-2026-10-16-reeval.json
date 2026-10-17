@@ -1,0 +1,21 @@
+[
+  {
+    "id": "AZ-077",
+    "verified_state": "keychain_delete_idempotency_cross_target_checked_native_unverified",
+    "severity": "P1",
+    "finding": "The macOS Keychain adapter now treats errSecItemNotFound on delete as successful idempotent cleanup, while missing reads remain fail-closed. Its ignored temporary-credential fixture retries delete. Isolated aarch64-apple-darwin adapter and test typechecking passed with Rust 1.98.1; no native link or macOS runtime test ran. Keychain accessibility and signed-identity recovery policy remain unresolved.",
+    "conclusion_proposal": "Keep blocked for actual signed macOS acceptance; do not infer platform readiness from cross-target typechecking.",
+    "next_action": "Choose and verify Keychain accessibility and signed-identity recovery policy in a real macOS test account; run temporary-item read/write, lock, revoke, corruption and migration tests with cleanup receipts.",
+    "remaining_work": [
+      "Explicit accessible/login-versus-data-protection policy validated against signed app identity",
+      "Native macOS read/write, lock, revoke, corruption and migration receipts",
+      "Independent unified review and rollback compatibility"
+    ],
+    "verification_gaps": [
+      "No native macOS run or Security.framework link",
+      "Ignored temporary-credential test has only been typechecked",
+      "Cross-identity recovery and Keychain accessibility not established"
+    ],
+    "evidence": ["docs/upgrade/evidence/AZ-077-keychain-adapter.md"]
+  }
+]

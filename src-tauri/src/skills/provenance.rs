@@ -39,6 +39,18 @@ pub struct SkillConfigMeta {
     #[serde(default)]
     pub source_url: Option<String>,
     #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub registry_version: Option<String>,
+    #[serde(default)]
+    pub content_sha256: Option<String>,
+    /// Tools requested by this skill. These are surfaced as capabilities and
+    /// are not persisted as a blanket user grant.
+    #[serde(default)]
+    pub requested_tools: Vec<String>,
+    #[serde(default)]
+    pub install_history: Vec<SkillInstallRecord>,
+    #[serde(default)]
     pub installed_from_session_id: Option<String>,
     #[serde(default)]
     pub promoted_at: Option<String>,
@@ -60,6 +72,11 @@ impl SkillConfigMeta {
             pinned: false,
             source: Some(source.to_string()),
             source_url,
+            version: None,
+            registry_version: None,
+            content_sha256: None,
+            requested_tools: Vec::new(),
+            install_history: Vec::new(),
             installed_from_session_id: session_id,
             promoted_at: None,
         }
@@ -72,6 +89,11 @@ impl SkillConfigMeta {
             pinned: false,
             source: Some(created_by.to_string()),
             source_url: None,
+            version: None,
+            registry_version: None,
+            content_sha256: None,
+            requested_tools: Vec::new(),
+            install_history: Vec::new(),
             installed_from_session_id: session_id,
             promoted_at: None,
         }
@@ -91,6 +113,20 @@ impl SkillConfigMeta {
     pub fn from_json(s: &str) -> Self {
         serde_json::from_str(s).unwrap_or_default()
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillInstallRecord {
+    pub action: String,
+    pub at: String,
+    pub source: String,
+    pub source_url: Option<String>,
+    pub version: Option<String>,
+    pub registry_version: Option<String>,
+    pub content_sha256: String,
+    pub requested_tools: Vec<String>,
+    pub added_tools: Vec<String>,
+    pub removed_tools: Vec<String>,
 }
 
 pub fn skills_root(config_dir: &Path) -> PathBuf {
@@ -216,6 +252,67 @@ pub fn add_hub_lock(root: &Path, skill_id: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+pub fn remove_hub_lock(root: &Path, skill_id: &str) -> std::io::Result<()> {
+    let lock_path = hub_lock_path(root);
+    if !lock_path.exists() {
+        return Ok(());
+    }
+    let raw = std::fs::read_to_string(&lock_path)?;
+    let mut ids: Vec<String> = serde_json::from_str(&raw)?;
+    ids.retain(|id| id != skill_id);
+    if ids.is_empty() {
+        std::fs::remove_file(lock_path)?;
+    } else {
+        std::fs::write(lock_path, serde_json::to_vec_pretty(&ids)?)?;
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct SkillAuthorizationEvent<'a> {
+    at: String,
+    action: &'static str,
+    skill_id: &'a str,
+    source: Option<&'a str>,
+    source_url: Option<&'a str>,
+    version: Option<&'a str>,
+    registry_version: Option<&'a str>,
+    content_sha256: Option<&'a str>,
+    requested_tools: &'a [String],
+}
+
+/// Record a durable uninstall intent before deleting the skill metadata that
+/// describes its requested capabilities. An intent event remains accurate if
+/// deletion subsequently fails; it does not claim deletion already succeeded.
+pub fn record_skill_revocation_intent(
+    root: &Path,
+    skill_id: &str,
+    meta: &SkillConfigMeta,
+) -> std::io::Result<()> {
+    use std::io::Write;
+    let dir = root.join(SUBDIR_HUB);
+    std::fs::create_dir_all(&dir)?;
+    let event = SkillAuthorizationEvent {
+        at: chrono::Utc::now().to_rfc3339(),
+        action: "revocation_requested",
+        skill_id,
+        source: meta.source.as_deref(),
+        source_url: meta.source_url.as_deref(),
+        version: meta.version.as_deref(),
+        registry_version: meta.registry_version.as_deref(),
+        content_sha256: meta.content_sha256.as_deref(),
+        requested_tools: &meta.requested_tools,
+    };
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("authorization-events.jsonl"))?;
+    let encoded = serde_json::to_vec(&event).map_err(std::io::Error::other)?;
+    file.write_all(&encoded)?;
+    file.write_all(b"\n")?;
+    file.sync_data()
+}
+
 /// One-time migration: move flat `skills/{name}/` → `skills/installed/{name}/`.
 pub fn migrate_flat_skills_to_installed(root: &Path) -> std::io::Result<u32> {
     ensure_evolution_dirs(root)?;
@@ -257,6 +354,28 @@ pub fn content_hash(content: &str) -> String {
     format!("{:016x}", h.finish())
 }
 
+pub fn content_sha256(content: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(content.as_bytes()))
+}
+
+/// Capabilities newly requested by a candidate relative to the installed one.
+/// Sorting and de-duplication keep comparisons stable and auditable.
+pub fn added_tools(previous: &[String], candidate: &[String]) -> Vec<String> {
+    let previous: std::collections::BTreeSet<_> = previous.iter().map(String::as_str).collect();
+    candidate
+        .iter()
+        .filter(|tool| !previous.contains(tool.as_str()))
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+pub fn removed_tools(previous: &[String], candidate: &[String]) -> Vec<String> {
+    added_tools(candidate, previous)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,5 +388,65 @@ mod tests {
 
         let installed = SkillConfigMeta::installed("clawhub", None, None);
         assert!(!is_writable(&installed, false));
+    }
+
+    #[test]
+    fn content_sha256_uses_standard_digest_and_tool_diff_is_stable() {
+        assert_eq!(
+            content_sha256("abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            added_tools(
+                &["read_file".into()],
+                &["write_file".into(), "read_file".into(), "write_file".into()]
+            ),
+            vec!["write_file"]
+        );
+        assert!(added_tools(&["read_file".into()], &["read_file".into()]).is_empty());
+    }
+
+    #[test]
+    fn legacy_metadata_loads_without_provenance_as_unverified_defaults() {
+        let meta = SkillConfigMeta::from_json(r#"{"lifecycle":"installed","locked":true}"#);
+        assert_eq!(meta.lifecycle, LIFECYCLE_INSTALLED);
+        assert!(meta.source.is_none());
+        assert!(meta.content_sha256.is_none());
+        assert!(meta.requested_tools.is_empty());
+        assert!(meta.install_history.is_empty());
+    }
+
+    #[test]
+    fn revocation_intent_keeps_audit_and_cleans_only_its_hub_lock() {
+        let root = std::env::temp_dir().join(format!(
+            "agentz-skill-revoke-test-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        std::fs::create_dir_all(&root).expect("create fixture");
+        let mut meta =
+            SkillConfigMeta::installed("clawhub", Some("https://example.test/skill".into()), None);
+        meta.version = Some("2.4.0".into());
+        meta.content_sha256 = Some(content_sha256("skill"));
+        meta.requested_tools = vec!["read_file".into(), "write_file".into()];
+        add_hub_lock(&root, "target").expect("lock target");
+        add_hub_lock(&root, "other").expect("lock other");
+
+        record_skill_revocation_intent(&root, "target", &meta).expect("write audit event");
+        remove_hub_lock(&root, "target").expect("remove target lock");
+
+        let event: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(root.join(SUBDIR_HUB).join("authorization-events.jsonl"))
+                .expect("read audit event"),
+        )
+        .expect("valid event");
+        assert_eq!(event["action"], "revocation_requested");
+        assert_eq!(event["skill_id"], "target");
+        assert_eq!(event["requested_tools"][1], "write_file");
+        let remaining: Vec<String> =
+            serde_json::from_slice(&std::fs::read(hub_lock_path(&root)).expect("read lock file"))
+                .expect("valid lock file");
+        assert_eq!(remaining, vec!["other"]);
+        let _ = std::fs::remove_dir_all(root);
     }
 }

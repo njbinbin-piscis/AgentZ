@@ -1,0 +1,34 @@
+{
+  "release_ready": false,
+  "build_session": 17529,
+  "published": false,
+  "files": [
+    {
+      "bytes": 784,
+      "path": "dist/index.html",
+      "sha256": "9b4750360340f24728c5d8cfe68e188fa54fcaad58dc917c17651e0f2066a263"
+    },
+    {
+      "bytes": 99968,
+      "path": "extension-host/dist/host.js",
+      "sha256": "59aba2b5ca6fea94b9ffc83eee5d62db18bcb145767c89301c420dec3956a416"
+    },
+    {
+      "bytes": 86616,
+      "path": "extension-host/dist/smoke.js",
+      "sha256": "b1bcca9eea59524f5f49d97a4269b12b8693b7b9c6e4a9e34516fcc824669f59"
+    },
+    {
+      "bytes": 37,
+      "path": "target/upgrade-local-build.json",
+      "sha256": "2e1084e26beacf45f4c53c092fc210cbc5df903891bba267c1bfce2a09d8e2dd"
+    },
+    {
+      "bytes": 82494,
+      "path": "docs/upgrade/evidence/AZ-064-current-source-snapshot.json",
+      "sha256": "3fc3aa5cd1ba6fdc33f3deeff1f37889cd26f555b0269281d4b702c4e96ed0b7"
+    }
+  ],
+  "purpose": "Local candidate build inputs, not installer provenance proof",
+  "installed": false
+}

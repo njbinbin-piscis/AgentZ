@@ -1,0 +1,13 @@
+{
+  "source_snapshot": "docs/upgrade/evidence/AZ-064-next-source-snapshot.json",
+  "build_exit_code": 0,
+  "published": false,
+  "release_ready": false,
+  "sha256": "d0844c488dbfaedced4aaa1019774293807903c2317f67f9438a8712d1a3395e",
+  "build_session": 66034,
+  "bytes": 98687336,
+  "installed": false,
+  "path": "C:\\Projects\\AgentZ\\target\\release\\candidate-0.9.7-20261009\\AgentZ_0.9.7_x64-setup.exe",
+  "build_inputs": "docs/upgrade/evidence/AZ-064-next-build-inputs.json",
+  "signature_status": "NotSigned"
+}

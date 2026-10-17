@@ -1,0 +1,9 @@
+# AZ-018 当前任务运行身份只读发现
+
+独占修改task-state/run.rs，新增current_task_run(task_id,environment_id)→Option<Run>，不改库schema、状态、mod/Cargo/台账。host负责fresh task/env授权，不从renderer环境猜identity。
+
+先校验identity并调用has_active_task验证同task所有Run/Attempt一致（bool忽略，不拒live），再按匹配task+当前freshenv过滤，以rowid DESC选择最新创建Run，复用load返回其当前attempt。mutable updated_ms不作为创建顺序。missingtask及不存在env匹配合法None；同task历史腐败即使查询别的env也错误，不repair。
+
+新增2真实SQLite夹具未运行：旧Runterminal→新Runterminal→retry验证最新Run和当前attempt；人为增旧Runupdated_ms不会改创建顺序；同task另一env匹配选择及missingtask/env返回None；readonly重开前后DB bytes不变；validenum不一致delivery在当前/另一env查询均拒，bytes不变。
+
+实际rustfmt与限定diff-check exit0，无Cargo。host入口发现服务/IPC/前端重新加载另包，未称GUI重启恢复通过。查询跨两次read（activity校验与identity选择）不是写事务或权限锁；caller环境租约与生产gate负责环境稳定，查询不启动或恢复副作用。

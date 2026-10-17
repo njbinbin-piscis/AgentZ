@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-040",
+    "verified_state": "current_session_approval_and_latest_tool_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "CodeZ input context derives awaiting-approval status from a permission request filtered to the current session and clears stale cards on project/session switch and turn completion or cancellation. A bounded latest-action label reads only the current session's tool name and running/done/error status, with no tool payload. The current-source summary/budget/details suite passes 18/18; typecheck and targeted ESLint pass with three existing hook warnings. Native approval and five representative user journeys were not run.",
+    "conclusion_proposal": "Keep preparing until representative walkthroughs and native GUI acceptance are completed.",
+    "next_action": "Perform five representative walkthroughs and native approval/first-run journeys; independently review the current source.",
+    "remaining_work": ["Five representative user walkthroughs", "Native GUI approval and first-run acceptance", "Independent current-source review"],
+    "verification_gaps": ["No native approval journey", "No five-user walkthrough record", "Current AssistantPanel change not independently reviewed"],
+    "evidence": ["docs/upgrade/evidence/AZ-040-execution.md"]
+  }
+]

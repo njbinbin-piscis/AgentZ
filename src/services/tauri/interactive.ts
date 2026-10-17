@@ -9,6 +9,10 @@ export function respondInteractiveUi(
 }
 
 /** Resolve a pending shell/file-write confirmation from the Agent harness. */
-export function respondPermissionRequest(requestId: string, approved: boolean): Promise<void> {
-  return invoke<void>("respond_permission_request", { requestId, approved });
+export function respondPermissionRequest(requestId: string, approved: boolean, expectedDigest?: string): Promise<void> {
+  return invoke<void>("respond_permission_request", { requestId, approved, expectedDigest });
+}
+
+export function getPermissionPreview(requestId: string): Promise<import("../../components/chat/PermissionCard").PermissionRequestCard> {
+  return invoke("get_permission_preview", { requestId });
 }

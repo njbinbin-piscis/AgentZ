@@ -1,0 +1,13 @@
+# AZ048 marker reparse follow-up independent review
+
+2026-10-11. Reviewer: Codex current_source_review. Read-only inspection of the corrected module and current lib fingerprint. Historical AZ-048-directory-independent-review.md preserves the pre-fix finding. No source, ledger or pinned evidence edited; no Cargo/native/GUI execution by reviewer. Root's final targeted Cargo53801 remains pending at request, so the earlier one-test pass does not validate these exact final bytes.
+
+Current raw SHA256:
+- crates/agentz-task-state/src/projectless.rs: 6059245cc488d14c77807d4bba89937a9057c1b5181e765fc566e30dd9a69682
+- crates/agentz-task-state/src/lib.rs: ba73a74324b07960b853780e797af76d34929047c03f9008505385e0fb2acc73
+
+The reported marker deficiency is closed in inspected source. Following the regular-file/nonsymlink/exact-length metadata check, the Windows-specific block imports MetadataExt and rejects marker.file_attributes() & 0x400 != 0 before read_to_string. This mirrors explicit directory reparse refusal and includes non-symlink reparse files. Formatting does not itself prove behavior; this conclusion is from the actual conditional and ordering. The existing filesystem fixture does not create a Windows reparse marker, so native reparse-case rejection is source-inspected rather than dynamically demonstrated.
+
+The limited create/reopen primitive is reviewable after owner obtains exact-source targeted verification: it uses a dedicated caller-owned root and UUID-shaped path, refuses existing creation, preserves artifacts/no Git initialization, verifies current marker contents and avoids implicit deletion/recovery. lib export hash is unchanged from the prior review, and its limited no-initialization export conclusion remains applicable. Upstream fingerprint refresh must preserve prior scopes/history; entire historical lib byte equivalence is not established.
+
+Trust constraints remain mandatory: caller selects genuinely application-owned root/authoritative ID and excludes untrusted concurrent mutation. Ancestor root reparse/symlink replacement, metadata/canonicalization/read/create TOCTOU, hardlink marker substitution and replacement-file read allocation are not resolved. No same-handle identity, unforgeable ownership, durable filesystem object identity, directory crash durability or transactional task-registration guarantee exists. Partial creation can retain orphan directories/markers and later create fails rather than adopting them. Host is not connected; this adds no IPC authority, execution permission, task routing, GUI behavior or complete AZ048 acceptance. No remaining blocker was found for this explicitly trusted-root, cooperative-use domain slice; hostile-root safety and native integration remain separate unfinished work.

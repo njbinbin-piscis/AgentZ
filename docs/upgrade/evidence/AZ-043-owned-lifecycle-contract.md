@@ -1,0 +1,11 @@
+# AZ043 owned DAP 生命周期实现契约
+
+2026-10-10。主实现为同一调试生命周期候选，正式AZ036/M1/原生调试Gate未完成，preparing仅消费经复核上游限定接口。
+
+客户端在监听/启动前生成唯一UUID sessionId；dap_start返回running与session_id，所有agentz:dap消息/日志/退出payload必须携带session_id。dap_send/dap_stop只操作明确匹配当前会话，旧停止不得影响替代会话。宿主启动先reserve代际与会话，异步remote/spawn后仅在仍归属时安装进程；过期自有进程撤销，事件仍需代际/会话核对。UUID用于关联与所有权，不作为新增用户权限授权。
+
+客户端pending request设有界期限，send失败/exit/dispose清timer与pending，listen/connect迟到返回必须解绑，绝不发无身份stop。Controller始终捕获localclient/start epoch及pause观察revision，Stop同步撤销UI归属再有界best-effort disconnect/dispose；旧start失败/EOF/stack/变量不得改变新会话。只有step响应成功或实际continued才切running；配置支持按真实capability，initialized期限失败不可假成功。
+
+宿主Content-Length解析有header/body界限、checked arithmetic、明确协议错误；失败只结束同归属adapter，不自动retry。固定当前project/remote上下文；不把原全局project变化重绑定旧session。完整项目切换调试清理、异常断点、文件源导航、真实适配器安装/launch/step/exception/stop录屏仍另验，node --stdio placeholder不算可用Node调试器。
+
+分工：ssh_audit独占dap.rs/新dap_frame；parallel_plan独占dapClient及fixture；remote_tests独占controller/store及fixture；Root协调契约、独立审查、合并验证与台账，只有Root启动单一Cargo验证。当前没有运行构建或真实adapter旅程，不将本契约算作实施交付。

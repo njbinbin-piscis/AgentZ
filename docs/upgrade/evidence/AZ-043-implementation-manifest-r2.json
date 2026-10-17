@@ -1,0 +1,50 @@
+{
+  "task": "AZ-043",
+  "generated": "2026-10-11T12:27:15.162Z",
+  "files": [
+    {
+      "path": "src-tauri/src/commands/dap.rs",
+      "sha256": "09e37361914cbdda3dc8c1d21e31927fc44e5498b829eb78c55926b2265ca899"
+    },
+    {
+      "path": "src-tauri/src/commands/dap_frame.rs",
+      "sha256": "35ac101ac0035f66ce7c1a0f145132a5c34298ed8dca0ed65d8870a9c9eac1ea"
+    },
+    {
+      "path": "src/extensions/debug/dapClient.ts",
+      "sha256": "acb362b4ddbea5cf7eb8af2707463ae0897ae4109e7da896cb4f6b0fc904d509"
+    },
+    {
+      "path": "src/extensions/debug/dapClient.test.ts",
+      "sha256": "f5dd7872dc2c8bef200daef4447522a38e9c505f6897deb25128e4c8c403e7d3"
+    },
+    {
+      "path": "src/extensions/debug/debugController.ts",
+      "sha256": "d7c93510179793583a3fc1f00dd8d99176e47a4a6efb18f3f8bbca6cdc82652e"
+    },
+    {
+      "path": "src/extensions/debug/debugController.test.ts",
+      "sha256": "a65cacf555eda3c0873e300701ca3ef96de9c62a9db3cb45e0cf478060fca610"
+    },
+    {
+      "path": "src/extensions/debug/debugStore.ts",
+      "sha256": "e4d581446d5d9a961ae6b65f9887cd986d7511540ffe45a066e043aa29ffffc6"
+    },
+    {
+      "path": "src/extensions/ui/ExtensionHostProvider.tsx",
+      "sha256": "68fc8f1e68e1a0edc67e7f55722961a0452662aceeb4a6450745d3e86353ef57"
+    },
+    {
+      "path": "src/extensions/ui/DebugView.tsx",
+      "sha256": "bb4255dee2635a499088314217a70d423d301b5a08eb80165d9173ecfff4652a"
+    },
+    {
+      "path": "src/extensions/ui/DebugView.test.tsx",
+      "sha256": "13c9c70326dc300750bc75299eb22a000689d53fcd458d32def0ef9794462c61"
+    },
+    {
+      "path": "src/extensions/ui/extensions.css",
+      "sha256": "cf427cb775e60ad67c17dd3af49f7ca82407a6ae6d70cb807d20a4036b1e22c7"
+    }
+  ]
+}

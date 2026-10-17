@@ -1,0 +1,15 @@
+# AZ036 live project-navigation preflight review
+
+2026-10-09. Independent read-only review of App.tsx and CodeZ snapshot getter plus workspaceNavigation helper. Root38904 unified frontend verification underway; host5 passed reported by root. No test/build/GUI run by this reviewer.
+
+No blocking defect identified in this limited project-switch preflight wiring. CodeZ registers a synchronous getter reading tabsRef/current activeTabPathRef and clears it on unmount; App does not rely on the debounced editor patch for dirty detection. Missing getter fails closed. switchProject serializes navigation, retains same-project no-op semantics, invokes non-destructive dirty/terminal-confirmation/strict workspaceSave checks, and only then destroys terminals/revokes old scope/commits project. Helper checks captured project and live snapshot after confirmation/save awaits. App repeats project/editor snapshot comparison after terminal cleanup and after scope revocation; false/exception leaves CodeZ mode unchanged through the prior result guard.
+
+Compared with old switch behavior: unsaved editor buffers now refuse switching instead of being lost by the project-change tab reset; failed workspaceSave is no longer swallowed; cancelled terminal confirmation does not destroy terminals. Snapshot getter avoids a debounce stale-buffer window. Dirty edits or editor-tab changes during preflight/cleanup cause abort rather than publishing a changed project. It does not implement automatic save/discard choice or full same-task worktree routing.
+
+Limits and new observable outcomes: cleanup and revoke are irreversible side effects within this flow, not transaction rollback. A stale response after terminal destruction can retain tabs/project while terminals already exited. A stale response after scope revocation can retain project/tabs while old scope is revoked and needs ordinary re-acquisition. Wiki/chat element state may already be cleared before that final abort. These conservative aborts must not be described as restoring every old workspace resource. Scope/backend native cleanup errors remain bounded by their existing APIs, not proven OS process termination here.
+
+Current snapshot compares editor/project and captured layout values; a callback holds its captured React layout values while awaiting. Do not generalize this into atomic validation of every UI layout update, filesystem write or external buffer mutation. The requirement delivered here is project-switch dirty/tab preservation with a live editor getter. closeProject still follows its separate existing path and is not covered by this package; GUI save/cancel/terminal prompts, native cleanup and actual race interaction remain unverified. All helper fixtures source-level only unless root explicitly records execution.
+
+Shared App/CodeZ pins require parent independent review refresh; prior hashes cannot silently persist. Fingerprints:
+- src/App.tsx: 78108b917bd57260d17df5f58a9fecc2a71a2e6431dfb9469b86eac1dbb8f3d5
+- src/workspaces/codez/index.tsx: decf3e4f31340dec9a392ed4cb87a8791fe80a8b7709eb7d21704d82f75756eb

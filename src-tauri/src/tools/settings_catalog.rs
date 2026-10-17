@@ -28,7 +28,10 @@ impl Tier {
 const FREE: &[(&str, &str)] = &[
     ("language", "UI / reply language, e.g. zh or en"),
     ("enable_streaming", "Stream model output"),
-    ("temperature", "Sampling temperature 0..2 (null = provider default)"),
+    (
+        "temperature",
+        "Sampling temperature 0..2 (null = provider default)",
+    ),
     ("top_p", "Nucleus sampling 0..1 (null = provider default)"),
     ("thinking", "Enable model thinking mode (null = default)"),
     ("max_tokens", "Max output tokens per reply"),
@@ -36,9 +39,18 @@ const FREE: &[(&str, &str)] = &[
     ("browser_headless", "Run the automation browser headless"),
     ("vision_enabled", "Allow image understanding"),
     ("vision_use_main_llm", "Use the main model for vision"),
-    ("summary_model", "Model used for summaries (null = main model)"),
-    ("project_instruction_budget_chars", "Budget for project instruction files"),
-    ("enable_project_instructions", "Load project instruction files"),
+    (
+        "summary_model",
+        "Model used for summaries (null = main model)",
+    ),
+    (
+        "project_instruction_budget_chars",
+        "Budget for project instruction files",
+    ),
+    (
+        "enable_project_instructions",
+        "Load project instruction files",
+    ),
     ("llm_read_timeout_secs", "LLM read timeout in seconds"),
     ("koi_timeout_secs", "Sub-agent task timeout in seconds"),
     ("heartbeat_enabled", "Enable the periodic heartbeat"),
@@ -47,26 +59,50 @@ const FREE: &[(&str, &str)] = &[
 ];
 
 const PRIVILEGED: &[(&str, &str)] = &[
-    ("policy_mode", "Tool policy profile: strict | balanced | dev"),
-    ("confirm_shell_commands", "Ask before running shell commands"),
+    (
+        "policy_mode",
+        "Tool policy profile: strict | balanced | dev",
+    ),
+    (
+        "confirm_shell_commands",
+        "Ask before running shell commands",
+    ),
     ("confirm_file_writes", "Ask before writing files"),
-    ("allow_outside_workspace", "Allow file access outside the workspace"),
+    (
+        "allow_outside_workspace",
+        "Allow file access outside the workspace",
+    ),
     ("tool_rate_limit_per_minute", "Tool calls per minute limit"),
     ("workspace_root", "Default working directory"),
     ("provider", "Default model provider"),
     ("model", "Default model name"),
     ("custom_base_url", "Custom API base URL"),
     ("fallback_models", "Ordered fallback model list"),
-    ("llm_providers", "Configured model providers (merged by id; API keys are never exposed)"),
+    (
+        "llm_providers",
+        "Configured model providers (merged by id; API keys are never exposed)",
+    ),
     ("mcp_servers", "MCP server definitions (merged by name)"),
     ("max_iterations", "Max agent loop iterations per turn"),
-    ("auto_compact_input_tokens_threshold", "Auto-compaction input token threshold"),
-    ("compaction_micro_percent", "Micro compaction trigger percent"),
+    (
+        "auto_compact_input_tokens_threshold",
+        "Auto-compaction input token threshold",
+    ),
+    (
+        "compaction_micro_percent",
+        "Micro compaction trigger percent",
+    ),
     ("compaction_auto_percent", "Auto compaction trigger percent"),
     ("compaction_full_percent", "Full compaction trigger percent"),
-    ("max_tool_result_tokens", "Max tokens kept from one tool result"),
+    (
+        "max_tool_result_tokens",
+        "Max tokens kept from one tool result",
+    ),
     ("skill_evolution", "Skill self-evolution settings object"),
-    ("piscis_personal_prompt", "Custom instructions (use append_instructions)"),
+    (
+        "piscis_personal_prompt",
+        "Custom instructions (use append_instructions)",
+    ),
 ];
 
 const SECRET_HINTS: &[&str] = &["api_key", "secret", "token", "password", "private_key"];
@@ -166,10 +202,14 @@ pub fn find_secret_write(patch: &Value, path: &str) -> Option<String> {
     match patch {
         Value::Object(map) => {
             for (k, v) in map {
-                let p = if path.is_empty() { k.clone() } else { format!("{path}.{k}") };
+                let p = if path.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{path}.{k}")
+                };
                 if is_secret_key(k) {
-                    let benign = matches!(v, Value::String(s) if s.is_empty() || s == "***")
-                        || v.is_null();
+                    let benign =
+                        matches!(v, Value::String(s) if s.is_empty() || s == "***") || v.is_null();
                     if !benign {
                         return Some(p);
                     }
@@ -237,14 +277,27 @@ pub fn diff(path: &str, old: &Value, new: &Value, out: &mut Vec<Value>) {
     if old == new {
         return;
     }
+    if path == "mcp_servers" || path.ends_with(".mcp_servers") {
+        out.push(json!({ "path": path, "old": mask_subtree(old), "new": mask_subtree(new) }));
+        return;
+    }
     match (old, new) {
         (Value::Object(o), Value::Object(n)) => {
             let mut keys: Vec<&String> = o.keys().chain(n.keys()).collect();
             keys.sort();
             keys.dedup();
             for k in keys {
-                let p = if path.is_empty() { k.clone() } else { format!("{path}.{k}") };
-                diff(&p, o.get(k).unwrap_or(&Value::Null), n.get(k).unwrap_or(&Value::Null), out);
+                let p = if path.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{path}.{k}")
+                };
+                diff(
+                    &p,
+                    o.get(k).unwrap_or(&Value::Null),
+                    n.get(k).unwrap_or(&Value::Null),
+                    out,
+                );
             }
         }
         (Value::Array(o), Value::Array(n)) if keyed(o) && keyed(n) => {
@@ -262,7 +315,10 @@ pub fn diff(path: &str, old: &Value, new: &Value, out: &mut Vec<Value>) {
             }
         }
         _ => {
-            let leaf = path.rsplit(['.', ']']).find(|s| !s.is_empty()).unwrap_or(path);
+            let leaf = path
+                .rsplit(['.', ']'])
+                .find(|s| !s.is_empty())
+                .unwrap_or(path);
             let (o, n) = if is_secret_key(leaf) {
                 (mask(old), mask(new))
             } else {
@@ -277,6 +333,14 @@ fn mask(v: &Value) -> Value {
     match v {
         Value::String(s) if !s.is_empty() => json!("***"),
         other => other.clone(),
+    }
+}
+
+fn mask_subtree(v: &Value) -> Value {
+    if v.is_null() {
+        Value::Null
+    } else {
+        json!("***")
     }
 }
 
@@ -306,7 +370,10 @@ mod tests {
     #[test]
     fn secrets_in_patch() {
         let bad = json!({"llm_providers":[{"id":"a","api_key":"sk-1"}]});
-        assert_eq!(find_secret_write(&bad, "").as_deref(), Some("llm_providers[0].api_key"));
+        assert_eq!(
+            find_secret_write(&bad, "").as_deref(),
+            Some("llm_providers[0].api_key")
+        );
         let ok = json!({"llm_providers":[{"id":"a","api_key":"***","model":"m"}]});
         assert!(find_secret_write(&ok, "").is_none());
         let mut stripped = ok.clone();
@@ -319,7 +386,10 @@ mod tests {
         let mut base = json!({"llm_providers":[
             {"id":"a","api_key":"k1","model":"x"},
             {"id":"b","api_key":"k2","model":"y"}]});
-        merge(&mut base, &json!({"llm_providers":[{"id":"a","model":"z"}]}));
+        merge(
+            &mut base,
+            &json!({"llm_providers":[{"id":"a","model":"z"}]}),
+        );
         assert_eq!(base["llm_providers"][0]["api_key"], "k1");
         assert_eq!(base["llm_providers"][0]["model"], "z");
         assert_eq!(base["llm_providers"][1]["model"], "y");
@@ -328,9 +398,29 @@ mod tests {
     #[test]
     fn diff_masks_secrets() {
         let mut out = vec![];
-        diff("", &json!({"a":{"api_key":"k1","m":1}}), &json!({"a":{"api_key":"k2","m":2}}), &mut out);
+        diff(
+            "",
+            &json!({"a":{"api_key":"k1","m":1}}),
+            &json!({"a":{"api_key":"k2","m":2}}),
+            &mut out,
+        );
         assert_eq!(out.len(), 2);
         let key = out.iter().find(|d| d["path"] == "a.api_key").unwrap();
         assert_eq!(key["old"], "***");
+    }
+
+    #[test]
+    fn secret_diff_masks_entire_mcp_subtree() {
+        let marker = "AZ031_MCP_DIFF_SYNTHETIC_SECRET";
+        let mut out = vec![];
+        diff(
+            "",
+            &json!({"mcp_servers":[{"name":"old","args":[marker]}]}),
+            &json!({"mcp_servers":[{"name":"new","url":marker}]}),
+            &mut out,
+        );
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0]["path"], "mcp_servers");
+        assert!(!serde_json::to_string(&out).unwrap().contains(marker));
     }
 }

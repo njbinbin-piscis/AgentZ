@@ -1,0 +1,20 @@
+{
+  "files": [
+    {
+      "path": "crates/agentz-task-state/src/projectless.rs",
+      "sha256": "ddbf3bde9db44e44285fecb679a90e43e55100983a2eee4529cd4bc0e84ae5a8"
+    },
+    {
+      "path": "crates/agentz-task-state/src/lib.rs",
+      "sha256": "ba73a74324b07960b853780e797af76d34929047c03f9008505385e0fb2acc73"
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "sha256": "4243052cf2eef1bd3ee40f00f5f5e13636d78c320312f80e0c5a31ff2ed7b9fd"
+    },
+    {
+      "path": "src-tauri/src/commands/project_scope.rs",
+      "sha256": "32a6e004386212e354f5c5115b28243d6676435314bc7b6c4af1c6809b8f673b"
+    }
+  ]
+}

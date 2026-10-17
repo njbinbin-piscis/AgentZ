@@ -1,0 +1,2 @@
+PASS: dependency/gate guards, legal transitions, completion evidence, atomic rejection, immutable completion, follow-up additions and cycle rejection; explicit independent source-pinned candidate reviews, stale-source rejection/refresh, no recursive exemptions and unchanged done/Gate counts; canonical plan unchanged
+Isolated fixture retained: C:\Users\zzz\AppData\Local\Temp\agentz-plan-check-pNnZAj

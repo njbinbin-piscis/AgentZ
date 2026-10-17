@@ -1,0 +1,5 @@
+# Checklist
+
+- [ ] Owner: Ada
+- [ ] Deadline: Friday
+- [ ] Deliverable: draft

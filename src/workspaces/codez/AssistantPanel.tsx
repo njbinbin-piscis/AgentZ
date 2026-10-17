@@ -6,6 +6,8 @@ import {
   onChatEvent,
   listSessions,
   SESSION_SOURCE_CODEZ,
+  SESSION_SOURCES_PROJECT_SHARED,
+  isReadOnlyInCodeZ,
   getMessagesPage,
   forkSession,
   deleteSession,
@@ -53,7 +55,15 @@ import ContextUsageRing, { type ContextUsageSnapshot } from "../../components/Co
 import { formatUserMessageDisplay } from "../../components/chatFileRefs";
 import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import AssistantMessageList from "./AssistantMessageList";
-import TaskPanel, { mergePlanItems, parsePlanFromToolInput } from "../../components/TaskPanel";
+import TaskPanel from "../../components/TaskPanel";
+import DurablePlanActions from "./DurablePlanActions";
+import RunHistoryPanel from "./RunHistoryPanel";
+import TaskDetailsPanel from "./TaskDetailsPanel";
+import InputContextSummary from "../../components/chat/InputContextSummary";
+import DeliveryReviewPanel from "./DeliveryReviewPanel";
+import TaskArtifactViewer from "./TaskArtifactViewer";
+import type { ArtifactText } from "../../services/tauri/taskArtifacts";
+import type { DurablePlan } from "../../services/tauri/chatPlan";
 import {
   truncateToolResultForUi,
   upsertToolStep,
@@ -69,8 +79,21 @@ import {
   promptPreview,
 } from "../../utils/composerDebug";
 import { useProjectEdgeActions } from "../../contexts/ProjectEdgeContext";
+import { useProjectScope } from "../../services/tauri/projectScope";
 import { collectArtifactsFromToolSteps, pathFromToolEvent } from "../workz/agentArtifacts";
 import "./AssistantPanel.css";
+import FirstRunChecklist from "./FirstRunChecklist";
+import {
+  OPEN_SETTINGS_EVENT,
+  SETTINGS_CLOSED_EVENT,
+  hasFirstTaskDone,
+  firstTaskFailureHint,
+  isLlmSetupFailure,
+  markFirstTaskDone,
+  requestOpenSettings,
+} from "./firstRun";
+import { OPEN_CODEZ_SESSION_EVENT, sameProjectPath, type OpenCodezSessionDetail } from "./sessionRoute";
+import { isConfigured } from "../../services/tauri/settings";
 
 interface ChatMessage {
   id?: string;
@@ -105,6 +128,7 @@ function messageFromDto(m: MessageDto): ChatMessage {
 
 interface AssistantPanelProps {
   projectDir: string | null;
+  onOpenFolder: () => void;
   /** External request to insert @file references into the composer. */
   insertRequest?: { paths: string[]; nonce: number } | null;
   /** External request to add a picked browser element chip to the composer. */
@@ -120,7 +144,9 @@ interface AssistantPanelProps {
 interface QueuedTurn {
   text: string;
   attachment: ChatAttachment | null;
-  clearPlan: boolean;
+  artifactRef?: { artifact_id: string; version: number; payload_sha256: string; expected_binding: ArtifactText["scope"] };
+  artifactScopeHandle?: string;
+  clearPlan: false;
   /** Bubble label when it differs from the model-facing prompt (auto-resume). */
   displayText?: string;
 }
@@ -193,6 +219,7 @@ interface MentionState {
 
 export default function AssistantPanel({
   projectDir,
+  onOpenFolder,
   insertRequest,
   insertElementRequest,
   insertTerminalRequest,
@@ -200,6 +227,7 @@ export default function AssistantPanel({
   onAttachRequestHandled,
 }: AssistantPanelProps) {
   const { t, i18n } = useTranslation();
+  const artifactScope = useProjectScope(projectDir);
   const {
     setPendingReview,
     setArtifacts,
@@ -210,12 +238,40 @@ export default function AssistantPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [turnDiffsByTurnId, setTurnDiffsByTurnId] = useState<Record<string, JournalFileDiff[]>>({});
   const [input, setInput] = useState("");
+  const [pendingArtifact, setPendingArtifact] = useState<{
+    project: string; session: string; reference: NonNullable<QueuedTurn["artifactRef"]>;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // True when the current error is a model-setup problem (key missing/rejected); shows a Settings action.
+  const [setupError, setSetupError] = useState(false);
+  const [firstTaskDone, setFirstTaskDone] = useState(() => hasFirstTaskDone());
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const refreshConfigured = useCallback(() => {
+    isConfigured()
+      .then((value) => setConfigured(value))
+      .catch(() => setConfigured(null));
+  }, []);
+  useEffect(() => {
+    refreshConfigured();
+  }, [refreshConfigured]);
+  // Settings can change the API key from anywhere (first-run action, menu, panel button);
+  // re-read the setup state whenever that panel is opened or closed.
+  useEffect(() => {
+    window.addEventListener(SETTINGS_CLOSED_EVENT, refreshConfigured);
+    window.addEventListener(OPEN_SETTINGS_EVENT, refreshConfigured);
+    return () => {
+      window.removeEventListener(SETTINGS_CLOSED_EVENT, refreshConfigured);
+      window.removeEventListener(OPEN_SETTINGS_EVENT, refreshConfigured);
+    };
+  }, [refreshConfigured]);
   const [queuedView, setQueuedView] = useState<string[]>([]);
+  const [artifactViewKey, setArtifactViewKey] = useState<string | null>(null);
   const [files, setFiles] = useState<string[]>([]);
   const [mention, setMention] = useState<MentionState | null>(null);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  // WorkZ team sessions are visible here but cannot be continued from CodeZ.
+  const [sessionReadOnly, setSessionReadOnly] = useState(false);
   const [showSessions, setShowSessions] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>(() => {
     const saved = localStorage.getItem("agentz-chat-mode");
@@ -226,6 +282,13 @@ export default function AssistantPanel({
   const inputHistory = useInputHistory("agentz-input-history-codez");
   const [toast, setToast] = useState<string | null>(null);
   const [planItems, setPlanItems] = useState<PlanTodoItem[]>([]);
+  const applyPersistedPlan = useCallback((plan: DurablePlan) => {
+    setPlanItems(plan.status === "cancelled" || plan.status === "replaced" ? [] : plan.items.map((item) => ({
+      id: item.id,
+      content: item.description,
+      status: item.state === "done" ? "completed" : item.state,
+    })));
+  }, []);
   const [toolSteps, setToolSteps] = useState<ToolTraceItem[]>([]);
   const [taskPanelOpen, setTaskPanelOpen] = useState(false);
   const [modeNotice, setModeNotice] = useState<string | null>(null);
@@ -253,8 +316,6 @@ export default function AssistantPanel({
   const sessionRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   busyRef.current = busy;
-  const projectDirRef = useRef(projectDir);
-  projectDirRef.current = projectDir;
   const streamPendingRef = useRef("");
   /** Total chars streamed into the in-flight assistant message (incl. unflushed). */
   const streamLenRef = useRef(0);
@@ -324,6 +385,10 @@ export default function AssistantPanel({
 
   useEffect(() => {
     sessionRef.current = null;
+    setSessionReadOnly(false);
+    setPermissionRequest(null);
+    setArtifactViewKey(null);
+    setPendingArtifact(null);
     historyCursorRef.current = { sessionId: "", offset: 0 };
     setHasMoreOlder(false);
     queueRef.current = [];
@@ -517,6 +582,8 @@ export default function AssistantPanel({
       // Terminal events must be handled even if `busy` state hasn't committed yet
       // (React batches setState; the backend can finish before re-render).
       if (env.channel === "agent_final") {
+        // Another conversation's turn ending must not resume or error this one.
+        if (env.sessionId && env.sessionId !== sessionRef.current) return;
         const fin = env.payload as {
           ok: boolean;
           error?: string;
@@ -556,19 +623,9 @@ export default function AssistantPanel({
         return;
       }
       if (env.channel !== "agent_event") return;
-      // A turn that errors never returns its session id from `chatSend`; adopt it
-      // from the event stream so the next message continues the same session
-      // instead of silently starting a new one (which made the old work vanish).
-      if (
-        busyRef.current &&
-        !sessionRef.current &&
-        env.sessionId &&
-        !env.sessionId.startsWith("koi_task_")
-      ) {
-        sessionRef.current = env.sessionId;
-        rememberLastSession(projectDirRef.current, env.sessionId);
-        historyCursorRef.current = { sessionId: env.sessionId, offset: 0 };
-      }
+      // The channel carries every session (WordZ, Koi members, background runs).
+      // Only this panel's conversation may touch its cards and transcript.
+      if (!env.sessionId || env.sessionId !== sessionRef.current) return;
       const evt = env.payload as AgentEvent;
 
       if (evt.type === "error") {
@@ -581,6 +638,7 @@ export default function AssistantPanel({
           toolName: evt.tool_name,
           toolInput: evt.tool_input,
           description: evt.description,
+          approval: evt.approval,
         });
         return;
       }
@@ -595,6 +653,7 @@ export default function AssistantPanel({
         evt.type === "done" ||
         evt.type === "cancelled"
       ) {
+        if (evt.type === "done" || evt.type === "cancelled") setPermissionRequest(null);
         handleAgentEvent(evt);
         return;
       }
@@ -609,13 +668,6 @@ export default function AssistantPanel({
           }
           break;
         case "tool_start":
-          if (evt.name === "plan_todo") {
-            const updates = parsePlanFromToolInput(evt.input);
-            if (updates.length > 0) {
-              const merge = Boolean((evt.input as { merge?: boolean })?.merge);
-              setPlanItems((prev) => (merge ? mergePlanItems(prev, updates) : updates));
-            }
-          }
           setToolSteps((prev) => upsertToolStep(prev, evt, streamLenRef.current));
           break;
         case "tool_end": {
@@ -743,6 +795,8 @@ export default function AssistantPanel({
       sessionId: sessionRef.current,
     });
     setError(null);
+    setSetupError(false);
+    refreshConfigured();
     const displayText =
       turn.displayText ??
       (turn.attachment && !turn.text.trim()
@@ -758,7 +812,13 @@ export default function AssistantPanel({
     ]);
     streamLenRef.current = 0;
     setToolSteps([]);
-    if (turn.clearPlan) setPlanItems([]);
+    // Fix the session id before the turn starts (the backend honours a
+    // client-provided id). The kernel event channel is shared by every panel
+    // and background run, so events are matched against this id from the very
+    // first event; adopting whichever session's event arrived first let other
+    // conversations' interactive cards and text leak into this one.
+    const turnSessionId = sessionRef.current ?? crypto.randomUUID();
+    sessionRef.current = turnSessionId;
     busyRef.current = true;
     setBusy(true);
     try {
@@ -766,12 +826,14 @@ export default function AssistantPanel({
       const res = await chatSend({
         prompt: turn.text,
         displayPrompt: displayText,
-        sessionId: sessionRef.current,
+        artifactRef: turn.artifactRef,
+        artifactScopeHandle: turn.artifactScopeHandle,
+        sessionId: turnSessionId,
         projectDir: projectDir!,
         attachment: turn.attachment,
         chatMode,
         modelId: modelId || null,
-        clearPlan: turn.clearPlan,
+        clearPlan: false,
         enabledSkills: enabledSkills.length > 0 ? enabledSkills : null,
         agentId: activeAgent || null,
         sessionSource: SESSION_SOURCE_CODEZ,
@@ -784,6 +846,9 @@ export default function AssistantPanel({
       });
       sessionRef.current = res.session_id;
       rememberLastSession(projectDir, res.session_id);
+      // A turn that completed without error is the first successful task.
+      markFirstTaskDone();
+      setFirstTaskDone(true);
       const turnId = res.turn_id ?? undefined;
       setMessages((m) => {
         const copy = m.slice();
@@ -815,8 +880,10 @@ export default function AssistantPanel({
       composerDbg("runTurn ← chatSend error", { error: promptPreview(msg, 500) });
       if (msg.includes("402") || msg.toLowerCase().includes("insufficient_balance")) {
         setError(t("chat.llmBalanceError"));
+        setSetupError(true);
       } else {
         setError(msg);
+        setSetupError(isLlmSetupFailure(msg));
       }
     } finally {
       busyRef.current = false;
@@ -831,7 +898,7 @@ export default function AssistantPanel({
           // keep in-memory messages if reload fails
         }
         if (projectDir) {
-          listSessions(projectDir, [SESSION_SOURCE_CODEZ])
+          listSessions(projectDir, SESSION_SOURCES_PROJECT_SHARED)
             .then(setSessions)
             .catch(() => setSessions([]));
           scheduleWorkspaceRefresh({ git: true, fileTree: true, force: true, delayMs: 0 });
@@ -847,18 +914,22 @@ export default function AssistantPanel({
   };
 
   const doSend = useCallback(
-    (text: string, att: ChatAttachment | null, clearPlan: boolean) => {
+    (text: string, att: ChatAttachment | null, artifact?: QueuedTurn["artifactRef"], scopeHandle?: string) => {
       if (busy) {
-        queueRef.current.push({ text, attachment: att, clearPlan });
+        queueRef.current.push({ text, attachment: att, artifactRef: artifact, artifactScopeHandle: scopeHandle, clearPlan: false });
         setQueuedView(queuedLabels(queueRef.current));
       } else {
-        void runTurnRef.current({ text, attachment: att, clearPlan });
+        void runTurnRef.current({ text, attachment: att, artifactRef: artifact, artifactScopeHandle: scopeHandle, clearPlan: false });
       }
     },
     [busy],
   );
 
   const submit = useCallback(() => {
+    if (sessionReadOnly) {
+      setToast(t("chat.teamSessionReadOnly"));
+      return;
+    }
     const done = composerDbgMark("submit");
     composerDbg("submit click", {
       chips: chipsSnapshot(composerChips),
@@ -884,32 +955,38 @@ export default function AssistantPanel({
       done();
       return;
     }
+    const selectedArtifact = pendingArtifact?.project === projectDir && pendingArtifact.session === sessionRef.current
+      ? pendingArtifact.reference : undefined;
+    if (pendingArtifact && (!selectedArtifact || !artifactScope)) {
+      setError("Artifact scope changed; reopen the artifact before continuing.");
+      done();
+      return;
+    }
     composerDbg("submit → clear input & chips");
     clearComposer();
+    setPendingArtifact(null);
     // A fresh user request restarts the auto-resume budget.
     autoResumeRef.current = 0;
 
-    const preservePlan = planItems.some(
-      (item) => item.status === "pending" || item.status === "in_progress",
-    );
     inputHistory.push(text);
-    composerDbg("submit → doSend", { preservePlan });
-    // A follow-up is far more often an answer to an earlier question than a
-    // request to discard work. Keep active todos and let the harness decide
-    // whether the user explicitly starts a replacement task.
-    doSend(text, pendingAttachment, !preservePlan);
+    composerDbg("submit → doSend");
+    // Ordinary Send always continues the task; local projection cannot authorize replacement.
+    doSend(text, pendingAttachment, selectedArtifact, selectedArtifact ? artifactScope?.handle : undefined);
     done();
   }, [
+    sessionReadOnly,
+    t,
     input,
     composerChips,
     projectDir,
-    planItems,
     doSend,
     inputHistory,
     t,
     busy,
     mention,
     clearComposer,
+    pendingArtifact,
+    artifactScope,
   ]);
 
   const onModeChange = useCallback(
@@ -943,7 +1020,7 @@ export default function AssistantPanel({
       setSessions([]);
       return;
     }
-    listSessions(projectDir, [SESSION_SOURCE_CODEZ])
+    listSessions(projectDir, SESSION_SOURCES_PROJECT_SHARED)
       .then(setSessions)
       .catch(() => setSessions([]));
   }, [projectDir]);
@@ -1003,7 +1080,11 @@ export default function AssistantPanel({
   }, [showSessions, refreshSessions]);
 
   const newSession = useCallback(() => {
+    setArtifactViewKey(null);
+    setPendingArtifact(null);
+    setPermissionRequest(null);
     sessionRef.current = null;
+    setSessionReadOnly(false);
     rememberLastSession(projectDir, null);
     historyCursorRef.current = { sessionId: "", offset: 0 };
     setHasMoreOlder(false);
@@ -1023,11 +1104,16 @@ export default function AssistantPanel({
   }, [projectDir, clearSessionArtifacts, clearCards]);
 
   const switchSession = useCallback(
-    async (id: string) => {
+    async (id: string, source?: string) => {
+      setArtifactViewKey(null);
+      setPendingArtifact(null);
+      setPermissionRequest(null);
       try {
         sessionRef.current = id;
+        setSessionReadOnly(isReadOnlyInCodeZ(source));
         rememberLastSession(projectDir, id);
         historyCursorRef.current = { sessionId: id, offset: 0 };
+        setPlanItems([]);
         setHasMoreOlder(false);
         setTurnDiffsByTurnId({});
         // A restored session opens on the newest message; older ones lazy-load
@@ -1040,7 +1126,6 @@ export default function AssistantPanel({
             if (el) el.scrollTop = el.scrollHeight;
           }),
         );
-        setPlanItems([]);
         setToolSteps([]);
         setError(null);
         setShowSessions(false);
@@ -1057,16 +1142,41 @@ export default function AssistantPanel({
   // After a restart, reopen the session that was active when the app closed.
   const switchSessionRef = useRef(switchSession);
   switchSessionRef.current = switchSession;
+  // WorkZ asks CodeZ to open one of the project's sessions. If the project is not current yet,
+  // hold the request and apply it when projectDir changes to the requested project.
+  const projectDirForRouteRef = useRef(projectDir);
+  projectDirForRouteRef.current = projectDir;
+  const pendingCodezOpenRef = useRef<OpenCodezSessionDetail | null>(null);
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const detail = (event as CustomEvent<OpenCodezSessionDetail>).detail;
+      if (!detail) return;
+      if (sameProjectPath(detail.projectDir, projectDirForRouteRef.current)) {
+        void switchSessionRef.current(detail.sessionId, detail.source ?? undefined);
+      } else {
+        pendingCodezOpenRef.current = detail;
+      }
+    };
+    window.addEventListener(OPEN_CODEZ_SESSION_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_CODEZ_SESSION_EVENT, onOpen);
+  }, []);
+  useEffect(() => {
+    const pending = pendingCodezOpenRef.current;
+    if (!pending || !sameProjectPath(pending.projectDir, projectDir)) return;
+    pendingCodezOpenRef.current = null;
+    void switchSessionRef.current(pending.sessionId, pending.source ?? undefined);
+  }, [projectDir]);
   useEffect(() => {
     if (!projectDir || sessionRef.current || busyRef.current) return;
     const lastId = readLastSession(projectDir);
     if (!lastId) return;
     let cancelled = false;
-    listSessions(projectDir, [SESSION_SOURCE_CODEZ])
+    listSessions(projectDir, SESSION_SOURCES_PROJECT_SHARED)
       .then((list) => {
         if (cancelled || sessionRef.current || busyRef.current) return;
-        if (list.some((s) => s.id === lastId)) {
-          void switchSessionRef.current(lastId);
+        const restored = list.find((s) => s.id === lastId);
+        if (restored) {
+          void switchSessionRef.current(lastId, restored.source);
         } else {
           rememberLastSession(projectDir, null);
         }
@@ -1083,7 +1193,7 @@ export default function AssistantPanel({
       try {
         const forked = await forkSession(sessionRef.current, projectDir!, undefined, messageId);
         refreshSessions();
-        await switchSession(forked.id);
+        await switchSession(forked.id, forked.source);
       } catch (e) {
         setError(String(e));
       }
@@ -1116,7 +1226,7 @@ export default function AssistantPanel({
     try {
       const forked = await forkSession(sessionRef.current, projectDir!);
       refreshSessions();
-      await switchSession(forked.id);
+      await switchSession(forked.id, forked.source);
     } catch (e) {
       setError(String(e));
     }
@@ -1226,7 +1336,7 @@ export default function AssistantPanel({
     [t],
   );
 
-  const canSend = Boolean(projectDir && (input.trim() || composerChips.length > 0));
+  const canSend = Boolean(projectDir && !sessionReadOnly && (input.trim() || composerChips.length > 0));
 
   const onInputChange = useCallback(
     (value: string, caret?: number) => {
@@ -1381,7 +1491,7 @@ export default function AssistantPanel({
             <div
               key={s.id}
               className={`agentz-session-row ${s.id === sessionRef.current ? "active" : ""}`}
-              onClick={() => void switchSession(s.id)}
+              onClick={() => void switchSession(s.id, s.source)}
             >
               <span className="agentz-session-title">{s.title || t("chat.untitled")}</span>
               <span className="agentz-session-count">{s.message_count}</span>
@@ -1406,6 +1516,27 @@ export default function AssistantPanel({
         open={taskPanelOpen}
         onOpenChange={setTaskPanelOpen}
       />
+      <DurablePlanActions projectDir={projectDir} sessionId={sessionRef.current}
+        busy={busy} onPlanChanged={applyPersistedPlan} />
+      <RunHistoryPanel projectDir={projectDir} sessionId={sessionRef.current} busy={busy} />
+      <TaskDetailsPanel projectDir={projectDir} sessionId={sessionRef.current} busy={busy} />
+      {projectDir && sessionRef.current && <>
+        <DeliveryReviewPanel projectDir={projectDir} sessionId={sessionRef.current}
+          onOpenArtifacts={() => setArtifactViewKey(JSON.stringify([projectDir, sessionRef.current]))} />
+        {artifactViewKey === JSON.stringify([projectDir, sessionRef.current]) && <TaskArtifactViewer
+          key={artifactViewKey} projectDir={projectDir} sessionId={sessionRef.current}
+          onClose={() => setArtifactViewKey(null)}
+          onContinue={(version: ArtifactText) => {
+            if (version.scope.task_id !== sessionRef.current || artifactViewKey !== JSON.stringify([projectDir, sessionRef.current])) return false;
+            setPendingArtifact({ project: projectDir, session: sessionRef.current,
+              reference: { artifact_id: version.metadata.artifact_id, version: version.metadata.version,
+                payload_sha256: version.metadata.payload_sha256, expected_binding: version.scope } });
+            setInput(old => old || t("chat.continueArtifactPrompt"));
+            setArtifactViewKey(null);
+            requestAnimationFrame(() => taRef.current?.focus());
+            return true;
+          }} />}
+      </>}
 
       <AssistantMessageList
         messages={messages}
@@ -1429,8 +1560,59 @@ export default function AssistantPanel({
         onPermissionResolved={handlePermissionResolved}
       />
 
-      {error && <div className="agentz-assistant-error">{error}</div>}
+      {messages.length === 0 && !firstTaskDone && (
+        <FirstRunChecklist
+          projectReady={Boolean(projectDir)} configured={configured} firstTaskDone={firstTaskDone}
+          onOpenFolder={onOpenFolder}
+          onOpenSettings={requestOpenSettings}
+          onTryExample={() => {
+            onInputChange(t("chat.firstRunExamplePrompt"));
+            requestAnimationFrame(() => taRef.current?.focus());
+          }}
+        />
+      )}
 
+      {error && (
+        <div className="agentz-assistant-error">
+          {error}
+          {setupError && (
+            <>
+              <div>{t("chat.setupErrorHint")}</div>
+              <button type="button" className="agentz-assistant-error-action" onClick={requestOpenSettings}>
+                {t("chat.firstRunOpenSettings")}
+              </button>
+            </>
+          )}
+          {!setupError && !firstTaskDone && firstTaskFailureHint(error) && (
+            <>
+              <div>{t(`chat.firstRunFailure${firstTaskFailureHint(error)}`)}</div>
+              {firstTaskFailureHint(error) === "project" && onOpenFolder && (
+                <button type="button" className="agentz-assistant-error-action" onClick={onOpenFolder}>{t("app.openFolder")}</button>
+              )}
+              {firstTaskFailureHint(error) === "connection" && (
+                <button type="button" className="agentz-assistant-error-action" onClick={requestOpenSettings}>{t("chat.firstRunOpenSettings")}</button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      <InputContextSummary
+        authorityProject={projectDir}
+        workspace={projectDir}
+        model={modelId || defaultModelLabel || null}
+        modelSource={modelId ? "selected" : defaultModelLabel ? "default" : "unknown"}
+        policy={appSettings?.policy_mode ?? null}
+        mode={`CodeZ ${chatMode}`}
+        state={permissionRequest && busy ? "approval" : busy ? "running" : error ? "error" : queuedView.length ? "queued" : "idle"}
+        latestAction={toolSteps.length ? { name: toolSteps[toolSteps.length - 1].name, status: toolSteps[toolSteps.length - 1].status } : null}
+      />
+      {pendingArtifact && (
+        <div className="agentz-assistant-artifact-ref">
+          {t("chat.continueArtifactSelected", { id: pendingArtifact.reference.artifact_id, version: pendingArtifact.reference.version })}
+          <button type="button" onClick={() => setPendingArtifact(null)}>{t("chat.continueArtifactRemove")}</button>
+        </div>
+      )}
       <ChatComposer
         value={input}
         onChange={onInputChange}

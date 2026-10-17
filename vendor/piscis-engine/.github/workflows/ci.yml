@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # The agent runtime crates are OS/UI-neutral and must build + test on every
+  # platform. No Tauri / system GUI deps are required here.
+  kernel:
+    name: Engine (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust build artefacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Rust format check
+        run: cargo fmt -p piscis-core -p piscis-kernel -p piscis-cli --check
+
+      - name: Clippy (-D warnings)
+        run: cargo clippy -p piscis-core -p piscis-kernel -p piscis-cli --all-targets -- -D warnings
+
+      - name: Unit tests
+        run: cargo test -p piscis-core -p piscis-kernel -p piscis-cli --lib --bins
+
+      - name: Build openpiscis-headless
+        run: cargo build -p piscis-cli --release --bin openpiscis-headless
+
+      - name: Headless integration tests (Linux only)
+        if: runner.os == 'Linux'
+        run: cargo test -p piscis-cli --test headless_cli
+
+      - name: Headless end-to-end LLM smoke (Linux, opt-in)
+        if: runner.os == 'Linux'
+        env:
+          OPENPISCIS_TEST_API_KEY: ${{ secrets.OPENPISCIS_TEST_API_KEY }}
+          OPENPISCIS_TEST_PROVIDER: ${{ vars.OPENPISCIS_TEST_PROVIDER }}
+          OPENPISCIS_TEST_MODEL: ${{ vars.OPENPISCIS_TEST_MODEL }}
+          OPENPISCIS_TEST_BASE_URL: ${{ vars.OPENPISCIS_TEST_BASE_URL }}
+        run: cargo test -p piscis-cli --test headless_cli -- e2e_run_returns_answer_with_real_api_key --nocapture

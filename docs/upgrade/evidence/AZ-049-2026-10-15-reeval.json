@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-049",
+    "verified_state": "structured_report_render_wired_to_task_bound_artifact_capture_local_checks_passed",
+    "severity": "P1",
+    "finding": "A report JSON file captured as kind report is validated and rendered by the host under fresh task/environment binding, then stored as an immutable readable artifact. Local native contract and client checks pass; cited facts and native journey are unverified.",
+    "conclusion_proposal": "Keep deferred until upstream artifact/delivery contracts and unified review are accepted.",
+    "next_action": "Review one fixed research report and open each source locator, exercise native task-bound capture/read/edit/continue, then independently review the final source and acceptance criteria.",
+    "remaining_work": ["Fixed research report and opened source locators", "Native capture/read/edit/continue journey", "Independent final review and upstream acceptance"],
+    "verification_gaps": ["No real research task or source fact-check", "No native desktop artifact journey"],
+    "evidence": ["docs/upgrade/evidence/AZ-049-2026-10-14/implementation.md", "docs/upgrade/evidence/AZ-049-task-bound-report-capture-2026-10-15.md"]
+  }
+]

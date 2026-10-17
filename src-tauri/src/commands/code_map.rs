@@ -272,12 +272,28 @@ mod tests {
                 file("src-tauri/src/x.rs", "service"),
             ],
             edges: vec![
-                GraphEdge { from: "file:src/ui/a.tsx".into(), to: "file:src/ui/b.tsx".into(), kind: "imports".into() },
-                GraphEdge { from: "file:src/ui/a.tsx".into(), to: "file:src-tauri/src/x.rs".into(), kind: "imports".into() },
-                GraphEdge { from: "module:src".into(), to: "file:src/ui/a.tsx".into(), kind: "contains".into() },
+                GraphEdge {
+                    from: "file:src/ui/a.tsx".into(),
+                    to: "file:src/ui/b.tsx".into(),
+                    kind: "imports".into(),
+                },
+                GraphEdge {
+                    from: "file:src/ui/a.tsx".into(),
+                    to: "file:src-tauri/src/x.rs".into(),
+                    kind: "imports".into(),
+                },
+                GraphEdge {
+                    from: "module:src".into(),
+                    to: "file:src/ui/a.tsx".into(),
+                    kind: "contains".into(),
+                },
             ],
             modules: vec![],
-            stats: GraphStats { files: 3, nodes: 3, edges: 3 },
+            stats: GraphStats {
+                files: 3,
+                nodes: 3,
+                edges: 3,
+            },
         };
         let churn: HashMap<String, u32> = [("src/ui/a.tsx".to_string(), 7)].into();
         let map = build_code_map(&doc, Path::new("/nonexistent"), Some(&churn));

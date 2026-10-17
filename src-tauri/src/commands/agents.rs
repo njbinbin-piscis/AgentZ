@@ -372,8 +372,8 @@ fn builtin_tool_catalog() -> Vec<BuiltinToolInfo> {
         ("file_diff", "Show diffs between file versions", "files"),
         ("file_list", "List directory entries", "files"),
         ("file_search", "Search files by name/content", "files"),
-        ("code_run", "Run code snippets in a sandbox", "exec"),
-        ("shell", "Execute shell commands", "exec"),
+        ("code_run", "", "exec"),
+        ("shell", "", "exec"),
         ("process_control", "List or stop OS processes", "exec"),
         ("web_search", "Search the web for links", "network"),
         ("web_fetch", "Fetch and read a URL as text", "network"),
@@ -437,10 +437,25 @@ fn builtin_tool_catalog() -> Vec<BuiltinToolInfo> {
         .map(|(id, hint, group)| BuiltinToolInfo {
             id: (*id).into(),
             label: (*id).into(),
-            hint: (*hint).into(),
+            hint: if matches!(*id, "code_run" | "shell") {
+                command_sandbox_catalog_hint().into()
+            } else {
+                (*hint).into()
+            },
             group: (*group).into(),
         })
         .collect()
+}
+
+fn command_sandbox_catalog_hint() -> &'static str {
+    #[cfg(windows)]
+    {
+        "Run commands in a Windows AppContainer scoped to the selected workspace with no network capability. Other platforms and elevated commands are unavailable."
+    }
+    #[cfg(not(windows))]
+    {
+        "Unavailable: commands are not executed because an operating-system sandbox is unavailable on this platform."
+    }
 }
 
 /// Return the catalog of builtin tools agents may whitelist.
@@ -456,8 +471,38 @@ mod smoke_tests {
     use std::path::PathBuf;
 
     #[test]
+    fn builtin_catalog_discloses_command_sandbox_boundary() {
+        let tools = builtin_tool_catalog();
+        let code_run = tools
+            .iter()
+            .find(|tool| tool.id == "code_run")
+            .expect("code_run catalog entry");
+        assert_eq!(code_run.label, "code_run");
+        let shell = tools
+            .iter()
+            .find(|tool| tool.id == "shell")
+            .expect("shell catalog entry");
+        if cfg!(windows) {
+            for tool in [code_run, shell] {
+                assert!(tool.hint.contains("Windows AppContainer"));
+                assert!(tool.hint.contains("no network capability"));
+                assert!(tool.hint.contains("unavailable"));
+            }
+        } else {
+            for tool in [code_run, shell] {
+                assert!(tool.hint.contains("commands are not executed"));
+            }
+        }
+    }
+
+    #[test]
     fn smoke_sync_seeded_agents_to_kois() {
-        let home = std::env::var("HOME").expect("HOME");
+        // Smoke test against a locally seeded app-data directory: skip (don't panic) where no home is set.
+        let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))
+        else {
+            eprintln!("skip: no HOME or USERPROFILE set");
+            return;
+        };
         let config = PathBuf::from(home).join(".local/share/com.agentz.desktop");
         if !config.join("agents/architect/agent.json").exists() {
             eprintln!("skip: run app once to seed agents first");

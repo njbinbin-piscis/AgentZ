@@ -13,7 +13,9 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter};
 
-use crate::commands::agents::{agents_get, agents_list, agents_save, agents_uninstall, AgentManifest};
+use crate::commands::agents::{
+    agents_get, agents_list, agents_save, agents_uninstall, AgentManifest,
+};
 use crate::commands::app_changes::{self, ChangeRecord};
 use crate::commands::data_scope::resolve_global_config_dir;
 use crate::commands::teams::{teams_get, teams_list, teams_save, teams_uninstall, TeamManifest};
@@ -39,7 +41,9 @@ impl AppControlTool {
     }
 
     fn notify(&self, kind: &str) {
-        let _ = self.app.emit(APP_CONTROL_UPDATED_EVENT, json!({ "kind": kind }));
+        let _ = self
+            .app
+            .emit(APP_CONTROL_UPDATED_EVENT, json!({ "kind": kind }));
     }
 
     async fn get_settings(&self) -> anyhow::Result<ToolResult> {
@@ -51,7 +55,17 @@ impl AppControlTool {
     }
 
     /// Validated, audited settings write shared by `update_settings` and `append_instructions`.
-    fn apply_settings(
+    async fn apply_settings(
+        &self,
+        patch: &Value,
+        session: &str,
+        allow_instructions: bool,
+    ) -> anyhow::Result<ToolResult> {
+        let _write_guard = crate::commands::settings::settings_write_guard().await;
+        self.apply_settings_locked(patch, session, allow_instructions)
+    }
+
+    fn apply_settings_locked(
         &self,
         patch: &Value,
         session: &str,
@@ -145,6 +159,7 @@ impl AppControlTool {
         if text.is_empty() || text.chars().count() > MAX_APPEND_CHARS {
             return bad(format!("`text` must be 1..={MAX_APPEND_CHARS} characters."));
         }
+        let _write_guard = crate::commands::settings::settings_write_guard().await;
         let path = self.config_dir()?.join("config.json");
         let settings = Settings::load(&path).map_err(|e| anyhow::anyhow!(e.to_string()))?;
         let current = settings.piscis_personal_prompt.clone();
@@ -154,9 +169,11 @@ impl AppControlTool {
             format!("{}\n{}", current.trim_end(), text)
         };
         if combined.chars().count() > MAX_INSTRUCTIONS_CHARS {
-            return bad("Custom instructions would exceed the size limit; ask the user to prune them.");
+            return bad(
+                "Custom instructions would exceed the size limit; ask the user to prune them.",
+            );
         }
-        self.apply_settings(&json!({ INSTRUCTIONS_KEY: combined }), session, true)
+        self.apply_settings_locked(&json!({ INSTRUCTIONS_KEY: combined }), session, true)
     }
 
     async fn create_assistant(&self, spec: &Value, session: &str) -> anyhow::Result<ToolResult> {
@@ -165,7 +182,10 @@ impl AppControlTool {
         if manifest.id.trim().is_empty() || manifest.name.trim().is_empty() {
             return bad("assistant requires non-empty `id` and `name`.");
         }
-        if agents_get(self.app.clone(), manifest.id.clone()).await.is_ok() {
+        if agents_get(self.app.clone(), manifest.id.clone())
+            .await
+            .is_ok()
+        {
             return bad("An assistant with this id exists; use update_assistant.");
         }
         if let Err(e) = app_changes::check_rate_limit(session) {
@@ -182,7 +202,12 @@ impl AppControlTool {
         )))
     }
 
-    async fn update_assistant(&self, id: &str, patch: &Value, session: &str) -> anyhow::Result<ToolResult> {
+    async fn update_assistant(
+        &self,
+        id: &str,
+        patch: &Value,
+        session: &str,
+    ) -> anyhow::Result<ToolResult> {
         let old = agents_get(self.app.clone(), id.to_string())
             .await
             .map_err(|e| anyhow::anyhow!(e))?;
@@ -214,7 +239,9 @@ impl AppControlTool {
             .map_err(|e| anyhow::anyhow!(e))?;
         let cid = self.audit_manifest("assistant", id, old_v, "deleted", session)?;
         self.notify("assistant");
-        Ok(ToolResult::ok(format!("Assistant '{id}' deleted. change_id={cid} (rollback restores it)")))
+        Ok(ToolResult::ok(format!(
+            "Assistant '{id}' deleted. change_id={cid} (rollback restores it)"
+        )))
     }
 
     async fn create_team(&self, spec: &Value, session: &str) -> anyhow::Result<ToolResult> {
@@ -223,7 +250,10 @@ impl AppControlTool {
         if manifest.id.trim().is_empty() || manifest.name.trim().is_empty() {
             return bad("team requires non-empty `id` and `name`.");
         }
-        if teams_get(self.app.clone(), manifest.id.clone()).await.is_ok() {
+        if teams_get(self.app.clone(), manifest.id.clone())
+            .await
+            .is_ok()
+        {
             return bad("A team with this id exists; use update_team.");
         }
         if let Err(e) = app_changes::check_rate_limit(session) {
@@ -242,7 +272,12 @@ impl AppControlTool {
         )))
     }
 
-    async fn update_team(&self, id: &str, patch: &Value, session: &str) -> anyhow::Result<ToolResult> {
+    async fn update_team(
+        &self,
+        id: &str,
+        patch: &Value,
+        session: &str,
+    ) -> anyhow::Result<ToolResult> {
         let old = teams_get(self.app.clone(), id.to_string())
             .await
             .map_err(|e| anyhow::anyhow!(e))?;
@@ -274,7 +309,9 @@ impl AppControlTool {
             .map_err(|e| anyhow::anyhow!(e))?;
         let cid = self.audit_manifest("team", id, old_v, "deleted", session)?;
         self.notify("team");
-        Ok(ToolResult::ok(format!("Team '{id}' deleted. change_id={cid} (rollback restores it)")))
+        Ok(ToolResult::ok(format!(
+            "Team '{id}' deleted. change_id={cid} (rollback restores it)"
+        )))
     }
 
     fn audit_manifest(
@@ -330,27 +367,39 @@ impl AppControlTool {
     }
 
     async fn list_assistants(&self) -> anyhow::Result<ToolResult> {
-        let list = agents_list(self.app.clone()).await.map_err(|e| anyhow::anyhow!(e))?;
+        let list = agents_list(self.app.clone())
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
         Ok(ToolResult::ok(serde_json::to_string_pretty(&list)?))
     }
 
     async fn list_teams(&self) -> anyhow::Result<ToolResult> {
-        let list = teams_list(self.app.clone()).await.map_err(|e| anyhow::anyhow!(e))?;
+        let list = teams_list(self.app.clone())
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
         Ok(ToolResult::ok(serde_json::to_string_pretty(&list)?))
     }
 }
 
-/// Blank out obvious secret fields before returning settings to the model.
+/// Blank secret-bearing subtrees before returning settings to the model. MCP
+/// environment and header names are provider-defined, so their values cannot
+/// be classified reliably from each key alone.
 fn redact_secrets(value: &mut Value) {
     match value {
         Value::Object(map) => {
             for (k, v) in map.iter_mut() {
-                if catalog::is_secret_key(k) {
-                    if let Value::String(s) = v {
-                        if !s.is_empty() {
-                            *s = "***".to_string();
-                        }
-                    }
+                if catalog::is_secret_key(k)
+                    || k == "mcp_servers"
+                    || matches!(
+                        k.to_ascii_lowercase().as_str(),
+                        "env" | "headers" | "credentials" | "auth"
+                    )
+                {
+                    *v = if v.is_null() || v.as_str().is_some_and(str::is_empty) {
+                        Value::Null
+                    } else {
+                        json!("***")
+                    };
                 } else {
                     redact_secrets(v);
                 }
@@ -358,6 +407,27 @@ fn redact_secrets(value: &mut Value) {
         }
         Value::Array(arr) => arr.iter_mut().for_each(redact_secrets),
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod secret_projection_tests {
+    use super::*;
+
+    #[test]
+    fn nested_secret_and_provider_defined_env_never_reach_tool_output() {
+        let marker = "unique-synthetic-secret-az031";
+        let mut settings = json!({
+            "api_key": { "nested": marker },
+            "mcp_servers": [{ "command": marker, "args": [marker], "url": marker, "env": { "CUSTOM_CRED": marker }, "headers": { "X-Custom": marker } }],
+            "language": "en"
+        });
+        redact_secrets(&mut settings);
+        let output = settings.to_string();
+        assert!(!output.contains(marker));
+        assert_eq!(settings["api_key"], "***");
+        assert_eq!(settings["mcp_servers"], "***");
+        assert_eq!(settings["language"], "en");
     }
 }
 
@@ -434,8 +504,12 @@ impl Tool for AppControlTool {
                 .and_then(|s| s.as_object())
                 .map(|o| o.keys().any(|k| catalog::tier_of(k) != Tier::Free))
                 .unwrap_or(true),
-            "append_instructions" | "update_assistant" | "delete_assistant" | "update_team"
-            | "delete_team" | "rollback" => true,
+            "append_instructions"
+            | "update_assistant"
+            | "delete_assistant"
+            | "update_team"
+            | "delete_team"
+            | "rollback" => true,
             _ => false,
         }
     }
@@ -449,12 +523,17 @@ impl Tool for AppControlTool {
         };
         match str_arg(&input, "action") {
             "get_settings" => self.get_settings().await,
-            "describe_settings" => Ok(ToolResult::ok(serde_json::to_string_pretty(&catalog::describe())?)),
+            "describe_settings" => Ok(ToolResult::ok(serde_json::to_string_pretty(
+                &catalog::describe(),
+            )?)),
             "update_settings" => {
                 let patch = input.get("settings").cloned().unwrap_or(Value::Null);
-                self.apply_settings(&patch, session, false)
+                self.apply_settings(&patch, session, false).await
             }
-            "append_instructions" => self.append_instructions(str_arg(&input, "text"), session).await,
+            "append_instructions" => {
+                self.append_instructions(str_arg(&input, "text"), session)
+                    .await
+            }
             "list_assistants" => self.list_assistants().await,
             "list_teams" => self.list_teams().await,
             "get_assistant" => {
@@ -504,7 +583,9 @@ impl Tool for AppControlTool {
             "list_changes" => {
                 let limit = input.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as usize;
                 let dir = self.config_dir()?;
-                Ok(ToolResult::ok(serde_json::to_string_pretty(&app_changes::list(&dir, limit))?))
+                Ok(ToolResult::ok(serde_json::to_string_pretty(
+                    &app_changes::list(&dir, limit),
+                )?))
             }
             "rollback" => {
                 let cid = str_arg(&input, "change_id");
@@ -519,7 +600,9 @@ impl Tool for AppControlTool {
                     Err(e) => bad(e),
                 }
             }
-            other => bad(format!("Unknown action '{other}'. See the tool description for valid actions.")),
+            other => bad(format!(
+                "Unknown action '{other}'. See the tool description for valid actions."
+            )),
         }
     }
 }

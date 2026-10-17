@@ -1,0 +1,9 @@
+# AZ-056 isolated local lifecycle gate candidate
+
+Added `lifecycle_gate.rs`, which creates an isolated Git project and two managed task worktrees. It registers distinct task/environment bindings, creates plans and runs, advances both runs, writes separate document artifacts, closes and reopens durable stores to check continuation, and archives/restores one task source into a new checkout while verifying the second task remains separate. On assertion failure the temporary fixture remains and its path is printed to the log for diagnosis; a passing fixture cleans up its worktrees and directory.
+
+The manual unsigned Windows candidate workflow now runs this specific test before packaging, captures its exit code and logs, uploads the log even when the test step fails, and stops the package step on a nonzero test exit. The workflow verifier asserts this gate cannot silently replace its captured exit with success. This workflow was not dispatched; its separate resource-integrity preflight may still block it.
+
+Local evidence: `lifecycle-test.log` and `result.json` record one passing Windows fixture; `node scripts/upgrade-candidate-workflow.verify.mjs` passed. This is a domain/Git integration fixture, not a native GUI, model, host restart or full review/file-list E2E. AZ-056 stays blocked for native journey and unified acceptance.
+
+Current-source follow-up (2026-10-16): the same two-task fixture now reads each task checkout through the product's change collector and file-view API after reopening durable stores. It requires exactly one untracked `result.md` per task, no base version, and task-specific contents in the review view. `cargo test -p agentz-task-state --locked --offline --test lifecycle_gate -- --nocapture` passed 1/1 on Windows; targeted rustfmt and diff checks passed. This covers the domain review file list and bytes but does not exercise the native review UI, actual workflow dispatch, host restart or a model run.

@@ -1,0 +1,7 @@
+# AZ038 WorkZ artifact entry independent review
+
+2026-10-10. Read-only review of new TaskArtifactViewer import, artifactViewKey state, openTask clearing and JSX entry. Current WorkZ index.tsx SHA256 7de0137cdb854c77d309e57d68932a4cec50c0d639d7f6c4fd1f3b56f623e1ec. No GUI/test/Cargo or product/ledger edit.
+
+No blocking defect found in this limited mount wiring. Artifact button/child live only for nonteam/nonpool, existing planProject whose selected project matches current projectDir and existing sessionRef. Key binds canonical authority project and session; mismatch unmounts old viewer instead of displaying another task's artifacts. Button merely selects view key, never changes project/session or submits a turn. openTask clears both fileViewKey and artifactViewKey immediately before async new-task fetch; same current liveforeground shortcut returns before clear and preserves its active view/stream. Viewer scopehook adds opaquehandle identity checks internally; mount does not treat canonicalpath as native permission.
+
+Shared pin refresh for AZ017/AZ035 should retain oldreview history and this current hash. This review concerns only WorkZ entry/mount, not the author's ongoing artifact UI operation-lock/reconcile fixes; those must independently pass before candidate freeze. Case/domain/read/delete semantics and native authorization remain their own reviews. GUI pane layout, close behavior and full task artifact acceptance have not run by this reviewer.

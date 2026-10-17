@@ -19,9 +19,13 @@ export interface McpServerConfig {
   name: string;
   transport: string;
   command: string;
+  command_configured?: boolean;
   args: string[];
+  args_configured?: boolean;
   url: string;
+  url_configured?: boolean;
   env: Record<string, string>;
+  headers?: Record<string, string>;
   enabled: boolean;
 }
 
@@ -53,6 +57,24 @@ export interface LlmSettings {
 export interface SettingsResponse extends LlmSettings {
   config_dir: string;
   is_configured: boolean;
+  secret_references: SecretReference[];
+}
+
+export interface SecretReference {
+  reference: string;
+  exists: boolean;
+}
+
+export function settingsSecretExists(reference: string): Promise<SecretReference> {
+  return invoke<SecretReference>("settings_secret_exists", { reference });
+}
+
+export function settingsSecretReplace(reference: string, value: string): Promise<SecretReference> {
+  return invoke<SecretReference>("settings_secret_replace", { reference, value });
+}
+
+export function settingsSecretDelete(reference: string): Promise<SecretReference> {
+  return invoke<SecretReference>("settings_secret_delete", { reference });
 }
 
 export function getSettings(): Promise<SettingsResponse> {
@@ -65,6 +87,14 @@ export function isConfigured(): Promise<boolean> {
 
 export function saveSettings(updates: LlmSettings): Promise<SettingsResponse> {
   return invoke<SettingsResponse>("save_settings", { updates });
+}
+
+export function saveSettingsWithSecrets(
+  updates: LlmSettings,
+  deletions: string[],
+  replacements: { reference: string; value: string }[],
+): Promise<SettingsResponse> {
+  return invoke<SettingsResponse>("save_settings_with_secrets", { updates, deletions, replacements });
 }
 
 /** Get the provider id selected as the global "flash" (small/fast) model. */

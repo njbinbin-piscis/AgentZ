@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-062",
+    "verified_state": "local_trend_gate_and_count_reconciliation_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "The local trend and fingerprint-bound synthetic-kernel gate validate sample totals, task-by-repeat planning, reported success ratio, per-task failure counts and SHA-256 fingerprint syntax. Optional intervention, usage and billed-cost limits fail closed on unknown values. A configurable minimum number of comparable summaries fails the gate when runs are missing. The 11-case verifier and frozen AZ-004 synthetic summary pass; independence of future runs is not established by the count alone.",
+    "conclusion_proposal": "Keep pending until the lifecycle harness and repeated actual target-scope measurements support a quality decision.",
+    "next_action": "Wire the gate to the stable lifecycle harness, collect repeated actual desktop/model summaries, then perform unified review.",
+    "remaining_work": ["Stable lifecycle harness dependency AZ-056", "Repeated actual target-scope measurements", "Unified acceptance review"],
+    "verification_gaps": ["Only synthetic-kernel baseline gate exercised", "No desktop or new live model trend"],
+    "evidence": ["docs/upgrade/evidence/implementation-batch-2026-10-14/implementation.md"]
+  }
+]

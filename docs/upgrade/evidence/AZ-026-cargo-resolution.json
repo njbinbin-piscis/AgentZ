@@ -1,0 +1,46 @@
+{
+  "exit_code": 0,
+  "no_sibling_override": true,
+  "upstream_revision": "527e55496caf4437e4265e02869f0a8c764549f6",
+  "platform_runtime_verified": false,
+  "schema_version": 1,
+  "command": "cargo metadata --offline --locked --format-version 1",
+  "local_packages": [
+    {
+      "manifest_path": "src-tauri/Cargo.toml",
+      "name": "agentz-desktop",
+      "version": "0.9.7"
+    },
+    {
+      "manifest_path": "crates/agentz-host/Cargo.toml",
+      "name": "agentz-host",
+      "version": "0.0.1"
+    },
+    {
+      "manifest_path": "crates/agentz-task-state/Cargo.toml",
+      "name": "agentz-task-state",
+      "version": "0.1.0"
+    },
+    {
+      "manifest_path": "vendor/piscis-engine/piscis-core/Cargo.toml",
+      "name": "piscis-core",
+      "version": "0.8.63"
+    },
+    {
+      "manifest_path": "vendor/piscis-engine/piscis-ide-tools/Cargo.toml",
+      "name": "piscis-ide-tools",
+      "version": "0.1.0"
+    },
+    {
+      "manifest_path": "vendor/piscis-engine/piscis-kernel/Cargo.toml",
+      "name": "piscis-kernel",
+      "version": "0.8.63"
+    },
+    {
+      "manifest_path": "vendor/secret-service/Cargo.toml",
+      "name": "secret-service",
+      "version": "5.1.0"
+    }
+  ],
+  "upstream_tag": "v0.8.68"
+}

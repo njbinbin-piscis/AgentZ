@@ -339,8 +339,8 @@ fn messages_rich(msgs: Vec<ChatMessage>) -> Vec<MessageDto> {
         if m.role == "assistant" && m.content.trim().is_empty() && calls.is_empty() {
             continue;
         }
-        let merge = m.role == "assistant"
-            && out.last().map(|l| l.role == "assistant").unwrap_or(false);
+        let merge =
+            m.role == "assistant" && out.last().map(|l| l.role == "assistant").unwrap_or(false);
         if !merge {
             out.push(MessageDto {
                 id: m.id.clone(),
@@ -371,7 +371,10 @@ fn messages_rich(msgs: Vec<ChatMessage>) -> Vec<MessageDto> {
             bubble.tools.push(ToolDto {
                 id: id.to_string(),
                 name: name.to_string(),
-                input: call.get("input").cloned().unwrap_or(serde_json::Value::Null),
+                input: call
+                    .get("input")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null),
                 result: None,
                 is_error: false,
                 text_offset: offset,
@@ -561,14 +564,11 @@ pub async fn chat_get_messages_page(
         if has_more {
             // Start the page on a real user message; the trimmed older rows are
             // picked up (whole) by the next page because `next_offset` excludes them.
-            if let Some(k) = raw
-                .iter()
-                .position(|m| {
-                    m.role == "user"
-                        && !m.content.trim().is_empty()
-                        && !is_kernel_injected_prompt(&m.content)
-                })
-            {
+            if let Some(k) = raw.iter().position(|m| {
+                m.role == "user"
+                    && !m.content.trim().is_empty()
+                    && !is_kernel_injected_prompt(&m.content)
+            }) {
                 if k > 0 {
                     raw.drain(..k);
                 }

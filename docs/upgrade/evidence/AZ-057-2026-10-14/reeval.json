@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-057",
+    "verified_state": "windows_resource_sampler_orphan_tracking_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "A bounded, identity-pinned Windows process-tree sampler emits JSONL and now continues tracking observed descendants after the root exits. A two-sample self-check and an orphaned-child PowerShell fixture passed; no AgentZ soak or real-model fault benchmark ran.",
+    "conclusion_proposal": "Keep blocked until frozen candidate build, hardware, thresholds and actual workload results are available.",
+    "next_action": "Freeze hardware/build/budget and run AgentZ cold-start, fault and two-hour workload with the sampler; preserve raw receipts.",
+    "remaining_work": ["Reviewed resource and timing budgets", "Frozen build and hardware profile", "AgentZ cold-start/fault/two-hour workload", "Real model attribution and unified review"],
+    "verification_gaps": ["Only PowerShell sampler fixtures", "No AgentZ benchmark", "No real model run", "AZ-026/AZ-032 not accepted"],
+    "evidence": ["docs/upgrade/evidence/AZ-057-2026-10-14/implementation.md", "docs/upgrade/evidence/AZ-057-2026-10-14/sampler-self-check.jsonl"]
+  }
+]

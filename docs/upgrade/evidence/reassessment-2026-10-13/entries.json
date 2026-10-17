@@ -1,0 +1,1808 @@
+[
+  {
+    "id": "AZ-001",
+    "claimed_status": "done",
+    "verified_state": "document_complete",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "document_complete",
+    "finding": "契约定义三旅程；不是产品旅程实测。",
+    "remaining_work": [
+      "版本化契约与当前发布范围对齐"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "版本化契约与当前发布范围对齐",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-002",
+    "claimed_status": "done",
+    "verified_state": "document_complete",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "document_complete",
+    "finding": "身份ADR明确独立登记；当前隔离身份验证读到，旧任务不可猜测绑定。",
+    "remaining_work": [
+      "审阅实际迁移与重开边界"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "审阅实际迁移与重开边界",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-003",
+    "claimed_status": "done",
+    "verified_state": "historical_baseline",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "historical_baseline",
+    "finding": "复现基线是旧版本人口；当前工作区修复不能由旧基线证明。",
+    "remaining_work": [
+      "按当前源码重新运行确认缺陷回归集"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "按当前源码重新运行确认缺陷回归集",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-004",
+    "claimed_status": "done",
+    "verified_state": "historical_limited_measurement",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "historical_limited_measurement",
+    "finding": "36样本旧真实kernel/provider合成基线；33自动成功与36语义裁定分别保留，账单未知。",
+    "remaining_work": [
+      "新版本重采样；真实桌面/复杂仓库任务另验收"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "新版本重采样；真实桌面/复杂仓库任务另验收",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-005",
+    "claimed_status": "done",
+    "verified_state": "document_complete",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "document_complete",
+    "finding": "支持矩阵限制跨平台；不是macOS/Linux实测。",
+    "remaining_work": [
+      "同步当前版本与实际支持范围"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "同步当前版本与实际支持范围",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-006",
+    "claimed_status": "done",
+    "verified_state": "document_complete",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "document_complete",
+    "finding": "容量文档有并行授权修订；历史排期不能当当前完成预测。",
+    "remaining_work": [
+      "按当前剩余工作量重排依赖和容量"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "按当前剩余工作量重排依赖和容量",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-007",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "lib.rs持久注册与load；desktop仅re-export，未本轮验证真实DB损坏/重启。",
+    "remaining_work": [
+      "当前精确版本登记/幂等/迁移测试"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前精确版本登记/幂等/迁移测试",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-008",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "resolve_task_workspace验证已绑定Git公共目录/branch/登记；无binding时允许本地fallback，require_binding由调用方决定。",
+    "remaining_work": [
+      "复核全部执行入口require_binding传播并测丢失绑定"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "复核全部执行入口require_binding传播并测丢失绑定",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-009",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "WorkZ resolveTaskWorktree和任务前景key保护已读；真实桌面A/B/重启GUI由ADR007豁免，不能说实测通过。",
+    "remaining_work": [
+      "补可执行宿主A/B恢复证据；保留GUI豁免声明"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "补可执行宿主A/B恢复证据；保留GUI豁免声明",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-010",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "start.create拒绝非Git/无commit，commit排除本地修改需ack；working模式限定HEAD。",
+    "remaining_work": [
+      "新版本dirty/specialpath/非Git回归"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "新版本dirty/specialpath/非Git回归",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-011",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "changes模块有结构化ChangeSet/ChangeError，host注册change_set/file_view；未逐类型复跑。",
+    "remaining_work": [
+      "完整工作树类型矩阵当前复跑"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "完整工作树类型矩阵当前复跑",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-012",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "三个journal IPC统一open_task_journal→resolve_task_workspace并持execution lease。",
+    "remaining_work": [
+      "当前隔离journal路由/undo跨任务用例"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前隔离journal路由/undo跨任务用例",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-013",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "Review使用changeSet/fileView；catch呈现错误，任务变化cleanup阻止旧响应；openPr不在范围。",
+    "remaining_work": [
+      "当前UI测试及端到端review版本检查"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前UI测试及端到端review版本检查",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-014",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "archive/create/restore宿主接线存在；不把source存在等同恢复字节完整性。",
+    "remaining_work": [
+      "当前恢复/故障/ignored文件矩阵"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前恢复/故障/ignored文件矩阵",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-015",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "discard要求task_id和cleanup lease，调用retain_task；domain保留搬移而非递归删除。",
+    "remaining_work": [
+      "当前身份错配/分步故障/恢复测试"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前身份错配/分步故障/恢复测试",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-016",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "merge预检拒绝双侧dirty、重复版本检查；receipt+archive保留恢复；host有repository key串行入口。",
+    "remaining_work": [
+      "当前事务中断与恢复/并行冲突回归"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前事务中断与恢复/并行冲突回归",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-017",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "permits状态图与Run/Attempt CAS及retry事务已实读；三个source pins失配。",
+    "remaining_work": [
+      "评审当前共享变动并重冻manifest后执行状态矩阵"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "评审当前共享变动并重冻manifest后执行状态矩阵",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-018",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "DurableStream校验Run/Attempt与Running状态，local单agent限制；两个pins失配。",
+    "remaining_work": [
+      "当前断流去重游标/持久事件故障测试；不要扩到team"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前断流去重游标/持久事件故障测试；不要扩到team",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-019",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "open_project_kernel_state调用owner reconciliation；OS lock描述保留活owner，无lease不可判死。",
+    "remaining_work": [
+      "当前Windows kill/reopen试验，复核runtime/lock变动"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前Windows kill/reopen试验，复核runtime/lock变动",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-020",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "clear_plan=true宿主明确拒绝；源码pins匹配但没有当前测试。",
+    "remaining_work": [
+      "当前续聊/merge/replacement持久计划用例"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前续聊/merge/replacement持久计划用例",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-021",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "worker completion register/seal拒绝已取消启动；三个共享pins失配；未证明所有工具和后代取消。",
+    "remaining_work": [
+      "当前queue/run/grace/uncooperative回归"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前queue/run/grace/uncooperative回归",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-022",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "Windows Job在首次执行前assign；终止后wait job empty；仅源码检查非native验证。",
+    "remaining_work": [
+      "当前native shell/code timeout/cancel清理与恢复"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前native shell/code timeout/cancel清理与恢复",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-023",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "ErrorClass只有UpstreamTransient可same-model retry；分类依赖扁平字符串启发式。",
+    "remaining_work": [
+      "当前HTTP/cancelbackoff用例及分类边界"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前HTTP/cancelbackoff用例及分类边界",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-024",
+    "claimed_status": "done",
+    "verified_state": "local_fail_closed_fix_unreviewed",
+    "severity": "P1",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "partial",
+    "finding": "主模型调用预算读取、绑定、存储、预留失败已改为拒绝；仍需审查配置文件被删除后旧限额放宽、其他模型入口及成本语义。",
+    "remaining_work": [
+      "审查已配置文件删除后的历史限额保持",
+      "盘点所有模型入口与费用语义",
+      "独立实现复核及用户任务验收"
+    ],
+    "verification_gaps": [
+      "没有真实模型费用与长时任务验收；本轮仅完成主调用路径故障测试。"
+    ],
+    "next_action": "独立复核fail-closed改动；覆盖已配置文件丢失、所有模型入口与真实费用语义。",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-025",
+    "claimed_status": "done",
+    "verified_state": "domain_only",
+    "severity": "P1",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "domain_only",
+    "finding": "ExternalActionStore在domain存在；src-tauri未搜到ExternalActionStore/external_action接线，limited scope不可代替provider动作幂等。",
+    "remaining_work": [
+      "明确接入宿主/实际外部动作并测丢响应，禁止自动重发"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "明确接入宿主/实际外部动作并测丢响应，禁止自动重发",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-026",
+    "claimed_status": "preparing",
+    "verified_state": "integrity_drift",
+    "severity": "P1",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "integrity_drift",
+    "finding": "完整vendor freeze脚本存在；167 source pins中5失配，旧完整冻结不是当前完整冻结。",
+    "remaining_work": [
+      "复审差异并重冻manifest；当前host/kernel契约测试"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "复审差异并重冻manifest；当前host/kernel契约测试",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-027",
+    "claimed_status": "done",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P2",
+    "conclusion_proposal": "retain_contract_done",
+    "implementation_state": "contract_defined",
+    "finding": "权限契约包含四级、六类资源期限撤销升级；契约明确不代表六类provider已生效。",
+    "remaining_work": [
+      "保留文档范围完成，实际资源执行逐项由028/034/后续任务验收。",
+      "本轮仅阅读矩阵，未重新运行动作例评。"
+    ],
+    "verification_gaps": [
+      "本轮仅阅读矩阵，未重新运行动作例评。"
+    ],
+    "next_action": "保留文档范围完成，实际资源执行逐项由028/034/后续任务验收。",
+    "inspected_files": [
+      "docs/upgrade/evidence/AZ-027-permission-contract.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-028",
+    "claimed_status": "done",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "retain_scope_revalidate",
+    "implementation_state": "integrated_candidate",
+    "finding": "ApprovalStore boot失效、binding/digest/expiry、原子claim存在；host before/after hook按调用身份配对。 done范围已拆出080/081/082/034，不能用审批层证明OS隔离。",
+    "remaining_work": [
+      "重跑当前approval领域/host/PermissionCard并对齐声明入口清单。",
+      "当前源码未重测；真实受保护UI点击未运行。"
+    ],
+    "verification_gaps": [
+      "当前源码未重测；真实受保护UI点击未运行。"
+    ],
+    "next_action": "重跑当前approval领域/host/PermissionCard并对齐声明入口清单。",
+    "inspected_files": [
+      "crates/agentz-task-state/src/approval.rs",
+      "src-tauri/src/runtime/approval.rs",
+      "src/components/chat/PermissionCard.tsx",
+      "docs/upgrade/evidence/AZ-028-acceptance-review-2026-10-06.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-029",
+    "claimed_status": "done",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "retain_scope_revalidate",
+    "implementation_state": "integrated_candidate",
+    "finding": "settings.save SecretStore及所有encrypt_field使用?失败关闭，临时文件sync+persist原子替换，无原明文fallback。 新平台secret provider代码与原Windows证据不同，不能继承旧测试。",
+    "remaining_work": [
+      "重跑损坏密钥/加密错误/写入失败与格式downgrade夹具并核对kernel source provenance。",
+      "未注入秘密/失败；未重跑rollback。"
+    ],
+    "verification_gaps": [
+      "未注入秘密/失败；未重跑rollback。"
+    ],
+    "next_action": "重跑损坏密钥/加密错误/写入失败与格式downgrade夹具并核对kernel source provenance。",
+    "inspected_files": [
+      "vendor/piscis-engine/piscis-kernel/src/store/settings.rs",
+      "vendor/piscis-engine/piscis-kernel/src/security/secrets.rs",
+      "docs/upgrade/evidence/ADR-004-protected-downgrade.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-030",
+    "claimed_status": "done",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "retain_windows_scope_revalidate",
+    "implementation_state": "windows_integrated_platform_candidates",
+    "finding": "Windows DPAPI当前用户绑定及旧key原子迁移存在；macOS/Linux新增provider分支不可视为Windows验收覆盖。",
+    "remaining_work": [
+      "分离Windows已测范围与其他平台候选；检查provider新增源码来源，重跑迁移/保护失败。",
+      "本轮未调用DPAPI/Keychain/keyring；跨用户及跨平台恢复未验。"
+    ],
+    "verification_gaps": [
+      "本轮未调用DPAPI/Keychain/keyring；跨用户及跨平台恢复未验。"
+    ],
+    "next_action": "分离Windows已测范围与其他平台候选；检查provider新增源码来源，重跑迁移/保护失败。",
+    "inspected_files": [
+      "vendor/piscis-engine/piscis-kernel/src/security/secrets.rs",
+      "docs/upgrade/evidence/AZ-030-windows-key-protection.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-031",
+    "claimed_status": "blocked",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "implement",
+    "implementation_state": "partial_redaction_not_reference_model",
+    "finding": "app_control.get_settings递归脱敏及diagnostics已知秘密文本替换存在；settings仍有api_key等实际值模型。 没有完成reference-only替换/删除/存在状态契约，不能把部分脱敏算全出口证明。",
+    "remaining_work": [
+      "建立secret reference DTO及声明出口表，植入唯一合成秘密做出口扫描。",
+      "缺替换/删除分离接口验收及所有出口扫描；不需要真实账号即可推进。"
+    ],
+    "verification_gaps": [
+      "缺替换/删除分离接口验收及所有出口扫描；不需要真实账号即可推进。",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "建立secret reference DTO及声明出口表，植入唯一合成秘密做出口扫描。",
+    "inspected_files": [
+      "src-tauri/src/tools/app_control.rs",
+      "src-tauri/src/diagnostics.rs",
+      "vendor/piscis-engine/piscis-kernel/src/store/settings.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-032",
+    "claimed_status": "review",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "acceptance_pending",
+    "implementation_state": "integrated_candidate",
+    "finding": "iframe无allow-same-origin；nonce CSP、source/null-origin/消息预算与panel资源token防线存在。 production未找到nonce时脚本明确禁用，安全失败关闭不等于扩展示例能渲染。",
+    "remaining_work": [
+      "保留真实Tauri正反验收缺口；验证打包nonce供给及跨panel资源泄漏。",
+      "真实Webview DOM/IPC隔离与资源handler联动未测；13旧测试不算当前pass。"
+    ],
+    "verification_gaps": [
+      "真实Webview DOM/IPC隔离与资源handler联动未测；13旧测试不算当前pass。"
+    ],
+    "next_action": "保留真实Tauri正反验收缺口；验证打包nonce供给及跨panel资源泄漏。",
+    "inspected_files": [
+      "src/extensions/ui/WebviewHost.tsx",
+      "src/extensions/ui/webviewSecurity.ts",
+      "src-tauri/tauri.conf.json",
+      "docs/upgrade/evidence/AZ-032-parallel-review.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-033",
+    "claimed_status": "done",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "retain_scope_revalidate",
+    "implementation_state": "integrated_candidate",
+    "finding": "skill metadata记录source/version/content SHA/requested tools；新增tools升级拒绝，卸载记录revocation。 技能声明不是 blanket grant；不能延伸到所有第三方extension授权。",
+    "remaining_work": [
+      "重跑service install-update-uninstall真实临时DB/目录夹具并核查扩展范围措辞。",
+      "当前skills/service及provenance未重测；真实市场安装/GUI未验。"
+    ],
+    "verification_gaps": [
+      "当前skills/service及provenance未重测；真实市场安装/GUI未验。"
+    ],
+    "next_action": "重跑service install-update-uninstall真实临时DB/目录夹具并核查扩展范围措辞。",
+    "inspected_files": [
+      "src-tauri/src/skills/provenance.rs",
+      "src-tauri/src/skills/service.rs",
+      "docs/upgrade/evidence/AZ-033-skill-provenance-authorization.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-034",
+    "claimed_status": "done",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "retain_windows_scope_revalidate",
+    "implementation_state": "windows_reference_integrated",
+    "finding": "AppContainer零网络capabilities、CREATE_SUSPENDED→job assignment→运行、cleanup错误无unsandboxed retry实现仍在。 done只覆盖Windows参考命令runner，LSP/DAP/PTY非同一隔离边界。",
+    "remaining_work": [
+      "重跑当前Windows正反文件/网络/取消/ACL案例，审新增kernel差异。",
+      "本轮不执行AppContainer；跨平台、低权限、跨卷/多用户与发行未验。"
+    ],
+    "verification_gaps": [
+      "本轮不执行AppContainer；跨平台、低权限、跨卷/多用户与发行未验。"
+    ],
+    "next_action": "重跑当前Windows正反文件/网络/取消/ACL案例，审新增kernel差异。",
+    "inspected_files": [
+      "vendor/piscis-engine/piscis-kernel/src/proc_windows_sandbox.rs",
+      "docs/upgrade/evidence/AZ-034-acceptance-review-2026-10-06.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-035",
+    "claimed_status": "preparing",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "finish_integration",
+    "implementation_state": "partial_aggregate_integrated",
+    "finding": "runtime只读聚合environment/run/plan/observerbudget，atomic_snapshot=false；events Unknown/artifacts Unsupported，即使独立产物API已存在。 opaque scope/session+fresh binding入口存在；多个pin漂移。",
+    "remaining_work": [
+      "独立复核当前共享修改，接入有界事件/产物引用或明确调整scope，不以UI拼接冒充聚合。",
+      "当前契约/双视图测试未重跑；新projectless接线与异步scope变更需回归。"
+    ],
+    "verification_gaps": [
+      "当前契约/双视图测试未重跑；新projectless接线与异步scope变更需回归。"
+    ],
+    "next_action": "独立复核当前共享修改，接入有界事件/产物引用或明确调整scope，不以UI拼接冒充聚合。",
+    "inspected_files": [
+      "crates/agentz-task-state/src/task_details.rs",
+      "src-tauri/src/runtime/task_details.rs",
+      "src-tauri/src/commands/chat_events.rs",
+      "src/services/tauri/taskDetails.ts",
+      "src/workspaces/codez/TaskDetailsPanel.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-036",
+    "claimed_status": "preparing",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "implement_task_route",
+    "implementation_state": "observation_only_partial",
+    "finding": "TaskView resolver/有界readonly TaskFileViewer存在；返回observation_only不能授IDE操作。 App openProjectInCodeZ仍switchProject(dir)，未建立同task editor/terminal/debug/preview操作路由。",
+    "remaining_work": [
+      "实现保留authority_project/session/task的操作scope并接四类面板，保留dirty/terminal预检。",
+      "同task跨视图真实操作未验；多个shared pin漂移。"
+    ],
+    "verification_gaps": [
+      "同task跨视图真实操作未验；多个shared pin漂移。"
+    ],
+    "next_action": "实现保留authority_project/session/task的操作scope并接四类面板，保留dirty/terminal预检。",
+    "inspected_files": [
+      "src-tauri/src/commands/task_view.rs",
+      "src-tauri/src/commands/task_view_read.rs",
+      "src/workspaces/codez/TaskFileViewer.tsx",
+      "src/App.tsx",
+      "src/services/workspaceNavigation.ts",
+      "src/workspaces/workz/index.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-037",
+    "claimed_status": "deferred",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "implement_after_task_route",
+    "implementation_state": "not_implemented_as_handoff",
+    "finding": "取消/计划续聊/缓冲保护是前置能力；未发现显式暂停→人工编辑→继续同Task交接协议。",
+    "remaining_work": [
+      "设计最小handoff状态与人类修改上下文消费，不能把stop/newRun称pause resume。",
+      "全旅程未实现/未测。"
+    ],
+    "verification_gaps": [
+      "全旅程未实现/未测。"
+    ],
+    "next_action": "设计最小handoff状态与人类修改上下文消费，不能把stop/newRun称pause resume。",
+    "inspected_files": [
+      "src/workspaces/workz/index.tsx",
+      "src/workspaces/codez/index.tsx",
+      "src-tauri/src/commands/chat_turn.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-038",
+    "claimed_status": "preparing",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "revalidate_and_bound_scope",
+    "implementation_state": "text_versions_integrated_candidate",
+    "finding": "真实payload BLOB/hash/版本、tombstone不复用、trigger拒绝、emptycursor None存在；host freshscope+lease capture/read/delete。 仅有界文本1MiB，webpage当文本；非二进制/可执行网页/完整ChangeSet域。",
+    "remaining_work": [
+      "复核artifacts/host新漂移并重跑domain/host/client，明确文本候选支持范围。",
+      "当前新diff未重新验；真实旧版本GUI/删除unknowncommit未验。"
+    ],
+    "verification_gaps": [
+      "当前新diff未重新验；真实旧版本GUI/删除unknowncommit未验。"
+    ],
+    "next_action": "复核artifacts/host新漂移并重跑domain/host/client，明确文本候选支持范围。",
+    "inspected_files": [
+      "crates/agentz-task-state/src/artifacts.rs",
+      "src-tauri/src/commands/task_artifacts.rs",
+      "src/services/tauri/taskArtifacts.ts",
+      "src/workspaces/codez/TaskArtifactViewer.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-039",
+    "claimed_status": "blocked",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "finish_acceptance_receipts",
+    "implementation_state": "passive_summary_integrated",
+    "finding": "Run execution/delivery decision与artifact-version验收/应用/发布明确分离；validation附件不显示passed。 只有观察回调，没有持久版本验收/应用发布回执或可操作完整流程。",
+    "remaining_work": [
+      "按三旅程补回执来源/评审动作；先复核AssistantPanel新pin漂移。",
+      "三条旅程可用性未跑，当前wrapper/summary未重测。"
+    ],
+    "verification_gaps": [
+      "三条旅程可用性未跑，当前wrapper/summary未重测。",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "按三旅程补回执来源/评审动作；先复核AssistantPanel新pin漂移。",
+    "inspected_files": [
+      "src/workspaces/codez/DeliverySummary.tsx",
+      "src/workspaces/codez/DeliveryReviewPanel.tsx",
+      "src/workspaces/codez/AssistantPanel.tsx",
+      "src/workspaces/workz/index.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-040",
+    "claimed_status": "preparing",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "user_walkthrough_pending",
+    "implementation_state": "input_observation_integrated",
+    "finding": "输入首行项目/workspace/model/localqueue/state可见，policy明确非grant；budget unknown非0且配置上限非执行 allowance。 首用走查与最近有效动作/阻塞完整体验仍无证明。",
+    "remaining_work": [
+      "复核AssistantPanel漂移，执行5次合成代表用户走查，区分队列/审批/运行预算。",
+      "未跑真实用户/GUI；当前摘要/预算测试未重跑。"
+    ],
+    "verification_gaps": [
+      "未跑真实用户/GUI；当前摘要/预算测试未重跑。"
+    ],
+    "next_action": "复核AssistantPanel漂移，执行5次合成代表用户走查，区分队列/审批/运行预算。",
+    "inspected_files": [
+      "src/components/chat/InputContextSummary.tsx",
+      "src/workspaces/codez/BudgetObservation.tsx",
+      "src/workspaces/codez/TaskDetailsPanel.tsx",
+      "src/workspaces/codez/AssistantPanel.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-041",
+    "claimed_status": "preparing",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "finish_conflict_workflow",
+    "implementation_state": "local_identity_guard_integrated",
+    "finding": "tracker scope/tab/revision/latestrequest保护及recovery readonly副本存在；index确有begin/settle read/save。 未有host expected-disk-version CAS/原子跨写者保证，暂无完整三方merge流程；index pin漂移。",
+    "remaining_work": [
+      "审index新修改并复现typing/save/watcher/恢复交错；明确保留/查看/合并与磁盘base。",
+      "当前并发实际文件/GUI未跑；历史helper pass不代表新index。"
+    ],
+    "verification_gaps": [
+      "当前并发实际文件/GUI未跑；历史helper pass不代表新index。"
+    ],
+    "next_action": "审index新修改并复现typing/save/watcher/恢复交错；明确保留/查看/合并与磁盘base。",
+    "inspected_files": [
+      "src/workspaces/codez/editorConflict.ts",
+      "src/workspaces/codez/editorRecovery.ts",
+      "src/workspaces/codez/index.tsx",
+      "src/workspaces/codez/editorRecovery.integration.test.ts"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-042",
+    "claimed_status": "done",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "revalidate_scope_completion",
+    "implementation_state": "recovery_client_integrated",
+    "finding": "健康重连重置连续重启预算，窗口10次/实际5min限制；closure文档写每小时与源码不一致。 client持文档重同步/陈旧诊断防护存在；原验收TS/Rust真实进程异常被GUI豁免，不等于实跑。",
+    "remaining_work": [
+      "核对ADR008豁免适用与原verification，修文档窗口描述并保留真实TS/Rust异常演练项。",
+      "本轮不重跑10fixtures；native服务/Monaco未验即使done。"
+    ],
+    "verification_gaps": [
+      "本轮不重跑10fixtures；native服务/Monaco未验即使done。"
+    ],
+    "next_action": "核对ADR008豁免适用与原verification，修文档窗口描述并保留真实TS/Rust异常演练项。",
+    "inspected_files": [
+      "src/services/tauri/lspSession.ts",
+      "src/services/tauri/lsp.ts",
+      "src/services/tauri/lspSession.test.ts",
+      "docs/upgrade/evidence/AZ-042-closure-evidence.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-043",
+    "claimed_status": "preparing",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "native_acceptance_pending",
+    "implementation_state": "owned_lifecycle_integrated_candidate",
+    "finding": "UUID+tombstone4096、generation、ownedspawn/事件、boundedframe、client request/connect deadline与latecleanup存在。 stop直接child尽力cleanup不证明所有debuggee/远程tree已终止；launch/attach映射需真实例。",
+    "remaining_work": [
+      "重跑当前host/client/controller后本地adapter launch/attach与异常退出记录。",
+      "无native调试录屏、进程树OS证明及同task环境跳转验收。"
+    ],
+    "verification_gaps": [
+      "无native调试录屏、进程树OS证明及同task环境跳转验收。"
+    ],
+    "next_action": "重跑当前host/client/controller后本地adapter launch/attach与异常退出记录。",
+    "inspected_files": [
+      "src-tauri/src/commands/dap.rs",
+      "src-tauri/src/commands/dap_frame.rs",
+      "src/extensions/debug/dapClient.ts",
+      "src/extensions/debug/debugController.ts",
+      "src/extensions/ui/DebugView.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-044",
+    "claimed_status": "preparing",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "revalidate_native_lifecycle",
+    "implementation_state": "terminal_lifecycle_integrated_candidate",
+    "finding": "Terminal lifecycle handler与host Windows Job实际树检查存在；源码明确spawn→adopt窗口/breakaway不覆盖。 Terminal/ide/Cargo指纹漂移；同taskroot受036未接线限制。",
+    "remaining_work": [
+      "独立审当前Job/terminal新增改动并重跑multiPTY/close/error，完成Task scope路由后验。",
+      "当前native测试未跑；其他OS与真实任务切换未验。"
+    ],
+    "verification_gaps": [
+      "当前native测试未跑；其他OS与真实任务切换未验。"
+    ],
+    "next_action": "独立审当前Job/terminal新增改动并重跑multiPTY/close/error，完成Task scope路由后验。",
+    "inspected_files": [
+      "src/workspaces/codez/Terminal.tsx",
+      "src/workspaces/codez/terminalLifecycle.ts",
+      "src-tauri/src/commands/ide.rs",
+      "src-tauri/Cargo.toml"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-045",
+    "claimed_status": "blocked",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "authenticated_fixture_pending",
+    "implementation_state": "generation_bound_candidate",
+    "finding": "RemoteSession generation/tasklocal绑定与forward有界generation队列存在；accept-new保留changed-key拒绝策略。 isolated SSH证据明确认证失败，authenticatedRemoteExecutionVerified/reconnectWriteVerified=false。",
+    "remaining_work": [
+      "准备可认证owned POSIX fixture验证文件/LSP/terminal/Agent断连重连且零重复写。",
+      "无真实认证远端写/黑洞/重连旅程，本轮未重跑。"
+    ],
+    "verification_gaps": [
+      "无真实认证远端写/黑洞/重连旅程，本轮未重跑。",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "准备可认证owned POSIX fixture验证文件/LSP/terminal/Agent断连重连且零重复写。",
+    "inspected_files": [
+      "src-tauri/src/remote/mod.rs",
+      "src-tauri/src/remote/forward.rs",
+      "src-tauri/src/remote/ssh_setup.rs",
+      "src-tauri/src/tools/remote_fs.rs",
+      "docs/upgrade/evidence/AZ-045-isolated-ssh.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-046",
+    "claimed_status": "deferred",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P1",
+    "conclusion_proposal": "implement_matrix",
+    "implementation_state": "not_implemented_as_compatibility_archive",
+    "finding": "扩展宿主/API及单项smoke不等于6个固定版本兼容档案；台账无证据。",
+    "remaining_work": [
+      "固定6扩展ID/version/来源/能力清单，做安装运行升级正反矩阵，不标未知兼容。",
+      "6扩展真实安装/运行/回归全部缺。"
+    ],
+    "verification_gaps": [
+      "6扩展真实安装/运行/回归全部缺。"
+    ],
+    "next_action": "固定6扩展ID/version/来源/能力清单，做安装运行升级正反矩阵，不标未知兼容。",
+    "inspected_files": [
+      "README.md",
+      "extension-host/src/host/apiFactory.ts",
+      "docs/known-issues.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-047",
+    "claimed_status": "preparing",
+    "verified_state": "current_source_read_only_no_tests_rerun",
+    "severity": "P2",
+    "conclusion_proposal": "expand_journey_a11y",
+    "implementation_state": "dock_keyboard_partial",
+    "finding": "tabNavigation有arrow/home/end，BottomPanel语义与焦点保护存在；仅dock局部不覆盖全产品键盘路径。 BottomPanel/Terminal pin漂移待审。",
+    "remaining_work": [
+      "复核当前dock/terminal修改，扩展到输入审批评审产物/空态error中英走查。",
+      "原生keyboard/accessibility全旅程未验；历史15tests不是当前pass。"
+    ],
+    "verification_gaps": [
+      "原生keyboard/accessibility全旅程未验；历史15tests不是当前pass。"
+    ],
+    "next_action": "复核当前dock/terminal修改，扩展到输入审批评审产物/空态error中英走查。",
+    "inspected_files": [
+      "src/workspaces/codez/tabNavigation.ts",
+      "src/workspaces/codez/BottomPanel.tsx",
+      "src/workspaces/codez/Terminal.tsx",
+      "src/workspaces/codez/BottomPanel.keyboard.test.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-048",
+    "claimed_status": "preparing",
+    "verified_state": "catalog_loss_guard_local_fix_unreviewed",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_integrate",
+    "implementation_state": "domain_host_partial_with_failopen_gap",
+    "finding": "已有workspaces或绑定库时catalog丢失现在拒绝回退；仍缺chat_turn端到端与极端全目录丢失恢复证明。",
+    "remaining_work": [
+      "chat_turn目录路由端到端",
+      "登记目录与绑定库同时丢失的恢复契约",
+      "独立实现复核"
+    ],
+    "verification_gaps": [
+      "没有原生桌面会话迁移与恢复实测。"
+    ],
+    "next_action": "独立复核catalog丢失检查，补chat_turn目录路由集成与恢复夹具。",
+    "inspected_files": [
+      "crates/agentz-task-state/src/projectless.rs",
+      "src-tauri/src/commands/project_scope.rs",
+      "src-tauri/src/commands/chat_turn.rs",
+      "src/workspaces/workz/index.tsx",
+      "src/services/tauri/projectScope.ts",
+      "docs/upgrade/evidence/AZ-048-directory-checkpoint.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json"
+  },
+  {
+    "id": "AZ-049",
+    "claimed_status": "deferred",
+    "verified_state": "not_started",
+    "severity": "P2",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "not_started",
+    "finding": "Artifact Kind::Report exists, but no research question/source locator/fact versus inference template or validator was located. Delegate is a read-only investigator, not a report delivery schema.",
+    "remaining_work": [
+      "After artifact/delivery contracts stabilize, add report DTO/template and locator/acceptance validation locally; then review one fixed report."
+    ],
+    "verification_gaps": [
+      "No generated report or locator/checklist acceptance receipt."
+    ],
+    "next_action": "After artifact/delivery contracts stabilize, add report DTO/template and locator/acceptance validation locally; then review one fixed report.",
+    "inspected_files": [
+      "src-tauri/src/tools/delegate.rs",
+      "crates/agentz-task-state/src/artifacts.rs",
+      "src/workspaces/codez/TaskArtifactViewer.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-050",
+    "claimed_status": "deferred",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "partial",
+    "finding": "capture/list/read/delete and text version preview exist; no edit/restore-version command or durable edited-artifact continuation path. MarkdownPreview only accepts content; it is not an editing lifecycle.",
+    "remaining_work": [
+      "Add explicit human edit with new-version commit, restore-as-new-version and continuation attachment under fresh binding; avoid overwriting history."
+    ],
+    "verification_gaps": [
+      "Saved-preview equality, restore history and continuation fixtures absent; GUI unrun/ADR008 waived."
+    ],
+    "next_action": "Add explicit human edit with new-version commit, restore-as-new-version and continuation attachment under fresh binding; avoid overwriting history.",
+    "inspected_files": [
+      "src-tauri/src/commands/task_artifacts.rs",
+      "src/workspaces/codez/TaskArtifactViewer.tsx",
+      "src/workspaces/codez/MarkdownPreview.tsx",
+      "src/services/tauri/taskArtifacts.ts"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-051",
+    "claimed_status": "pending",
+    "verified_state": "oauth_helpers_test_only",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "尚未接入的OAuth帮助函数改为仅在单测编译，宿主编译通过；start/callback/refresh命令依旧未实现。",
+    "remaining_work": [
+      "First finish local secret-reference storage/masking, validated callback state and bounded refresh/revocation gates using fake provider fixtures; reserve live provider acceptance as a separate account gate."
+    ],
+    "verification_gaps": [
+      "Controlled provider/account live authorization and revoke not run; local helpers alone do not prove lifecycle."
+    ],
+    "next_action": "补OAuth start/callback/refresh及受保护凭据存储；保留外部账号端到端验收。",
+    "inspected_files": [
+      "src-tauri/src/commands/connectors.rs",
+      "src-tauri/src/tools/api_connector.rs",
+      "src/services/tauri/connectors.ts",
+      "src-tauri/src/commands/chat_turn.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-052",
+    "claimed_status": "deferred",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "partial",
+    "finding": "Outbound API tool/gateway exist and external_action domain exists, but inspected outbound code does not consume its immutable permit/idempotency/reconciliation contract. This is an existing unguarded surface, not absence of all send code.",
+    "remaining_work": [
+      "Connect POST/PUT/DELETE and gateway.send to prepare/frozen approval/start/completion/unknown reconciliation; create sandbox-local tests before live external account receipt."
+    ],
+    "verification_gaps": [
+      "No frozen target/recipient UI, unknown-result reconciliation or deduped-send acceptance."
+    ],
+    "next_action": "Connect POST/PUT/DELETE and gateway.send to prepare/frozen approval/start/completion/unknown reconciliation; create sandbox-local tests before live external account receipt.",
+    "inspected_files": [
+      "src-tauri/src/tools/api_connector.rs",
+      "src-tauri/src/commands/connectors.rs",
+      "src-tauri/src/commands/gateway.rs",
+      "crates/agentz-task-state/src/external_action.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-053",
+    "claimed_status": "pending",
+    "verified_state": "unshipped_dependency_fix",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "AgentZ registers pinned robotz-browser v0.1.13 cdff2c947f812648050a550b8e9d8a887bf01e01. Its cached snapshot has no navigation generation and invalidate_tab spawns asynchronous removal. Newer generation-aware RobotZ working tree is not AgentZ pinned implementation. AgentZ BrowserActivity is global recent-use/chat-active close UX, not task/page ownership or user-takeover revocation. UI navigate shares manager without task token.",
+    "remaining_work": [
+      "Port/pin reviewed generation-aware ref handling and wire every GUI/tool navigation plus user takeover to same captured task/page generation; fixture stale-ref and delayed action refusal."
+    ],
+    "verification_gaps": [
+      "Actual pinned-browser user takeover/stale-reference journey unrun; no task-bound lease/revoke evidence."
+    ],
+    "next_action": "将RobotZ浏览器代际/同步失效修复固定到AgentZ依赖并在实际固定版本上验证接管恢复。",
+    "inspected_files": [
+      "Cargo.lock",
+      "Cargo.toml",
+      "src-tauri/src/commands/chat_turn.rs",
+      "src-tauri/src/browser/activity.rs",
+      "src-tauri/src/browser/mod.rs",
+      "src-tauri/src/commands/browser.rs",
+      "C:/Users/zzz/.cargo/git/checkouts/robotz-869dfd69374135c7/cdff2c9/crates/robotz-browser/src/snapshot.rs",
+      "C:/Projects/RobotZ/crates/robotz-browser/src/snapshot.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-054",
+    "claimed_status": "pending",
+    "verified_state": "not_started",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "not_started",
+    "finding": "AgentZ desktop registry explicitly installs robotz_browser, not robotz-automation UIA/DesktopAutomation. app_control manages AgentZ settings and does not establish native application focus control. RobotZ separate working tree has UIA foreground/non-password guards; that does not show AgentZ runtime exposure or a supported application contract.",
+    "remaining_work": [
+      "Define one supported Windows application/action set, add host focus identity and user takeover gate plus sensitive-region policy; test pure guards first and preserve native unverified label."
+    ],
+    "verification_gaps": [
+      "No AgentZ native UIA integration or controlled app acceptance. GUI waiver does not fabricate OS operation evidence."
+    ],
+    "next_action": "Define one supported Windows application/action set, add host focus identity and user takeover gate plus sensitive-region policy; test pure guards first and preserve native unverified label.",
+    "inspected_files": [
+      "src-tauri/src/commands/chat_turn.rs",
+      "src-tauri/Cargo.toml",
+      "src-tauri/src/tools/app_control.rs",
+      "C:/Projects/RobotZ/crates/robotz-automation/src/uia.rs",
+      "C:/Projects/RobotZ/crates/robotz-automation/src/desktop_automation.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-055",
+    "claimed_status": "deferred",
+    "verified_state": "not_started",
+    "severity": "P1",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "not_started",
+    "finding": "Run/environment owner leases exist, but no cross-task foreground/browser/shared-file resource lease was found. RobotZ tab lock is one global tab pointer, without task/attempt owner.",
+    "remaining_work": [
+      "After browser/native action binding, implement distinct task-attempt resource capability with queue/busy/revoke/drop and cancellation fixtures; do not repurpose process owner lease."
+    ],
+    "verification_gaps": [
+      "No two-task front-resource contention/revocation fixture."
+    ],
+    "next_action": "After browser/native action binding, implement distinct task-attempt resource capability with queue/busy/revoke/drop and cancellation fixtures; do not repurpose process owner lease.",
+    "inspected_files": [
+      "src-tauri/src/runtime/owner_lease.rs",
+      "src-tauri/src/state.rs",
+      "src-tauri/src/browser/activity.rs",
+      "C:/Users/zzz/.cargo/git/checkouts/robotz-869dfd69374135c7/cdff2c9/crates/robotz-browser/src/snapshot.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-056",
+    "claimed_status": "blocked",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "CI runs lint/typecheck/frontend tests/extension smoke/workspace Rust tests; candidate workflow builds artifacts. No single create→dual-task→continue→restart→review→archive/restore orchestration gate found.",
+    "remaining_work": [
+      "Implement local isolated lifecycle harness and log/failure gate first; then add it to candidate workflow. Keep native UI journey explicitly waived under ADR008, not passed."
+    ],
+    "verification_gaps": [
+      "CI source is not a CI execution receipt; no candidate-specific integrated lifecycle log.",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "Implement local isolated lifecycle harness and log/failure gate first; then add it to candidate workflow. Keep native UI journey explicitly waived under ADR008, not passed.",
+    "inspected_files": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/candidate.yml",
+      "scripts/upgrade-candidate-workflow.verify.mjs",
+      "src-tauri/src/commands/agent_task.rs",
+      "docs/upgrade/evidence/ADR-008-gui-blanket-waiver.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-057",
+    "claimed_status": "blocked",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "perfCounters and bounded-process regressions are measurement primitives, not cold-start/two-hour/long-chat benchmark. No two-hour hardware/version/resource result was located.",
+    "remaining_work": [
+      "Freeze budgets and implement owned Windows sampler/fault harness locally; record hardware/build/attribution and actual soak run separately from waived visual checks."
+    ],
+    "verification_gaps": [
+      "No baseline/repeated two-hour memory/handle/child residual measurements.",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "Freeze budgets and implement owned Windows sampler/fault harness locally; record hardware/build/attribution and actual soak run separately from waived visual checks.",
+    "inspected_files": [
+      "src/utils/perfCounters.ts",
+      "src/utils/perfCounters.test.ts",
+      "src-tauri/src/runtime/durable_stream.rs",
+      "src-tauri/src/commands/ide.rs",
+      "docs/upgrade/evidence/AZ-005-support-matrix.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-058",
+    "claimed_status": "blocked",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "blocked_external",
+    "implementation_state": "partial",
+    "finding": "Cross-platform CI/release YAML and macOS/Linux credential adapters exist; no installation-and-core-journey native receipts in reviewed scope. Build definitions are not runtime proof.",
+    "remaining_work": [
+      "Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade."
+    ],
+    "verification_gaps": [
+      "Actual macOS/Linux machines/sessions absent; ADR008 does not waive external platforms.",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade.",
+    "inspected_files": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/release.yml",
+      "docs/upgrade/evidence/AZ-005-support-matrix.md",
+      "docs/upgrade/evidence/ADR-008-gui-blanket-waiver.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-059",
+    "claimed_status": "blocked",
+    "verified_state": "production_build_passes_without_minification",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "禁用当前损坏的esbuild压缩步骤后生产构建通过；主chunk约5.95MB（gzip约1.18MB），首屏性能未测。",
+    "remaining_work": [
+      "定位压缩器输出解析故障",
+      "恢复可验证压缩方案",
+      "测量首屏与重型资源加载"
+    ],
+    "verification_gaps": [
+      "未做桌面首屏计时与打包体积验收。"
+    ],
+    "next_action": "定位Vite/esbuild压缩故障，恢复可验证的压缩方案并测量首屏和重资源基线。",
+    "inspected_files": [
+      "vite.config.ts",
+      "src/App.tsx",
+      "src/workspaces/codez/index.tsx",
+      "src/workspaces/codez/MarkdownPreview.tsx",
+      "src/workspaces/codez/mermaidSafe.ts",
+      "src/workspaces/codez/CodeMap/layout.ts"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-060",
+    "claimed_status": "pending",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "CodeZ model URI cleanup, extension disposers and DAP session revocation now exist; this supersedes a blanket no-cleanup statement. In-process subagent inflight lifecycle also has outcome cleanup. No two-hour resource census demonstrates listener/model/PTY/index cleanup after task/panel close.",
+    "remaining_work": [
+      "Inventory owned listeners/models/processes/index jobs with allocation/release counters; target measured leaks and run close/restart soak against frozen budget."
+    ],
+    "verification_gaps": [
+      "No measured long-run memory/resource slope and post-close census."
+    ],
+    "next_action": "Inventory owned listeners/models/processes/index jobs with allocation/release counters; target measured leaks and run close/restart soak against frozen budget.",
+    "inspected_files": [
+      "src/workspaces/codez/index.tsx",
+      "src/extensions/debug/dapClient.ts",
+      "src/extensions/extensionService.ts",
+      "src-tauri/src/runtime/koi.rs",
+      "src/utils/perfCounters.ts"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-061",
+    "claimed_status": "pending",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "Turn tracing includes app_version/task/environment fields; diagnostic export concatenates log files with known settings secret replacement. Export reads only Settings values, skips secrets shorter than eight chars and does not include connector credentials; no user range preview or complete task/run/tool/environment diagnostic manifest.",
+    "remaining_work": [
+      "Unify trace IDs and bounded export manifest; include all secret providers without exposing values, redact before preview/export, test short/connector/newly rotated secrets and task-failure locator."
+    ],
+    "verification_gaps": [
+      "No all-source secret fixture or user range preview; current log-only export not complete support bundle."
+    ],
+    "next_action": "Unify trace IDs and bounded export manifest; include all secret providers without exposing values, redact before preview/export, test short/connector/newly rotated secrets and task-failure locator.",
+    "inspected_files": [
+      "src-tauri/src/diagnostics.rs",
+      "src-tauri/src/commands/diagnostics.rs",
+      "src-tauri/src/commands/chat_turn.rs",
+      "src-tauri/src/commands/connectors.rs",
+      "src-tauri/src/tools/settings_catalog.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-062",
+    "claimed_status": "pending",
+    "verified_state": "partial",
+    "severity": "P2",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "Trend script groups by model/endpoint and refuses spec/fixture mismatch; fixed-baseline reporter checks missing/contradictory samples. Existing AZ004 report records 33/36 success for kernel synthetic tools, not desktop/OS outcomes. Trend lacks intervention/cost/host-fault fields and CI quality threshold enforcement; sample count consistency is not fully checked by trend validateSummary.",
+    "remaining_work": [
+      "Extend compatible summary schema with known/unknown cost/intervention/fault attribution, assert count invariants, add regression threshold gate; retain synthetic versus actual desktop scopes."
+    ],
+    "verification_gaps": [
+      "No multi-run host/product trend or gate execution; real-model additional samples need explicit provider budget."
+    ],
+    "next_action": "Extend compatible summary schema with known/unknown cost/intervention/fault attribution, assert count invariants, add regression threshold gate; retain synthetic versus actual desktop scopes.",
+    "inspected_files": [
+      "scripts/upgrade-eval-trend.mjs",
+      "scripts/upgrade-eval-trend.verify.mjs",
+      "scripts/upgrade-model-baseline-report.mjs",
+      "scripts/upgrade-model-baseline.mjs",
+      "docs/upgrade/evidence/AZ-004-live-summary-v1.json",
+      ".github/workflows/ci.yml"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-063",
+    "claimed_status": "pending",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "Task-state schema version checks and kernel additive migrations exist, plus workspace hot-exit snapshot and secret migration code. They do not form a versioned protected whole-product backup/restore contract. ADR004 explicitly requires matched config/key backup before release.",
+    "remaining_work": [
+      "Implement inventory/versioned protected backup transaction covering task/session/environment/settings/artifact identities and compatible key references; failure retains original and recovery validates binding."
+    ],
+    "verification_gaps": [
+      "No whole-product migration rollback or protected cross-version restore receipts."
+    ],
+    "next_action": "Implement inventory/versioned protected backup transaction covering task/session/environment/settings/artifact identities and compatible key references; failure retains original and recovery validates binding.",
+    "inspected_files": [
+      "crates/agentz-task-state/src/lib.rs",
+      "vendor/piscis-engine/piscis-kernel/src/store/db.rs",
+      "vendor/piscis-engine/piscis-kernel/src/security/secrets.rs",
+      "src-tauri/src/commands/workspace.rs",
+      "docs/upgrade/evidence/ADR-004-protected-downgrade.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-064",
+    "claimed_status": "blocked",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "blocked_external",
+    "implementation_state": "partial",
+    "finding": "Offline signing evidence schema/validator, candidate preflight and actual local NSIS candidate receipts exist. Reviewed workflows installer records NotSigned, installed=false, release_ready=false; older known risk references do not automatically describe current source. Validator explicitly checks supplied-record consistency only and cannot authenticate native signing or installation. Release YAML still publishes non-draft outputs on v* independently of quality receipts.",
+    "remaining_work": [
+      "Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied."
+    ],
+    "verification_gaps": [
+      "No certificate identity/native signature/notarization/install/uninstall acceptance; current source is newer than inspected installer.",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied.",
+    "inspected_files": [
+      "scripts/upgrade-signing-evidence.mjs",
+      "docs/upgrade/contracts/signing-evidence.schema.json",
+      "scripts/upgrade-release-preflight.mjs",
+      ".github/workflows/candidate.yml",
+      ".github/workflows/release.yml",
+      "docs/upgrade/evidence/AZ-064-workflows-installer.json"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-065",
+    "claimed_status": "deferred",
+    "verified_state": "not_started",
+    "severity": "P1",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "not_started",
+    "finding": "No updater plugin/config or in-app update flow found; RELEASE documents manual unsigned upgrades. ADR004 is a downgrade policy, not implementation.",
+    "remaining_work": [
+      "After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment."
+    ],
+    "verification_gaps": [
+      "No bad-signature/recovery/compatible-data rollback fixture."
+    ],
+    "next_action": "After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment.",
+    "inspected_files": [
+      "src-tauri/Cargo.toml",
+      "src-tauri/tauri.conf.json",
+      "RELEASE.md",
+      "docs/upgrade/evidence/ADR-004-protected-downgrade.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-066",
+    "claimed_status": "pending",
+    "verified_state": "partial",
+    "severity": "P2",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "SettingsPanel exposes provider/API-key configuration and DevEnv diagnostics exist. No dedicated clean-machine first-success wizard/sample journey was located.",
+    "remaining_work": [
+      "Build offline readiness checklist linking missing model credential/tool/environment to actionable settings/diagnostic actions and a fixed first-task example; keep actual clean-install/model run separate."
+    ],
+    "verification_gaps": [
+      "No clean-machine first successful task receipt; no fake missing-key/tool onboarding fixture."
+    ],
+    "next_action": "Build offline readiness checklist linking missing model credential/tool/environment to actionable settings/diagnostic actions and a fixed first-task example; keep actual clean-install/model run separate.",
+    "inspected_files": [
+      "src/workspaces/codez/SettingsPanel.tsx",
+      "src/hooks/useAppSettings.ts",
+      "src-tauri/src/commands/devenv.rs",
+      "src/App.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-067",
+    "claimed_status": "pending",
+    "verified_state": "partial",
+    "severity": "P2",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "Support matrix and candidate notes distinguish unverified scope; version injected from package and preflight checks identity. RELEASE still says current model v0.3.0 while package is0.9.7. Known-issues status index updated2026-10-13 still describes plan continuity as in-memory despite durable plan integration; its scope must be narrowed to remaining unsupported paths rather than blanket assertion.",
+    "remaining_work": [
+      "Reconcile docs against current exact path/feature coverage, synchronize version checks in CI and write implemented/verified/waived/planned sections without promoting build support."
+    ],
+    "verification_gaps": [
+      "No complete docs version/claim consistency gate; old issue refs partly deliberately unverified."
+    ],
+    "next_action": "Reconcile docs against current exact path/feature coverage, synchronize version checks in CI and write implemented/verified/waived/planned sections without promoting build support.",
+    "inspected_files": [
+      "README.md",
+      "RELEASE.md",
+      "docs/known-issues.md",
+      "docs/upgrade/evidence/AZ-005-support-matrix.md",
+      "docs/upgrade/release-notes-0.9.7.md",
+      "package.json",
+      "scripts/upgrade-release-preflight.mjs",
+      "src-tauri/src/tools/durable_plan_todo.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-068",
+    "claimed_status": "blocked",
+    "verified_state": "not_started",
+    "severity": "P2",
+    "conclusion_proposal": "blocked_external",
+    "implementation_state": "not_started",
+    "finding": "No actual participant roster/feedback ledger/cohort support window was located. Existing review templates are engineering records, not a Beta program.",
+    "remaining_work": [
+      "Prepare severity/attribution/rollback intake templates locally; named owner must select cohort and authorize distribution before actual external feedback."
+    ],
+    "verification_gaps": [
+      "Actual Beta participants and feedback unavailable; cannot fabricate stakeholder or send outreach.",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "Prepare severity/attribution/rollback intake templates locally; named owner must select cohort and authorize distribution before actual external feedback.",
+    "inspected_files": [
+      "docs/upgrade/review-template.md",
+      "docs/upgrade/release-checklist-0.9.7.md",
+      "docs/upgrade/evidence/AZ-005-support-matrix.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-069",
+    "claimed_status": "deferred",
+    "verified_state": "not_started",
+    "severity": "P1",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "not_started",
+    "finding": "Milestone ledger/candidate checklist exist, but no stable-release decision with complete gates, supported scope and accepted risk identities. Candidate hashes do not authorize release.",
+    "remaining_work": [
+      "Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence."
+    ],
+    "verification_gaps": [
+      "Stable product/installation/recovery/signing/Beta receipts missing; final user release decision remains external."
+    ],
+    "next_action": "Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence.",
+    "inspected_files": [
+      "docs/upgrade/plan.json",
+      "docs/upgrade/release-checklist-0.9.7.md",
+      "docs/upgrade/evidence/AZ-005-support-matrix.md",
+      ".github/workflows/release.yml"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-070",
+    "claimed_status": "deferred",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "partial",
+    "finding": "Teams carry member IDs/org_spec/project pool and runtime requires workspace for pool turns; it no longer silently falls back to global workspace for such turns. Workflow dispatch assigns run.project_dir to nodes; inspected contract lacks authoritative per-member environment/output/integration-owner and conflict-resolution identity.",
+    "remaining_work": [
+      "Add member environment and artifact/output provenance contracts under real task binding, explicit integration owner and conflict policy; build concurrent same-file/environment fixtures before team defaults."
+    ],
+    "verification_gaps": [
+      "No member-specific workspace isolation/integration artifact acceptance."
+    ],
+    "next_action": "Add member environment and artifact/output provenance contracts under real task binding, explicit integration owner and conflict policy; build concurrent same-file/environment fixtures before team defaults.",
+    "inspected_files": [
+      "src-tauri/src/commands/teams.rs",
+      "src-tauri/src/runtime/koi.rs",
+      "src-tauri/src/runtime/workflow.rs",
+      "src-tauri/src/tools/call_fish.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-071",
+    "claimed_status": "deferred",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "partial",
+    "finding": "Subagent runtime has per-turn cancellation handles; teams configure task_timeout_secs; workflow has active-turn cancellation/retry/error outcome paths. These are implemented primitives. No shared authoritative team token/time/cost ledger across all members found in inspected team/runtime; existing tool budget hooks do not prove team aggregation/fanout acknowledgement.",
+    "remaining_work": [
+      "Connect one team-owned durable budget and member reservations, cancellation fanout with settlement acknowledgement and partial-failure attribution; avoid copying limits per member."
+    ],
+    "verification_gaps": [
+      "No team total-budget or all-member cancel settlement fixture/actual team cost receipt."
+    ],
+    "next_action": "Connect one team-owned durable budget and member reservations, cancellation fanout with settlement acknowledgement and partial-failure attribution; avoid copying limits per member.",
+    "inspected_files": [
+      "src-tauri/src/runtime/koi.rs",
+      "src-tauri/src/commands/teams.rs",
+      "src-tauri/src/runtime/workflow.rs",
+      "src-tauri/src/runtime/task_budget.rs",
+      "src-tauri/src/tools/call_fish.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-072",
+    "claimed_status": "pending",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "fix_then_done",
+    "implementation_state": "partial",
+    "finding": "Kernel CronScheduler installs in-memory tokio jobs; desktop pool heartbeat uses background loops. No durable trigger occurrence identity/deduped dispatch/sleep restart compensation registry found.",
+    "remaining_work": [
+      "Implement trigger/occurrence/claim ledger with explicit missed-window policy, disable generation and no automatic repeat of unknown external actions; deterministic clock/restart fixtures first."
+    ],
+    "verification_gaps": [
+      "No restart/sleep/dangerous trigger dedupe acceptance; heartbeat settings are not durable automation."
+    ],
+    "next_action": "Implement trigger/occurrence/claim ledger with explicit missed-window policy, disable generation and no automatic repeat of unknown external actions; deterministic clock/restart fixtures first.",
+    "inspected_files": [
+      "vendor/piscis-engine/piscis-kernel/src/scheduler/cron.rs",
+      "src-tauri/src/runtime/heartbeat.rs",
+      "src-tauri/src/tools/settings_catalog.rs",
+      "crates/agentz-task-state/src/external_action.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-073",
+    "claimed_status": "deferred",
+    "verified_state": "partial",
+    "severity": "P2",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "partial",
+    "finding": "Pool heartbeat avoids ack-only response output and durable Run event notice triggers replay; neither is a persistent user notification inbox with read state/task link/deduplication.",
+    "remaining_work": [
+      "After durable trigger/run identity, build persisted meaningful-change inbox and quiet policy, unread/seen/event dedupe fixtures and task navigation."
+    ],
+    "verification_gaps": [
+      "No inbox/read-state/notification dedupe product acceptance."
+    ],
+    "next_action": "After durable trigger/run identity, build persisted meaningful-change inbox and quiet policy, unread/seen/event dedupe fixtures and task navigation.",
+    "inspected_files": [
+      "src-tauri/src/runtime/heartbeat.rs",
+      "src/services/tauri/runEventNotice.ts",
+      "src/workspaces/codez/RunHistoryPanel.tsx"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-074",
+    "claimed_status": "deferred",
+    "verified_state": "partial",
+    "severity": "P1",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "partial",
+    "finding": "Workflow JSON persists cursor/blackboard/history and waiting_human state; in-flight cancellation and resume primitives exist. Thus old no-workflow-implementation finding is too broad. Separate JSON workflow lifecycle is not unified durable Run/Attempt/external-action receipts. Crash after side effect before save_run can repeat node; retry can reissue an unknown-effect action.",
+    "remaining_work": [
+      "Unify node attempt/checkpoint/approval identities and commit action receipts before cursor advance; explicit unknown-result reconciliation, restart no-repeat and exact-human-node fixtures."
+    ],
+    "verification_gaps": [
+      "No dangerous-node crash-window dedupe or cross-restart approval-binding acceptance."
+    ],
+    "next_action": "Unify node attempt/checkpoint/approval identities and commit action receipts before cursor advance; explicit unknown-result reconciliation, restart no-repeat and exact-human-node fixtures.",
+    "inspected_files": [
+      "src-tauri/src/runtime/workflow.rs",
+      "src-tauri/src/commands/workflow.rs",
+      "src/services/tauri/workflow.ts",
+      "src/services/tauri/workflow.test.ts",
+      "crates/agentz-task-state/src/external_action.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-075",
+    "claimed_status": "deferred",
+    "verified_state": "not_started",
+    "severity": "P2",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "not_started",
+    "finding": "Single-model baseline exists, but no single-agent/read-only-parallel/implementation-team matched-condition experiment located. Generic team capabilities are not benefit evidence.",
+    "remaining_work": [
+      "Write fixed task/cohort/config/hash/cost/intervention comparison protocol locally; execute authorized actual models after team scope/budget constraints are ready."
+    ],
+    "verification_gaps": [
+      "No relative-benefit/cost/latency/quality sample set; no model calls in this reassessment."
+    ],
+    "next_action": "Write fixed task/cohort/config/hash/cost/intervention comparison protocol locally; execute authorized actual models after team scope/budget constraints are ready.",
+    "inspected_files": [
+      "scripts/upgrade-model-baseline.mjs",
+      "scripts/upgrade-model-baseline-report.mjs",
+      "docs/upgrade/evidence/AZ-004-live-summary-v1.json",
+      "src-tauri/src/tools/delegate.rs",
+      "src-tauri/src/runtime/koi.rs"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-076",
+    "claimed_status": "deferred",
+    "verified_state": "partial",
+    "severity": "P2",
+    "conclusion_proposal": "deferred_with_reason",
+    "implementation_state": "partial",
+    "finding": "heartbeat_enabled and per-tool/agent enablement settings exist; blanket no-feature-switch statement is inaccurate. No evidence-linked automation/team release gate/rollback switch contract located.",
+    "remaining_work": [
+      "Define per-capability supported scenarios/defaults and authoritative disable/revoke switch after prerequisites; UI limits must reflect unverified platforms, and defaults require actual benefit/safety receipts."
+    ],
+    "verification_gaps": [
+      "No controlled-capability release decision or disable-in-flight automation/team fixture."
+    ],
+    "next_action": "Define per-capability supported scenarios/defaults and authoritative disable/revoke switch after prerequisites; UI limits must reflect unverified platforms, and defaults require actual benefit/safety receipts.",
+    "inspected_files": [
+      "src-tauri/src/tools/settings_catalog.rs",
+      "src-tauri/src/runtime/heartbeat.rs",
+      "src-tauri/src/commands/chat_turn.rs",
+      "docs/upgrade/evidence/AZ-005-support-matrix.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-077",
+    "claimed_status": "blocked",
+    "verified_state": "implemented_unverified",
+    "severity": "P1",
+    "conclusion_proposal": "blocked_external",
+    "implementation_state": "implemented_unverified",
+    "finding": "Native SecItem adapter is wired under macOS with local non-sync generic-password master key and fail-closed OSStatus handling. Native tests are ignored; no actual macOS receipt. Current perform rejects every nonzero status, including missing item on delete; accessibility policy is not explicit. These local design/code tasks must not be blocked wholesale by missing Mac hardware.",
+    "remaining_work": [
+      "Locally specify missing/delete idempotency and explicit accessible/keychain/signing-identity recovery policy, build mock status fixtures; reserve actual read/write/lock/revoke/corruption/migration for real signed macOS session."
+    ],
+    "verification_gaps": [
+      "Real macOS Keychain/signing identity unavailable; cross-target typecheck is not native execution.",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "Locally specify missing/delete idempotency and explicit accessible/keychain/signing-identity recovery policy, build mock status fixtures; reserve actual read/write/lock/revoke/corruption/migration for real signed macOS session.",
+    "inspected_files": [
+      "vendor/piscis-engine/piscis-kernel/src/security/macos_keychain.rs",
+      "vendor/piscis-engine/piscis-kernel/src/security/secrets.rs",
+      "docs/upgrade/evidence/AZ-077-keychain-adapter.md",
+      "docs/upgrade/evidence/ADR-008-gui-blanket-waiver.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-078",
+    "claimed_status": "blocked",
+    "verified_state": "implemented_unverified",
+    "severity": "P1",
+    "conclusion_proposal": "blocked_external",
+    "implementation_state": "implemented_unverified",
+    "finding": "Secret Service adapter uses DH encrypted sessions, refuses locked default collection/prompt fallback, cleans failed creation and is wired under Linux. Actual Linux ignored tests are unrun. Blocking service calls have no inspected deadline; secrets AlreadyExists path recursively calls Self::new without explicit bound. These are actionable local work before Linux native acceptance.",
+    "remaining_work": [
+      "Add bounded service boundary and bounded key-create retry with fault fixtures; then real Linux session tests for unavailable bus/locked/prompt/corrupt/revoke/migration and cleanup."
+    ],
+    "verification_gaps": [
+      "Real Linux desktop Secret Service provider/session absent; cross-target compile does not prove runtime or cross-machine backup portability.",
+      "历史阻塞仍在，解锁条件未获得新的实测证据。"
+    ],
+    "next_action": "Add bounded service boundary and bounded key-create retry with fault fixtures; then real Linux session tests for unavailable bus/locked/prompt/corrupt/revoke/migration and cleanup.",
+    "inspected_files": [
+      "vendor/piscis-engine/piscis-kernel/src/security/linux_keyring.rs",
+      "vendor/piscis-engine/piscis-kernel/src/security/secrets.rs",
+      "vendor/secret-service/src/util.rs",
+      "docs/upgrade/evidence/AZ-078-secret-service-adapter.md"
+    ],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json"
+  },
+  {
+    "id": "AZ-079",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "file_journal undo按id ASC选择earliest applied snapshot并每path一次；实际当前bytes/新建删除未复跑。",
+    "remaining_work": [
+      "当前重复写/新建再改/失败undone回归"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前重复写/新建再改/失败undone回归",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-080",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "approval有有界链接扫描及provider前复验历史证据；路径名provider仍有最终TOCTOU窗口。",
+    "remaining_work": [
+      "当前junction时序fixture复跑；句柄no-follow另立范围"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前junction时序fixture复跑；句柄no-follow另立范围",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-081",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "file_search共享忽略目录常量，approval复用；未证明所有后台入口和递归边界。",
+    "remaining_work": [
+      "当前忽略canary与预检一致性测试"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前忽略canary与预检一致性测试",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-082",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "LSP格式化前递归结构过滤uri/targetUri/changes键，canonical现存本地文件限定。",
+    "remaining_work": [
+      "当前嵌套URI/rename/edit/异常scheme fixture；live LSP另测"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前嵌套URI/rename/edit/异常scheme fixture；live LSP另测",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  },
+  {
+    "id": "AZ-083",
+    "claimed_status": "done",
+    "verified_state": "bounded_source_review",
+    "severity": "P2",
+    "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
+    "implementation_state": "bounded_source_review",
+    "finding": "旧ready/release握手证据保留；当前生产Job等待已读但没有当前native复验。",
+    "remaining_work": [
+      "当前Windows handshake连续回归，保留失败与超时断言"
+    ],
+    "verification_gaps": [
+      "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+    ],
+    "next_action": "当前Windows handshake连续回归，保留失败与超时断言",
+    "inspected_files": [],
+    "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json"
+  }
+]

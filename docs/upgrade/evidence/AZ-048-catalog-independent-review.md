@@ -1,0 +1,13 @@
+# AZ048 catalog in-progress independent review
+
+2026-10-11. Reviewer: Codex current_source_review. Read-only three observations of current projectless.rs SHA256 6907d1df1a7c86937ad0e3cdb5e099912c581971540df949394b622aa489d22a. No source/ledger edits, Cargo or native/GUI checks performed. Parent describes root-binding work and session33133 pending, but observed bytes remain an intermediate implementation; no completion or successful test result is inferred.
+
+Current blockers reported immediately to root:
+
+- initialize refers to undefined root_text and calls connection.transaction() with an immutable connection binding. This observed revision is not a compile-ready final candidate.
+- open_existing only prepares a zero-row selector; it does not read projectless_catalog_identity or compare persisted root/schema. Another ordinary root therefore is not refused at this observed code, contradicting the added wrong-root fixture's intended assertions. Existing initialize also does not branch to verified open_existing.
+- Existing database shape is not checked as ordinary named tables with supported layout/identity cardinality or trigger absence. create_task trusts INSERT success without same-transaction post-insert row verification. An AFTER INSERT trigger erasing registration can return success with no persisted task. A view/altered schema may also defeat assumed uniqueness. Before registering a durable bounded catalog, require suitable layout/trigger refusal or transactional actual-result verification, with meaningful corruption/trigger fixture.
+
+Positive intended boundary: filesystem marker alone is not enough for reopen_task; it queries registered task schema before existing-directory validation. create_task creates files before registration; registration error explicitly retains files and does not adopt/delete them. Actual filesystem/domain fixture added for drop/reopen, preserved artifact, orphan refusal, missing directory refusal and wrong-root rejection is meaningful, but presence does not establish passage and current code cannot support all assertions.
+
+Previously reviewed marker Windows reparse rejection remains. Dedicated trusted-root/caller authorization, ancestor-path TOCTOU, marker hardlinks/path-read allocation, partial filesystem/DB commit, directory crash durability and host-unconnected constraints remain. No host authority, user-facing projectless task routing or full AZ048 acceptance is provided. Final corrected source must receive new exact fingerprints and follow-up review; this evidence preserves the observed intermediate findings without attributing changes or reverting files.

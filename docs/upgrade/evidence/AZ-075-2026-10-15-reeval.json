@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-075",
+    "verified_state": "matched_comparison_protocol_prepared_unreviewed",
+    "severity": "P2",
+    "finding": "A versioned matched-task protocol now fixes three arms, environment and build hashes, complete per-run receipts, paired comparisons, unknown cost treatment, and a conservative default decision. No actual model or team experiment ran.",
+    "conclusion_proposal": "Keep deferred until AZ-070/AZ-071 contracts, AZ-062 collection, authorized model runs, and unified review.",
+    "next_action": "After team scope and budget contracts, freeze a real experiment card and run paired single/read-only-parallel/implementation-team repeats with actual model, cost, intervention, and oracle receipts.",
+    "remaining_work": ["Executable fixture and frozen card", "Three-arm authorized actual-model sample set", "Paired analysis and independent default-policy review"],
+    "verification_gaps": ["No model calls or cost receipts", "No team-run comparative measurements", "Upstream task/environment and team budget contracts not accepted"],
+    "evidence": ["docs/upgrade/team-benefit-protocol.md"]
+  }
+]

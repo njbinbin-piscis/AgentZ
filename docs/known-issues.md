@@ -7,6 +7,29 @@ refactor. Fix these after the current task queue drains.
 
 Owner: Piscis. Created: 2026-09-29.
 
+## Status index (2026-10-13)
+
+Line numbers in the sections below are from the 2026-09-29 snapshot and have
+drifted. Find the code by symbol with `rg` instead of by line. Support scope
+(what is verified per platform) is tracked in
+[AZ-005 支持矩阵](upgrade/evidence/AZ-005-support-matrix.md); a known issue
+here does not change that matrix.
+
+| # | Item | Status on 2026-10-13 | Stale reference / how to verify |
+| --- | --- | --- | --- |
+| 1 | Whole-turn 600s timeout | Host part fixed (Fix batch 1); per-step recovery still kernel-side | `default_timeout` no longer exists. Current turn timeout: `rg -n "turn_timeout_secs" src-tauri/src/commands/chat_turn.rs` |
+| 2 | LLM request retry | Open, kernel-side (`piscis-kernel`) | Its "pinned v0.8.62" is stale: root `Cargo.toml` pins `v0.8.68`. `clawhub_get_with_retry` is unrelated to the agent LLM path |
+| 3 | Tool timeout returned to agent | Open, kernel-side | Not re-verified in this pass |
+| 4 | UAC prompt must not hard-fail | Open, partly host-side | Not re-verified in this pass |
+| 5 | CRLF multi-line `file_edit` | Resolved in Fix batch 5 ("fixed upstream"). The "Open" status in its own section is superseded | Resolved; kept for history |
+| 6 | Verification gap in this environment | Not re-verified in this pass | See section 6 |
+| 7 | Aborted turn drops plan continuity | Host part fixed; store still in-memory, no cross-restart durability | Not re-verified in this pass |
+| 8 | `plan_todo` stuck `in_progress` | Open; Fix batch 1 only surfaces the count | Not re-verified in this pass |
+| 21 / 22 | DeepSeek tool-call pairing and "think" compatibility | Status as recorded in their sections (Fix batch 7 landed an engine commit) | Not re-verified in this pass |
+
+Windows packaging target: see the README. Verified outputs are the NSIS `.exe`
+files uploaded by `.github/workflows/release.yml`.
+
 ---
 
 ## 1. `agent turn failed: timed out after 600s` kills the whole turn

@@ -91,8 +91,34 @@ pub fn open_project_kernel_state(
 ) -> Result<KernelState, String> {
     let config_dir = resolve_global_config_dir(app)?;
     let db_dir = resolve_project_data_dir(project_dir)?;
-    open_kernel_state_split(&config_dir, &db_dir)
-        .map_err(|e| format!("failed to initialise kernel state: {e}"))
+    let state = open_kernel_state_split(&config_dir, &db_dir)
+        .map_err(|e| format!("failed to initialise kernel state: {e}"))?;
+    reconcile_project_owners(project_dir);
+    Ok(state)
+}
+
+/// Startup reconciliation of active Runs whose owner process is gone (AZ-019). Runs
+/// without owner evidence are left untouched; failures are logged, never block opening.
+fn reconcile_project_owners(project_dir: &str) {
+    let root = match agentz_task_state::canonical_root(Path::new(project_dir.trim())) {
+        Ok(root) => root,
+        Err(error) => {
+            tracing::warn!(%error, "owner reconciliation skipped: invalid project root");
+            return;
+        }
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    match crate::runtime::owner_lease::reconcile_project(Path::new(&root), now) {
+        Ok(report) => {
+            for (run_id, disposition) in report {
+                tracing::info!(%run_id, ?disposition, "owner reconciliation");
+            }
+        }
+        Err(error) => tracing::warn!(%error, "owner reconciliation failed"),
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

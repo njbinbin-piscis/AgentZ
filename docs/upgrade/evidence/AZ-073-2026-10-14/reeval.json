@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-073",
+    "verified_state": "persisted_inbox_with_rotating_approval_reconciliation_candidate_unreviewed",
+    "severity": "P2",
+    "finding": "A SQLite inbox stores deduplicated, read-state notices from bound Run transitions, approvals, semantic changes and local reminders. Approval reconciliation uses a durable rotating cursor over bounded pages of 1,000 unread candidates, so a full page of live approvals does not permanently starve later stale notices. Four inbox domain tests and two host reconciliation tests pass, including a 1,001-notice restart fixture. Native navigation, actual sleep/resume and product-level quietness journeys are untested.",
+    "conclusion_proposal": "Keep deferred until AZ-072 durable trigger integration and product inbox wiring are complete.",
+    "next_action": "Exercise native reminder/approval click-to-task and unchanged-state quietness; verify multiple-read backlog behavior and complete AZ-072 trigger integration.",
+    "remaining_work": ["Native click-to-task and quietness journey", "Multiple-read backlog product verification", "Full AZ-072 automation trigger integration"],
+    "verification_gaps": ["No native product-level unchanged-state or navigation fixture", "Approval expiry/restart covered by a local fixture only", "AZ-072 not accepted"],
+    "evidence": ["docs/upgrade/evidence/AZ-073-2026-10-14/implementation.md"]
+  }
+]

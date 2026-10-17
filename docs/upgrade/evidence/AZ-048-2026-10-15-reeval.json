@@ -1,0 +1,23 @@
+[
+  {
+    "id": "AZ-048",
+    "verified_state": "host_trusted_projectless_turn_and_observation_wired_local_checks_passed",
+    "severity": "P1",
+    "finding": "The current implementation resolves a managed projectless directory through the host catalog for chat, approvals, plan lookup and task observation. WorkZ creates and reopens bound sessions; a two-session native resolver fixture and client tests pass. End-to-end desktop/model and recovery journeys remain unverified.",
+    "conclusion_proposal": "Keep preparing pending unified native and recovery acceptance.",
+    "next_action": "Run a real first turn and continuation in separate projectless sessions, reopen after restart, verify catalog-loss refusal and legacy free-session compatibility; review final source and rollback evidence before acceptance.",
+    "remaining_work": [
+      "Native desktop first-turn and continuation journey",
+      "Reopen and legacy free-session compatibility journey",
+      "Catalog-loss recovery and rollback acceptance",
+      "Unified source review and evidence freeze"
+    ],
+    "verification_gaps": [
+      "No real desktop/model turn executed",
+      "No native reopen/legacy/rollback journey executed"
+    ],
+    "evidence": [
+      "docs/upgrade/evidence/AZ-048-projectless-turn-gap-2026-10-14.md"
+    ]
+  }
+]

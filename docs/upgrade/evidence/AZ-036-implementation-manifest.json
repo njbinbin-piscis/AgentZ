@@ -1,0 +1,94 @@
+{
+  "captured_at": "2026-10-10T03:59:21.290Z",
+  "scope": "bounded task read and navigation candidate, not full IDE execution handoff",
+  "files": [
+    {
+      "path": "src/App.tsx",
+      "sha256": "79fd684ddaad63cb573db8740358aff68a3a08a818f573325a8d41361db2f465"
+    },
+    {
+      "path": "src/i18n/en.ts",
+      "sha256": "c718a52cd27c3b1f6e2dc0950fd6c4d3992ab6af9ae8d6b5837592670d69493e"
+    },
+    {
+      "path": "src/i18n/zh.ts",
+      "sha256": "bbca86c830405bc983d8297bf000d34dfeea9975f85e6693ac22f2be739f8984"
+    },
+    {
+      "path": "src/workspaces/codez/index.tsx",
+      "sha256": "4885b81cc033d4a9499f41088255f58524a74aec719fd2f1eea85b7792e96785"
+    },
+    {
+      "path": "src/workspaces/workz/index.tsx",
+      "sha256": "472d401fd2bf8b543162f2ffe30a00b4e7aab145fd94a81a224d9b68a20cb866"
+    },
+    {
+      "path": "src/services/workspaceNavigation.ts",
+      "sha256": "716fc3d3a3ff945aa3b25b62a3eb1f42b02fba804347c609c1030e492ce681bf"
+    },
+    {
+      "path": "src/services/workspaceNavigation.test.ts",
+      "sha256": "2699415a5f1fab15def42021caaae7522a8cde4080c04e5facac7d4d5334f723"
+    },
+    {
+      "path": "src/services/tauri/taskView.ts",
+      "sha256": "1ec02d0698eb4c4cb8ec82a31453007cbd35fe28f4502310663aebfdc2cafd7b"
+    },
+    {
+      "path": "src/services/tauri/taskView.test.ts",
+      "sha256": "b6a238ddde57abaf2a0644a738684e45a3cfe716fb961b2c5bb3ef9de7502986"
+    },
+    {
+      "path": "src/services/tauri/taskFiles.ts",
+      "sha256": "17510b26edc22e72b5ae4232182e4d3fa829268a4b74de43ca65d937967df1cc"
+    },
+    {
+      "path": "src/services/tauri/taskFiles.test.ts",
+      "sha256": "a3ee5aec7f448d13cdc0d6c95efd95b6d6070b2d22c92f88365b68b8f938c6ce"
+    },
+    {
+      "path": "src/workspaces/codez/TaskFileViewer.tsx",
+      "sha256": "b3913a6fba9419721254bbfe5c1c60ea7deb8ecf0a1a9b6eaa11f098bf41b1f1"
+    },
+    {
+      "path": "src/workspaces/codez/TaskFileViewer.test.tsx",
+      "sha256": "87b74d349756224c9266ecf2a8a0b93527e8b87a2e3d9f4b7388ecd02d377aeb"
+    },
+    {
+      "path": "src-tauri/src/commands/task_view.rs",
+      "sha256": "18fbfe84c79ea825c0d4a9da8036b63436bdbc3acf80c6ecb4fedc1ae15970cf"
+    },
+    {
+      "path": "src-tauri/src/commands/task_view_read.rs",
+      "sha256": "8a38d539c9c3e3db9924169e158d348b84cd1fe6c3d03bdbf90f547489e1657a"
+    },
+    {
+      "path": "src-tauri/src/commands/chat_plan.rs",
+      "sha256": "2392747b2def2b915e115159629cda076b8865ee62abcc90271a62cc5348f4a5"
+    },
+    {
+      "path": "src-tauri/src/commands/mod.rs",
+      "sha256": "e3bdaa6d8a1f793d6c64c3c9a9326c5000a75f442d1378a062b519165829ad33"
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "sha256": "2516371b7cbeff732ca7747e90f00eee7addcc62848a769fbdca139b91dd3c81"
+    },
+    {
+      "path": "src/workspaces/codez/editorConflict.ts",
+      "sha256": "18913faf070f34c48c1ffef4496aed0cba018f1f2b34400a7f0143e6beadf8a0"
+    },
+    {
+      "path": "src/workspaces/codez/editorConflict.test.ts",
+      "sha256": "1a186cb366b939c12b7dc9ac7434ffcb1d44515092aa2fcc8a714b104d913695"
+    },
+    {
+      "path": "src/workspaces/codez/editorRecovery.ts",
+      "sha256": "25ff29527254b07dd159f2952902557ac56c0d645a43beae8bf3f7cb030d7968"
+    },
+    {
+      "path": "src/workspaces/codez/editorRecovery.integration.test.ts",
+      "sha256": "b252966ab7da5f4367501cd14e3123be65653709c54ca86d9a30f2b86be92446"
+    }
+  ]
+}

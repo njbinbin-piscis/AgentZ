@@ -1,0 +1,107 @@
+diff --git a/piscis-kernel/src/tools/file_search.rs b/piscis-kernel/src/tools/file_search.rs
+index 187ae7d..735a62d 100644
+--- a/piscis-kernel/src/tools/file_search.rs
++++ b/piscis-kernel/src/tools/file_search.rs
+@@ -8,6 +8,20 @@ use std::path::{Path, PathBuf};
+ 
+ const MAX_RESULTS: usize = 500;
+ const MAX_CONTENT_BYTES: usize = 200 * 1024; // 200 KB per file for grep
++pub const EXCLUDED_SEARCH_DIRECTORY_NAMES: &[&str] = &[
++    ".git",
++    "node_modules",
++    "target",
++    ".cache",
++    "__pycache__",
++    ".vs",
++];
++
++pub fn is_excluded_search_directory(name: &str) -> bool {
++    EXCLUDED_SEARCH_DIRECTORY_NAMES
++        .iter()
++        .any(|excluded| excluded.eq_ignore_ascii_case(name))
++}
+ 
+ pub struct FileSearchTool;
+ 
+@@ -397,18 +411,19 @@ fn walk_dir<F: FnMut(&Path) -> bool>(dir: &Path, depth: usize, max_depth: usize,
+     };
+     for entry in entries.flatten() {
+         let path = entry.path();
++        let is_dir = path.is_dir();
++        if is_dir
++            && path
++                .file_name()
++                .and_then(|name| name.to_str())
++                .is_some_and(is_excluded_search_directory)
++        {
++            continue;
++        }
+         if !visitor(&path) {
+             return;
+         }
+-        if path.is_dir() {
+-            // Skip common noise directories
+-            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+-            if matches!(
+-                name,
+-                ".git" | "node_modules" | "target" | ".cache" | "__pycache__" | ".vs"
+-            ) {
+-                continue;
+-            }
++        if is_dir {
+             walk_dir(&path, depth + 1, max_depth, visitor);
+         }
+     }
+@@ -455,3 +470,52 @@ fn glob_to_regex(glob: &str) -> String {
+     regex.push('$');
+     regex
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn walk_dir_skips_excluded_directories_before_visiting_entries() {
++        struct TempRoot(PathBuf);
++        impl Drop for TempRoot {
++            fn drop(&mut self) {
++                let _ = std::fs::remove_dir_all(&self.0);
++            }
++        }
++
++        let root =
++            std::env::temp_dir().join(format!("file-search-excludes-{}", uuid::Uuid::new_v4()));
++        std::fs::create_dir(&root).expect("create file search fixture");
++        let _root = TempRoot(root.clone());
++        std::fs::create_dir(root.join("src")).expect("create included directory");
++        std::fs::write(root.join("src/visible.rs"), "visible").expect("write visible file");
++        for excluded in EXCLUDED_SEARCH_DIRECTORY_NAMES {
++            let directory = root.join(excluded);
++            std::fs::create_dir(&directory).expect("create excluded directory");
++            std::fs::write(directory.join("hidden.rs"), "must not visit")
++                .expect("write excluded file");
++        }
++
++        let mut visited = Vec::new();
++        walk_dir(&root, 0, 10, &mut |path| {
++            visited.push(path.to_path_buf());
++            true
++        });
++
++        assert!(visited.iter().any(|path| path.ends_with("visible.rs")));
++        for excluded in EXCLUDED_SEARCH_DIRECTORY_NAMES {
++            assert!(
++                !visited
++                    .iter()
++                    .any(|path| path.components().any(|component| {
++                        component
++                            .as_os_str()
++                            .to_string_lossy()
++                            .eq_ignore_ascii_case(excluded)
++                    })),
++                "excluded directory {excluded} or its contents reached the visitor"
++            );
++        }
++    }
++}

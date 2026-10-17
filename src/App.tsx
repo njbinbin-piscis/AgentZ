@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { openFolderDialog } from "./services/tauri";
+import { getProjectScope, pickProjectScope, restoreProjectScope, revokeProjectScope } from "./services/tauri/projectScope";
 import { isRemoteDir, OPEN_PROJECT_EVENT } from "./extensions/remoteTargets";
+import { preflightWorkspaceNavigation } from "./services/workspaceNavigation";
 import {
   workspaceLoad,
   workspaceSave,
@@ -12,7 +13,6 @@ import {
   type LayoutSnapshot,
   type WorkspaceSnapshot,
 } from "./services/tauri/workspace";
-import { CodeMapPanel } from "./workspaces/codez/CodeMap";
 import { generateRepoWiki } from "./services/tauri/repoWiki";
 import {
   graphIndexVisualState,
@@ -36,8 +36,12 @@ import {
 } from "./theme";
 import { syncEditorThemeWithAppearance } from "./workspaces/codez/themeStore";
 import CodeZWorkspace from "./workspaces/codez";
+import TaskFileViewer from "./workspaces/codez/TaskFileViewer";
 import WorkZWorkspace, { type WikiBuildAction } from "./workspaces/workz";
 import SettingsPanel from "./workspaces/codez/SettingsPanel";
+import { OPEN_SETTINGS_EVENT, SETTINGS_CLOSED_EVENT } from "./workspaces/codez/firstRun";
+import { modeShortcutLabel, modeShortcutTarget } from "./utils/modeShortcut";
+import { requestOpenCodezSession } from "./workspaces/codez/sessionRoute";
 import ZLogo from "./components/ZLogo";
 import { browserClose, browserCloseGuard, type PickedElement } from "./services/tauri/browser";
 import type { ChatAttachment } from "./services/tauri/chat";
@@ -62,10 +66,16 @@ import ResourceLibraryPanel, {
 import AssistantMessagesPanel from "./workspaces/codez/AssistantMessagesPanel";
 import { getImSettings } from "./services/tauri/gateway";
 import ExtensionHostProvider from "./extensions/ui/ExtensionHostProvider";
+import { debugController } from "./extensions/debug/debugController";
 import { ProjectEdgeProvider } from "./contexts/ProjectEdgeContext";
 import ProjectEdgeShell from "./components/ProjectEdgeShell";
+import NotificationInbox from "./components/NotificationInbox";
 import { composerDbg } from "./utils/composerDebug";
 import "./App.css";
+
+const CodeMapPanel = lazy(() =>
+  import("./workspaces/codez/CodeMap").then(({ CodeMapPanel }) => ({ default: CodeMapPanel })),
+);
 
 type Mode = "codez" | "workz";
 
@@ -77,7 +87,29 @@ function normProjectPath(p: string): string {
 export default function App() {
   const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("workz");
+  // Cursor-style window switch: Ctrl/Cmd+Shift+N -> IDE (CodeZ), Ctrl/Cmd+Alt+N -> Agents (WorkZ).
+  // Both views share the current project, so switching keeps the workspace context.
+  useEffect(() => {
+    const onModeKey = (event: KeyboardEvent) => {
+      const target = modeShortcutTarget(event);
+      if (!target) return;
+      event.preventDefault();
+      setMode(target);
+    };
+    window.addEventListener("keydown", onModeKey);
+    return () => window.removeEventListener("keydown", onModeKey);
+  }, []);
+  const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
   const [projectDir, setProjectDir] = useState<string | null>(null);
+  const [taskFileRoute, setTaskFileRoute] = useState<{ authorityProject: string; sessionId: string } | null>(null);
+  const [inboxTaskRoute, setInboxTaskRoute] = useState<{ projectDir: string; taskId: string; nonce: number } | null>(null);
+  const projectNavigationBusy = useRef(false);
+  const currentProjectRef = useRef(projectDir);
+  currentProjectRef.current = projectDir;
+  const liveEditorSnapshot = useRef<(() => EditorSnapshot) | null>(null);
+  const registerNavigationSnapshot = useCallback((read: (() => EditorSnapshot) | null) => {
+    liveEditorSnapshot.current = read;
+  }, []);
   const [chatOpen, setChatOpen] = useState(true);
   const [chatWidth, setChatWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem("agentz-chat-width"));
@@ -100,6 +132,12 @@ export default function App() {
   } | null>(null);
   const [browserOpen, setBrowserOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Inline "open Settings" actions (first-run checklist, setup errors) dispatch this event.
+  useEffect(() => {
+    const open = () => setSettingsOpen(true);
+    window.addEventListener(OPEN_SETTINGS_EVENT, open);
+    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, open);
+  }, []);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryInitial, setLibraryInitial] = useState<LibraryInitialState | null>(null);
   const [assistantPanelOpen, setAssistantPanelOpen] = useState(false);
@@ -212,7 +250,7 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     void workspaceLoad()
-      .then((snap) => {
+      .then(async (snap) => {
         if (cancelled || !snap?.project_dir) {
           setWorkspaceReady(true);
           return;
@@ -242,7 +280,18 @@ export default function App() {
             ...ideLayoutPatchRef.current,
           },
         });
-        setProjectDir(snap.project_dir);
+        let restoredDir = snap.project_dir;
+        if (!isRemoteDir(restoredDir)) {
+          try {
+            const scope = await restoreProjectScope("workspace");
+            restoredDir = scope.project_dir;
+            if (cancelled) return;
+          } catch {
+            // Workspace editing can still restore; durable plan actions require a host scope.
+            if (cancelled) return;
+          }
+        }
+        setProjectDir(restoredDir);
         setWorkspaceReady(true);
       })
       .catch(() => setWorkspaceReady(true));
@@ -367,17 +416,38 @@ export default function App() {
   }, [wikiMenuOpen]);
 
   const switchProject = useCallback(
-    async (dir: string) => {
+    async (dir: string, navigationOwned = false) => {
+    if (!navigationOwned && projectNavigationBusy.current) return false;
+    if (!navigationOwned) projectNavigationBusy.current = true;
     try {
-      if (projectDir && normProjectPath(dir) === normProjectPath(projectDir)) return;
-      if (projectDir) {
-        const ok = await confirmTerminalCloseOnProjectChange(t);
-        if (!ok) return;
-        await destroyAllTerminals();
+      if (projectDir && normProjectPath(dir) === normProjectPath(projectDir)) return true;
+      const readSnapshot = () => {
+        if (!liveEditorSnapshot.current) throw new Error("Live editor snapshot unavailable");
+        return { ...buildWorkspaceSnapshot(), editor: liveEditorSnapshot.current() };
+      };
+      const checked = await preflightWorkspaceNavigation({
+        readSnapshot,
+        isCurrent: () => currentProjectRef.current === projectDir,
+        confirmTerminals: () => projectDir ? confirmTerminalCloseOnProjectChange(t) : Promise.resolve(true),
+        persist: workspaceSave,
+      });
+      if (checked.status !== "ready") {
+        if (checked.reason === "dirty_buffers") window.alert(t("app.saveBeforeProjectSwitch", { defaultValue: "Save or close your edited files and unsaved drafts before switching projects." }));
+        if (checked.reason === "save_failed") window.alert(t("app.projectSwitchSaveFailed", { defaultValue: "Could not preserve the workspace. Project switching was cancelled." }));
+        return false;
       }
+      const stillCurrent = () => currentProjectRef.current === projectDir && JSON.stringify(readSnapshot()) === JSON.stringify(checked.snapshot);
+      if (projectDir) await destroyAllTerminals();
+      if (!stillCurrent()) return false;
+      // The debug session belongs to the old project: stop it before the switch is visible.
+      await debugController.stop();
+      if (!stillCurrent()) return false;
       setIdeWikiOpenPath(null);
       setChatInsertElement(null);
-      await persistWorkspace();
+      const previousScope = projectDir ? getProjectScope(projectDir) : null;
+      if (previousScope) await revokeProjectScope(previousScope.handle);
+      if (!stillCurrent()) return false;
+      setTaskFileRoute(null);
       setProjectDir(dir);
       if (!isRemoteDir(dir)) {
         try {
@@ -387,11 +457,14 @@ export default function App() {
           // Non-fatal — user can apply templates from settings later.
         }
       }
+      return true;
     } catch (e) {
       console.error("switchProject failed:", e);
+    } finally {
+      if (!navigationOwned) projectNavigationBusy.current = false;
     }
     },
-    [projectDir, t, persistWorkspace],
+    [projectDir, t, buildWorkspaceSnapshot],
   );
 
   useEffect(() => {
@@ -404,49 +477,96 @@ export default function App() {
   }, [switchProject]);
 
   const pickFolder = useCallback(async () => {
+    if (projectNavigationBusy.current) return;
+    projectNavigationBusy.current = true;
     try {
-      const dir = await openFolderDialog(projectDir);
-      if (dir) await switchProject(dir);
+      const scope = await pickProjectScope();
+      if (scope && !await switchProject(scope.project_dir, true)) {
+        await revokeProjectScope(scope.handle);
+      }
     } catch (e) {
       console.error("pickFolder failed:", e);
+    } finally {
+      projectNavigationBusy.current = false;
     }
-  }, [projectDir, switchProject]);
+  }, [switchProject]);
 
   const openProjectInCodeZ = useCallback(
     async (dir: string) => {
-      await switchProject(dir);
+      if (!await switchProject(dir)) return;
+      setMode("codez");
+    },
+    [switchProject],
+  );
+
+  // WorkZ opens a project's CodeZ-origin chat here: same project database, same session.
+  const openSessionInCodeZ = useCallback(
+    async (projectPath: string, sessionId: string, source: string) => {
+      if (!projectPath || !sessionId) return;
+      if (!await switchProject(projectPath)) return;
+      setMode("codez");
+      requestOpenCodezSession({ projectDir: projectPath, sessionId, source });
+    },
+    [switchProject],
+  );
+
+  const openTaskFilesInCodeZ = useCallback(
+    async (authorityProject: string, sessionId: string) => {
+      if (!authorityProject || !sessionId) return;
+      if (!await switchProject(authorityProject)) return;
+      setTaskFileRoute({ authorityProject, sessionId });
       setMode("codez");
     },
     [switchProject],
   );
 
   const closeProject = useCallback(async () => {
-    if (!projectDir) return;
+    if (!projectDir || projectNavigationBusy.current) return;
+    projectNavigationBusy.current = true;
     try {
-      const ok = await confirmTerminalCloseOnProjectChange(t);
-      if (!ok) return;
-      await destroyAllTerminals();
-      setIdeWikiOpenPath(null);
-      try {
-        const guard = await browserCloseGuard();
-        if (!guard.can_close || guard.agent_active) {
-          const msg = guard.reason ?? t("browser.closeConfirm");
-          // eslint-disable-next-line no-alert
-          if (!window.confirm(msg)) return;
-        }
-      } catch {
-        // eslint-disable-next-line no-alert
-        if (!window.confirm(t("browser.closeConfirm"))) return;
+      const readSnapshot = () => {
+        if (!liveEditorSnapshot.current) throw new Error("Live editor snapshot unavailable");
+        return { ...buildWorkspaceSnapshot(), editor: liveEditorSnapshot.current() };
+      };
+      const checked = await preflightWorkspaceNavigation({
+        readSnapshot,
+        isCurrent: () => currentProjectRef.current === projectDir,
+        confirmTerminals: async () => {
+          if (!await confirmTerminalCloseOnProjectChange(t)) return false;
+          try {
+            const guard = await browserCloseGuard();
+            return (guard.can_close && !guard.agent_active) || window.confirm(guard.reason ?? t("browser.closeConfirm"));
+          } catch {
+            return window.confirm(t("browser.closeConfirm"));
+          }
+        },
+        persist: workspaceSave,
+      });
+      if (checked.status !== "ready") {
+        if (checked.reason === "dirty_buffers") window.alert(t("app.saveBeforeProjectClose", { defaultValue: "Save or close your edited files and unsaved drafts before closing the project." }));
+        if (checked.reason === "save_failed") window.alert(t("app.projectCloseSaveFailed", { defaultValue: "Could not preserve the workspace. Project closing was cancelled." }));
+        return;
       }
+      const stillCurrent = () => currentProjectRef.current === projectDir && JSON.stringify(readSnapshot()) === JSON.stringify(checked.snapshot);
+      await destroyAllTerminals();
+      if (!stillCurrent()) return;
+      await debugController.stop();
+      if (!stillCurrent()) return;
+      const scope = getProjectScope(projectDir);
+      if (scope) await revokeProjectScope(scope.handle);
+      if (!stillCurrent()) return;
+      setIdeWikiOpenPath(null);
       setBrowserOpen(false);
       setChatInsertElement(null);
       void browserClose().catch(() => {});
-      await persistWorkspace();
+      setTaskFileRoute(null);
       setProjectDir(null);
     } catch (e) {
       console.error("closeProject failed:", e);
+    } finally {
+      projectNavigationBusy.current = false;
     }
-  }, [projectDir, t, persistWorkspace]);
+  }, [projectDir, t, buildWorkspaceSnapshot]);
 
   const handleSendToChat = useCallback((paths: string[]) => {
     if (paths.length === 0) return;
@@ -814,20 +934,25 @@ export default function App() {
           >
             <SettingsIcon />
           </button>
+          <NotificationInbox projectDir={projectDir} onOpenTask={(taskId) => {
+            if (!projectDir) return;
+            setInboxTaskRoute({ projectDir, taskId, nonce: Date.now() });
+            setMode("workz");
+          }} />
         </div>
 
         <div className="agentz-mode-switch">
           <button
             className={mode === "workz" ? "active" : ""}
             onClick={() => setMode("workz")}
-            title={t("app.modeWorkZTitle")}
+            title={`${t("app.modeWorkZTitle")} (${modeShortcutLabel("workz", isMac)})`}
           >
             {t("app.modeWorkZ")}
           </button>
           <button
             className={mode === "codez" ? "active" : ""}
             onClick={() => setMode("codez")}
-            title={t("app.modeCodeZTitle")}
+            title={`${t("app.modeCodeZTitle")} (${modeShortcutLabel("codez", isMac)})`}
           >
             {t("app.modeCodeZ")}
           </button>
@@ -835,7 +960,8 @@ export default function App() {
       </header>
 
       {codeMapOpen && projectDir && (
-        <CodeMapPanel
+        <Suspense fallback={null}>
+          <CodeMapPanel
           projectDir={projectDir}
           onClose={() => setCodeMapOpen(false)}
           onOpenFile={(rel) => {
@@ -851,7 +977,8 @@ export default function App() {
             setMode("codez");
             handleSendToChat([`${projectDir.replace(/[\\/]+$/, "")}/${rel}`]);
           }}
-        />
+          />
+        </Suspense>
       )}
 
       <main className="agentz-main">
@@ -871,7 +998,16 @@ export default function App() {
                 onScreenshotToChat={handleScreenshotToChat}
                 workspaceRestore={workspaceRestore}
                 onWorkspacePatch={handleWorkspacePatch}
+                onRegisterNavigationSnapshot={registerNavigationSnapshot}
               />
+              {taskFileRoute && projectDir && normProjectPath(taskFileRoute.authorityProject) === normProjectPath(projectDir) && (
+                <TaskFileViewer
+                  key={JSON.stringify(taskFileRoute)}
+                  projectDir={taskFileRoute.authorityProject}
+                  sessionId={taskFileRoute.sessionId}
+                  onClose={() => setTaskFileRoute(null)}
+                />
+              )}
             </div>
             <div
               className="agentz-ide-chat-resize"
@@ -885,6 +1021,7 @@ export default function App() {
             <div className="agentz-ide-chat" style={{ width: chatWidth }} hidden={!chatOpen}>
               <IdeSidePanel
                 projectDir={projectDir}
+                onOpenFolder={pickFolder}
                 insertRequest={chatInsert}
                 insertElementRequest={chatInsertElement}
                 insertTerminalRequest={chatInsertTerminal}
@@ -897,8 +1034,11 @@ export default function App() {
         <div className="agentz-pane" hidden={mode !== "workz"}>
           <WorkZWorkspace
             projectDir={projectDir}
+            openTaskRequest={inboxTaskRoute}
             onOpenFolder={pickFolder}
             onOpenProjectInCodeZ={(dir) => void openProjectInCodeZ(dir)}
+            onOpenTaskFilesInCodeZ={(authorityProject, sessionId) => void openTaskFilesInCodeZ(authorityProject, sessionId)}
+            onOpenSessionInCodeZ={(projectPath, sessionId, source) => void openSessionInCodeZ(projectPath, sessionId, source)}
             wikiBuildNonce={wikiBuildNonce}
             wikiBuildAction={wikiBuildAction}
             onWikiBusyChange={setWikiBusy}
@@ -911,7 +1051,13 @@ export default function App() {
       </main>
 
       {settingsOpen && (
-        <SettingsPanel onClose={() => setSettingsOpen(false)} projectDir={projectDir} />
+        <SettingsPanel
+          onClose={() => {
+            setSettingsOpen(false);
+            window.dispatchEvent(new CustomEvent(SETTINGS_CLOSED_EVENT));
+          }}
+          projectDir={projectDir}
+        />
       )}
       {libraryOpen && (
         <ResourceLibraryPanel

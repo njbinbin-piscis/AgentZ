@@ -12,8 +12,7 @@ use tracing::{info, warn};
 
 use piscis_core::heartbeat::{
     assessment_requires_coordination, build_heartbeat_coordination_gap_notice,
-    build_pool_heartbeat_message, collect_pool_attention, is_heartbeat_ack_only,
-    PoolAttention,
+    build_pool_heartbeat_message, collect_pool_attention, is_heartbeat_ack_only, PoolAttention,
 };
 use piscis_core::host::{EventSink, HeadlessCliMode, HeadlessCliRequest};
 use piscis_kernel::store::settings::default_heartbeat_prompt;
@@ -164,16 +163,14 @@ async fn run_heartbeat_round(app: &AppHandle, project_dir: &str) -> bool {
         if !open {
             continue;
         }
-        let Some(attention) =
-            collect_pool_attention(&pool, &messages, &pool_todos, &koi_ids, 0)
+        let Some(attention) = collect_pool_attention(&pool, &messages, &pool_todos, &koi_ids, 0)
         else {
             continue;
         };
         if !assessment_requires_coordination(&attention.assessment) {
             continue;
         }
-        if let Err(e) = dispatch_pool_attention(app, project_dir, &attention, &base_prompt).await
-        {
+        if let Err(e) = dispatch_pool_attention(app, project_dir, &attention, &base_prompt).await {
             warn!(
                 target: "pool::heartbeat",
                 pool_id = %pool.id,
@@ -204,7 +201,12 @@ async fn latest_piscis_message_id(
     guard
         .get_pool_messages(pool_id, 100, 0)
         .ok()
-        .and_then(|msgs| msgs.iter().filter(|m| m.sender_id == "piscis").map(|m| m.id).max())
+        .and_then(|msgs| {
+            msgs.iter()
+                .filter(|m| m.sender_id == "piscis")
+                .map(|m| m.id)
+                .max()
+        })
         .unwrap_or(0)
 }
 
@@ -214,6 +216,13 @@ async fn dispatch_pool_attention(
     attention: &PoolAttention,
     base_prompt: &str,
 ) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    // Hold before opening session/runtime state and through the entire turn.
+    // The shared turn runner must not acquire a nested execution lease.
+    let _environment_lease = state.environment_access.execution().await;
+    let _task_activity = state
+        .task_activity
+        .try_enter(std::path::Path::new(project_dir), &attention.session_id)?;
     let kernel = open_project_kernel_state(app, project_dir).map_err(|e| e.to_string())?;
     let (db, _settings) = kernel.clone();
     {
@@ -239,7 +248,6 @@ async fn dispatch_pool_attention(
         attention.pool_id
     );
 
-    let state = app.state::<AppState>();
     let config_dir = resolve_global_config_dir(app).map_err(|e| e.to_string())?;
     let journal =
         Arc::new(crate::journal::open_project_journal(project_dir).map_err(|e| e.to_string())?);
@@ -265,11 +273,12 @@ async fn dispatch_pool_attention(
         sink,
         state.plan_state.clone(),
         None,
+        project_dir.to_string(),
         cancel,
         None,
         "agent".to_string(),
         None,
-        true,
+        false,
         None,
         state.lsp_manager.clone(),
         state.browser.clone(),
@@ -281,6 +290,7 @@ async fn dispatch_pool_attention(
         None,
         Some(attention.pool_id.clone()),
         false,
+        None,
     )
     .await
     .map_err(|e| e.to_string())?;

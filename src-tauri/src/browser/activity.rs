@@ -36,9 +36,7 @@ impl BrowserActivity {
             return BrowserCloseGuard {
                 can_close: false,
                 agent_active: true,
-                reason: Some(
-                    "An agent turn is in progress and may be using the browser.".into(),
-                ),
+                reason: Some("An agent turn is in progress and may be using the browser.".into()),
             };
         }
         if recent_browser {

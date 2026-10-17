@@ -1,0 +1,18 @@
+   Compiling agentz-desktop v0.9.7 (C:\Projects\AgentZ\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 43s
+     Running unittests src\lib.rs (target\debug\deps\agentz_desktop_lib-31653dfccf28278e.exe)
+
+running 10 tests
+test runtime::task_budget::tests::failed_reservation_updates_stay_queued_until_applied ... ok
+test runtime::task_budget::tests::unbound_scope_is_transparent ... ok
+test runtime::task_budget::tests::missing_store_stops_call_before_provider ... ok
+test runtime::task_budget::tests::limits_round_trip_and_reject_negative_values ... ok
+test runtime::task_budget::tests::exhausted_active_time_refuses_before_the_provider ... ok
+test runtime::task_budget::tests::sub_agent_scope_shares_the_parent_task_budget ... ok
+test runtime::task_budget::tests::active_time_limit_admits_calls_with_a_bounded_reservation ... ok
+test runtime::task_budget::tests::exhausted_limit_stops_next_call_and_raised_limit_resumes_without_reset ... ok
+test runtime::task_budget::tests::unlimited_default_records_usage_and_never_denies ... ok
+test runtime::task_budget::tests::dropped_calls_are_settled_and_do_not_hold_slots_or_budget ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 292 filtered out; finished in 1.02s
+

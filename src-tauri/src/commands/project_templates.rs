@@ -40,7 +40,8 @@ fn bundled_templates_root(app: &AppHandle) -> Option<PathBuf> {
             return Some(p);
         }
     }
-    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../bundled/preinstall/project-templates");
+    let dev =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../bundled/preinstall/project-templates");
     if dev.is_dir() {
         return Some(dev);
     }
@@ -140,10 +141,7 @@ fn convert_codebuddy_hooks(raw: &str) -> Result<HooksConfig, String> {
             }
         }
     }
-    Ok(HooksConfig {
-        version: 1,
-        hooks,
-    })
+    Ok(HooksConfig { version: 1, hooks })
 }
 
 #[tauri::command]

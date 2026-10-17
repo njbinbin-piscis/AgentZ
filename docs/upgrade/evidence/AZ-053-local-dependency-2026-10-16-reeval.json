@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-053",
+    "verified_state": "unshipped_dependency_fix_local_tests_pass",
+    "severity": "P1",
+    "finding": "AgentZ still pins RobotZ v0.1.13 cdff2c947f812648050a550b8e9d8a887bf01e01. The separate dirty RobotZ working tree contains generation-aware snapshot and tool changes; its four generation tests pass offline on Windows, but AgentZ does not consume those bytes and actual takeover has not been tested.",
+    "conclusion_proposal": "Keep pending until a reviewed immutable RobotZ revision is pinned and AgentZ's browser navigation/takeover path is verified.",
+    "next_action": "Review and pin an immutable RobotZ revision with generation-aware refs, then run AgentZ's pinned stale-ref and delayed-action takeover fixtures.",
+    "remaining_work": ["Reviewed immutable RobotZ dependency revision", "AgentZ pinned dependency test", "Actual task/page takeover revocation and delayed-action refusal", "Unified review"],
+    "verification_gaps": ["Local tests used dirty RobotZ working tree, not AgentZ pinned dependency", "No GUI takeover or delayed action test"],
+    "evidence": ["docs/upgrade/evidence/AZ-053-local-dependency-check-2026-10-16.md"]
+  }
+]

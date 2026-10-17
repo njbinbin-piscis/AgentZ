@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { listen } from "@tauri-apps/api/event";
 import DropdownSelect from "../../../components/DropdownSelect";
 import {
+  CONNECTOR_OAUTH_RESULT_EVENT,
   createApiConnector,
   getConnectorCredentials,
   listConnectors,
+  refreshConnectorOAuth,
   saveConnectorCredentials,
   setConnectorEnabled,
+  startConnectorOAuth,
   uninstallConnector,
   type ConnectorInfo,
+  type ConnectorOAuthResult,
   type CreateApiConnectorRequest,
 } from "../../../services/tauri/connectors";
 
@@ -77,6 +82,7 @@ export default function ConnectorsInstalledView({ expandConnectorId }: Connector
 
   const [editing, setEditing] = useState<string | null>(null);
   const [credForm, setCredForm] = useState<Record<string, string>>({});
+  const [oauthNotice, setOauthNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -93,6 +99,63 @@ export default function ConnectorsInstalledView({ expandConnectorId }: Connector
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // The backend reports the end of an authorization attempt; refresh so `authorized` updates.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    void listen<ConnectorOAuthResult>(CONNECTOR_OAUTH_RESULT_EVENT, (event) => {
+      const result = event.payload;
+      setOauthNotice(
+        result.ok
+          ? t("connectors.oauthDone")
+          : t("connectors.oauthFailed", { error: result.error ?? "" }),
+      );
+      void refresh();
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [refresh, t]);
+
+  const doStartOAuth = useCallback(
+    async (c: ConnectorInfo) => {
+      setBusy(c.id);
+      setError(null);
+      setOauthNotice(null);
+      try {
+        const url = await startConnectorOAuth(c.id);
+        setOauthNotice(t("connectors.oauthOpened", { url }));
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [t],
+  );
+
+  const doRefreshOAuth = useCallback(
+    async (c: ConnectorInfo) => {
+      setBusy(c.id);
+      setError(null);
+      setOauthNotice(null);
+      try {
+        await refreshConnectorOAuth(c.id);
+        setOauthNotice(t("connectors.oauthDone"));
+        await refresh();
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [refresh, t],
+  );
 
   const applyPreset = useCallback((presetId: string) => {
     const p = API_PRESETS.find((x) => x.id === presetId);
@@ -160,8 +223,9 @@ export default function ConnectorsInstalledView({ expandConnectorId }: Connector
     setError(null);
     try {
       setCredForm(await getConnectorCredentials(c.id));
-    } catch {
+    } catch (error) {
       setCredForm({});
+      setError(String(error));
     }
   }, []);
 
@@ -199,6 +263,7 @@ export default function ConnectorsInstalledView({ expandConnectorId }: Connector
         <h3>{t("connectors.title")}</h3>
         <p className="agentz-settings-hint">{t("connectors.hint")}</p>
         {error && <div className="agentz-settings-error">{error}</div>}
+        {oauthNotice && <div className="agentz-settings-hint">{oauthNotice}</div>}
 
         <div className="agentz-settings-field" style={{ marginTop: 12 }}>
           <button type="button" onClick={() => setApiOpen((v) => !v)}>
@@ -341,6 +406,24 @@ export default function ConnectorsInstalledView({ expandConnectorId }: Connector
                     )}
                   </div>
                   <div className="agentz-wb-actions" style={{ flexShrink: 0 }}>
+                    {c.auth_method === "oauth2" && (
+                      <button
+                        type="button"
+                        disabled={busy === c.id}
+                        onClick={() => void doStartOAuth(c)}
+                      >
+                        {t("connectors.oauthAuthorize")}
+                      </button>
+                    )}
+                    {c.auth_method === "oauth2" && c.authorized && (
+                      <button
+                        type="button"
+                        disabled={busy === c.id}
+                        onClick={() => void doRefreshOAuth(c)}
+                      >
+                        {t("connectors.oauthRefresh")}
+                      </button>
+                    )}
                     {c.auth_method !== "none" && (
                       <button type="button" onClick={() => void openCreds(c)}>
                         {t("connectors.credentials")}

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-049",
+    "verified_state": "local_report_contract_candidate_unreviewed",
+    "severity": "P2",
+    "finding": "A versioned report DTO, source-locator validator and deterministic Markdown template exist locally with positive, negative and Markdown-injection fixtures.",
+    "conclusion_proposal": "Keep deferred until task-bound artifact capture, report review and unified acceptance.",
+    "next_action": "Wire validated report output to a report artifact under fresh task/environment binding, then review one fixed report and its source locators.",
+    "remaining_work": ["Task-bound artifact capture and locator opening", "One fixed report with actual source review", "Independent implementation review"],
+    "verification_gaps": ["No real research report", "No UI or artifact-capture integration", "No native desktop run"],
+    "evidence": ["docs/upgrade/evidence/AZ-049-2026-10-14/implementation.md"]
+  }
+]

@@ -1,0 +1,6 @@
+{
+  "native_gui": "not_run",
+  "test": "lifecycle_gate",
+  "exit_code": 0,
+  "platform": "windows-local"
+}

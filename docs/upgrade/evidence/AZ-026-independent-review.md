@@ -1,0 +1,21 @@
+# AZ026 independent fixed-kernel candidate review
+
+2026-10-09. Read-only review of freeze utility, host public contract tests, execution/source/artifact/resolution records. No Cargo, new freeze, publication or platform execution by this reviewer. Parent reports complete forward/reverse/relocation checks, host3 tests and strictClippy passed; this reviewer distinguishes reported results from own checks.
+
+## Limited conclusion and actual independent checks
+
+No blocking defect found for the limited local fixed-product compatibility/source-bundle candidate. Independently read and SHA256-compared all 132 vendor files, 29 companion files, 6 integration files and all 4 retained artifacts (size/hash), against the saved manifests; all matched. This does not constitute independent semantic review of all vendor source or a release approval.
+
+Freeze archives fixed upstream commit 527e55496caf4437e4265e02869f0a8c764549f6 via git archive; sibling working tree contents are not read. Product source is exclusively AgentZ/vendor, not an uncommitted sibling override. Fresh temporary repositories disable hooks, autocrlf/filemode conversion locally. Binary/full-index diff replaces the complete inventoried upstream file set; forward/reverse/second-forward byte comparisons explicitly include deleted/new files. Relocated bundle includes adjacent secret-service required by relative manifests. Script never modifies live source, lockfiles or user Git settings, tags/publishes nothing and marks release_ready=false.
+
+Inventory rejects symbolic links and nonregular entries within trees, forbidden runtime/build names and excludes .git. Copy/deletion touches only individually inventoried files in a newly created snapshot tree. Artifact comparison confirms the currently recorded paths are under the intended retained candidate directory. This is ordinary local source preparation, not an adversarial filesystem authorization boundary: root-directory reparse points, symlink races or hostile archive/path input are not separately validated. The fixed trusted repository is a precondition.
+
+Source/integration hashes are captured then rechecked at the end, so detected mutations fail closed; this is sampled consistency, not an atomic filesystem snapshot. A transient change restored before final sampling or mutation after return is not ruled out. Consumers must keep using frozen artifacts/pins, never assume all future live reads are identical. Tar header determinism is not promised and execution evidence correctly states that limitation.
+
+## Compatibility evidence and limits
+
+Sanitized cargo resolution lists seven local packages under AgentZ, no sibling override. Kernel/core actual manifests are 0.8.63, ide-tools0.1.0, companion5.1.0; upstream tagv0.8.68 is not falsely substituted as a package version. Host tests consume public recovery/retry types through fixed product dependencies: unknown cleanup stays passive, content/image retained, cancellation/omission distinct, auth/quota no retry/fallback. They are three bounded contract checks, not a relocated complete rebuild or every tool/provider compatibility path. Parent reported test/Clippy outcomes are retained without claiming this reviewer reran them.
+
+Complete engine overlay provenance is immutable upstream plus patch; companion is a bundled hash-pinned local snapshot, with no separate upstream revision/overlay provenance asserted. Companion source/legal/platform behavior requires its own review if distribution is intended. inventory .git exclusion is deliberate metadata exclusion, not proof every packaged source/config lacks secrets; no all-source security/license clearance is implied.
+
+The new freeze utility supersedes the old partial chain only for complete byte reconstruction; it does not retroactively validate every change semantically. Windows installer build underway is separate evidence. GUI, fresh machine, signed release, public distribution, full relocated compile, Linux/macOS runtime, real external side effects and rollback remain unverified. AZ026 may be recorded as the limited candidate version/compatibility delivery when parent applies its criteria, but this review does not auto-pass an upstream formal Gate or mark release-ready.

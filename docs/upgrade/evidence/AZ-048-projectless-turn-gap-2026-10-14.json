@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-048",
+    "verified_state": "catalog_and_host_api_candidate_with_unwired_turn_binding_gap",
+    "severity": "P1",
+    "finding": "Projectless session creation persists a catalog binding, but WorkZ does not consume it. A bound managed directory is rejected by chat_turn and ApprovalHooks because require_binding accepts only TaskEnvironment records, not the projectless catalog.",
+    "conclusion_proposal": "Keep preparing and do not wire the UI until host-trusted catalog binding is checked at initial turn and every authorization recheck.",
+    "next_action": "Add trusted projectless binding mode across chat_turn, approval rechecks and task observation; then wire WorkZ new/reopen and test two-session isolation plus lost-catalog recovery.",
+    "remaining_work": ["Host-trusted projectless approval binding", "Task observation and continuation binding", "WorkZ new/reopen integration", "Two-session and catalog-loss fixture", "Native unified acceptance"],
+    "verification_gaps": ["No end-to-end bound projectless turn", "No native task routing or recovery journey"],
+    "evidence": ["docs/upgrade/evidence/AZ-048-projectless-turn-gap-2026-10-14.md"]
+  }
+]

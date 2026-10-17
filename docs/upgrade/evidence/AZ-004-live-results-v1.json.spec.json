@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "baseline": "first-fixed-synthetic-v1",
+  "spec_sha256": "f57dc7bcaf7a667d42ba4eeceff2b258c3c62c661eb98105b83e2cbccc04e7a3",
+  "fixture_source_sha256": "1a9243308dd564364e91ccbdbe46a727cc2cc5f8ad0ed5abfd43a5654977ad7e",
+  "repeats": 3,
+  "model": "deepseek-flash",
+  "endpoint": "https://api.deepseek.com",
+  "thinking": false,
+  "maximum_samples": 36,
+  "maximum_logical_calls": 144,
+  "planned_maximum_output_tokens": 36864,
+  "maximum_request_payload_bytes": 589824,
+  "budget_note": "request-byte proxy and logical-call/output caps; provider internal wire retries/usage/prices not a hard billing guarantee",
+  "scope": "real kernel synthetic fixture tools; not host/GUI/OS or priced settlement",
+  "tasks": [
+    {
+      "id": "J1-01",
+      "source": "export const add=(a,b)=>a-b;",
+      "prompt": "Read source.txt; fix add to add operands, preserve compact style. Write out.txt.",
+      "required": [
+        "a+b"
+      ],
+      "forbidden": [
+        "a-b"
+      ]
+    },
+    {
+      "id": "J1-02",
+      "source": "function eligible(age){return age>18;}",
+      "prompt": "Read source.txt; fix eligibility to include age18, preserve function name. Write out.txt.",
+      "required": [
+        "age>=18",
+        "eligible"
+      ],
+      "forbidden": [
+        "age>18"
+      ]
+    },
+    {
+      "id": "J1-03",
+      "source": "export const items=['red','blue'];",
+      "prompt": "Read source.txt; extend items with green without removing existing entries. Write out.txt.",
+      "required": [
+        "red",
+        "blue",
+        "green"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "J1-04",
+      "source": "{\"enabled\":false,\"timeout\":30}",
+      "prompt": "Read source.txt; write valid JSON out.txt with enabled true and timeout unchanged.",
+      "required": [
+        "\"enabled\":true",
+        "\"timeout\":30"
+      ],
+      "forbidden": [
+        "\"enabled\":false"
+      ]
+    },
+    {
+      "id": "J2-01",
+      "source": "module-a.ts: entry=start; module-b.ts: entry=finish;",
+      "prompt": "Read source.txt; write out.txt research identifying both module entry points and cite both exact file names.",
+      "required": [
+        "module-a.ts",
+        "start",
+        "module-b.ts",
+        "finish"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "J2-02",
+      "source": "policy.md: retries=3; cache.md: ttl=60 seconds;",
+      "prompt": "Read source.txt; write out.txt two-setting summary with file citations, values and TTL unit.",
+      "required": [
+        "policy.md",
+        "3",
+        "cache.md",
+        "60",
+        "seconds"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "J2-03",
+      "source": "release.md: tested=Windows; macOS=not tested; Linux=not tested;",
+      "prompt": "Read source.txt; write out.txt explicit platform support evidence. Do not claim untested platforms tested.",
+      "required": [
+        "Windows",
+        "macOS",
+        "Linux",
+        "not tested"
+      ],
+      "forbidden": [
+        "all platforms tested"
+      ]
+    },
+    {
+      "id": "J2-04",
+      "source": "trace.md: observed=timeout; cause=unknown;",
+      "prompt": "Read source.txt; write out.txt separating observed timeout from unknown cause, cite trace.md. Do not invent network failure.",
+      "required": [
+        "timeout",
+        "unknown",
+        "trace.md"
+      ],
+      "forbidden": [
+        "network failure"
+      ]
+    },
+    {
+      "id": "J3-01",
+      "source": "meeting: owner=Ada; deadline=Friday; deliverable=draft;",
+      "prompt": "Read source.txt; write Markdown checklist out.txt containing owner, deadline and deliverable.",
+      "required": [
+        "Ada",
+        "Friday",
+        "draft",
+        "- [ ]"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "J3-02",
+      "source": "title=Local report; scope=synthetic; cost=unknown;",
+      "prompt": "Read source.txt; write Markdown out.txt with title Local report, synthetic scope and explicit unknown cost, never zero cost.",
+      "required": [
+        "Local report",
+        "synthetic",
+        "unknown"
+      ],
+      "forbidden": [
+        "cost=0",
+        "cost: 0"
+      ]
+    },
+    {
+      "id": "J3-03",
+      "source": "HUMAN NOTE: preserve this line.\nDraft: add a Risks section.",
+      "prompt": "Read source.txt; produce out.txt adding a Markdown Risks section while retaining exact HUMAN NOTE line.",
+      "required": [
+        "HUMAN NOTE: preserve this line.",
+        "Risks"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "J3-04",
+      "source": "Goal: offline guide.\nCompleted: overview.\nOpen: backup instructions.",
+      "prompt": "Read source.txt; continue the existing guide into out.txt preserving goal/overview and adding backup instructions. Do not replace goal with a new task.",
+      "required": [
+        "offline",
+        "overview",
+        "backup"
+      ],
+      "forbidden": []
+    }
+  ]
+}

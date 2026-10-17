@@ -305,7 +305,11 @@ fn seed_preinstall_resources(app: &AppHandle, config_dir: &Path) {
     let skills_dest = crate::skills::provenance::installed_dir(&skills_root);
     let skills_src = bundle.join("skills");
     if skills_src.is_dir() {
-        for entry in std::fs::read_dir(&skills_src).into_iter().flatten().flatten() {
+        for entry in std::fs::read_dir(&skills_src)
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             if entry.path().is_dir() {
                 let slug = entry.file_name().to_string_lossy().to_string();
                 copy_tree_if_absent(&entry.path(), &skills_dest.join(&slug));
@@ -316,14 +320,21 @@ fn seed_preinstall_resources(app: &AppHandle, config_dir: &Path) {
     let agents_src = bundle.join("agents");
     if agents_src.is_dir() {
         let agents_dest = config_dir.join("agents");
-        for entry in std::fs::read_dir(&agents_src).into_iter().flatten().flatten() {
+        for entry in std::fs::read_dir(&agents_src)
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             if !entry.path().is_dir() {
                 continue;
             }
             let agent_json = entry.path().join("agent.json");
             if agent_json.is_file() {
                 let id = entry.file_name().to_string_lossy().to_string();
-                copy_file_if_absent(&agent_json, &agents_dest.join(safe_id(&id)).join("agent.json"));
+                copy_file_if_absent(
+                    &agent_json,
+                    &agents_dest.join(safe_id(&id)).join("agent.json"),
+                );
             }
         }
     }
@@ -331,19 +342,29 @@ fn seed_preinstall_resources(app: &AppHandle, config_dir: &Path) {
     let commands_src = bundle.join("commands");
     if commands_src.is_dir() {
         let commands_dest = config_dir.join("commands");
-        for entry in std::fs::read_dir(&commands_src).into_iter().flatten().flatten() {
+        for entry in std::fs::read_dir(&commands_src)
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             if !entry.path().is_dir() {
                 continue;
             }
             let cmd_json = entry.path().join("command.json");
             if cmd_json.is_file() {
                 let id = entry.file_name().to_string_lossy().to_string();
-                copy_file_if_absent(&cmd_json, &commands_dest.join(safe_id(&id)).join("command.json"));
+                copy_file_if_absent(
+                    &cmd_json,
+                    &commands_dest.join(safe_id(&id)).join("command.json"),
+                );
             }
         }
     }
 
-    info!("seed: copied CodeBuddy preinstall from {}", bundle.display());
+    info!(
+        "seed: copied CodeBuddy preinstall from {}",
+        bundle.display()
+    );
 }
 
 #[derive(Debug, Deserialize, Default)]

@@ -48,9 +48,11 @@ export interface TreeViewState {
 
 export interface WebviewState {
   handle: string;
+  resourceToken: string;
   viewType: string;
   title: string;
   html: string;
+  enableScripts: boolean;
 }
 
 export interface ScmProviderState {
@@ -111,6 +113,7 @@ class ExtensionUiStore {
   private activeOutput: string | null = null;
   private treeViews = new Map<string, TreeViewState>();
   private webviews = new Map<string, WebviewState>();
+  private pendingWebviewHtml = new Map<string, string>();
   private messages: MessageToast[] = [];
   private quickPick: QuickPickRequest | null = null;
   private inputBox: InputBoxRequest | null = null;
@@ -280,7 +283,9 @@ class ExtensionUiStore {
 
   // ── webviews ──
   setWebview(state: WebviewState): void {
-    this.webviews.set(state.handle, state);
+    const html = this.pendingWebviewHtml.get(state.handle);
+    this.pendingWebviewHtml.delete(state.handle);
+    this.webviews.set(state.handle, html === undefined ? state : { ...state, html });
     this.emit();
   }
   setWebviewHtml(handle: string, html: string): void {
@@ -288,10 +293,15 @@ class ExtensionUiStore {
     if (wv) {
       wv.html = html;
       this.emit();
+    } else {
+      this.pendingWebviewHtml.set(handle, html);
     }
   }
-  removeWebview(handle: string): void {
+  removeWebview(handle: string): WebviewState | undefined {
+    const removed = this.webviews.get(handle);
+    this.pendingWebviewHtml.delete(handle);
     if (this.webviews.delete(handle)) this.emit();
+    return removed;
   }
 
   // ── scm ──
@@ -339,6 +349,7 @@ class ExtensionUiStore {
     this.activeOutput = null;
     this.treeViews.clear();
     this.webviews.clear();
+    this.pendingWebviewHtml.clear();
     this.messages = [];
     this.quickPick = null;
     this.inputBox = null;

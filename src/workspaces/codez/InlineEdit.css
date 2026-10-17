@@ -102,3 +102,15 @@
   text-decoration: line-through;
   text-decoration-color: rgba(239, 68, 68, 0.5);
 }
+.agentz-lsp-health {
+  position: absolute;
+  right: 18px;
+  bottom: 8px;
+  z-index: 5;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--bg-secondary, #252526);
+  color: var(--text-secondary, #bbb);
+  font-size: 12px;
+  pointer-events: none;
+}

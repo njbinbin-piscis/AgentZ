@@ -1,0 +1,218 @@
+vite v5.4.21 building for production...
+transforming...
+✓ 4164 modules transformed.
+rendering chunks...
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/Projects/AgentZ/node_modules/@tauri-apps/plugin-dialog/dist-js/index.js is dynamically imported by C:/Projects/AgentZ/src/components/chat/interactiveUi/DisplayBlocks.tsx but also statically imported by C:/Projects/AgentZ/src/components/chatComposerUtils.ts, C:/Projects/AgentZ/src/services/tauri/confirm.ts, C:/Projects/AgentZ/src/services/tauri/index.ts, C:/Projects/AgentZ/src/services/tauri/vsix.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+target/reassessment-2026-10-13/web-current/index.html                                            0.78 kB │ gzip:     0.38 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size3-Regular-CTq5MqoE.woff              4.42 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2             4.93 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2             5.21 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2             5.47 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size4-Regular-BF-4gkZK.woff              5.98 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size2-Regular-oD1tc_U0.woff              6.19 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size1-Regular-C195tn64.woff              6.50 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Caligraphic-Regular-Di6jR-x-.woff2       6.91 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2          6.91 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size3-Regular-DgpXs0kz.ttf               7.59 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Caligraphic-Regular-CTRA-rTL.woff        7.66 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Caligraphic-Bold-BEiXGLvX.woff           7.72 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Script-Regular-D3wIWfF6.woff2            9.64 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_SansSerif-Regular-DDBCnlJ7.woff2        10.34 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size4-Regular-DWFBv043.ttf              10.36 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Script-Regular-D5yQViql.woff            10.59 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Fraktur-Regular-CTYiF6lA.woff2          11.32 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Fraktur-Bold-CL6g_b3V.woff2             11.35 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size2-Regular-B7gKUWhC.ttf              11.51 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_SansSerif-Italic-C3H0VqGB.woff2         12.03 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_SansSerif-Bold-D1sUS0GD.woff2           12.22 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Size1-Regular-Dbsnue_I.ttf              12.23 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_SansSerif-Regular-CS6fqUqJ.woff         12.32 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Caligraphic-Regular-wX97UBjC.ttf        12.34 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Caligraphic-Bold-ATXxdsX0.ttf           12.37 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Fraktur-Regular-Dxdc4cR9.woff           13.21 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Fraktur-Bold-BsDP51OF.woff              13.30 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Typewriter-Regular-CO6r4hn1.woff2       13.57 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_SansSerif-Italic-DN2j7dab.woff          14.11 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_SansSerif-Bold-DbIhKOiC.woff            14.41 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Typewriter-Regular-C0xS9mPB.woff        16.03 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2          16.40 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Math-Italic-t53AETM-.woff2              16.44 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Script-Regular-C5JkGWo-.ttf             16.65 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2          16.78 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2              16.99 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Math-BoldItalic-iY-2wyZ7.woff           18.67 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Math-Italic-DA0__PXp.woff               18.75 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-BoldItalic-SpSLRI95.woff           19.41 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_SansSerif-Regular-BNo7hRIc.ttf          19.44 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Fraktur-Regular-CB_wures.ttf            19.57 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Fraktur-Bold-BdnERNNW.ttf               19.58 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-Italic-BMLOBm91.woff               19.68 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_SansSerif-Italic-YYjJ1zSn.ttf           22.36 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_SansSerif-Bold-CFMepnvq.ttf             24.50 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-Bold-Cx986IdX.woff2                25.32 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-Regular-B22Nviop.woff2             26.27 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf         27.56 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2              28.08 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-Bold-Jm3AIy58.woff                 29.91 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-Regular-Dr94JaBh.woff              30.77 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Math-BoldItalic-B3XSjfu4.ttf            31.20 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Math-Italic-flOr_0UB.ttf                31.31 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-BoldItalic-DzxPMmG6.ttf            32.97 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_AMS-Regular-DMm9YOAa.woff               33.52 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-Italic-3WenGoN9.ttf                33.58 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-Bold-waoOVXN0.ttf                  51.34 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_Main-Regular-ypZvNtVU.ttf               53.58 kB
+target/reassessment-2026-10-13/web-current/assets/KaTeX_AMS-Regular-DRggAlZN.ttf                63.63 kB
+target/reassessment-2026-10-13/web-current/assets/codicon-ngg6Pgfi.ttf                         121.97 kB
+target/reassessment-2026-10-13/web-current/assets/editor.worker-Bcb90Ofr.js                    543.85 kB
+target/reassessment-2026-10-13/web-current/assets/json.worker-BaVg4bKs.js                      843.51 kB
+target/reassessment-2026-10-13/web-current/assets/html.worker-k2DNzlfk.js                    1,240.60 kB
+target/reassessment-2026-10-13/web-current/assets/css.worker-BXnLYZW0.js                     1,869.18 kB
+target/reassessment-2026-10-13/web-current/assets/ts.worker-Dq1RJ8jR.js                     13,252.33 kB
+target/reassessment-2026-10-13/web-current/assets/monaco-B6UfNlAV.css                          206.31 kB │ gzip:    30.23 kB
+target/reassessment-2026-10-13/web-current/assets/index-DLwXai40.css                           276.59 kB │ gzip:    48.72 kB
+target/reassessment-2026-10-13/web-current/assets/channel-9HdGXN4p.js                            0.20 kB │ gzip:     0.16 kB
+target/reassessment-2026-10-13/web-current/assets/init-ZxktEp_H.js                               0.26 kB │ gzip:     0.16 kB
+target/reassessment-2026-10-13/web-current/assets/chunk-QZHKN3VN-Clk53V3B.js                     0.38 kB │ gzip:     0.24 kB
+target/reassessment-2026-10-13/web-current/assets/chunk-FMBD7UC4-BE9C--3I.js                     0.43 kB │ gzip:     0.30 kB
+target/reassessment-2026-10-13/web-current/assets/chunk-4BX2VUAB-CnVxUChm.js                     0.50 kB │ gzip:     0.25 kB
+target/reassessment-2026-10-13/web-current/assets/chunk-55IACEB6-G0zdQHLK.js                     0.52 kB │ gzip:     0.31 kB
+target/reassessment-2026-10-13/web-current/assets/stateDiagram-v2-BHNVJYJU-BrSUXb1B.js           0.77 kB │ gzip:     0.43 kB
+target/reassessment-2026-10-13/web-current/assets/classDiagram-4FO5ZUOK-ByXCbgXq.js              0.85 kB │ gzip:     0.46 kB
+target/reassessment-2026-10-13/web-current/assets/classDiagram-v2-Q7XG4LA2-ByXCbgXq.js           0.85 kB │ gzip:     0.46 kB
+target/reassessment-2026-10-13/web-current/assets/infoDiagram-5YYISTIA-C-gFSq-f.js               1.09 kB │ gzip:     0.58 kB
+target/reassessment-2026-10-13/web-current/assets/chunk-2J33WTMH-BeOp1PYF.js                     1.11 kB │ gzip:     0.50 kB
+target/reassessment-2026-10-13/web-current/assets/azcli-BEAhqcuE.js                              1.30 kB │ gzip:     0.34 kB
+target/reassessment-2026-10-13/web-current/assets/javascript-Dvtc0wa_.js                         1.31 kB │ gzip:     0.52 kB
+target/reassessment-2026-10-13/web-current/assets/ini-BcQysCTb.js                                1.67 kB │ gzip:     0.67 kB
+target/reassessment-2026-10-13/web-current/assets/csp-D_3BK2Wp.js                                1.70 kB │ gzip:     0.57 kB
+target/reassessment-2026-10-13/web-current/assets/ordinal-DSZU4PqD.js                            2.18 kB │ gzip:     0.77 kB
+target/reassessment-2026-10-13/web-current/assets/scheme-D7PxodDG.js                             2.36 kB │ gzip:     0.86 kB
+target/reassessment-2026-10-13/web-current/assets/bat-Bqkp9Cfu.js                                2.66 kB │ gzip:     1.04 kB
+target/reassessment-2026-10-13/web-current/assets/xml-C6tpU9gz.js                                2.75 kB │ gzip:     0.92 kB
+target/reassessment-2026-10-13/web-current/assets/flow9-ZSTChSMd.js                              2.76 kB │ gzip:     0.97 kB
+target/reassessment-2026-10-13/web-current/assets/sb-Chfc_wZF.js                                 2.81 kB │ gzip:     1.03 kB
+target/reassessment-2026-10-13/web-current/assets/pla-DEV89yYj.js                                2.87 kB │ gzip:     0.78 kB
+target/reassessment-2026-10-13/web-current/assets/dockerfile--oxj0cAH.js                         3.02 kB │ gzip:     0.82 kB
+target/reassessment-2026-10-13/web-current/assets/pascaligo-VA_LQ1oU.js                          3.25 kB │ gzip:     1.13 kB
+target/reassessment-2026-10-13/web-current/assets/lua-hNsuGJkO.js                                3.43 kB │ gzip:     1.12 kB
+target/reassessment-2026-10-13/web-current/assets/bicep-DIlfshcM.js                              3.44 kB │ gzip:     1.08 kB
+target/reassessment-2026-10-13/web-current/assets/objective-c-B1L1C5EC.js                        3.48 kB │ gzip:     1.16 kB
+target/reassessment-2026-10-13/web-current/assets/cameligo-CLaaYNMV.js                           3.51 kB │ gzip:     1.18 kB
+target/reassessment-2026-10-13/web-current/assets/graphql-BeiGgjIU.js                            3.77 kB │ gzip:     1.42 kB
+target/reassessment-2026-10-13/web-current/assets/chunk-ND2GUHAM-D8-zdyz6.js                     3.77 kB │ gzip:     1.12 kB
+target/reassessment-2026-10-13/web-current/assets/lexon-C1U0m2n9.js                              3.81 kB │ gzip:     1.20 kB
+target/reassessment-2026-10-13/web-current/assets/typespec-R77Ln7Jb.js                           3.90 kB │ gzip:     1.24 kB
+target/reassessment-2026-10-13/web-current/assets/sparql-DxuVdnRl.js                             3.94 kB │ gzip:     1.34 kB
+target/reassessment-2026-10-13/web-current/assets/mips-CJm71dS3.js                               4.14 kB │ gzip:     1.30 kB
+target/reassessment-2026-10-13/web-current/assets/m3-6ko6q9-_.js                                 4.15 kB │ gzip:     1.45 kB
+target/reassessment-2026-10-13/web-current/assets/sophia-D7pU0Y1d.js                             4.27 kB │ gzip:     1.48 kB
+target/reassessment-2026-10-13/web-current/assets/shell-vZEubQ82.js                              4.48 kB │ gzip:     1.34 kB
+target/reassessment-2026-10-13/web-current/assets/go-brnMpFrj.js                                 4.49 kB │ gzip:     1.49 kB
+target/reassessment-2026-10-13/web-current/assets/fsharp-D2uoxuLH.js                             4.51 kB │ gzip:     1.55 kB
+target/reassessment-2026-10-13/web-current/assets/pascal-DMQyD4Xk.js                             4.71 kB │ gzip:     1.65 kB
+target/reassessment-2026-10-13/web-current/assets/r-CtqYUQ6l.js                                  4.80 kB │ gzip:     1.43 kB
+target/reassessment-2026-10-13/web-current/assets/less-B7Qaxw-O.js                               5.00 kB │ gzip:     1.49 kB
+target/reassessment-2026-10-13/web-current/assets/tcl-Bb4GCwBr.js                                5.05 kB │ gzip:     1.48 kB
+target/reassessment-2026-10-13/web-current/assets/liquid-DCeInlq7.js                             5.08 kB │ gzip:     1.61 kB
+target/reassessment-2026-10-13/web-current/assets/qsharp-BWK6YLKm.js                             5.14 kB │ gzip:     1.67 kB
+target/reassessment-2026-10-13/web-current/assets/cypher-D0--_GAN.js                             5.15 kB │ gzip:     1.64 kB
+target/reassessment-2026-10-13/web-current/assets/java-Dt3iMn2o.js                               5.16 kB │ gzip:     1.77 kB
+target/reassessment-2026-10-13/web-current/assets/kotlin-Ddo1SjA5.js                             5.20 kB │ gzip:     1.76 kB
+target/reassessment-2026-10-13/web-current/assets/hcl-CrX1Es2W.js                                5.21 kB │ gzip:     1.77 kB
+target/reassessment-2026-10-13/web-current/assets/redis-O7gSt3oh.js                              5.25 kB │ gzip:     1.56 kB
+target/reassessment-2026-10-13/web-current/assets/restructuredtext-B-KQCVu_.js                   5.32 kB │ gzip:     1.61 kB
+target/reassessment-2026-10-13/web-current/assets/powershell-BXiKvz7Z.js                         5.39 kB │ gzip:     1.64 kB
+target/reassessment-2026-10-13/web-current/assets/coffee-CzJ5oEdj.js                             5.51 kB │ gzip:     1.55 kB
+target/reassessment-2026-10-13/web-current/assets/diagram-5GNKFQAL-Bm_4Dh0o.js                   5.57 kB │ gzip:     1.89 kB
+target/reassessment-2026-10-13/web-current/assets/mdx-DpoujaZr.js                                5.75 kB │ gzip:     1.36 kB
+target/reassessment-2026-10-13/web-current/assets/yaml-C3gJylj5.js                               5.81 kB │ gzip:     1.68 kB
+target/reassessment-2026-10-13/web-current/assets/css-i3rI3_64.js                                6.10 kB │ gzip:     1.60 kB
+target/reassessment-2026-10-13/web-current/assets/cssMode-H6bZ66Vd.js                            6.15 kB │ gzip:     1.52 kB
+target/reassessment-2026-10-13/web-current/assets/rust-B1c0VCeq.js                               6.27 kB │ gzip:     2.02 kB
+target/reassessment-2026-10-13/web-current/assets/apex-DVGUZ64i.js                               6.39 kB │ gzip:     2.21 kB
+target/reassessment-2026-10-13/web-current/assets/python-K0heC28t.js                             6.44 kB │ gzip:     1.98 kB
+target/reassessment-2026-10-13/web-current/assets/dart-vLMHv35g.js                               6.48 kB │ gzip:     2.00 kB
+target/reassessment-2026-10-13/web-current/assets/markdown-B0YTnTxW.js                           6.65 kB │ gzip:     2.05 kB
+target/reassessment-2026-10-13/web-current/assets/htmlMode-5vRMn2Hs.js                           6.89 kB │ gzip:     1.63 kB
+target/reassessment-2026-10-13/web-current/assets/arc-NiHn8DgJ.js                                6.94 kB │ gzip:     1.96 kB
+target/reassessment-2026-10-13/web-current/assets/msdax-BBeIktCY.js                              6.95 kB │ gzip:     2.08 kB
+target/reassessment-2026-10-13/web-current/assets/csharp-BJeIuvde.js                             6.98 kB │ gzip:     2.01 kB
+target/reassessment-2026-10-13/web-current/assets/swift-BmOZGynf.js                              7.18 kB │ gzip:     2.31 kB
+target/reassessment-2026-10-13/web-current/assets/diagram-LMA3HP47-DH2MtK6o.js                   7.52 kB │ gzip:     2.47 kB
+target/reassessment-2026-10-13/web-current/assets/html-XRnv6VZX.js                               7.56 kB │ gzip:     1.49 kB
+target/reassessment-2026-10-13/web-current/assets/typescript-DzPGCGEi.js                         7.84 kB │ gzip:     2.49 kB
+target/reassessment-2026-10-13/web-current/assets/ecl-CeuUgzaZ.js                                7.94 kB │ gzip:     2.47 kB
+target/reassessment-2026-10-13/web-current/assets/cpp-CcN6f0ik.js                                8.22 kB │ gzip:     2.54 kB
+target/reassessment-2026-10-13/web-current/assets/pug-BxCXwerb.js                                8.26 kB │ gzip:     1.97 kB
+target/reassessment-2026-10-13/web-current/assets/vb-Bm6ESA0Q.js                                 8.33 kB │ gzip:     2.39 kB
+target/reassessment-2026-10-13/web-current/assets/scss-B42qMyAu.js                               9.07 kB │ gzip:     2.11 kB
+target/reassessment-2026-10-13/web-current/assets/defaultLocale-Pq0tsfXx.js                      9.37 kB │ gzip:     2.81 kB
+target/reassessment-2026-10-13/web-current/assets/wgsl-_KPae5vw.js                               9.78 kB │ gzip:     3.29 kB
+target/reassessment-2026-10-13/web-current/assets/pieDiagram-4H26LBE5-CXcsDQG1.js               10.00 kB │ gzip:     3.21 kB
+target/reassessment-2026-10-13/web-current/assets/st-C-b0Dh53.js                                10.15 kB │ gzip:     2.49 kB
+target/reassessment-2026-10-13/web-current/assets/twig-DvgEGWAV.js                              10.26 kB │ gzip:     2.18 kB
+target/reassessment-2026-10-13/web-current/assets/handlebars-DrHhc3hs.js                        10.34 kB │ gzip:     1.76 kB
+target/reassessment-2026-10-13/web-current/assets/julia-Cm3ItYL_.js                             10.49 kB │ gzip:     2.96 kB
+target/reassessment-2026-10-13/web-current/assets/scala-DbVzH-3O.js                             10.70 kB │ gzip:     2.54 kB
+target/reassessment-2026-10-13/web-current/assets/diagram-2AECGRRQ-BHsGSui2.js                  11.22 kB │ gzip:     3.24 kB
+target/reassessment-2026-10-13/web-current/assets/linear-Dx_8RGxV.js                            11.24 kB │ gzip:     3.19 kB
+target/reassessment-2026-10-13/web-current/assets/systemverilog-BOC0OOdC.js                     11.63 kB │ gzip:     3.19 kB
+target/reassessment-2026-10-13/web-current/assets/php-Bkx1qpkQ.js                               12.48 kB │ gzip:     2.46 kB
+target/reassessment-2026-10-13/web-current/assets/protobuf-CndvAUGu.js                          12.68 kB │ gzip:     2.29 kB
+target/reassessment-2026-10-13/web-current/assets/perl-DC0Z0tlO.js                              12.82 kB │ gzip:     3.64 kB
+target/reassessment-2026-10-13/web-current/assets/razor-CveUmZmn.js                             13.27 kB │ gzip:     2.56 kB
+target/reassessment-2026-10-13/web-current/assets/clojure-fcgFaMHx.js                           13.94 kB │ gzip:     3.93 kB
+target/reassessment-2026-10-13/web-current/assets/ruby-DCd4DmAr.js                              15.31 kB │ gzip:     3.98 kB
+target/reassessment-2026-10-13/web-current/assets/sql-BAGepFCR.js                               15.56 kB │ gzip:     4.57 kB
+target/reassessment-2026-10-13/web-current/assets/mysql-BWiizXSn.js                             16.16 kB │ gzip:     4.46 kB
+target/reassessment-2026-10-13/web-current/assets/redshift-CvYMMYZY.js                          16.33 kB │ gzip:     4.67 kB
+target/reassessment-2026-10-13/web-current/assets/pgsql-DaSGFTLp.js                             18.25 kB │ gzip:     4.86 kB
+target/reassessment-2026-10-13/web-current/assets/elixir-eLfY1jWH.js                            18.74 kB │ gzip:     4.62 kB
+target/reassessment-2026-10-13/web-current/assets/stateDiagram-AJRCARHV-D3dpLok_.js             19.14 kB │ gzip:     4.85 kB
+target/reassessment-2026-10-13/web-current/assets/postiats-CVVurEnu.js                          19.30 kB │ gzip:     5.04 kB
+target/reassessment-2026-10-13/web-current/assets/powerquery-BQ_t1ZiQ.js                        21.65 kB │ gzip:     5.09 kB
+target/reassessment-2026-10-13/web-current/assets/diagram-KO2AKTUF-DpD7u7s6.js                  21.84 kB │ gzip:     5.60 kB
+target/reassessment-2026-10-13/web-current/assets/abap-D5KwWAsZ.js                              22.97 kB │ gzip:     6.11 kB
+target/reassessment-2026-10-13/web-current/assets/dagre-BM42HDAG-DIRRApa5.js                    23.47 kB │ gzip:     5.65 kB
+target/reassessment-2026-10-13/web-current/assets/solidity-yHOxYChb.js                          26.03 kB │ gzip:     5.06 kB
+target/reassessment-2026-10-13/web-current/assets/jsonMode-CFs6ztjc.js                          28.88 kB │ gzip:     6.21 kB
+target/reassessment-2026-10-13/web-current/assets/diagram-OG6HWLK6-CvSQdVnh.js                  32.21 kB │ gzip:     7.76 kB
+target/reassessment-2026-10-13/web-current/assets/ishikawaDiagram-YF4QCWOH-D67ZMScx.js          35.34 kB │ gzip:     9.39 kB
+target/reassessment-2026-10-13/web-current/assets/kanban-definition-UN3LZRKU-BJaiJHNQ.js        38.89 kB │ gzip:     9.60 kB
+target/reassessment-2026-10-13/web-current/assets/tsMode-BvvjxPoo.js                            40.36 kB │ gzip:     7.96 kB
+target/reassessment-2026-10-13/web-current/assets/freemarker2-Dcbh3mTn.js                       42.10 kB │ gzip:     8.89 kB
+target/reassessment-2026-10-13/web-current/assets/mindmap-definition-RKZ34NQL-CE-YgR1G.js       43.72 kB │ gzip:    10.75 kB
+target/reassessment-2026-10-13/web-current/assets/journeyDiagram-JHISSGLW-CFyCxE5N.js           45.39 kB │ gzip:    11.27 kB
+target/reassessment-2026-10-13/web-current/assets/wardleyDiagram-YWT4CUSO-B8Gi7PEK.js           45.62 kB │ gzip:     9.04 kB
+target/reassessment-2026-10-13/web-current/assets/sankeyDiagram-5OEKKPKP-C2fhOs_v.js            46.50 kB │ gzip:    11.76 kB
+target/reassessment-2026-10-13/web-current/assets/erDiagram-TEJ5UH35-D3xctCOA.js                48.76 kB │ gzip:    12.05 kB
+target/reassessment-2026-10-13/web-current/assets/requirementDiagram-4Y6WPE33--z174MfG.js       53.06 kB │ gzip:    12.28 kB
+target/reassessment-2026-10-13/web-current/assets/gitGraphDiagram-PVQCEYII-DNXIgaMf.js          58.46 kB │ gzip:    11.74 kB
+target/reassessment-2026-10-13/web-current/assets/timeline-definition-PNZ67QCA-c-_PVVG1.js      61.46 kB │ gzip:    13.71 kB
+target/reassessment-2026-10-13/web-current/assets/lspLanguageFeatures-CD_P9NC-.js               61.69 kB │ gzip:    10.96 kB
+target/reassessment-2026-10-13/web-current/assets/quadrantDiagram-W4KKPZXB-BWuMKRxM.js          62.49 kB │ gzip:    12.77 kB
+target/reassessment-2026-10-13/web-current/assets/graph-C28nWAce.js                             66.29 kB │ gzip:    14.55 kB
+target/reassessment-2026-10-13/web-current/assets/chunk-AQP2D5EJ-DVHH38xb.js                    72.15 kB │ gzip:    16.93 kB
+target/reassessment-2026-10-13/web-current/assets/xychartDiagram-2RQKCTM6-DnLLnqPu.js           75.33 kB │ gzip:    15.10 kB
+target/reassessment-2026-10-13/web-current/assets/layout-CTd90k4D.js                            79.97 kB │ gzip:    18.93 kB
+target/reassessment-2026-10-13/web-current/assets/chunk-727SXJPM-DhC0nJvO.js                    84.23 kB │ gzip:    20.30 kB
+target/reassessment-2026-10-13/web-current/assets/vennDiagram-CIIHVFJN-Dtai2k31.js              88.54 kB │ gzip:    21.40 kB
+target/reassessment-2026-10-13/web-current/assets/flowDiagram-I6XJVG4X-CGkMQKZZ.js             103.37 kB │ gzip:    24.01 kB
+target/reassessment-2026-10-13/web-current/assets/c4Diagram-AAUBKEIU-Cy_TeTrL.js               118.61 kB │ gzip:    24.24 kB
+target/reassessment-2026-10-13/web-current/assets/ganttDiagram-6RSMTGT7-Bjr-x8HL.js            131.57 kB │ gzip:    30.34 kB
+target/reassessment-2026-10-13/web-current/assets/blockDiagram-GPEHLZMM-CWXPjX3t.js            142.36 kB │ gzip:    28.19 kB
+target/reassessment-2026-10-13/web-current/assets/sequenceDiagram-3UESZ5HK-Ez0bRzv_.js         202.47 kB │ gzip:    38.34 kB
+target/reassessment-2026-10-13/web-current/assets/cose-bilkent-S5V4N54A-oFSdhPtG.js            213.48 kB │ gzip:    34.41 kB
+target/reassessment-2026-10-13/web-current/assets/app-vendor-D5YY4G3B.js                       379.64 kB │ gzip:    85.95 kB
+target/reassessment-2026-10-13/web-current/assets/architectureDiagram-3BPJPVTR-6yKJLcTk.js     416.45 kB │ gzip:    63.82 kB
+target/reassessment-2026-10-13/web-current/assets/markdown-Deyx3yTJ.js                         719.89 kB │ gzip:   162.82 kB
+target/reassessment-2026-10-13/web-current/assets/cytoscape.esm-F9I4bL4s.js                    957.24 kB │ gzip:   203.63 kB
+target/reassessment-2026-10-13/web-current/assets/mermaid.core-Cln9PTNv.js                     995.21 kB │ gzip:   173.36 kB
+target/reassessment-2026-10-13/web-current/assets/wardley-L42UT6IY-Dgpfq19c.js               1,210.76 kB │ gzip:   209.86 kB
+target/reassessment-2026-10-13/web-current/assets/index-3oxdPqys.js                          5,945.99 kB │ gzip: 1,178.03 kB
+target/reassessment-2026-10-13/web-current/assets/monaco-C7N-yrRY.js                         7,409.69 kB │ gzip: 1,385.26 kB
+✓ built in 6m 7s

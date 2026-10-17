@@ -1,0 +1,35 @@
+[
+  {
+    "id": "AZ-062",
+    "verified_state": "local_trend_gate_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "Count invariants, scope-separated trend, Wilson interval, known/unknown cost and host-fault fields, and a fingerprint-bound nonzero regression gate are implemented and locally verified.",
+    "conclusion_proposal": "Keep pending until independent review and lifecycle CI integration; kernel synthetic measurements do not establish desktop quality.",
+    "next_action": "Independently review source and thresholds, wire the gate after AZ-056 harness, then execute frozen desktop/model measurements.",
+    "remaining_work": ["Independent source and gate-threshold review", "Lifecycle CI integration after AZ-056", "Actual host-fault and billed-cost observations"],
+    "verification_gaps": ["No desktop or live host-fault trend", "No CI gate wiring", "No independent implementation review"],
+    "evidence": ["docs/upgrade/evidence/implementation-batch-2026-10-14/implementation.md"]
+  },
+  {
+    "id": "AZ-066",
+    "verified_state": "offline_first_task_guidance_candidate_unreviewed",
+    "severity": "P2",
+    "finding": "First-run checklist now includes project readiness and a composer-only safe example, alongside existing model credential and first-task indicators.",
+    "conclusion_proposal": "Keep pending until clean-install and real first-task checks; tool readiness is not yet observable.",
+    "next_action": "Add actionable tool/environment diagnostics and validate first task on a clean signed build with an authorized model.",
+    "remaining_work": ["Tool/environment readiness diagnostics", "Clean-install first-task walkthrough", "Independent UI review"],
+    "verification_gaps": ["No actual clean install or model task", "No desktop GUI walkthrough"],
+    "evidence": ["docs/upgrade/evidence/implementation-batch-2026-10-14/implementation.md"]
+  },
+  {
+    "id": "AZ-068",
+    "verified_state": "local_beta_intake_prepared",
+    "severity": "P2",
+    "finding": "Feedback template and local triage/stop-expansion protocol exist; no cohort, window or Beta run has been authorized.",
+    "conclusion_proposal": "Keep blocked on prerequisite evidence and human cohort/distribution decision.",
+    "next_action": "After engineering prerequisites, obtain named owner, cohort and window; run actual authorized Beta and record triage outcomes.",
+    "remaining_work": ["Named owner, consented cohort and time window", "Prerequisite gate evidence", "Actual Beta intake and support response"],
+    "verification_gaps": ["No external participants or Beta run", "No support response evidence"],
+    "evidence": ["docs/upgrade/evidence/implementation-batch-2026-10-14/implementation.md"]
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "captured_at": "2026-10-10T14:02:17.229Z",
+  "files": [
+    {
+      "path": "src/workspaces/codez/BottomPanel.tsx",
+      "sha256": "8191f78ed0277af4c260511c050d7960476921992f14777856ff4965d8fa98d0"
+    },
+    {
+      "path": "src/workspaces/codez/tabNavigation.ts",
+      "sha256": "5bb9a2abc43d341f0b44904a8bd139ecb31f10ffe4dbeb5f52fccff80ae421fe"
+    },
+    {
+      "path": "src/workspaces/codez/BottomPanel.keyboard.test.tsx",
+      "sha256": "710f722953e9e621a99dd56352812219034a1a2f01c4b137886ada53ed221bda"
+    },
+    {
+      "path": "src/workspaces/codez/tabNavigation.test.ts",
+      "sha256": "f4d04333ebe7802b59316732e5f7366138694bbf642b8a64025187dc198c46af"
+    },
+    {
+      "path": "src/workspaces/codez/Terminal.tsx",
+      "sha256": "71d7ad05734f55b356d3237d8f6fce99b4b2fc16770222fe2d40c353f0d6865c"
+    },
+    {
+      "path": "src/workspaces/codez/Terminal.lifecycle.test.tsx",
+      "sha256": "43b702e585b38ba68cb66cecdb8664e71430b9f6807a69dfed07caf7bd8680d3"
+    }
+  ]
+}

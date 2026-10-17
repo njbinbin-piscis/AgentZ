@@ -1,0 +1,17 @@
+# AZ048 projectless client independent review
+
+2026-10-11. Reviewer: Codex current_source_review. Read-only inspection of current projectScope service and its three additional projectless fixtures, plus existing cache consumers. No source/ledger/pinned evidence edit and no tests/typecheck/native invoke/GUI executed by reviewer. Root reports host check47282 exit0 in6m24s. Client Vitest/full TypeScript16951 was running at request and is not asserted passed.
+
+Raw SHA256:
+- src/services/tauri/projectScope.ts: cf160f63ff90344a41363c234e869d8f19d388ffbc6a7221d04d2413d310128f
+- src/services/tauri/projectScope.test.ts: 62eb3447bea034109299209a7c59f7f0b79e465b982c1346903acbbff1f308b5
+
+reopen validates the entire lowercase hyphenated UUID-shaped string before invoke, supplies only directoryId, and compares returned directory_id to requested identity before remember can cache authority. Invalid/mismatched IDs reject before scope publication. create invokes the fixed command without renderer path/config/window/generation arguments. Both propagate native/validation failures without fallback, retry or replacement creation. UUID syntax does not prove registered existence, task ownership or UUID version; native catalog/authority remains required.
+
+rememberDirectory validates object/identity/scope presence then delegates scope validation to existing remember. The returned wrapper and nested cached scope are frozen; identical path/handle reuses stable existing scope object and replacement publishes observable new scope. Existing opaque cache, subscriptions, restore source validation and forget-before-native revoke remain present. No handle persistence, prompting or execution grant is added. Validation checks required fields/types rather than forbidding every unknown key or JS prototype/getter; expected input is ordinary Tauri deserialized DTO, not arbitrary executable objects.
+
+Three new fixtures invoke real exported service with native invoke mocked: creation and ID-only reopening cache the returned scope; invalid IDs/mismatch/invalid scope produce no cache publication; missing-directory rejection issues one reopen and no create. Existing fixtures still exercise immutable snapshot identity, observable replacement/revocation, known restore sources and authorization-error propagation. Tests do not run real Tauri command authorization, filesystem catalog, scope mint or UI/session lifecycle. Synthetic paths/handles are controlled inputs rather than authority proof.
+
+Remaining integration limits: no directory_id-to-chat-session persistence or restore policy, UI invocation, transport-uncertain create reconciliation, stale concurrent acquire/revoke generation, host scope reclamation or complete projectless journey. A failed create response after native success can retain an unreturned registered directory; blindly retrying is not deduplicated. Cache validation does not cryptographically bind path to ID; it relies on trusted native result. Earlier global scope limits and current host/domain filesystem trust constraints remain.
+
+No additional blocking source issue found in this limited projectless client/opaque cache integration. Exact-source owner checks are required before fingerprint registration. Shared consumer refresh must preserve prior scopes/review history; missing historical dirty bytes prevents asserting full old-source equivalence or authorship. Full AZ048 native/UI/session/rollback acceptance remains unfinished.

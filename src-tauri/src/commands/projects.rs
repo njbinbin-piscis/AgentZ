@@ -89,7 +89,11 @@ fn norm_key(path: &str) -> String {
 
 fn display_name(path: &str) -> String {
     let p = path.trim().trim_end_matches(['/', '\\']);
-    p.rsplit(['/', '\\']).next().filter(|s| !s.is_empty()).unwrap_or(p).to_string()
+    p.rsplit(['/', '\\'])
+        .next()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(p)
+        .to_string()
 }
 
 fn now_secs() -> i64 {
@@ -109,7 +113,9 @@ fn touch_project(store: &mut Store, path: &str, now: i64) {
         path: path.trim().trim_end_matches(['/', '\\']).to_string(),
         last_opened: now,
     });
-    store.projects.sort_by_key(|p| std::cmp::Reverse(p.last_opened));
+    store
+        .projects
+        .sort_by_key(|p| std::cmp::Reverse(p.last_opened));
     store.projects.truncate(MAX_PROJECTS);
 }
 
@@ -119,9 +125,14 @@ fn remove_project(store: &mut Store, path: &str) {
 }
 
 fn free_dir(config_dir: &Path) -> Result<PathBuf, String> {
-    let dir = config_dir.join(FREE_DIR_NAME);
+    let dir = free_sessions_path(config_dir);
     std::fs::create_dir_all(&dir).map_err(|e| format!("create free-sessions dir: {e}"))?;
     Ok(dir)
+}
+
+/// Host-owned location only; metadata queries must not create workspace directories.
+pub(super) fn free_sessions_path(config_dir: &Path) -> PathBuf {
+    config_dir.join(FREE_DIR_NAME)
 }
 
 fn effective_default_dir(config_dir: &Path, store: &Store) -> (PathBuf, bool) {
@@ -151,7 +162,12 @@ fn view_of(store: &Store) -> Vec<ProjectView> {
             ProjectView {
                 path: p.path.clone(),
                 name: display_name(&p.path),
-                kind: if exists && dir.join(".git").exists() { "repo" } else { "dir" }.to_string(),
+                kind: if exists && dir.join(".git").exists() {
+                    "repo"
+                } else {
+                    "dir"
+                }
+                .to_string(),
                 exists,
                 last_opened: p.last_opened,
             }
@@ -239,7 +255,11 @@ pub async fn workz_list_all_sessions(
             continue;
         }
         match chat_list_sessions(app.clone(), Some(dir.clone()), sources.clone(), None).await {
-            Ok(sessions) => out.push(ProjectSessions { project_dir: dir, sessions, error: None }),
+            Ok(sessions) => out.push(ProjectSessions {
+                project_dir: dir,
+                sessions,
+                error: None,
+            }),
             Err(e) => out.push(ProjectSessions {
                 project_dir: dir,
                 sessions: Vec::new(),

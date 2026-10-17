@@ -1,0 +1,21 @@
+# AZ-035 前端 DTO 与挂载独立复核
+
+2026-10-09。只读审查taskDetails.ts runtime validator、Rust Source serde/task_details、Plan状态规则，以及CodeZ/WorkZ挂载。未运行npm/tsc/Cargo，主线程13360执行目标检查；未改源码或台账。
+
+## 限定结论
+
+未见当前合法宿主DTO误拒绝或跨scope显示的新blocking P1/P2。Rust Source使用status tagged snake_case，与前端available{value,version}/非available仅status对应；完整TaskDetails.scope/atomic_snapshot/sources字段匹配。Run cancelled（双l）/delivery与Rust枚举一致，Succeeded必须有非NotReady delivery。Plan Completed允许Done/Cancelled全部闭合但非空，Active允许空，Cancelled/ Replaced保留任意合法items，与现PlanStore一致。
+
+前端严格数字为非负safe整数，policy revision/plan revision>=1，不把i64超JS安全范围截断或浮点金额转整数。大于safe范围真实账应明确拒绝显示而不是错误余额，这是一项兼容边界，未声称任意i64展示。unknown计量字段与known各币种小计原样保留，nullablelimit/cost不转换0；无报价/unknownprice不会显示可用余额。Panel明确budget enforcement未接，observeravailable不等于授权。
+
+Binding/currentevent/Run/plan全task/env/run/currentAttempt对应；budget因DTO无project字段仅能校root task，项目授权仍由宿主scope服务负责。service只能确认响应task等于请求session，不能根据opaquehandle自己证明canonicalproject，必须依赖宿主mainwindow lookup+异步后二次scope校验。invoke错误直接reject，不降级Missing；Panel清除旧值显示通用错误且不展示rawhost路径。
+
+CodeZ以projectDir+sessionRef当前值挂载；WorkZ只在非team/非pool下挂载，传planProject.selected==projectDir时的canonical，否则null，不冒称团队scope支持。共享Panel用project/scopehandle/session requestKey render首帧mask和effect generation/disposed防旧回复；缺opaque scope不invoke；focus/manual/busy-change刷新无timer，正在请求时忽略额外focus/manual，不启动执行或恢复。
+
+状态label有own-property guard，坏原型名fallback Unknown；不展示原始工具参数/ID/payload。完整Cancelled计划只用done/total概览，不改持久投影。Source状态available/missing/unavailable/stale/unknown/unsupported与非原子读取提示清晰。
+
+## 验证范围与后续
+
+service与组件fixture由主线程统一运行，不能把本只读review写成实跑通过。真实native IPC、GUI布局/首帧切任务、WorkZ free/跨工作区旅程、旧schema支持、i64大额显示策略仍未验收；原始Gate不变。DTO exact-key schema刻意failclosed，未来新增Rust字段需同步版本/validator，不能静默接受未定义契约。
+
+独立交互审查随后发现在途focus丢刷新P2；现tsx0f58bcecda7a1f99e9d3d0e2fbc09be62722c70a9fb661772bc2822cc2bc09a6采用pending合并，finally同generation且未disposed追加一次读，替代上文忽略行为。测试增加deferred真实focus与卸载，nodewindow环境已补EventTarget。本代理未运行测试，等待主线程最新target/tsc结果。

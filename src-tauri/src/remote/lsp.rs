@@ -48,7 +48,9 @@ pub async fn start(target: RemoteTarget, project_dir: &str, language: &str) -> R
         map.remove(&k);
     }
 
-    let root = vfs::parse(project_dir).ok_or("not a remote workspace")?.path;
+    let root = vfs::parse(project_dir)
+        .ok_or("not a remote workspace")?
+        .path;
     let lang = LspManager::supported_languages()
         .into_iter()
         .find(|l| l.language_id == language)
@@ -63,13 +65,24 @@ pub async fn start(target: RemoteTarget, project_dir: &str, language: &str) -> R
         .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
-        .map_err(|e| format!("{}: failed to spawn language server: {e}", target.authority()))?;
+        .map_err(|e| {
+            format!(
+                "{}: failed to spawn language server: {e}",
+                target.authority()
+            )
+        })?;
 
     // Fail fast when the binary is missing instead of handing Monaco a dead socket.
     let mut stderr = BufReader::new(child.stderr.take().ok_or("no stderr")?);
     let mut first = String::new();
-    let probe = tokio::time::timeout(std::time::Duration::from_millis(1500), stderr.read_line(&mut first)).await;
-    if first.contains("AGENTZ_LSP_MISSING") || matches!(probe, Ok(Ok(0))) && child.try_wait().ok().flatten().is_some() {
+    let probe = tokio::time::timeout(
+        std::time::Duration::from_millis(1500),
+        stderr.read_line(&mut first),
+    )
+    .await;
+    if first.contains("AGENTZ_LSP_MISSING")
+        || matches!(probe, Ok(Ok(0))) && child.try_wait().ok().flatten().is_some()
+    {
         return Err(format!(
             "language server '{server}' is not installed on {} — {}",
             target.authority(),
@@ -79,11 +92,15 @@ pub async fn start(target: RemoteTarget, project_dir: &str, language: &str) -> R
 
     let stdin = child.stdin.take().ok_or("no stdin")?;
     let stdout = child.stdout.take().ok_or("no stdout")?;
-    let listener = TcpListener::bind("127.0.0.1:0").await.map_err(|e| e.to_string())?;
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let done_task = done.clone();
-    let authority = vfs::parse(project_dir).map(|u| u.authority).unwrap_or_default();
+    let authority = vfs::parse(project_dir)
+        .map(|u| u.authority)
+        .unwrap_or_default();
     tokio::spawn(async move {
         if let Err(e) = bridge(listener, stdin, stdout, stderr, first, authority).await {
             tracing::warn!("remote LSP bridge exited: {e}");
@@ -91,7 +108,14 @@ pub async fn start(target: RemoteTarget, project_dir: &str, language: &str) -> R
         done_task.store(true, std::sync::atomic::Ordering::SeqCst);
     });
 
-    sessions().lock().unwrap().insert(k, Session { port, done, _child: child });
+    sessions().lock().unwrap().insert(
+        k,
+        Session {
+            port,
+            done,
+            _child: child,
+        },
+    );
     Ok(port)
 }
 
@@ -112,7 +136,11 @@ fn server_script(root: &str, server: &str, args: &[String]) -> String {
 }
 
 pub fn stop(project_dir: &str, language: &str) -> bool {
-    sessions().lock().unwrap().remove(&key(project_dir, language)).is_some()
+    sessions()
+        .lock()
+        .unwrap()
+        .remove(&key(project_dir, language))
+        .is_some()
 }
 
 pub fn stop_all() {
@@ -127,10 +155,6 @@ async fn bridge(
     first_stderr: String,
     authority: String,
 ) -> Result<(), String> {
-    let (stream, _) = listener.accept().await.map_err(|e| e.to_string())?;
-    let ws = tokio_tungstenite::accept_async(stream).await.map_err(|e| e.to_string())?;
-    let (mut tx, mut rx) = ws.split();
-
     let (out_tx, mut out_rx) = tokio::sync::mpsc::channel::<String>(256);
     let reader = tokio::spawn(read_frames(stdout, out_tx.clone()));
     let log = tokio::spawn(async move {
@@ -155,11 +179,30 @@ async fn bridge(
         }
     });
 
+    // Observe stdout termination even before a client arrives or while it is
+    // handshaking. Stderr may remain open after the protocol stream closes.
+    let mut readers = BridgeReaders {
+        stdout: reader,
+        stderr: log,
+    };
+    let accept = async {
+        let (stream, _) = listener.accept().await.map_err(|e| e.to_string())?;
+        tokio_tungstenite::accept_async(stream)
+            .await
+            .map_err(|e| e.to_string())
+    };
+    let ws = tokio::select! {
+        result = accept => result?,
+        _ = &mut readers.stdout => return Ok(()),
+    };
+    let (mut tx, mut rx) = ws.split();
+
     // Raw authority as the client encodes it (Monaco lowercases/escapes it);
     // learned from the first client URI so server URIs map back exactly.
     let mut client_authority: Option<String> = None;
     let result = loop {
         tokio::select! {
+            _ = &mut readers.stdout => break Ok(()),
             msg = rx.next() => match msg {
                 Some(Ok(Message::Text(text))) => {
                     let Ok(mut v) = serde_json::from_str::<Value>(&text) else { continue };
@@ -191,9 +234,19 @@ async fn bridge(
             },
         }
     };
-    reader.abort();
-    log.abort();
     result
+}
+
+struct BridgeReaders {
+    stdout: tokio::task::JoinHandle<()>,
+    stderr: tokio::task::JoinHandle<()>,
+}
+
+impl Drop for BridgeReaders {
+    fn drop(&mut self) {
+        self.stdout.abort();
+        self.stderr.abort();
+    }
 }
 
 /// Content-Length framed LSP messages → JSON bodies.
@@ -220,7 +273,11 @@ async fn read_frames(stdout: tokio::process::ChildStdout, tx: tokio::sync::mpsc:
         if r.read_exact(&mut buf).await.is_err() {
             return;
         }
-        if tx.send(String::from_utf8_lossy(&buf).into_owned()).await.is_err() {
+        if tx
+            .send(String::from_utf8_lossy(&buf).into_owned())
+            .await
+            .is_err()
+        {
             return;
         }
     }
@@ -234,12 +291,16 @@ fn to_server(s: &str, learned: &mut Option<String>) -> Option<String> {
     if learned.is_none() {
         *learned = Some(auth.to_string());
     }
-    Some(format!("file://{}", if path.is_empty() { "/" } else { path }))
+    Some(format!(
+        "file://{}",
+        if path.is_empty() { "/" } else { path }
+    ))
 }
 
 fn to_client(s: &str, authority: &str) -> Option<String> {
     let path = s.strip_prefix("file://")?;
-    path.starts_with('/').then(|| format!("{CLIENT_PREFIX}{authority}{path}"))
+    path.starts_with('/')
+        .then(|| format!("{CLIENT_PREFIX}{authority}{path}"))
 }
 
 /// Matches Monaco's `URI.toString()` authority form.
@@ -279,10 +340,101 @@ fn rewrite(v: &mut Value, f: &mut dyn FnMut(&str) -> Option<String>) {
 mod tests {
     use super::*;
 
+    async fn child_exit_closes_bridge(connect_client: bool) {
+        #[cfg(windows)]
+        let mut command = {
+            let mut c = piscis_kernel::proc::tokio_command("powershell.exe");
+            c.args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "$null = [Console]::ReadLine()",
+            ]);
+            c
+        };
+        #[cfg(not(windows))]
+        let mut command = {
+            let mut c = piscis_kernel::proc::tokio_command("sh");
+            c.args(["-c", "read value"]);
+            c
+        };
+        let mut child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let stdin = child.stdin.take().unwrap();
+        let stdout = child.stdout.take().unwrap();
+        let stderr = BufReader::new(child.stderr.take().unwrap());
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let finished = done.clone();
+        let task = tokio::spawn(async move {
+            let result = bridge(
+                listener,
+                stdin,
+                stdout,
+                stderr,
+                String::new(),
+                "fixture".into(),
+            )
+            .await;
+            finished.store(true, std::sync::atomic::Ordering::SeqCst);
+            result
+        });
+        let mut client = if connect_client {
+            Some(
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(10),
+                    tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{port}")),
+                )
+                .await
+                .unwrap()
+                .unwrap()
+                .0,
+            )
+        } else {
+            None
+        };
+        child.kill().await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(5), task)
+            .await
+            .expect("bridge stayed alive after child exit")
+            .unwrap()
+            .unwrap();
+        assert!(done.load(std::sync::atomic::Ordering::SeqCst));
+        assert!(tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .is_err());
+        if let Some(client) = client.as_mut() {
+            let message = tokio::time::timeout(std::time::Duration::from_secs(5), client.next())
+                .await
+                .unwrap();
+            assert!(!matches!(message, Some(Ok(Message::Text(_)))));
+        }
+    }
+
+    #[tokio::test]
+    async fn child_exit_before_client_retires_listener() {
+        child_exit_closes_bridge(false).await;
+    }
+
+    #[tokio::test]
+    async fn child_exit_with_client_retires_listener() {
+        child_exit_closes_bridge(true).await;
+    }
+
     #[test]
     fn uri_round_trip() {
         let mut learned = None;
-        let s = to_server("agentz-remote://ssh-remote%2Bbox/home/me/a.rs", &mut learned).unwrap();
+        let s = to_server(
+            "agentz-remote://ssh-remote%2Bbox/home/me/a.rs",
+            &mut learned,
+        )
+        .unwrap();
         assert_eq!(s, "file:///home/me/a.rs");
         assert_eq!(learned.as_deref(), Some("ssh-remote%2Bbox"));
         assert_eq!(

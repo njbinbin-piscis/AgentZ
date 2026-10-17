@@ -2,19 +2,20 @@
 
 pub mod api_connector;
 pub mod app_control;
-pub mod devenv;
-pub mod settings_catalog;
 pub mod call_fish;
 pub mod chat_ui;
 pub mod chat_ui_listen;
 pub mod chat_ui_patch;
 pub mod chat_ui_schema;
 pub mod codebase_search;
-pub mod graph_search;
-pub mod graph_explore;
 pub mod delegate;
+pub mod devenv;
+pub mod durable_plan_todo;
+pub mod graph_explore;
+pub mod graph_search;
 pub mod plan_mode_ui;
 pub mod remote_fs;
+pub mod settings_catalog;
 pub mod skill_manage;
 pub mod symbols;
 pub mod terminal_read;
