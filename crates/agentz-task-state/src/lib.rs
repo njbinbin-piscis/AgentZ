@@ -18,6 +18,34 @@ pub mod merge;
 pub mod plan;
 pub mod run;
 pub mod start;
+
+/// `git` child processes never open a console window on Windows. A window created by the GUI
+/// host takes focus, which re-fires focus-driven refreshes and starts more git processes.
+pub(crate) mod git_process {
+    #[cfg(windows)]
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    /// Blocking `git` command with the console window suppressed on Windows.
+    pub(crate) fn command() -> std::process::Command {
+        #[allow(unused_mut)]
+        let mut cmd = std::process::Command::new("git");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+        cmd
+    }
+
+    /// Async `git` command with the console window suppressed on Windows.
+    pub(crate) fn tokio_command() -> tokio::process::Command {
+        #[allow(unused_mut)]
+        let mut cmd = tokio::process::Command::new("git");
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd
+    }
+}
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 

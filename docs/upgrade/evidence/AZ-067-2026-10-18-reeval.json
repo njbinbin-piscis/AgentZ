@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-067",
+    "verified_state": "local_release_document_sync_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "RELEASE was stale about version, MSI distribution and CSP; it now states the current 0.9.11 source/candidate boundary and publishing preconditions. The local version check now validates RELEASE and README/RELEASE local links. Local check and ledger validation passed; no CI or native acceptance ran.",
+    "conclusion_proposal": "Keep pending until extension/platform support evidence and unified documentation review are complete.",
+    "next_action": "Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.",
+    "remaining_work": ["Extension compatibility evidence", "macOS/Linux support evidence", "Unified documentation review"],
+    "verification_gaps": ["CI workflow not dispatched", "No installation, signature or cross-platform acceptance"],
+    "evidence": ["docs/upgrade/evidence/AZ-067-2026-10-18-local-doc-sync.md"]
+  }
+]

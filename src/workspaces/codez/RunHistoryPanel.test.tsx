@@ -1,5 +1,6 @@
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FOCUS_REFRESH_GAP_MS } from "../../utils/coalesce";
 const { discovery, readPage, scopes, language, subscribe, notices, dispose } = vi.hoisted(() => ({
   discovery: vi.fn(),
   subscribe: vi.fn(),
@@ -464,35 +465,46 @@ describe("passive scoped execution history", () => {
     expect(readPage.mock.calls[0][1]).toBe("other-task");
     expect(text()).not.toContain("private-run-task");
   });
-  it("refreshes on busy transition, manual request and focus/online/visible wakeups", async () => {
-    await mount();
-    await act(async () => {
-      renderer!.update(<RunHistoryPanel {...props} busy />);
-    });
-    await act(async () => {
-      renderer!.root.findByType("button").props.onClick();
-    });
-    await act(async () => {
+  it("refreshes on busy transition and manual request, coalescing focus/online/visible wakeups", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      await mount();
+      await act(async () => {
+        renderer!.update(<RunHistoryPanel {...props} busy />);
+      });
+      await act(async () => {
+        renderer!.root.findByType("button").props.onClick();
+      });
+      const before = discovery.mock.calls.length;
+      await act(async () => {
+        window.dispatchEvent(new Event("focus"));
+      });
+      await act(async () => {
+        window.dispatchEvent(new Event("online"));
+      });
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      // A burst of wakeups costs one immediate reload; the rest merge into one trailing reload.
+      expect(discovery).toHaveBeenCalledTimes(before + 1);
+      await act(async () => {
+        vi.advanceTimersByTime(FOCUS_REFRESH_GAP_MS);
+      });
+      expect(discovery).toHaveBeenCalledTimes(before + 2);
+      Object.assign(document, { visibilityState: "hidden" });
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(discovery).toHaveBeenCalledTimes(before + 2);
+      act(() => {
+        renderer!.unmount();
+      });
+      renderer = undefined;
       window.dispatchEvent(new Event("focus"));
-    });
-    await act(async () => {
-      window.dispatchEvent(new Event("online"));
-    });
-    await act(async () => {
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    expect(discovery).toHaveBeenCalledTimes(6);
-    Object.assign(document, { visibilityState: "hidden" });
-    await act(async () => {
-      document.dispatchEvent(new Event("visibilitychange"));
-    });
-    expect(discovery).toHaveBeenCalledTimes(6);
-    act(() => {
-      renderer!.unmount();
-    });
-    renderer = undefined;
-    window.dispatchEvent(new Event("focus"));
-    expect(discovery).toHaveBeenCalledTimes(6);
+      expect(discovery).toHaveBeenCalledTimes(before + 2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it("shows real errors and rejects corrupt pages without continuing or displaying partial history", async () => {
     readPage.mockResolvedValue(page(2, true));

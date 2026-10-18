@@ -719,7 +719,7 @@ async fn direct_git_identity(root: &Path) -> Result<Value, String> {
     async fn git(root: &Path, args: &[&str]) -> Result<std::process::Output, String> {
         tokio::time::timeout(
             Duration::from_secs(10),
-            tokio::process::Command::new("git")
+            piscis_kernel::proc::tokio_command("git")
                 .args(args)
                 .env("LC_ALL", "C")
                 .current_dir(root)

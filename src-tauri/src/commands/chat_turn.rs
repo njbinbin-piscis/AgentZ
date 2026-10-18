@@ -1992,14 +1992,24 @@ pub async fn run_agentz_turn(
             let selected =
                 crate::commands::connectors::resolve_named_connector_mcp_configs(&config_dir, ids);
             if !selected.is_empty() {
-                piscis_kernel::tools::register_mcp_tools(&mut registry, &selected).await;
+                crate::commands::connectors::register_connector_mcp_tools(
+                    &mut registry,
+                    &config_dir,
+                    &selected,
+                )
+                .await;
             }
         }
         None => {
             let connector_configs =
                 crate::commands::connectors::resolve_connector_mcp_configs(&config_dir);
             if !connector_configs.is_empty() {
-                piscis_kernel::tools::register_mcp_tools(&mut registry, &connector_configs).await;
+                crate::commands::connectors::register_connector_mcp_tools(
+                    &mut registry,
+                    &config_dir,
+                    &connector_configs,
+                )
+                .await;
             }
             if let Some(agent) = agent.as_ref() {
                 if !agent.connectors.is_empty() {
@@ -2014,8 +2024,12 @@ pub async fn run_agentz_turn(
                         .filter(|c| !already.contains(&c.name))
                         .collect();
                     if !agent_connectors.is_empty() {
-                        piscis_kernel::tools::register_mcp_tools(&mut registry, &agent_connectors)
-                            .await;
+                        crate::commands::connectors::register_connector_mcp_tools(
+                            &mut registry,
+                            &config_dir,
+                            &agent_connectors,
+                        )
+                        .await;
                     }
                 }
             }

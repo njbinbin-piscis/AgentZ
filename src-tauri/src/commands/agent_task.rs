@@ -10,8 +10,8 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use piscis_kernel::proc::tokio_command;
 use serde::Serialize;
-use tokio::process::Command;
 use tokio::time::timeout;
 
 use crate::commands::data_scope::require_project_dir;
@@ -216,7 +216,7 @@ fn branch_for(task_id: &str) -> String {
 async fn run_git(dir: &Path, args: &[&str]) -> Result<String, String> {
     let output = timeout(
         Duration::from_secs(60),
-        Command::new("git")
+        tokio_command("git")
             .args(args)
             .current_dir(dir)
             .kill_on_drop(true)
@@ -641,7 +641,7 @@ pub async fn agent_task_open_pr(
     let project = PathBuf::from(project);
 
     // gh present?
-    let gh_ok = Command::new("gh")
+    let gh_ok = tokio_command("gh")
         .arg("--version")
         .current_dir(&project)
         .output()
@@ -663,7 +663,7 @@ pub async fn agent_task_open_pr(
     let _ = run_git(&project, &["push", "-u", "origin", &branch]).await;
 
     let body = body.unwrap_or_default();
-    let output = Command::new("gh")
+    let output = tokio_command("gh")
         .args([
             "pr", "create", "--base", &base, "--head", &branch, "--title", &title, "--body", &body,
         ])

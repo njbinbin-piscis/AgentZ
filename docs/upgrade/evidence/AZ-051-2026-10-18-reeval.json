@@ -1,0 +1,21 @@
+[
+  {
+    "id": "AZ-051",
+    "verified_state": "local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "Current desktop source already contains PKCE loopback authorization, refresh and OS-sealed token storage. This batch closes three expiry edge cases, keeps an unrelated callback from consuming an authorization attempt, revalidates registered connector MCP tools against current manifest, token, expiry and resolved transport before each new call in chat, Koi and gateway, and aborts a pending OAuth task on disable/uninstall before credential cleanup. Local OAuth lifecycle transitions now serialize callback/refresh token writes with disable, uninstall and manual credential save; refresh rejects disabled connectors, replaced manifest identity or changed credentials after its network call. The callback reads a bounded complete HTTP request line so a split valid redirect is accepted. Windows focused OAuth tests passed 24/24 including stale-refresh and split-request fixtures, MCP guard fixture passed 1/1 and the complete desktop library suite passed 361/361 with 7 ignored on the final OAuth source. The desktop crate cargo check passed before the final lifecycle and callback edits; no native desktop journey, live MCP server or provider account was used.",
+    "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account.",
+    "next_action": "Review the current PKCE callback, refresh and per-call MCP guard; decide provider-side revocation support, then run one real provider authorization/expiry/revoke journey and in-flight cancellation case during unified acceptance.",
+    "remaining_work": [
+      "Independent review of the current OAuth callback, refresh and storage candidate",
+      "Concurrent native lifecycle race fixture, provider revoke policy and already in-flight MCP call handling",
+      "Actual provider authorization, expiry, refresh and revoke receipts"
+    ],
+    "verification_gaps": [
+      "No external provider account or real OAuth endpoint was exercised",
+      "No native desktop callback journey, live MCP call or provider-side revoke receipt",
+      "No unified independent implementation review"
+    ],
+    "evidence": ["docs/upgrade/evidence/AZ-051-expiry-guard-2026-10-18.md"]
+  }
+]

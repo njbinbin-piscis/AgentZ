@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-064",
+    "verified_state": "local_publication_guard_candidate_native_unverified",
+    "severity": "P1",
+    "finding": "All six publishing bundle jobs now depend on a version/ledger/release-gate prerequisite. Local tests reject mismatched tags and branch dispatch, and the current 0.9.11 ledger correctly refuses publication because M2-M8, MB and AZ-069 are open. A per-platform clean-machine trust/install/upgrade/uninstall/restore evidence card is prepared. No workflow dispatch or native signing/install result ran.",
+    "conclusion_proposal": "Keep blocked until certificate and trust identity, clean-machine install/start/uninstall and rollback receipts are reviewed.",
+    "next_action": "Obtain external signing/notarization identities and clean test machines; build a frozen candidate through the nonpublishing path, complete native receipts, then make the explicit AZ-069 release decision.",
+    "remaining_work": ["Signing and notarization identities", "Frozen signed artifact hashes", "Clean-machine install/start/uninstall", "Rollback and independent acceptance"],
+    "verification_gaps": ["GitHub publishing workflow not dispatched", "No trusted signature or native installer journey"],
+    "evidence": ["docs/upgrade/evidence/AZ-064-2026-10-18-publication-guard.md", "docs/upgrade/evidence/AZ-064-installer-acceptance-protocol.md"]
+  }
+]

@@ -234,7 +234,12 @@ async fn build_koi_registry(
         let connector_configs =
             crate::commands::connectors::resolve_connector_mcp_configs(&config_dir);
         if !connector_configs.is_empty() {
-            register_mcp_tools(&mut registry, &connector_configs).await;
+            crate::commands::connectors::register_connector_mcp_tools(
+                &mut registry,
+                &config_dir,
+                &connector_configs,
+            )
+            .await;
         }
     }
     registry

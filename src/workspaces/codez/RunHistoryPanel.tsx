@@ -8,6 +8,7 @@ import {
   type DurableRunEvent,
   type RunEventStream,
 } from "../../services/tauri/runEvents";
+import { coalesce, FOCUS_REFRESH_GAP_MS } from "../../utils/coalesce";
 import "./RunHistoryPanel.css";
 import { committedHighWatermark, committedNoticeBytes } from "../../services/tauri/runEventNotice";
 import { onChatEvent, type ChatEventEnvelope } from "../../services/tauri/chat";
@@ -90,15 +91,18 @@ export default function RunHistoryPanel({
   const requestRefresh = useCallback(() => reload.current(), []);
 
   useEffect(() => {
+    // Focus, online, and visibility events often arrive together; one reload covers the burst.
+    const refresh = coalesce(requestRefresh, FOCUS_REFRESH_GAP_MS);
     const visible = () => {
-      if (document.visibilityState === "visible") requestRefresh();
+      if (document.visibilityState === "visible") refresh.call();
     };
-    window.addEventListener("focus", requestRefresh);
-    window.addEventListener("online", requestRefresh);
+    window.addEventListener("focus", refresh.call);
+    window.addEventListener("online", refresh.call);
     document.addEventListener("visibilitychange", visible);
     return () => {
-      window.removeEventListener("focus", requestRefresh);
-      window.removeEventListener("online", requestRefresh);
+      refresh.cancel();
+      window.removeEventListener("focus", refresh.call);
+      window.removeEventListener("online", refresh.call);
       document.removeEventListener("visibilitychange", visible);
     };
   }, [requestRefresh]);

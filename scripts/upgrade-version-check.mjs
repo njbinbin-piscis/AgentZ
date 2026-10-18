@@ -14,6 +14,7 @@ const versions = {
   tauri: JSON.parse(read("src-tauri/tauri.conf.json")).version,
   cargo: /^version\s*=\s*"([^"]+)"/m.exec(cargo ?? "")?.[1],
   readme: /当前源码版本\s*\*\*(\d+\.\d+\.\d+)\*\*/u.exec(read("README.md"))?.[1],
+  releaseDoc: /Current source version:\s*\*\*(\d+\.\d+\.\d+)\*\*/u.exec(read("RELEASE.md"))?.[1],
 };
 const expected = versions.package;
 const errors = [];
@@ -28,9 +29,18 @@ if (extensionHostLock.version !== extensionHostVersion || extensionHostLock.pack
 for (const filename of [`docs/upgrade/release-notes-${expected}.md`, `docs/upgrade/release-checklist-${expected}.md`]) {
   if (!existsSync(path.join(root, filename))) errors.push(`missing ${filename}`);
 }
+for (const filename of ["README.md", "RELEASE.md"]) {
+  for (const [, target] of read(filename).matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
+    if (/^(?:[a-z][a-z\d+.-]*:|#)/i.test(target)) continue;
+    const relative = target.split("#", 1)[0];
+    if (!relative) continue;
+    const resolved = path.resolve(root, path.dirname(filename), relative);
+    if (!resolved.startsWith(root + path.sep) || !existsSync(resolved)) errors.push(`${filename}: broken local link ${target}`);
+  }
+}
 if (errors.length) {
   console.error(errors.join("\n"));
   process.exitCode = 1;
 } else {
-  console.log(`AgentZ ${expected}: package, lockfile, Cargo, Tauri, README and candidate docs agree; extension-host ${extensionHostVersion} package and lockfile agree`);
+  console.log(`AgentZ ${expected}: package, lockfile, Cargo, Tauri, README, RELEASE and candidate docs agree; README/RELEASE local links resolve; extension-host ${extensionHostVersion} package and lockfile agree`);
 }

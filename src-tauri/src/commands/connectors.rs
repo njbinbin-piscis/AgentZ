@@ -25,6 +25,10 @@ use tauri::AppHandle;
 use tracing::{info, warn};
 
 use piscis_kernel::store::settings::McpServerConfig;
+use piscis_kernel::{
+    agent::tool::{Tool, ToolContext, ToolRegistry, ToolResult},
+    tools::mcp::{build_mcp_tools, McpProxyTool},
+};
 
 use crate::commands::data_scope::resolve_global_config_dir;
 
@@ -331,13 +335,16 @@ fn unix_now() -> i64 {
 /// never leaves with a token that dies in flight.
 const OAUTH_EXPIRY_SKEW_SECS: i64 = 60;
 
-/// A token whose `expires_at` (unix seconds) has passed. A missing or unparsable value
-/// means the provider did not declare an expiry, so the token is not treated as expired.
+/// A token whose `expires_at` (unix seconds) has passed. A missing value means the provider
+/// did not declare an expiry; a malformed stored value fails closed.
 fn oauth_token_expired(creds: &HashMap<String, String>, now: i64) -> bool {
-    creds
-        .get("expires_at")
-        .and_then(|v| v.trim().parse::<i64>().ok())
-        .is_some_and(|expires_at| now + OAUTH_EXPIRY_SKEW_SECS >= expires_at)
+    match creds.get("expires_at") {
+        None => false,
+        Some(value) => match value.trim().parse::<i64>() {
+            Ok(expires_at) => now.saturating_add(OAUTH_EXPIRY_SKEW_SECS) >= expires_at,
+            Err(_) => true,
+        },
+    }
 }
 
 fn random_hex_token() -> String {
@@ -427,9 +434,15 @@ pub(crate) fn store_oauth_tokens(
             creds.remove("refresh_token");
         }
     }
-    match expires_in.filter(|s| *s > 0) {
+    match expires_in {
         Some(seconds) => {
-            creds.insert("expires_at".into(), (now + seconds).to_string());
+            let expires_at = if seconds <= 0 {
+                now
+            } else {
+                now.checked_add(seconds)
+                    .ok_or_else(|| "token expiry is out of range".to_string())?
+            };
+            creds.insert("expires_at".into(), expires_at.to_string());
         }
         None => {
             creds.remove("expires_at");
@@ -487,6 +500,27 @@ fn pending_oauth() -> &'static std::sync::Mutex<HashMap<String, PendingOAuth>> {
     static PENDING: std::sync::OnceLock<std::sync::Mutex<HashMap<String, PendingOAuth>>> =
         std::sync::OnceLock::new();
     PENDING.get_or_init(|| std::sync::Mutex::new(HashMap::new()))
+}
+
+/// Serialize local OAuth state transitions and credential writes. A refresh or callback that
+/// finishes after disable/uninstall must not restore tokens removed by that operation.
+fn oauth_lifecycle() -> &'static tokio::sync::Mutex<()> {
+    static LIFECYCLE: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LIFECYCLE.get_or_init(|| tokio::sync::Mutex::new(()))
+}
+
+async fn abort_pending_oauth(id: &str) -> Result<(), String> {
+    let previous = {
+        let mut map = pending_oauth()
+            .lock()
+            .map_err(|_| "authorization state unavailable".to_string())?;
+        map.remove(id)
+    };
+    if let Some(previous) = previous {
+        previous.task.abort();
+        let _ = previous.task.await;
+    }
+    Ok(())
 }
 
 /// Token endpoint response (RFC 6749 §5.1). Only the fields this app stores are kept.
@@ -639,6 +673,39 @@ fn parse_callback_request(
     Ok(url.query_pairs().into_owned().collect())
 }
 
+/// TCP may split the request line across reads. Read only that line, with a fixed size and
+/// deadline; headers are irrelevant to the callback state/code check.
+async fn read_callback_request_line(socket: &mut TcpStream) -> Result<String, String> {
+    const MAX_REQUEST_LINE: usize = 8192;
+    let mut line = Vec::with_capacity(256);
+    let mut chunk = [0u8; 512];
+    loop {
+        let count = tokio::time::timeout(
+            std::time::Duration::from_secs(OAUTH_REQUEST_TIMEOUT_SECS),
+            socket.read(&mut chunk),
+        )
+        .await
+        .map_err(|_| "callback request timed out".to_string())?
+        .map_err(|_| "callback request could not be read".to_string())?;
+        if count == 0 {
+            return Err("callback request ended before its first line".into());
+        }
+        let end = chunk[..count]
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .map(|index| index + 1);
+        let take = end.unwrap_or(count);
+        if line.len() + take > MAX_REQUEST_LINE {
+            return Err("callback request line is too long".into());
+        }
+        line.extend_from_slice(&chunk[..take]);
+        if end.is_some() {
+            return String::from_utf8(line)
+                .map_err(|_| "callback request line is not UTF-8".to_string());
+        }
+    }
+}
+
 async fn write_callback_page(socket: &mut TcpStream, status: &str, message: &'static str) {
     let body =
         format!("<!doctype html><meta charset=\"utf-8\"><title>AgentZ</title><p>{message}</p>");
@@ -656,8 +723,8 @@ async fn reject(socket: &mut TcpStream, reason: String) -> Result<TokenResponse,
     Err(reason)
 }
 
-/// Accept one redirect, validate it and exchange the code. Requests that fail validation
-/// never reach the token endpoint.
+/// Accept the matching redirect and exchange the code. Unrelated local requests cannot
+/// consume the authorization attempt; the caller enforces the overall callback deadline.
 async fn await_callback_and_exchange(
     listener: TcpListener,
     oauth: &ConnectorOAuth,
@@ -666,56 +733,54 @@ async fn await_callback_and_exchange(
     state: &str,
     verifier: &str,
 ) -> Result<TokenResponse, String> {
-    let (mut socket, _) = listener
-        .accept()
-        .await
-        .map_err(|_| "callback listener failed".to_string())?;
-    let mut buf = vec![0u8; 8192];
-    let read = tokio::time::timeout(
-        std::time::Duration::from_secs(OAUTH_REQUEST_TIMEOUT_SECS),
-        socket.read(&mut buf),
-    )
-    .await;
-    let n = match read {
-        Ok(Ok(n)) if n > 0 => n,
-        _ => return reject(&mut socket, "callback was not received".into()).await,
-    };
-    let request = String::from_utf8_lossy(&buf[..n]).into_owned();
-    let params = match parse_callback_request(&request, redirect_path) {
-        Ok(params) => params,
-        Err(reason) => return reject(&mut socket, reason).await,
-    };
-    let received_state = params.get("state").map(String::as_str).unwrap_or("");
-    if !oauth_state_matches(state, received_state) {
-        return reject(
-            &mut socket,
-            "authorization state mismatch; the callback was ignored".into(),
-        )
-        .await;
-    }
-    if let Some(error) = params.get("error") {
-        // The provider's error code is shown to the user, so keep only a short safe subset.
-        let safe: String = error
-            .chars()
-            .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
-            .take(64)
-            .collect();
-        return reject(
-            &mut socket,
-            format!("authorization was refused by the provider: {safe}"),
-        )
-        .await;
-    }
-    let code = match params.get("code").filter(|c| !c.is_empty()) {
-        Some(code) => code.clone(),
-        None => return reject(&mut socket, "callback has no authorization code".into()).await,
-    };
-    match exchange_authorization_code(oauth, &code, verifier, redirect_uri).await {
-        Ok(tokens) => {
-            write_callback_page(&mut socket, "200 OK", CALLBACK_DONE_PAGE).await;
-            Ok(tokens)
+    loop {
+        let (mut socket, _) = listener
+            .accept()
+            .await
+            .map_err(|_| "callback listener failed".to_string())?;
+        let request = match read_callback_request_line(&mut socket).await {
+            Ok(request) => request,
+            Err(_) => {
+                write_callback_page(&mut socket, "400 Bad Request", CALLBACK_FAILED_PAGE).await;
+                continue;
+            }
+        };
+        let params = match parse_callback_request(&request, redirect_path) {
+            Ok(params) => params,
+            Err(_) => {
+                write_callback_page(&mut socket, "400 Bad Request", CALLBACK_FAILED_PAGE).await;
+                continue;
+            }
+        };
+        let received_state = params.get("state").map(String::as_str).unwrap_or("");
+        if !oauth_state_matches(state, received_state) {
+            write_callback_page(&mut socket, "400 Bad Request", CALLBACK_FAILED_PAGE).await;
+            continue;
         }
-        Err(reason) => reject(&mut socket, reason).await,
+        if let Some(error) = params.get("error") {
+            // The provider's error code is shown to the user, so keep only a short safe subset.
+            let safe: String = error
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+                .take(64)
+                .collect();
+            return reject(
+                &mut socket,
+                format!("authorization was refused by the provider: {safe}"),
+            )
+            .await;
+        }
+        let code = match params.get("code").filter(|c| !c.is_empty()) {
+            Some(code) => code.clone(),
+            None => return reject(&mut socket, "callback has no authorization code".into()).await,
+        };
+        return match exchange_authorization_code(oauth, &code, verifier, redirect_uri).await {
+            Ok(tokens) => {
+                write_callback_page(&mut socket, "200 OK", CALLBACK_DONE_PAGE).await;
+                Ok(tokens)
+            }
+            Err(reason) => reject(&mut socket, reason).await,
+        };
     }
 }
 
@@ -756,6 +821,7 @@ fn open_in_browser(url: &str) -> Result<(), String> {
 /// browser opens, and the authorization URL is returned for display if opening fails.
 #[tauri::command]
 pub async fn connectors_oauth_start(app: AppHandle, id: String) -> Result<String, String> {
+    let _lifecycle = oauth_lifecycle().lock().await;
     let dir = connectors_dir(&app)?;
     let manifest = ConnectorManifest::load(&dir.join(safe_id(&id)).join("connector.json"))?;
     let oauth = require_oauth2(&manifest)?;
@@ -765,16 +831,7 @@ pub async fn connectors_oauth_start(app: AppHandle, id: String) -> Result<String
     let authorize_url = oauth_authorize_url(&oauth, &state, &pkce_challenge(&verifier))?;
 
     // Abort an attempt already in flight for this connector, and wait for it to release the port.
-    let previous = {
-        let mut map = pending_oauth()
-            .lock()
-            .map_err(|_| "authorization state unavailable".to_string())?;
-        map.remove(&manifest.id)
-    };
-    if let Some(previous) = previous {
-        previous.task.abort();
-        let _ = previous.task.await;
-    }
+    abort_pending_oauth(&manifest.id).await?;
 
     let listener = TcpListener::bind(&bind_addr).await.map_err(|_| {
         format!(
@@ -800,14 +857,17 @@ pub async fn connectors_oauth_start(app: AppHandle, id: String) -> Result<String
         )
         .await;
         let result: Result<(), String> = match outcome {
-            Ok(Ok(tokens)) => store_oauth_tokens(
-                &task_dir,
-                &id_for_task,
-                &tokens.access_token,
-                tokens.refresh_token.as_deref(),
-                tokens.expires_in,
-                unix_now(),
-            ),
+            Ok(Ok(tokens)) => {
+                let _lifecycle = oauth_lifecycle().lock().await;
+                store_oauth_tokens(
+                    &task_dir,
+                    &id_for_task,
+                    &tokens.access_token,
+                    tokens.refresh_token.as_deref(),
+                    tokens.expires_in,
+                    unix_now(),
+                )
+            }
             Ok(Err(reason)) => Err(reason),
             Err(_) => Err("authorization timed out before the browser redirected back".into()),
         };
@@ -851,6 +911,9 @@ pub async fn connectors_oauth_refresh(app: AppHandle, id: String) -> Result<(), 
     let dir = connectors_dir(&app)?;
     let manifest = ConnectorManifest::load(&dir.join(safe_id(&id)).join("connector.json"))?;
     let oauth = require_oauth2(&manifest)?;
+    if !manifest.enabled {
+        return Err("connector is disabled; authorize and enable it before refreshing".into());
+    }
     let creds = load_credentials_for_update(&dir, &manifest.id)?;
     let stored = creds
         .get("refresh_token")
@@ -859,6 +922,8 @@ pub async fn connectors_oauth_refresh(app: AppHandle, id: String) -> Result<(), 
         .ok_or_else(|| "no refresh token is stored; authorize the connector again".to_string())?;
     let tokens = refresh_access_token(&oauth, &stored).await?;
     let next_refresh = merged_refresh_token(&tokens, &stored);
+    let _lifecycle = oauth_lifecycle().lock().await;
+    validate_refresh_commit(&dir, &id, &manifest.id, &stored)?;
     store_oauth_tokens(
         &dir,
         &manifest.id,
@@ -867,6 +932,25 @@ pub async fn connectors_oauth_refresh(app: AppHandle, id: String) -> Result<(), 
         tokens.expires_in,
         unix_now(),
     )
+}
+
+/// Called under the lifecycle lock after a remote refresh completes. The old network response
+/// cannot restore tokens if the connector was disabled, replaced or reauthorized meanwhile.
+fn validate_refresh_commit(
+    dir: &Path,
+    id: &str,
+    original_manifest_id: &str,
+    expected_refresh_token: &str,
+) -> Result<(), String> {
+    let current = ConnectorManifest::load(&dir.join(safe_id(id)).join("connector.json"))?;
+    if !current.enabled || current.auth.method != "oauth2" || current.id != original_manifest_id {
+        return Err("connector authorization changed during refresh".into());
+    }
+    let current_creds = load_credentials_for_update(dir, &current.id)?;
+    if current_creds.get("refresh_token").map(String::as_str) != Some(expected_refresh_token) {
+        return Err("connector credentials changed during refresh".into());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -984,9 +1068,12 @@ mod oauth_exchange_tests {
         });
         let mut client = TcpStream::connect(addr).await.unwrap();
         client
-            .write_all(
-                b"GET /callback?code=code-1&state=state-ok HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
-            )
+            .write_all(b"GET /callback?code=code-1&sta")
+            .await
+            .unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        client
+            .write_all(b"te=state-ok HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
             .await
             .unwrap();
         let mut page = String::new();
@@ -998,18 +1085,18 @@ mod oauth_exchange_tests {
     }
 
     #[tokio::test]
-    async fn callback_with_wrong_state_is_rejected_before_any_exchange() {
-        // Port 9 (discard) would refuse a connection; reaching it would fail with a
-        // token-request error instead of the state error asserted below.
-        let oauth = oauth_for("http://127.0.0.1:9/token", "http://127.0.0.1/callback");
+    async fn callback_with_wrong_state_does_not_consume_the_attempt() {
+        let (token_url, captured) = fake_token_endpoint(r#"{"access_token":"at-2"}"#).await;
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
+        let redirect = format!("http://{addr}/callback");
+        let oauth = oauth_for(&token_url, &redirect);
         let server = tokio::spawn(async move {
             await_callback_and_exchange(
                 listener,
                 &oauth,
                 "/callback",
-                "http://127.0.0.1/callback",
+                &redirect,
                 "state-ok",
                 "verifier-1",
             )
@@ -1025,8 +1112,31 @@ mod oauth_exchange_tests {
         let mut page = String::new();
         client.read_to_string(&mut page).await.unwrap();
         assert!(page.starts_with("HTTP/1.1 400"));
-        let error = server.await.unwrap().unwrap_err();
-        assert!(error.contains("state mismatch"), "{error}");
+        let mut valid = TcpStream::connect(addr).await.unwrap();
+        valid
+            .write_all(
+                b"GET /callback?code=code-1&state=state-ok HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        let mut valid_page = String::new();
+        valid.read_to_string(&mut valid_page).await.unwrap();
+        assert!(valid_page.starts_with("HTTP/1.1 200 OK"));
+        assert_eq!(server.await.unwrap().unwrap().access_token, "at-2");
+        assert!(captured.await.unwrap().contains("code=code-1"));
+    }
+
+    #[tokio::test]
+    async fn callback_request_line_has_a_fixed_size_limit() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            read_callback_request_line(&mut socket).await
+        });
+        let mut client = TcpStream::connect(addr).await.unwrap();
+        client.write_all(&vec![b'x'; 8193]).await.unwrap();
+        assert!(server.await.unwrap().is_err());
     }
 
     #[test]
@@ -1071,6 +1181,63 @@ mod oauth_exchange_tests {
 #[cfg(test)]
 mod oauth_flow_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn abort_pending_attempt_stops_late_token_work() {
+        let id = format!("fixture-{}", uuid::Uuid::new_v4());
+        let reached_token_write = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let reached = reached_token_write.clone();
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            let _ = started_tx.send(());
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            reached.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        pending_oauth().lock().unwrap().insert(
+            id.clone(),
+            PendingOAuth {
+                state: "fixture-state".into(),
+                task,
+            },
+        );
+        started_rx.await.unwrap();
+        abort_pending_oauth(&id).await.unwrap();
+        assert!(!pending_oauth().lock().unwrap().contains_key(&id));
+        assert!(!reached_token_write.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
+    #[test]
+    fn stale_refresh_response_cannot_commit_after_disable_or_reauthorization() {
+        let dir = std::env::temp_dir().join(format!("agentz-refresh-{}", uuid::Uuid::new_v4()));
+        let connector = dir.join("demo");
+        std::fs::create_dir_all(&connector).unwrap();
+        let manifest = connector.join("connector.json");
+        let credentials = connector.join("credentials.json");
+        std::fs::write(
+            &manifest,
+            r#"{"id":"demo","name":"Demo","enabled":true,"auth":{"method":"oauth2"}}"#,
+        )
+        .unwrap();
+        std::fs::write(&credentials, r#"{"refresh_token":"old"}"#).unwrap();
+        assert!(validate_refresh_commit(&dir, "demo", "demo", "old").is_ok());
+
+        std::fs::write(
+            &manifest,
+            r#"{"id":"demo","name":"Demo","enabled":false,"auth":{"method":"oauth2"}}"#,
+        )
+        .unwrap();
+        assert!(validate_refresh_commit(&dir, "demo", "demo", "old").is_err());
+
+        std::fs::write(
+            &manifest,
+            r#"{"id":"demo","name":"Demo","enabled":true,"auth":{"method":"oauth2"}}"#,
+        )
+        .unwrap();
+        std::fs::write(&credentials, r#"{"refresh_token":"new"}"#).unwrap();
+        assert!(validate_refresh_commit(&dir, "demo", "demo", "old").is_err());
+        assert!(validate_refresh_commit(&dir, "demo", "replaced", "new").is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     fn oauth() -> ConnectorOAuth {
         ConnectorOAuth {
@@ -1153,7 +1320,11 @@ mod oauth_flow_tests {
             now
         ));
         assert!(!oauth_token_expired(&creds(&[]), now));
-        assert!(!oauth_token_expired(&creds(&[("expires_at", "soon")]), now));
+        assert!(oauth_token_expired(&creds(&[("expires_at", "soon")]), now));
+        assert!(oauth_token_expired(
+            &creds(&[("expires_at", "9223372036854775807")]),
+            i64::MAX
+        ));
     }
 
     #[test]
@@ -1173,6 +1344,11 @@ mod oauth_flow_tests {
         assert_eq!(stored["refresh_token"], "ref-1");
         assert_eq!(stored["expires_at"], "4600");
         assert_eq!(stored["unrelated"], "kept");
+        assert!(store_oauth_tokens(&dir, id, "tok-unsafe", None, Some(i64::MAX), 1_000).is_err());
+        assert_eq!(load_credentials(&dir, id)["access_token"], "tok-1");
+        store_oauth_tokens(&dir, id, "tok-expired", None, Some(0), 1_000).unwrap();
+        let expired = load_credentials(&dir, id);
+        assert!(oauth_token_expired(&expired, 1_000));
 
         // A later response without expiry must not keep the old expiry.
         store_oauth_tokens(&dir, id, "tok-2", None, None, 2_000).unwrap();
@@ -1428,6 +1604,10 @@ fn connector_to_mcp_config(dir: &Path, manifest: &ConnectorManifest) -> Option<M
     if manifest.kind != "mcp" {
         return None;
     }
+    // OAuth disable is a revocation boundary even for an agent that selected this connector.
+    if manifest.auth.method == "oauth2" && !manifest.enabled {
+        return None;
+    }
     let creds = load_credentials(dir, &manifest.id);
     if !is_authorized(manifest, &creds) {
         return None;
@@ -1517,6 +1697,165 @@ pub fn resolve_named_connector_mcp_configs(
         }
     }
     out
+}
+
+/// Register connector MCP tools with a per-call authorization check. A registry may outlive
+/// a credential refresh or revocation; the MCP client holds the credentials from registration.
+pub async fn register_connector_mcp_tools(
+    registry: &mut ToolRegistry,
+    config_dir: &Path,
+    configs: &[McpServerConfig],
+) {
+    for config in configs {
+        for tool in build_mcp_tools(config).await {
+            registry.register(Box::new(ConnectorMcpTool {
+                inner: tool,
+                config_dir: config_dir.to_path_buf(),
+                registered_config: config.clone(),
+            }));
+        }
+    }
+}
+
+fn same_mcp_config(a: &McpServerConfig, b: &McpServerConfig) -> bool {
+    a.name == b.name
+        && a.transport == b.transport
+        && a.command == b.command
+        && a.args == b.args
+        && a.url == b.url
+        && a.env == b.env
+        && a.headers == b.headers
+        && a.enabled == b.enabled
+}
+
+struct ConnectorMcpTool {
+    inner: McpProxyTool,
+    config_dir: PathBuf,
+    registered_config: McpServerConfig,
+}
+
+impl ConnectorMcpTool {
+    fn still_authorized(&self) -> bool {
+        let dir = self.config_dir.join("connectors");
+        let path = dir
+            .join(safe_id(&self.inner.server_name))
+            .join("connector.json");
+        let Ok(manifest) = ConnectorManifest::load(&path) else {
+            return false;
+        };
+        if manifest.id != self.inner.server_name {
+            return false;
+        }
+        connector_to_mcp_config(&dir, &manifest)
+            .is_some_and(|current| same_mcp_config(&current, &self.registered_config))
+    }
+}
+
+#[async_trait::async_trait]
+impl Tool for ConnectorMcpTool {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+
+    fn input_schema(&self) -> serde_json::Value {
+        self.inner.input_schema()
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.inner.is_read_only()
+    }
+
+    fn needs_confirmation(&self, input: &serde_json::Value) -> bool {
+        self.inner.needs_confirmation(input)
+    }
+
+    async fn call(
+        &self,
+        input: serde_json::Value,
+        ctx: &ToolContext,
+    ) -> anyhow::Result<ToolResult> {
+        if !self.still_authorized() {
+            return Ok(ToolResult::err(
+                "connector authorization changed; start a new turn after reconnecting",
+            ));
+        }
+        self.inner.call(input, ctx).await
+    }
+}
+
+#[cfg(test)]
+mod connector_guard_tests {
+    use super::*;
+    use piscis_kernel::tools::mcp::McpClient;
+    use std::sync::Arc;
+
+    #[test]
+    fn registered_mcp_tool_refuses_changed_or_revoked_credentials() {
+        let root =
+            std::env::temp_dir().join(format!("agentz-connector-guard-{}", uuid::Uuid::new_v4()));
+        let dir = root.join("connectors").join("demo");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("connector.json"),
+            r#"{"id":"demo","name":"Demo","kind":"mcp","transport":"http","url":"https://example.test/mcp","enabled":true,"auth":{"method":"oauth2"}}"#,
+        )
+        .unwrap();
+        let credentials = dir.join("credentials.json");
+        let expires_at = unix_now() + 3600;
+        std::fs::write(
+            &credentials,
+            format!(r#"{{"access_token":"token-a","expires_at":"{expires_at}"}}"#),
+        )
+        .unwrap();
+        let manifest = ConnectorManifest::load(&dir.join("connector.json")).unwrap();
+        let config = connector_to_mcp_config(&root.join("connectors"), &manifest).unwrap();
+        let guard = ConnectorMcpTool {
+            inner: McpProxyTool {
+                server_name: "demo".into(),
+                tool_name: "fixture".into(),
+                tool_description: "fixture".into(),
+                schema: serde_json::json!({}),
+                client: Arc::new(McpClient::new(config.clone())),
+            },
+            config_dir: root.clone(),
+            registered_config: config,
+        };
+        assert!(guard.still_authorized());
+        std::fs::write(
+            &credentials,
+            format!(r#"{{"access_token":"token-b","expires_at":"{expires_at}"}}"#),
+        )
+        .unwrap();
+        assert!(!guard.still_authorized());
+        std::fs::write(
+            &credentials,
+            format!(r#"{{"access_token":"token-a","expires_at":"{expires_at}"}}"#),
+        )
+        .unwrap();
+        let mut disabled = manifest.clone();
+        disabled.enabled = false;
+        std::fs::write(
+            dir.join("connector.json"),
+            serde_json::to_string(&disabled).unwrap(),
+        )
+        .unwrap();
+        assert!(!guard.still_authorized());
+        assert!(connector_to_mcp_config(&root.join("connectors"), &disabled).is_none());
+        std::fs::write(
+            dir.join("connector.json"),
+            serde_json::to_string(&manifest).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(&credentials, "{}").unwrap();
+        assert!(!guard.still_authorized());
+        std::fs::remove_file(dir.join("connector.json")).unwrap();
+        assert!(!guard.still_authorized());
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }
 
 /// System-prompt section for user-selected connectors (generic agent mode).
@@ -1747,6 +2086,7 @@ pub async fn connectors_create_api(
 
 #[tauri::command]
 pub async fn connectors_uninstall(app: AppHandle, id: String) -> Result<(), String> {
+    let _lifecycle = oauth_lifecycle().lock().await;
     let dir = connectors_dir(&app)?;
     let target = dir.join(safe_id(&id));
     if !target.exists() {
@@ -1757,6 +2097,10 @@ pub async fn connectors_uninstall(app: AppHandle, id: String) -> Result<(), Stri
     if !canonical.starts_with(&base) {
         return Err("path traversal blocked".into());
     }
+    let pending_id = ConnectorManifest::load(&target.join("connector.json"))
+        .map(|manifest| manifest.id)
+        .unwrap_or_else(|_| id.clone());
+    abort_pending_oauth(&pending_id).await?;
     tokio::fs::remove_dir_all(&target)
         .await
         .map_err(|e| e.to_string())?;
@@ -1769,6 +2113,7 @@ pub async fn connectors_set_enabled(
     id: String,
     enabled: bool,
 ) -> Result<(), String> {
+    let _lifecycle = oauth_lifecycle().lock().await;
     let dir = connectors_dir(&app)?;
     let path = dir.join(safe_id(&id)).join("connector.json");
     let mut manifest = ConnectorManifest::load(&path)?;
@@ -1784,6 +2129,7 @@ pub async fn connectors_set_enabled(
     std::fs::write(&path, pretty).map_err(|e| e.to_string())?;
     // Disabling an OAuth connector drops its tokens; re-enabling requires a new authorization.
     if !enabled && manifest.auth.method == "oauth2" {
+        abort_pending_oauth(&manifest.id).await?;
         clear_oauth_tokens(&dir, &manifest.id)?;
     }
     Ok(())
@@ -1795,6 +2141,7 @@ pub async fn connectors_save_credentials(
     id: String,
     credentials: HashMap<String, String>,
 ) -> Result<(), String> {
+    let _lifecycle = oauth_lifecycle().lock().await;
     let dir = connectors_dir(&app)?;
     let target = dir.join(safe_id(&id));
     if !target.join("connector.json").exists() {

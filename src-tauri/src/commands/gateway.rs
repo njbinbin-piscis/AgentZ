@@ -684,7 +684,12 @@ async fn handle_inbound(
     if let Some(dir) = config_path.parent() {
         let connector_configs = crate::commands::connectors::resolve_connector_mcp_configs(dir);
         if !connector_configs.is_empty() {
-            register_mcp_tools(&mut registry, &connector_configs).await;
+            crate::commands::connectors::register_connector_mcp_tools(
+                &mut registry,
+                dir,
+                &connector_configs,
+            )
+            .await;
         }
     }
 

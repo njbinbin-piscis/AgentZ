@@ -59,7 +59,6 @@ import TaskPanel from "../../components/TaskPanel";
 import DurablePlanActions from "./DurablePlanActions";
 import RunHistoryPanel from "./RunHistoryPanel";
 import TaskDetailsPanel from "./TaskDetailsPanel";
-import InputContextSummary from "../../components/chat/InputContextSummary";
 import DeliveryReviewPanel from "./DeliveryReviewPanel";
 import TaskArtifactViewer from "./TaskArtifactViewer";
 import type { ArtifactText } from "../../services/tauri/taskArtifacts";
@@ -82,9 +81,8 @@ import { useProjectEdgeActions } from "../../contexts/ProjectEdgeContext";
 import { useProjectScope } from "../../services/tauri/projectScope";
 import { collectArtifactsFromToolSteps, pathFromToolEvent } from "../workz/agentArtifacts";
 import "./AssistantPanel.css";
-import FirstRunChecklist from "./FirstRunChecklist";
+import { isConfigured } from "../../services/tauri/settings";
 import {
-  OPEN_SETTINGS_EVENT,
   SETTINGS_CLOSED_EVENT,
   hasFirstTaskDone,
   firstTaskFailureHint,
@@ -93,8 +91,6 @@ import {
   requestOpenSettings,
 } from "./firstRun";
 import { OPEN_CODEZ_SESSION_EVENT, sameProjectPath, type OpenCodezSessionDetail } from "./sessionRoute";
-import { isConfigured } from "../../services/tauri/settings";
-
 interface ChatMessage {
   id?: string;
   role: "user" | "assistant";
@@ -246,25 +242,19 @@ export default function AssistantPanel({
   // True when the current error is a model-setup problem (key missing/rejected); shows a Settings action.
   const [setupError, setSetupError] = useState(false);
   const [firstTaskDone, setFirstTaskDone] = useState(() => hasFirstTaskDone());
-  const [configured, setConfigured] = useState<boolean | null>(null);
-  const refreshConfigured = useCallback(() => {
-    isConfigured()
-      .then((value) => setConfigured(value))
-      .catch(() => setConfigured(null));
-  }, []);
+  // Shown only before the first message, and only when no model key is configured.
+  // A failed check shows nothing rather than a false warning.
+  const [needsSetup, setNeedsSetup] = useState(false);
   useEffect(() => {
-    refreshConfigured();
-  }, [refreshConfigured]);
-  // Settings can change the API key from anywhere (first-run action, menu, panel button);
-  // re-read the setup state whenever that panel is opened or closed.
-  useEffect(() => {
-    window.addEventListener(SETTINGS_CLOSED_EVENT, refreshConfigured);
-    window.addEventListener(OPEN_SETTINGS_EVENT, refreshConfigured);
-    return () => {
-      window.removeEventListener(SETTINGS_CLOSED_EVENT, refreshConfigured);
-      window.removeEventListener(OPEN_SETTINGS_EVENT, refreshConfigured);
+    const check = () => {
+      isConfigured()
+        .then((ok) => setNeedsSetup(!ok))
+        .catch(() => setNeedsSetup(false));
     };
-  }, [refreshConfigured]);
+    check();
+    window.addEventListener(SETTINGS_CLOSED_EVENT, check);
+    return () => window.removeEventListener(SETTINGS_CLOSED_EVENT, check);
+  }, []);
   const [queuedView, setQueuedView] = useState<string[]>([]);
   const [artifactViewKey, setArtifactViewKey] = useState<string | null>(null);
   const [files, setFiles] = useState<string[]>([]);
@@ -796,7 +786,6 @@ export default function AssistantPanel({
     });
     setError(null);
     setSetupError(false);
-    refreshConfigured();
     const displayText =
       turn.displayText ??
       (turn.attachment && !turn.text.trim()
@@ -1560,16 +1549,13 @@ export default function AssistantPanel({
         onPermissionResolved={handlePermissionResolved}
       />
 
-      {messages.length === 0 && !firstTaskDone && (
-        <FirstRunChecklist
-          projectReady={Boolean(projectDir)} configured={configured} firstTaskDone={firstTaskDone}
-          onOpenFolder={onOpenFolder}
-          onOpenSettings={requestOpenSettings}
-          onTryExample={() => {
-            onInputChange(t("chat.firstRunExamplePrompt"));
-            requestAnimationFrame(() => taRef.current?.focus());
-          }}
-        />
+      {messages.length === 0 && needsSetup && (
+        <div className="agentz-assistant-setup-hint" role="note">
+          <span>{t("chat.setupNeeded")}</span>
+          <button type="button" className="agentz-assistant-error-action" onClick={requestOpenSettings}>
+            {t("chat.firstRunOpenSettings")}
+          </button>
+        </div>
       )}
 
       {error && (
@@ -1597,16 +1583,6 @@ export default function AssistantPanel({
         </div>
       )}
 
-      <InputContextSummary
-        authorityProject={projectDir}
-        workspace={projectDir}
-        model={modelId || defaultModelLabel || null}
-        modelSource={modelId ? "selected" : defaultModelLabel ? "default" : "unknown"}
-        policy={appSettings?.policy_mode ?? null}
-        mode={`CodeZ ${chatMode}`}
-        state={permissionRequest && busy ? "approval" : busy ? "running" : error ? "error" : queuedView.length ? "queued" : "idle"}
-        latestAction={toolSteps.length ? { name: toolSteps[toolSteps.length - 1].name, status: toolSteps[toolSteps.length - 1].status } : null}
-      />
       {pendingArtifact && (
         <div className="agentz-assistant-artifact-ref">
           {t("chat.continueArtifactSelected", { id: pendingArtifact.reference.artifact_id, version: pendingArtifact.reference.version })}

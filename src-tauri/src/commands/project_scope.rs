@@ -17,8 +17,26 @@ pub struct ProjectScopeDto {
 fn dto(scope: VerifiedProjectScope) -> ProjectScopeDto {
     ProjectScopeDto {
         handle: scope.handle().into(),
-        project_dir: scope.project().to_string_lossy().into(),
+        project_dir: renderer_path(scope.project()),
     }
+}
+
+/// Canonical Windows paths carry the verbatim `\\?\` prefix. In verbatim form Windows does not
+/// treat `/` as a separator, and the renderer joins `projectDir` with `/` to open files, so
+/// those joins resolve to nothing. The renderer gets the ordinary spelling. Backend checks keep
+/// the canonical value; the renderer's path is canonicalized again on every use.
+fn renderer_path(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{rest}");
+    }
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        let bytes = rest.as_bytes();
+        if bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && &bytes[1..3] == br":\" {
+            return rest.to_string();
+        }
+    }
+    text.into_owned()
 }
 fn require_main(window: &WebviewWindow) -> Result<(), String> {
     if window.label() != "main" {
@@ -378,6 +396,24 @@ pub(crate) fn install_main_lifecycle(app: &AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn renderer_path_drops_verbatim_prefix_only_when_safe() {
+        assert_eq!(
+            renderer_path(Path::new(r"\\?\C:\Projects\AgentZ")),
+            r"C:\Projects\AgentZ"
+        );
+        assert_eq!(
+            renderer_path(Path::new(r"\\?\UNC\server\share\project")),
+            r"\\server\share\project"
+        );
+        // Other verbatim forms and ordinary paths are returned unchanged.
+        assert_eq!(renderer_path(Path::new(r"C:\plain")), r"C:\plain");
+        assert_eq!(
+            renderer_path(Path::new(r"\\?\Volume{1}\x")),
+            r"\\?\Volume{1}\x"
+        );
+    }
     #[test]
     fn known_restore_does_not_accept_arbitrary_existing_directory() {
         let owned =

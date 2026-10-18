@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-058",
+    "verified_state": "platform_journey_protocol_prepared_native_unverified",
+    "severity": "P1",
+    "finding": "A reusable macOS/Linux runtime test card now specifies frozen build identity, install/start, two-task isolation, descendant termination, failure/recovery, platform secrets, uninstall, evidence hashes and stop conditions. No platform test ran.",
+    "conclusion_proposal": "Keep blocked until owned macOS and Linux sessions are available and actual journeys complete.",
+    "next_action": "After AZ-056/AZ-057 candidate freeze, execute separate macOS and Linux native cards with model and credential fixtures; record differences in the support matrix.",
+    "remaining_work": ["Owned macOS and Linux test sessions", "Frozen candidate and model endpoint", "Actual install/start/task/terminate/recover receipts", "Independent review and support matrix update"],
+    "verification_gaps": ["No macOS or Linux runtime session", "No native journey, process-group or rollback result"],
+    "evidence": ["docs/upgrade/evidence/AZ-058-platform-journey-protocol.md"]
+  }
+]

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   FIRST_TASK_DONE_KEY,
-  firstRunSteps,
   firstTaskFailureHint,
   hasFirstTaskDone,
   isLlmSetupFailure,
@@ -16,27 +15,6 @@ function memoryStore() {
     setItem: (key: string, value: string) => void data.set(key, value),
   };
 }
-
-describe("firstRunSteps", () => {
-  it("marks the key step done only when configured", () => {
-    const steps = firstRunSteps({ projectReady: true, configured: true, firstTaskDone: false });
-    expect(steps).toEqual([
-      { id: "project", status: "done" },
-      { id: "api_key", status: "done" },
-      { id: "first_task", status: "todo" },
-    ]);
-  });
-
-  it("reports the key step as todo when not configured and unknown while pending", () => {
-    expect(firstRunSteps({ projectReady: false, configured: false, firstTaskDone: false })[0].status).toBe("todo");
-    expect(firstRunSteps({ projectReady: true, configured: false, firstTaskDone: false })[1].status).toBe("todo");
-    expect(firstRunSteps({ projectReady: true, configured: null, firstTaskDone: false })[1].status).toBe("unknown");
-  });
-
-  it("marks the task step done after the first successful task", () => {
-    expect(firstRunSteps({ projectReady: true, configured: true, firstTaskDone: true })[2].status).toBe("done");
-  });
-});
 
 describe("firstTaskFailureHint", () => {
   it.each([

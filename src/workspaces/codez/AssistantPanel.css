@@ -399,6 +399,16 @@
   border-top: 1px solid #6b2222;
 }
 
+.agentz-assistant-setup-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #9ca3af;
+  border-top: 1px solid #2a2f3a;
+}
+
 .agentz-msg.queued {
   opacity: 0.55;
 }

@@ -29591,32 +29591,111 @@
             "blocker": null
           },
           "evidence": null
+        },
+        {
+          "at": "2026-10-17T20:57:50.204Z",
+          "note": "AZ-051 bounded OAuth expiry guards; Windows focused tests passed; native provider and unified review open",
+          "reeval": {
+            "verified_state": "local_oauth_expiry_fail_closed_guard_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
+          }
+        },
+        {
+          "at": "2026-10-17T21:05:04.004Z",
+          "note": "AZ-051 OAuth expiry and callback recovery batch; 21 Windows focused tests pass; provider and unified review open",
+          "reeval": {
+            "verified_state": "local_oauth_expiry_and_callback_recovery_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
+          }
+        },
+        {
+          "at": "2026-10-17T21:27:02.727Z",
+          "note": "AZ-051 local OAuth guard batch: expiry, callback recovery and per-call MCP revalidation across chat/Koi/gateway; focused Windows tests pass; native and provider acceptance open",
+          "reeval": {
+            "verified_state": "local_oauth_expiry_callback_and_mcp_revalidation_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
+          }
+        },
+        {
+          "at": "2026-10-17T21:32:41.089Z",
+          "note": "AZ-051 pending OAuth attempt now aborts before disable/uninstall cleanup; focused Windows OAuth tests 22/22; native/provider acceptance open",
+          "reeval": {
+            "verified_state": "local_oauth_expiry_callback_mcp_revalidation_and_pending_abort_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
+          }
+        },
+        {
+          "at": "2026-10-17T21:47:29.595Z",
+          "note": "AZ-051 Windows desktop crate cargo check passed on current OAuth candidate; no native/provider acceptance; status stays pending",
+          "reeval": {
+            "verified_state": "local_oauth_expiry_callback_mcp_revalidation_and_pending_abort_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
+          }
+        },
+        {
+          "at": "2026-10-17T21:53:48.750Z",
+          "note": "AZ-051 local OAuth lifecycle transitions serialized; refresh rechecks disabled/changed credentials after network, focused 22 tests pass; concurrent native race and provider acceptance remain open",
+          "reeval": {
+            "verified_state": "local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
+          }
+        },
+        {
+          "at": "2026-10-17T22:00:44.812Z",
+          "note": "AZ-051 stale refresh guard fixture passed after local lifecycle serialization; focused OAuth 23/23; native race and provider acceptance remain open",
+          "reeval": {
+            "verified_state": "local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
+          }
+        },
+        {
+          "at": "2026-10-17T22:03:20.724Z",
+          "note": "AZ-051 current desktop library full suite 360 passed, 7 ignored; source candidate still pending native/provider and independent acceptance",
+          "reeval": {
+            "verified_state": "local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
+          }
+        },
+        {
+          "at": "2026-10-18T02:07:46.563Z",
+          "note": "AZ-051 bounded split callback fixture passed; final OAuth 24 and desktop library 361 tests pass, 7 ignored; native/provider acceptance pending",
+          "reeval": {
+            "verified_state": "local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
+          }
         }
       ],
       "reviewer": null,
       "reeval": {
         "id": "AZ-051",
-        "claimed_status": "pending",
-        "verified_state": "oauth_helpers_test_only",
+        "verified_state": "local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed",
         "severity": "P1",
-        "conclusion_proposal": "fix_then_done",
-        "implementation_state": "partial",
-        "finding": "尚未接入的OAuth帮助函数改为仅在单测编译，宿主编译通过；start/callback/refresh命令依旧未实现。",
+        "finding": "Current desktop source already contains PKCE loopback authorization, refresh and OS-sealed token storage. This batch closes three expiry edge cases, keeps an unrelated callback from consuming an authorization attempt, revalidates registered connector MCP tools against current manifest, token, expiry and resolved transport before each new call in chat, Koi and gateway, and aborts a pending OAuth task on disable/uninstall before credential cleanup. Local OAuth lifecycle transitions now serialize callback/refresh token writes with disable, uninstall and manual credential save; refresh rejects disabled connectors, replaced manifest identity or changed credentials after its network call. The callback reads a bounded complete HTTP request line so a split valid redirect is accepted. Windows focused OAuth tests passed 24/24 including stale-refresh and split-request fixtures, MCP guard fixture passed 1/1 and the complete desktop library suite passed 361/361 with 7 ignored on the final OAuth source. The desktop crate cargo check passed before the final lifecycle and callback edits; no native desktop journey, live MCP server or provider account was used.",
+        "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account.",
+        "next_action": "Review the current PKCE callback, refresh and per-call MCP guard; decide provider-side revocation support, then run one real provider authorization/expiry/revoke journey and in-flight cancellation case during unified acceptance.",
         "remaining_work": [
-          "First finish local secret-reference storage/masking, validated callback state and bounded refresh/revocation gates using fake provider fixtures; reserve live provider acceptance as a separate account gate."
+          "Independent review of the current OAuth callback, refresh and storage candidate",
+          "Concurrent native lifecycle race fixture, provider revoke policy and already in-flight MCP call handling",
+          "Actual provider authorization, expiry, refresh and revoke receipts"
         ],
         "verification_gaps": [
-          "Controlled provider/account live authorization and revoke not run; local helpers alone do not prove lifecycle."
+          "No external provider account or real OAuth endpoint was exercised",
+          "No native desktop callback journey, live MCP call or provider-side revoke receipt",
+          "No unified independent implementation review"
         ],
-        "next_action": "补OAuth start/callback/refresh及受保护凭据存储；保留外部账号端到端验收。",
-        "inspected_files": [
-          "src-tauri/src/commands/connectors.rs",
-          "src-tauri/src/tools/api_connector.rs",
-          "src/services/tauri/connectors.ts",
-          "src-tauri/src/commands/chat_turn.rs"
+        "evidence": [
+          "docs/upgrade/evidence/AZ-051-expiry-guard-2026-10-18.md"
         ],
-        "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
-        "recorded_at": "2026-10-13T07:54:37.644Z"
+        "recorded_at": "2026-10-18T02:07:46.563Z"
       }
     },
     {
@@ -30572,33 +30651,39 @@
             "severity": "P1",
             "conclusion_proposal": "blocked_external"
           }
+        },
+        {
+          "at": "2026-10-18T02:28:08.568Z",
+          "note": "AZ-058 reusable native platform journey protocol prepared; actual macOS/Linux acceptance remains blocked",
+          "reeval": {
+            "verified_state": "platform_journey_protocol_prepared_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep blocked until owned macOS and Linux sessions are available and actual journeys complete."
+          }
         }
       ],
       "reviewer": null,
       "reeval": {
         "id": "AZ-058",
-        "claimed_status": "blocked",
-        "verified_state": "partial",
+        "verified_state": "platform_journey_protocol_prepared_native_unverified",
         "severity": "P1",
-        "conclusion_proposal": "blocked_external",
-        "implementation_state": "partial",
-        "finding": "Cross-platform CI/release YAML and macOS/Linux credential adapters exist; no installation-and-core-journey native receipts in reviewed scope. Build definitions are not runtime proof.",
+        "finding": "A reusable macOS/Linux runtime test card now specifies frozen build identity, install/start, two-task isolation, descendant termination, failure/recovery, platform secrets, uninstall, evidence hashes and stop conditions. No platform test ran.",
+        "conclusion_proposal": "Keep blocked until owned macOS and Linux sessions are available and actual journeys complete.",
+        "next_action": "After AZ-056/AZ-057 candidate freeze, execute separate macOS and Linux native cards with model and credential fixtures; record differences in the support matrix.",
         "remaining_work": [
-          "Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade."
+          "Owned macOS and Linux test sessions",
+          "Frozen candidate and model endpoint",
+          "Actual install/start/task/terminate/recover receipts",
+          "Independent review and support matrix update"
         ],
         "verification_gaps": [
-          "Actual macOS/Linux machines/sessions absent; ADR008 does not waive external platforms.",
-          "历史阻塞仍在，解锁条件未获得新的实测证据。"
+          "No macOS or Linux runtime session",
+          "No native journey, process-group or rollback result"
         ],
-        "next_action": "Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade.",
-        "inspected_files": [
-          ".github/workflows/ci.yml",
-          ".github/workflows/release.yml",
-          "docs/upgrade/evidence/AZ-005-support-matrix.md",
-          "docs/upgrade/evidence/ADR-008-gui-blanket-waiver.md"
+        "evidence": [
+          "docs/upgrade/evidence/AZ-058-platform-journey-protocol.md"
         ],
-        "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
-        "recorded_at": "2026-10-13T07:54:37.644Z"
+        "recorded_at": "2026-10-18T02:28:08.568Z"
       }
     },
     {
@@ -32360,35 +32445,58 @@
             "severity": "P1",
             "conclusion_proposal": "blocked_external"
           }
+        },
+        {
+          "at": "2026-10-18T02:48:56.481Z",
+          "note": "AZ-064 publishing workflow fail-closed gate candidate; signing and native acceptance unchanged",
+          "reeval": {
+            "verified_state": "local_publication_guard_candidate_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep blocked until certificate and trust identity, clean-machine install/start/uninstall and rollback receipts are reviewed."
+          }
+        },
+        {
+          "at": "2026-10-18T03:02:54.175Z",
+          "note": "AZ-064 local publication guard and clean-machine installer protocol prepared; native signing acceptance unchanged",
+          "reeval": {
+            "verified_state": "local_publication_guard_candidate_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep blocked until certificate and trust identity, clean-machine install/start/uninstall and rollback receipts are reviewed."
+          }
+        },
+        {
+          "at": "2026-10-18T03:08:07.460Z",
+          "note": "AZ-064 branch-dispatch refusal added to publishing gate; native acceptance unchanged",
+          "reeval": {
+            "verified_state": "local_publication_guard_candidate_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep blocked until certificate and trust identity, clean-machine install/start/uninstall and rollback receipts are reviewed."
+          }
         }
       ],
       "reviewer": null,
       "reeval": {
         "id": "AZ-064",
-        "claimed_status": "blocked",
-        "verified_state": "partial",
+        "verified_state": "local_publication_guard_candidate_native_unverified",
         "severity": "P1",
-        "conclusion_proposal": "blocked_external",
-        "implementation_state": "partial",
-        "finding": "Offline signing evidence schema/validator, candidate preflight and actual local NSIS candidate receipts exist. Reviewed workflows installer records NotSigned, installed=false, release_ready=false; older known risk references do not automatically describe current source. Validator explicitly checks supplied-record consistency only and cannot authenticate native signing or installation. Release YAML still publishes non-draft outputs on v* independently of quality receipts.",
+        "finding": "All six publishing bundle jobs now depend on a version/ledger/release-gate prerequisite. Local tests reject mismatched tags and branch dispatch, and the current 0.9.11 ledger correctly refuses publication because M2-M8, MB and AZ-069 are open. A per-platform clean-machine trust/install/upgrade/uninstall/restore evidence card is prepared. No workflow dispatch or native signing/install result ran.",
+        "conclusion_proposal": "Keep blocked until certificate and trust identity, clean-machine install/start/uninstall and rollback receipts are reviewed.",
+        "next_action": "Obtain external signing/notarization identities and clean test machines; build a frozen candidate through the nonpublishing path, complete native receipts, then make the explicit AZ-069 release decision.",
         "remaining_work": [
-          "Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied."
+          "Signing and notarization identities",
+          "Frozen signed artifact hashes",
+          "Clean-machine install/start/uninstall",
+          "Rollback and independent acceptance"
         ],
         "verification_gaps": [
-          "No certificate identity/native signature/notarization/install/uninstall acceptance; current source is newer than inspected installer.",
-          "历史阻塞仍在，解锁条件未获得新的实测证据。"
+          "GitHub publishing workflow not dispatched",
+          "No trusted signature or native installer journey"
         ],
-        "next_action": "Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied.",
-        "inspected_files": [
-          "scripts/upgrade-signing-evidence.mjs",
-          "docs/upgrade/contracts/signing-evidence.schema.json",
-          "scripts/upgrade-release-preflight.mjs",
-          ".github/workflows/candidate.yml",
-          ".github/workflows/release.yml",
-          "docs/upgrade/evidence/AZ-064-workflows-installer.json"
+        "evidence": [
+          "docs/upgrade/evidence/AZ-064-2026-10-18-publication-guard.md",
+          "docs/upgrade/evidence/AZ-064-installer-acceptance-protocol.md"
         ],
-        "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
-        "recorded_at": "2026-10-13T07:54:37.644Z"
+        "recorded_at": "2026-10-18T03:08:07.460Z"
       }
     },
     {
@@ -32832,14 +32940,23 @@
             "severity": "P1",
             "conclusion_proposal": "Keep pending until extension/platform support evidence and unified documentation review are complete."
           }
+        },
+        {
+          "at": "2026-10-18T02:24:36.128Z",
+          "note": "AZ-067 local 0.9.11 release documentation and link/version check candidate; acceptance unchanged",
+          "reeval": {
+            "verified_state": "local_release_document_sync_candidate_unreviewed",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until extension/platform support evidence and unified documentation review are complete."
+          }
         }
       ],
       "reviewer": null,
       "reeval": {
         "id": "AZ-067",
-        "verified_state": "local_version_and_documentation_candidate_unreviewed",
+        "verified_state": "local_release_document_sync_candidate_unreviewed",
         "severity": "P1",
-        "finding": "README and 0.9.7 candidate notes distinguish source version from release acceptance. The local/CI consistency check covers the product package and lockfile, Cargo, Tauri, README and candidate docs, and independently checks extension-host's package/lockfile version. The local check passed; CI was not dispatched.",
+        "finding": "RELEASE was stale about version, MSI distribution and CSP; it now states the current 0.9.11 source/candidate boundary and publishing preconditions. The local version check now validates RELEASE and README/RELEASE local links. Local check and ledger validation passed; no CI or native acceptance ran.",
         "conclusion_proposal": "Keep pending until extension/platform support evidence and unified documentation review are complete.",
         "next_action": "Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.",
         "remaining_work": [
@@ -32852,9 +32969,9 @@
           "No installation, signature or cross-platform acceptance"
         ],
         "evidence": [
-          "docs/upgrade/evidence/AZ-067-2026-10-14/implementation.md"
+          "docs/upgrade/evidence/AZ-067-2026-10-18-local-doc-sync.md"
         ],
-        "recorded_at": "2026-10-15T22:22:01.366Z"
+        "recorded_at": "2026-10-18T02:24:36.128Z"
       }
     },
     {

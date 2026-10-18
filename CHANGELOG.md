@@ -5,6 +5,28 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.12] - 2026-10-18
+
+### Added
+
+- CodeZ shows a single line above the first message when no model API key is configured, with a button that opens Settings.
+
+### Changed
+
+- Removed the configuration summary and the first-run checklist from the CodeZ and WorkZ chat windows. They took layout space and did not explain what they controlled.
+- Task details, run history, and the notification inbox refresh on window focus at most once every 2 seconds. A burst of focus, online, and visibility events costs one reload.
+
+### Fixed
+
+- On Windows, project paths returned to the interface no longer carry the `\\?\` prefix. Files under the project open again.
+- On Windows, git child processes no longer open console windows. Focus-triggered refreshes were starting git, which opened a console window that took focus and triggered the next refresh.
+
+### Known limits
+
+- This release has not passed the upgrade acceptance gates. See `docs/upgrade/acceptance-0.9.12.md` for the unaccepted items and the user test cases.
+- Installers are unsigned. macOS and Linux builds were not run on real machines.
+- Other limits listed under 0.9.11 still apply.
+
 ## [0.9.11] - 2026-10-17
 
 ### Security

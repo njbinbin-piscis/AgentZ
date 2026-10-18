@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getProjectScope, useProjectScope } from "../services/tauri/projectScope";
 import { listNotifications, markNotificationRead, type InboxPage, type TaskNotice } from "../services/tauri/notificationInbox";
 import { pollReminders } from "../services/tauri/automationReminder";
+import { coalesce, FOCUS_REFRESH_GAP_MS } from "../utils/coalesce";
 import "./NotificationInbox.css";
 
 interface Props {
@@ -39,9 +40,14 @@ export default function NotificationInbox({ projectDir, onOpenTask }: Props) {
     }
     void tick();
     const timer = window.setInterval(() => void tick(), 60_000);
-    const onFocus = () => void tick();
-    window.addEventListener("focus", onFocus);
-    return () => { disposed = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
+    const onFocus = coalesce(() => void tick(), FOCUS_REFRESH_GAP_MS);
+    window.addEventListener("focus", onFocus.call);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      onFocus.cancel();
+      window.removeEventListener("focus", onFocus.call);
+    };
   }, [projectDir, scope]);
 
   async function refresh() {

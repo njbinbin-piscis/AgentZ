@@ -1065,8 +1065,8 @@ Gate：pending；前置：M2, M3, M4。
 - 关联审查：F06, F08；风险：外部副作用和前台资源；先测试账户与受控应用，独立授权。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
 - 阻塞：无；下一步：补OAuth start/callback/refresh及受保护凭据存储；保留外部账号端到端验收。。
-- 当前复评：oauth_helpers_test_only；结论：fix_then_done；下一步：补OAuth start/callback/refresh及受保护凭据存储；保留外部账号端到端验收。。
-- 复评剩余：First finish local secret-reference storage/masking, validated callback state and bounded refresh/revocation gates using fake provider fixtures; reserve live provider acceptance as a separate account gate.；验证缺口：Controlled provider/account live authorization and revoke not run; local helpers alone do not prove lifecycle.。
+- 当前复评：local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed；结论：Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account.；下一步：Review the current PKCE callback, refresh and per-call MCP guard; decide provider-side revocation support, then run one real provider authorization/expiry/revoke journey and in-flight cancellation case during unified acceptance.。
+- 复评剩余：Independent review of the current OAuth callback, refresh and storage candidate；Concurrent native lifecycle race fixture, provider revoke policy and already in-flight MCP call handling；Actual provider authorization, expiry, refresh and revoke receipts；验证缺口：No external provider account or real OAuth endpoint was exercised；No native desktop callback journey, live MCP call or provider-side revoke receipt；No unified independent implementation review。
 - 证据：待附提交/PR/测试日志/截图或报告。
 - 完成摘要：待填写；复盘：待填写。
 
@@ -1197,8 +1197,8 @@ Gate：pending；前置：M0。
 - 关联审查：F11, F12；风险：硬件/模型影响测量；固定环境并报告缺失证据。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
 - 阻塞：waiting macOS/Linux test accounts (external, ADR-007)；下一步：Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade.。
-- 当前复评：partial；结论：blocked_external；下一步：Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade.。
-- 复评剩余：Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade.；验证缺口：Actual macOS/Linux machines/sessions absent; ADR008 does not waive external platforms.；历史阻塞仍在，解锁条件未获得新的实测证据。。
+- 当前复评：platform_journey_protocol_prepared_native_unverified；结论：Keep blocked until owned macOS and Linux sessions are available and actual journeys complete.；下一步：After AZ-056/AZ-057 candidate freeze, execute separate macOS and Linux native cards with model and credential fixtures; record differences in the support matrix.。
+- 复评剩余：Owned macOS and Linux test sessions；Frozen candidate and model endpoint；Actual install/start/task/terminate/recover receipts；Independent review and support matrix update；验证缺口：No macOS or Linux runtime session；No native journey, process-group or rollback result。
 - 证据：待附提交/PR/测试日志/截图或报告。
 - 完成摘要：待填写；复盘：待填写。
 
@@ -1311,8 +1311,8 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 - 关联审查：F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
 - 阻塞：waiting code-signing certificate and notarization accounts (external)；下一步：Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied.。
-- 当前复评：partial；结论：blocked_external；下一步：Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied.。
-- 复评剩余：Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied.；验证缺口：No certificate identity/native signature/notarization/install/uninstall acceptance; current source is newer than inspected installer.；历史阻塞仍在，解锁条件未获得新的实测证据。。
+- 当前复评：local_publication_guard_candidate_native_unverified；结论：Keep blocked until certificate and trust identity, clean-machine install/start/uninstall and rollback receipts are reviewed.；下一步：Obtain external signing/notarization identities and clean test machines; build a frozen candidate through the nonpublishing path, complete native receipts, then make the explicit AZ-069 release decision.。
+- 复评剩余：Signing and notarization identities；Frozen signed artifact hashes；Clean-machine install/start/uninstall；Rollback and independent acceptance；验证缺口：GitHub publishing workflow not dispatched；No trusted signature or native installer journey。
 - 证据：docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/RC-extension-host.md；docs/upgrade/release-candidate-scope.md；docs/upgrade/evidence/RC-windows-build.log；docs/upgrade/evidence/RC-windows-artifact.json；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/RC-version-identity.md；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/RC-0.9.7-windows-artifact.json；docs/upgrade/evidence/RC-source-closure-followup.md；docs/upgrade/evidence/RC-source-provenance-review.md；docs/upgrade/evidence/AZ-064-current-local-build.md；docs/upgrade/evidence/AZ-064-current-artifact-preflight.json；docs/upgrade/evidence/current-release-scope.md；docs/upgrade/evidence/AZ-064-next-local-build.md；docs/upgrade/evidence/AZ-064-next-build-inputs.json；docs/upgrade/evidence/AZ-064-next-installer.json；docs/upgrade/evidence/AZ-064-next-artifact-preflight.json；docs/upgrade/evidence/AZ-064-contract-local-build.md；docs/upgrade/evidence/AZ-064-contract-local-build.md；docs/upgrade/evidence/AZ-064-contract-installer.json；docs/upgrade/evidence/AZ-064-workflows-local-build.md；docs/upgrade/evidence/AZ-064-workflows-local-build.md；docs/upgrade/evidence/AZ-064-workflows-installer.json。
 - 完成摘要：新20261009 Windows NSIS候选构建成功且独立归档，源码314项无变化；未签名/安装/回滚/发布；复盘：待填写。
 
@@ -1365,7 +1365,7 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 - 关联审查：F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
 - 阻塞：无；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.。
-- 当前复评：local_version_and_documentation_candidate_unreviewed；结论：Keep pending until extension/platform support evidence and unified documentation review are complete.；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.。
+- 当前复评：local_release_document_sync_candidate_unreviewed；结论：Keep pending until extension/platform support evidence and unified documentation review are complete.；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.。
 - 复评剩余：Extension compatibility evidence；macOS/Linux support evidence；Unified documentation review；验证缺口：CI workflow not dispatched；No installation, signature or cross-platform acceptance。
 - 证据：待附提交/PR/测试日志/截图或报告。
 - 完成摘要：待填写；复盘：待填写。

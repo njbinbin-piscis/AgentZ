@@ -52,7 +52,6 @@ import RunHistoryPanel from "../codez/RunHistoryPanel";
 import TaskDetailsPanel from "../codez/TaskDetailsPanel";
 import TaskFileViewer from "../codez/TaskFileViewer";
 import TaskArtifactViewer from "../codez/TaskArtifactViewer";
-import InputContextSummary from "../../components/chat/InputContextSummary";
 import DeliveryReviewPanel from "../codez/DeliveryReviewPanel";
 import type { DurablePlan } from "../../services/tauri/chatPlan";
 import { createProjectlessSession, lookupProjectlessSession, getProjectScope, pickProjectScope, restoreProjectScope } from "../../services/tauri/projectScope";
@@ -1902,16 +1901,6 @@ export default function WorkZWorkspace({
           </div>
         </div>
 
-        <InputContextSummary
-          authorityProject={planProject?.selected === projectDir ? planProject.canonical : projectDir}
-          workspace={(worktree?.id === sessionRef.current ? worktree.worktree_path : null) ?? (activeTeam || activeAgentId ? null : isFree ? freeTaskWorkspace : isolate ? null : projectDir)}
-          model={showModelSelector ? modelId || defaultModelLabel || null : null}
-          modelSource={!showModelSelector ? "unknown" : modelId ? "selected" : defaultModelLabel ? "default" : "unknown"}
-          policy={appSettings?.policy_mode ?? null}
-          mode={activeTeam ? "WorkZ team" : activeAgentId ? "WorkZ agent" : "WorkZ"}
-          state={busy ? "running" : error ? "error" : "idle"}
-          optionalCount={showGenericComposerTools ? enabledSkills.length + enabledConnectors.length : 0}
-        />
         <ChatComposer
           value={goal}
           onChange={(value, caret) => {

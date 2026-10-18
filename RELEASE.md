@@ -1,130 +1,28 @@
-# Releasing AgentZ
+# AgentZ release procedure
 
-This document covers how AgentZ is currently distributed, how end users install
-the **unsigned** builds, and the concrete steps + CI secrets needed to enable
-code signing, notarization, and in-app auto-update later.
+Current source version: **0.9.12**. This is a source and release-candidate label, not a claim that an installer or stable release passed acceptance. See the [historical support baseline](docs/upgrade/evidence/AZ-005-support-matrix.md), [current upgrade progress](docs/upgrade/progress.md), [0.9.12 release notes](docs/upgrade/release-notes-0.9.12.md), and [0.9.12 checklist](docs/upgrade/release-checklist-0.9.12.md) for the recorded scope and open checks.
 
-## Current release model (v0.3.0)
+## Build and distribution boundary
 
-- **Unsigned / manual download.** Artifacts are built by
-  [`.github/workflows/release.yml`](.github/workflows/release.yml) using
-  `tauri-action` and attached to a **published** (non-draft) GitHub release.
-- **Platforms produced on tag `v*` (or manual dispatch):**
-  - Linux x86_64 + aarch64 — `.deb`, `.AppImage`
-  - Windows x86_64 + aarch64 — `.msi`, `.exe` (NSIS)
-  - macOS — `.dmg`, `.app` (Apple Silicon and Universal)
-- **No in-app updater.** Users update by downloading the newer release manually.
+`.github/workflows/release.yml` runs on a pushed `v*` tag or manual dispatch. Its `tauri-action` jobs create or update a **published** GitHub Release (`releaseDraft: false`) and upload bundles. A prerequisite job checks the source version, M0–M8 and MB gates, the accepted AZ-069 release decision, and that the workflow ref is the matching `v<version>` tag before any bundle job can start. Manual dispatch from a branch is rejected. Triggering that workflow is a distribution action; it is not a local verification step. Do not push a tag or dispatch it while the release decision and required gates are open.
 
-### Cutting a release
+The workflow builds Linux `.deb` and AppImage, Windows NSIS `.exe`, and macOS `.dmg` bundles. Windows workflow artifacts select `bundle/nsis/*.exe`; `tauri.conf.json` has `targets: "all"`, which may also build an `.msi`, but the workflow does not separately upload or verify it. A bundle target or CI build is not evidence of install, launch, upgrade, uninstall, credential access, or rollback on that platform.
 
-1. Bump the version in the three places that must agree:
-   - `package.json` (`version`)
-   - `src-tauri/Cargo.toml` (`package.version`)
-   - `src-tauri/tauri.conf.json` (`version`)
-   - (also `extension-host/package.json` if it ships in lockstep)
-2. Update [`CHANGELOG.md`](CHANGELOG.md).
-3. Tag and push: `git tag v0.3.0 && git push origin v0.3.0`.
-4. The release workflow builds all platforms and publishes the release.
+The current candidate has no recorded signed Windows installer, notarized macOS bundle, clean-machine install/uninstall, or native macOS/Linux core journey. The in-app trusted updater and its recovery path are not accepted. See the [upgrade progress](docs/upgrade/progress.md) and AZ-064/AZ-065/AZ-077/AZ-078 evidence before changing support claims.
 
-## Installing the unsigned builds (end users)
+## Prepare a candidate
 
-Because these builds are not yet code signed, the OS will warn that the
-publisher is unverified. This is expected.
+1. Update `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, the README source version, changelog, and matching release notes/checklist. Keep the extension-host package and lockfile aligned with each other.
+2. Run `node scripts/upgrade-version-check.mjs` and the relevant build/tests. This checks labels and required documents; it does not certify the installer.
+3. Freeze source and artifact hashes. Complete the release preflight, signing/trust checks, native installation and recovery journeys, and explicit gate decision in `docs/upgrade/`.
+4. Only after an authorized release decision, push a version tag or manually dispatch the publishing workflow. Record the resulting assets and platform receipts.
 
-### macOS (Gatekeeper)
+## Signing and updater prerequisites
 
-The `.dmg`/`.app` is unsigned and un-notarized, so a normal double-click is
-blocked with "AgentZ can't be opened because Apple cannot check it for
-malicious software."
+macOS notarization requires an Apple Developer signing identity and notarization credentials. Windows signing requires an appropriate trusted certificate or signing service. The workflow currently has no accepted signing identity for this candidate. Keep secrets in CI's protected store; do not put private keys or passwords in this repository.
 
-1. Drag **AgentZ.app** to `/Applications`.
-2. Right-click (or Control-click) the app → **Open** → **Open** in the dialog.
-   This records an exception for that copy of the app.
-3. If still blocked, remove the quarantine attribute in Terminal:
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/AgentZ.app
-   ```
+An updater needs a pinned trusted public key, authenticated update manifest and channel policy, compatibility checks, and interrupted-download/install recovery. Implement and verify those with AZ-065 before enabling automatic updates. Do not infer updater readiness from the presence of Tauri bundle files.
 
-### Windows (SmartScreen)
+## Diagnostics and security scope
 
-The `.msi`/`.exe` is unsigned, so SmartScreen shows "Windows protected your PC".
-
-1. Click **More info**.
-2. Click **Run anyway**.
-
-### Linux
-
-- **AppImage:** `chmod +x AgentZ_*.AppImage && ./AgentZ_*.AppImage`
-- **Debian/Ubuntu:** `sudo dpkg -i agentz_*_amd64.deb` (or `sudo apt install ./agentz_*_amd64.deb` to pull dependencies).
-
-## Diagnostics / logs
-
-AgentZ writes a daily-rolling log to `{config dir}/logs/agentz.log`:
-
-- Linux: `~/.config/com.agentz.desktop/logs/`
-- macOS: `~/Library/Application Support/com.agentz.desktop/logs/`
-- Windows: `%APPDATA%\com.agentz.desktop\logs\`
-- Override the base directory with `AGENTZ_CONFIG_DIR`.
-
-Increase verbosity with `RUST_LOG` (e.g. `RUST_LOG=debug`). See
-[`.env.example`](.env.example) for all supported variables.
-
-## Roadmap: signing, notarization, and auto-update
-
-When certificates are available, the following can be enabled with **no
-application code changes** — only `release.yml` inputs and repository secrets.
-
-### macOS code signing + notarization
-
-Add to the macOS jobs' `tauri-action` step `env`:
-
-| Secret | Purpose |
-| --- | --- |
-| `APPLE_CERTIFICATE` | Base64 of the "Developer ID Application" `.p12`. |
-| `APPLE_CERTIFICATE_PASSWORD` | Password for the `.p12`. |
-| `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: Your Org (TEAMID)`. |
-| `APPLE_ID` | Apple ID used for notarization. |
-| `APPLE_PASSWORD` | App-specific password for that Apple ID. |
-| `APPLE_TEAM_ID` | Apple developer Team ID. |
-
-### Windows code signing
-
-| Secret | Purpose |
-| --- | --- |
-| `WINDOWS_CERTIFICATE` | Base64 of the code-signing `.pfx`. |
-| `WINDOWS_CERTIFICATE_PASSWORD` | Password for the `.pfx`. |
-
-Configure `bundle.windows.certificateThumbprint` / `signCommand` (or an Azure
-Trusted Signing action) in `tauri.conf.json` accordingly.
-
-### In-app auto-update (`tauri-plugin-updater`)
-
-1. Add the `tauri-plugin-updater` plugin (Rust + JS) and register it.
-2. Generate an updater keypair: `npm run tauri signer generate`.
-3. Add `plugins.updater` to `tauri.conf.json` with the public key and the
-   release endpoint(s) (e.g. the GitHub releases `latest.json`).
-4. Add secrets:
-
-| Secret | Purpose |
-| --- | --- |
-| `TAURI_SIGNING_PRIVATE_KEY` | Updater private key. |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the updater key. |
-
-`tauri-action` will then emit the signed update artifacts and `latest.json`.
-
-## Security note: Content Security Policy
-
-`src-tauri/tauri.conf.json` currently sets `app.security.csp: null` (no CSP).
-
-**Decision for this release: retain `null`.** The renderer loads several rich,
-dynamically-evaluated front-end subsystems (Monaco editor workers, Mermaid,
-syntax highlighting) and talks to local bridges (LSP over WebSocket) plus
-user-configured model/gateway endpoints. A tight CSP would need careful
-per-source allow-listing (`script-src`, `worker-src`, `connect-src`, `img-src`,
-`style-src`) and regression testing across IDE + Agent modes; shipping a
-mis-scoped CSP risks breaking core features.
-
-**Follow-up:** define a least-privilege CSP — start from `default-src 'self'`,
-add `connect-src` for the WebSocket bridge and configured API hosts,
-`worker-src blob:` for Monaco, and the minimal `style-src`/`img-src` the UI
-needs — then validate before enabling. Track as a hardening task post-release.
+Diagnostic export and secret storage have their own evidence in AZ-031/AZ-061. The renderer CSP is configured in `src-tauri/tauri.conf.json`; any change to it needs desktop coverage for Monaco, local bridges, resources, and configured endpoints. The config and source are the authority for current behavior, not historical release notes.

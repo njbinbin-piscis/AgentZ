@@ -1,6 +1,6 @@
 # AgentZ 实施进度
 
-更新时间：2026/10/17 21:34:44（Asia/Tokyo）；由台账自动生成。
+更新时间：2026/10/18 12:08:10（Asia/Tokyo）；由台账自动生成。
 
 任务：83；已验收：37；执行/评审：11；阻塞：11。
 
@@ -69,23 +69,23 @@ Gate通过：M0, M1。
 - AZ-048 无仓库任务独立工作目录：host_trusted_projectless_turn_and_observation_wired_local_checks_passed；下一步：Run a real first turn and continuation in separate projectless sessions, reopen after restart, verify catalog-loss refusal and legacy free-session compatibility; review final source and rollback evidence before acceptance.。
 - AZ-049 研究报告交付模板：structured_report_render_wired_to_task_bound_artifact_capture_local_checks_passed；下一步：Review one fixed research report and open each source locator, exercise native task-bound capture/read/edit/continue, then independently review the final source and acceptance criteria.。
 - AZ-050 文档产物编辑预览闭环：host_resolved_versioned_continuation_local_checks_passed；下一步：Run native create/edit/restore/continue/archive journey, verify HTML/Markdown preview and failed-send recovery, then independently review final source and upstream contracts.。
-- AZ-051 连接器授权生命周期：oauth_helpers_test_only；下一步：补OAuth start/callback/refresh及受保护凭据存储；保留外部账号端到端验收。。
+- AZ-051 连接器授权生命周期：local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed；下一步：Review the current PKCE callback, refresh and per-call MCP guard; decide provider-side revocation support, then run one real provider authorization/expiry/revoke journey and in-flight cancellation case during unified acceptance.。
 - AZ-052 外部发送与发布交付流程：partial；下一步：Connect POST/PUT/DELETE and gateway.send to prepare/frozen approval/start/completion/unknown reconciliation; create sandbox-local tests before live external account receipt.。
 - AZ-053 浏览器上下文与抢占恢复：unshipped_dependency_fix_local_tests_pass；下一步：Review and pin an immutable RobotZ revision with generation-aware refs, then run AgentZ's pinned stale-ref and delayed-action takeover fixtures.。
 - AZ-054 Windows 桌面操作最小闭环：not_started；下一步：Define one supported Windows application/action set, add host focus identity and user takeover gate plus sensitive-region policy; test pure guards first and preserve native unverified label.。
 - AZ-055 建立跨任务桌面资源租约：not_started；下一步：After browser/native action binding, implement distinct task-attempt resource capability with queue/busy/revoke/drop and cancellation fixtures; do not repurpose process owner lease.。
 - AZ-056 核心生命周期 E2E 门禁：isolated_kernel_lifecycle_gate_candidate_unreviewed；下一步：Run the candidate workflow after resource preflight is satisfied; add host/native A/B, review/file-list and recovery receipts before acceptance.。
 - AZ-057 Windows 故障与长时运行基准：windows_resource_sampler_orphan_tracking_candidate_unreviewed；下一步：Freeze hardware/build/budget and run AgentZ cold-start, fault and two-hour workload with the sampler; preserve raw receipts.。
-- AZ-058 macOS/Linux 核心旅程验证：partial；下一步：Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade.。
+- AZ-058 macOS/Linux 核心旅程验证：platform_journey_protocol_prepared_native_unverified；下一步：After AZ-056/AZ-057 candidate freeze, execute separate macOS and Linux native cards with model and credential fixtures; record differences in the support matrix.。
 - AZ-059 优化首屏与重型资源加载：code_map_lazy_chunk_minified_build_unreviewed；下一步：Measure controlled initial load and graph-open load, then run native offline journey after AZ-040 review.。
 - AZ-060 消除长任务资源增长：owned_pty_model_listener_watcher_extension_graph_snapshot_candidate；下一步：Exercise concurrent Tauri terminal-create command invocations and a real repository graph-build close, then run the two-hour close/restart soak against a frozen AZ-057 budget.。
 - AZ-061 统一诊断关联和脱敏导出：bounded_redacted_log_manifest_candidate_unreviewed；下一步：Verify task/run/environment/tool fields with a real failing tool and native export, then run all-source secret scan after AZ-031.。
 - AZ-062 建立评测趋势与质量门禁：local_trend_gate_and_count_reconciliation_candidate_unreviewed；下一步：Wire the gate to the stable lifecycle harness, collect repeated actual desktop/model summaries, then perform unified review.。
 - AZ-063 版本化数据迁移与备份恢复：offline_encrypted_backup_preview_candidate_unreviewed；下一步：Integrate enforced writer quiescence and coherent SQLite snapshot capture, then implement guarded atomic in-place recovery with original preservation and credential/task binding validation using historical fixtures.。
-- AZ-064 签名、公证与安装器验收：partial；下一步：Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied.。
+- AZ-064 签名、公证与安装器验收：local_publication_guard_candidate_native_unverified；下一步：Obtain external signing/notarization identities and clean test machines; build a frozen candidate through the nonpublishing path, complete native receipts, then make the explicit AZ-069 release decision.。
 - AZ-065 可信更新与失败恢复：not_started；下一步：After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment.。
 - AZ-066 首次成功任务引导：first_task_project_tool_connection_guidance_local_checks_passed；下一步：Review first-task UI with real tool/environment failures; run five clean signed-build first-use journeys using an authorized model after upstream dependencies are accepted.。
-- AZ-067 同步支持文档与发布说明：local_version_and_documentation_candidate_unreviewed；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.。
+- AZ-067 同步支持文档与发布说明：local_release_document_sync_candidate_unreviewed；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.。
 - AZ-068 运行 Beta 与支持分流：local_beta_intake_prepared；下一步：After engineering prerequisites, obtain named owner, cohort and window; run actual authorized Beta and record triage outcomes.。
 - AZ-069 完成稳定版发布决策：not_started；下一步：Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence.。
 - AZ-070 成员任务环境与集成契约：partial；下一步：Add member environment and artifact/output provenance contracts under real task binding, explicit integration owner and conflict policy; build concurrent same-file/environment fixtures before team defaults.。

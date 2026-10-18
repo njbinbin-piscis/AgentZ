@@ -46,4 +46,13 @@ export default defineConfig({
     },
   },
   optimizeDeps: { entries: ["src/main.tsx"] },
+  test: {
+    // scripts/*.test.mjs use node:test and run through `npm run test:scripts`.
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.{idea,git,cache,output,temp}/**",
+      "scripts/**",
+    ],
+  },
 });

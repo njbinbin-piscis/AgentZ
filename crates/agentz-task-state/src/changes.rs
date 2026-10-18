@@ -1,11 +1,6 @@
 //! Read-only review of the complete current checkout relative to a frozen base.
 use serde::Serialize;
-use std::{
-    collections::BTreeMap,
-    io::Write,
-    path::Path,
-    process::{Command, Stdio},
-};
+use std::{collections::BTreeMap, io::Write, path::Path, process::Stdio};
 
 #[derive(Debug, Serialize)]
 pub struct ChangeError {
@@ -67,7 +62,7 @@ pub struct FileView {
 }
 
 fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, ChangeError> {
-    let output = Command::new("git")
+    let output = crate::git_process::command()
         .arg("--literal-pathspecs")
         .arg("-C")
         .arg(root)
@@ -89,7 +84,7 @@ fn git(root: &Path, args: &[&str]) -> Result<Vec<u8>, ChangeError> {
 }
 
 fn blob_id(root: &Path, bytes: &[u8]) -> Result<String, ChangeError> {
-    let mut child = Command::new("git")
+    let mut child = crate::git_process::command()
         .arg("-C")
         .arg(root)
         .args(["hash-object", "--stdin"])

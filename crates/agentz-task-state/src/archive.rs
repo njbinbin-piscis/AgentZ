@@ -8,7 +8,7 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ pub(crate) fn git(
     args: &[&str],
     input: Option<&[u8]>,
 ) -> Result<Vec<u8>, String> {
-    let mut cmd = Command::new("git");
+    let mut cmd = crate::git_process::command();
     cmd.arg("-C")
         .arg(root)
         .args(args)

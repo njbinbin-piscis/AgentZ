@@ -232,7 +232,7 @@ fn persist(project: &Path, receipt: &Receipt) -> Result<(), MergeError> {
 }
 async fn user_git(project: &Path, args: &[&str]) -> Result<String, String> {
     // Preserve the user's identity/configuration. Metadata snapshots use a separate identity.
-    let mut command = tokio::process::Command::new("git");
+    let mut command = crate::git_process::tokio_command();
     command
         .arg("-C")
         .arg(project)

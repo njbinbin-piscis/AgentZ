@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useProjectScope } from "../../services/tauri/projectScope";
 import { readTaskDetails, type TaskDetails } from "../../services/tauri/taskDetails";
+import { coalesce, FOCUS_REFRESH_GAP_MS } from "../../utils/coalesce";
 import BudgetObservation from "./BudgetObservation";
 
 const labels: Record<string, [string, string]> = {
@@ -58,12 +59,15 @@ export default function TaskDetailsPanel({ projectDir, sessionId, busy }: {
       }
     };
     refresh.current = () => { void load(); };
-    const onFocus = () => { void load(); };
-    window.addEventListener("focus", onFocus);
+    // Focus can fire in bursts (the window regains focus, then a child process steals it);
+    // coalesce them so each burst costs one reload.
+    const focusLoad = coalesce(() => void load(), FOCUS_REFRESH_GAP_MS);
+    window.addEventListener("focus", focusLoad.call);
     void load();
     return () => {
       disposed = true;
-      window.removeEventListener("focus", onFocus);
+      focusLoad.cancel();
+      window.removeEventListener("focus", focusLoad.call);
       refresh.current = () => {};
     };
   }, [key, scope, sessionId, busy]);
