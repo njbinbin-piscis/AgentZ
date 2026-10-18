@@ -29,6 +29,24 @@ impl TaskActivity {
         lock.try_lock_owned()
             .map_err(|_| "task queued/running or goal mutation active".into())
     }
+
+    /// True while a host turn (or goal mutation) still holds the task gate.
+    /// Used to heal persisted `running` session rows that outlived their turn.
+    pub fn is_active(&self, project: &Path, task: &str) -> bool {
+        if task.trim().is_empty() {
+            return false;
+        }
+        let Ok(key) = agentz_task_state::canonical_root(project).map(|root| (root, task.to_owned()))
+        else {
+            return false;
+        };
+        let Ok(mut entries) = self.0.lock() else {
+            return false;
+        };
+        entries.retain(|_, weak| weak.strong_count() > 0);
+        // The Arc backing the gate lives only while a turn holds OwnedMutexGuard.
+        entries.get(&key).and_then(Weak::upgrade).is_some()
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -49,10 +67,13 @@ mod tests {
                 .is_err()
         );
         assert!(gate.try_enter(&root, "task").is_err());
+        assert!(gate.is_active(&root, "other"));
         drop(queued);
         let replacement = gate.try_enter(&root, "task").unwrap();
         drop(replacement);
         drop(other_task);
+        assert!(!gate.is_active(&root, "other"));
+        assert!(!gate.is_active(&root, "missing"));
         drop(other_project);
         for id in 0..50 {
             drop(gate.try_enter(&root, &format!("temporary-{id}")).unwrap());

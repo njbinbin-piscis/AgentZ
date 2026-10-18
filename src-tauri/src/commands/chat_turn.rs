@@ -59,6 +59,52 @@ const PLAN_MODE_DISABLED: &[&str] = &[
     "plan_todo",
 ];
 
+/// Ensures a turn that wrote `status=running` always clears it — including on
+/// early `?` exits — so the WorkZ sidebar cannot keep a stale blinking LED.
+struct SessionRunningGuard {
+    db: Arc<Mutex<piscis_kernel::store::db::Database>>,
+    session_id: String,
+}
+
+impl SessionRunningGuard {
+    fn arm(db: Arc<Mutex<piscis_kernel::store::db::Database>>, session_id: String) -> Self {
+        Self { db, session_id }
+    }
+
+    async fn finish(self, failed: bool) {
+        {
+            let db = self.db.lock().await;
+            let status = if failed { "error" } else { "idle" };
+            if let Err(e) = db.update_session_status(&self.session_id, status) {
+                tracing::warn!(
+                    session_id = %self.session_id,
+                    status,
+                    "failed to finalize session status: {e}"
+                );
+            }
+        }
+        std::mem::forget(self);
+    }
+}
+
+impl Drop for SessionRunningGuard {
+    fn drop(&mut self) {
+        let db = self.db.clone();
+        let session_id = self.session_id.clone();
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                let db = db.lock().await;
+                if let Err(e) = db.update_session_status(&session_id, "idle") {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        "failed to heal session status after aborted turn: {e}"
+                    );
+                }
+            });
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct LlmRuntime {
     provider: String,
@@ -2304,13 +2350,16 @@ pub async fn run_agentz_turn(
         piscis_kernel::agent::plan::new_plan_store()
     };
 
-    {
-        let db = db.lock().await;
-        db.append_message(&session_id, "user", &display_for_db)
+    let status_guard = {
+        let db_guard = db.lock().await;
+        db_guard
+            .append_message(&session_id, "user", &display_for_db)
             .context("failed to append user message")?;
-        let _ = db.update_session_status(&session_id, "running");
-        let _ = maybe_autotitle_session_from_first_prompt(&db, &session_id, &display_for_db);
-    }
+        let _ = db_guard.update_session_status(&session_id, "running");
+        let _ = maybe_autotitle_session_from_first_prompt(&db_guard, &session_id, &display_for_db);
+        drop(db_guard);
+        SessionRunningGuard::arm(db.clone(), session_id.clone())
+    };
 
     // WorkZ swarm follow-up: short coordinator reminder (org_spec stays in turn 1 history).
     if let (Some(_team_id), Some(pool_id)) = (
@@ -2929,20 +2978,36 @@ pub async fn run_agentz_turn(
     };
     // One captured decision controls drain and terminal state. A late Stop cannot
     // turn an undrained completion into a falsely confirmed cancellation.
+    // Soft-fail these steps so session status is always finalized below.
     let cancellation_requested = cancel.load(Ordering::SeqCst);
+    let mut terminal_err: Option<anyhow::Error> = None;
     let cancellation_unconfirmed = if cancellation_requested {
         if let Some(run) = durable_run.as_mut() {
-            run.request_cancelling().map_err(anyhow::Error::msg)?;
+            if let Err(e) = run.request_cancelling() {
+                terminal_err = Some(anyhow::Error::msg(e));
+            }
         }
-        !cancellation_completion
-            .wait_requested(&early_binding, std::time::Duration::from_secs(10))
-            .await
-            .map_err(anyhow::Error::msg)?
-            .may_finalize_cancelled()
+        if terminal_err.is_some() {
+            true
+        } else {
+            match cancellation_completion
+                .wait_requested(&early_binding, std::time::Duration::from_secs(10))
+                .await
+            {
+                Ok(decision) => !decision.may_finalize_cancelled(),
+                Err(e) => {
+                    terminal_err = Some(anyhow::Error::msg(e));
+                    true
+                }
+            }
+        }
     } else {
         false
     };
-    let turn_failed = error_msg.is_some() || stream_error.is_some() || cancellation_unconfirmed;
+    let turn_failed = error_msg.is_some()
+        || stream_error.is_some()
+        || cancellation_unconfirmed
+        || terminal_err.is_some();
     // A recording failure retains its cause even if the agent deadline also expired.
     let effective_timeout = turn_timeout_secs.filter(|_| !durability_failed);
 
@@ -2968,12 +3033,18 @@ pub async fn run_agentz_turn(
     // Revoke plan writes before making the durable Attempt terminal.
     drop(plan_attempt_guard);
     if let Some(run) = durable_run {
-        run.finish(
+        if let Err(e) = run.finish(
             cancellation_requested && !durability_failed && !cancellation_unconfirmed,
             turn_failed,
             effective_timeout.is_some() || cancellation_unconfirmed,
-        )
-        .map_err(|e| anyhow!("failed to persist run terminal state: {e}"))?;
+        ) {
+            let err = anyhow!("failed to persist run terminal state: {e}");
+            if terminal_err.is_none() {
+                terminal_err = Some(err);
+            } else {
+                tracing::warn!(session_id = %session_id, "{err}");
+            }
+        }
     }
     let lifecycle_state = if cancellation_unconfirmed {
         "interrupted"
@@ -3039,12 +3110,12 @@ pub async fn run_agentz_turn(
         event_sink.emit_session(&session_id, "agent_final", serde_json::json!({"ok": true}));
     }
 
-    // Reset the session status set to `running` at turn start so the sidebar
-    // stops showing the live indicator once this turn ends. (Without this the
-    // dot blinks forever because `task.status` stays `running` in the DB.)
-    {
-        let db = db.lock().await;
-        let _ = db.update_session_status(&session_id, if turn_failed { "error" } else { "idle" });
+    // Clear the `running` marker written at turn start (Drop heals early exits).
+    status_guard
+        .finish(turn_failed || terminal_err.is_some())
+        .await;
+    if let Some(err) = terminal_err {
+        return Err(err);
     }
 
     if !turn_failed {

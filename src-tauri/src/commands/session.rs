@@ -1,12 +1,16 @@
 //! Chat session management — list / load / fork / delete / checkpoints.
 
+use std::path::Path;
+
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use piscis_kernel::store::db::{ChatMessage, Database, Session};
 
 use crate::commands::data_scope::{open_project_kernel_state, ProjectDirParam};
+use crate::runtime::task_activity::TaskActivity;
+use crate::state::AppState;
 use crate::commands::session_sources::{
     excluded_from_workz_task_list, is_codez_source, is_coordinator_boilerplate_title,
     is_generic_codez_title, is_generic_workz_title, is_workz_task_source, normalize_source,
@@ -396,6 +400,90 @@ async fn with_db<T>(
     f(&guard)
 }
 
+/// Persist and return a consistent sidebar status. A `running` row with no live
+/// task gate is treated as aborted (process kill, early turn exit) and healed.
+fn reconcile_listed_status(
+    db: &Database,
+    activity: &TaskActivity,
+    project: &Path,
+    session_id: &str,
+    status: &str,
+) -> String {
+    if status != "running" {
+        return status.to_string();
+    }
+    if activity.is_active(project, session_id) {
+        return "running".into();
+    }
+    match db.update_session_status(session_id, "idle") {
+        Ok(()) => {
+            tracing::info!(
+                session_id,
+                "healed stale session status running -> idle (no live turn)"
+            );
+        }
+        Err(e) => {
+            tracing::warn!(
+                session_id,
+                "failed to heal stale running session status: {e}"
+            );
+        }
+    }
+    "idle".into()
+}
+
+#[cfg(test)]
+mod reconcile_tests {
+    use super::reconcile_listed_status;
+    use crate::runtime::task_activity::TaskActivity;
+    use piscis_kernel::store::db::Database;
+
+    #[tokio::test]
+    async fn heals_running_without_live_gate_and_keeps_live_running() {
+        let root = std::env::temp_dir().join(format!(
+            "agentz-session-reconcile-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let db = Database::open_in_memory().unwrap();
+        let live = db
+            .create_session_with_source(Some("live"), "workz")
+            .unwrap();
+        let stale = db
+            .create_session_with_source(Some("stale"), "workz")
+            .unwrap();
+        db.update_session_status(&live.id, "running").unwrap();
+        db.update_session_status(&stale.id, "running").unwrap();
+
+        let activity = TaskActivity::default();
+        let _gate = activity.try_enter(&root, &live.id).unwrap();
+
+        assert_eq!(
+            reconcile_listed_status(&db, &activity, &root, &live.id, "running"),
+            "running"
+        );
+        assert_eq!(
+            reconcile_listed_status(&db, &activity, &root, &stale.id, "running"),
+            "idle"
+        );
+        assert_eq!(
+            db.list_sessions(10, 0)
+                .unwrap()
+                .into_iter()
+                .find(|s| s.id == stale.id)
+                .unwrap()
+                .status,
+            "idle"
+        );
+        assert_eq!(
+            reconcile_listed_status(&db, &activity, &root, "idle-row", "idle"),
+            "idle"
+        );
+        drop(_gate);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
 fn messages_raw_chronological(db: &Database, session_id: &str) -> Result<Vec<ChatMessage>, String> {
     db.get_messages_latest(session_id, 1000)
         .map_err(|e| format!("get_messages failed: {e}"))
@@ -456,57 +544,69 @@ pub async fn chat_list_sessions(
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
     let workz_listing = !filter.is_empty() && filter.iter().any(|s| is_workz_task_source(s));
-    with_db(&app, ProjectDirParam { project_dir }, move |db| {
-        let sessions = db
-            .list_sessions(200, 0)
-            .map_err(|e| format!("list_sessions failed: {e}"))?;
-        Ok(sessions
-            .into_iter()
-            .filter(|s| {
-                if filter.is_empty() {
-                    return true;
-                }
-                if !source_matches_filter(&s.source, &filter) {
-                    return false;
-                }
-                if workz_listing && excluded_from_workz_task_list(&s.source) {
-                    return false;
-                }
-                if let Some(ref want_team) = team_filter {
-                    if normalize_source(&s.source) == SOURCE_WORKZ_TEAM {
-                        let meta = load_workz_meta(db, &s.id).unwrap_or_default();
-                        match meta.team_id.as_deref().filter(|t| !t.is_empty()) {
-                            Some(bound) if bound != want_team.as_str() => return false,
-                            None => {}
-                            _ => {}
+    let project = ProjectDirParam { project_dir };
+    let project_path = project.required()?;
+    let activity = app.state::<AppState>().task_activity.clone();
+    with_db(
+        &app,
+        ProjectDirParam {
+            project_dir: Some(project_path.clone()),
+        },
+        move |db| {
+            let sessions = db
+                .list_sessions(200, 0)
+                .map_err(|e| format!("list_sessions failed: {e}"))?;
+            let project = Path::new(&project_path);
+            Ok(sessions
+                .into_iter()
+                .filter(|s| {
+                    if filter.is_empty() {
+                        return true;
+                    }
+                    if !source_matches_filter(&s.source, &filter) {
+                        return false;
+                    }
+                    if workz_listing && excluded_from_workz_task_list(&s.source) {
+                        return false;
+                    }
+                    if let Some(ref want_team) = team_filter {
+                        if normalize_source(&s.source) == SOURCE_WORKZ_TEAM {
+                            let meta = load_workz_meta(db, &s.id).unwrap_or_default();
+                            match meta.team_id.as_deref().filter(|t| !t.is_empty()) {
+                                Some(bound) if bound != want_team.as_str() => return false,
+                                None => {}
+                                _ => {}
+                            }
                         }
                     }
-                }
-                true
-            })
-            .map(|s| {
-                let meta = load_workz_meta(db, &s.id).unwrap_or_default();
-                let title = if is_workz_task_source(&s.source) {
-                    resolve_workz_task_list_title(db, &s)
-                } else if is_codez_source(&s.source) {
-                    resolve_codez_list_title(db, &s)
-                } else {
-                    s.title.clone()
-                };
-                SessionMeta {
-                    id: s.id,
-                    title,
-                    status: s.status,
-                    message_count: s.message_count,
-                    updated_at: s.updated_at.to_rfc3339(),
-                    source: s.source,
-                    team_id: meta.team_id,
-                    pool_id: meta.pool_id,
-                    cwd: meta.cwd,
-                }
-            })
-            .collect())
-    })
+                    true
+                })
+                .map(|s| {
+                    let meta = load_workz_meta(db, &s.id).unwrap_or_default();
+                    let title = if is_workz_task_source(&s.source) {
+                        resolve_workz_task_list_title(db, &s)
+                    } else if is_codez_source(&s.source) {
+                        resolve_codez_list_title(db, &s)
+                    } else {
+                        s.title.clone()
+                    };
+                    let status =
+                        reconcile_listed_status(db, &activity, project, &s.id, &s.status);
+                    SessionMeta {
+                        id: s.id,
+                        title,
+                        status,
+                        message_count: s.message_count,
+                        updated_at: s.updated_at.to_rfc3339(),
+                        source: s.source,
+                        team_id: meta.team_id,
+                        pool_id: meta.pool_id,
+                        cwd: meta.cwd,
+                    }
+                })
+                .collect())
+        },
+    )
     .await
 }
 

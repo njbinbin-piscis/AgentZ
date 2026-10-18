@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.17] - 2026-10-19
+
+### Fixed
+
+- WorkZ session LED no longer keeps blinking after a turn has stopped. Session status is finalized when a turn ends (including early exits), listing heals stale `running` rows that have no live task gate, and the sidebar only pulses for sessions that are actually in `runningIds`.
+
+### Known limits
+
+- This release has not passed the upgrade acceptance gates. The unaccepted items and user test cases remain in `docs/upgrade/acceptance-0.9.12.md`.
+- Installers are unsigned. macOS and Linux builds were not run on real machines.
+- Other limits listed under 0.9.16 still apply.
+
 ## [0.9.16] - 2026-10-18
 
 ### Fixed

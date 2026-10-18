@@ -58,7 +58,14 @@ export default function WorkzSidebar({
         onClick={() => onOpenSession(dir, task.id)}
       >
         <span
-          className={`agentz-workz-task-dot ${runningIds.includes(task.id) ? "running" : task.status}`}
+          className={`agentz-workz-task-dot ${
+            runningIds.includes(task.id)
+              ? "running"
+              : // Persisted `running` without a live turn is stale; never pulse on it.
+                task.status === "running"
+                ? "idle"
+                : task.status
+          }`}
         />
         <span className="agentz-workz-task-title">
           {taskDisplayTitle(task.title, t("agent.untitled"))}
