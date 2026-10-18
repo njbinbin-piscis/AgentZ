@@ -7,7 +7,6 @@ import {
   listSessions,
   SESSION_SOURCE_WORKZ,
   SESSION_SOURCE_WORKZ_TEAM,
-  SESSION_SOURCE_CODEZ,
   SESSION_SOURCES_PROJECT_SHARED,
   getMessages,
   deleteSession,
@@ -93,8 +92,6 @@ interface WorkZWorkspaceProps {
   onOpenFolder: () => void;
   /** Switch the CodeZ project to `dir` and show CodeZ. */
   onOpenProjectInCodeZ?: (dir: string) => void;
-  /** Open a project's CodeZ-origin session in CodeZ (its home view) instead of continuing it here. */
-  onOpenSessionInCodeZ?: (projectDir: string, sessionId: string, source: string) => void;
   /** Increment from title bar to trigger repo wiki generation. */
   wikiBuildNonce?: number;
   wikiBuildAction?: WikiBuildAction;
@@ -186,7 +183,6 @@ export default function WorkZWorkspace({
   projectDir: appProjectDir,
   openTaskRequest,
   onOpenProjectInCodeZ,
-  onOpenSessionInCodeZ,
   wikiBuildNonce = 0,
   wikiBuildAction = "overview",
   onWikiBusyChange,
@@ -1234,13 +1230,8 @@ export default function WorkZWorkspace({
 
   const openSession = useCallback(
     (dir: string, id: string) => {
-      // CodeZ-origin chats keep their CodeZ UI; WorkZ opens them in CodeZ rather than
-      // continuing them with WorkZ task semantics (worktree / isolation).
-      const source = Object.values(groups).flat().find((s) => s.id === id)?.source;
-      if (source === SESSION_SOURCE_CODEZ && onOpenSessionInCodeZ) {
-        onOpenSessionInCodeZ(dir, id, source);
-        return;
-      }
+      // CodeZ and WorkZ are two views of one project's sessions: any CodeZ or WorkZ session opens
+      // here. The stored source keeps governing its behaviour (the host accepts either view).
       if (sameScope(dir)) {
         void openTask(id);
         return;
@@ -1248,7 +1239,7 @@ export default function WorkZWorkspace({
       rememberLastTask(dir, id);
       setScope(scopeForDir(dir));
     },
-    [groups, onOpenSessionInCodeZ, sameScope, openTask, scopeForDir],
+    [sameScope, openTask, scopeForDir],
   );
 
   const lastInboxRequest = useRef<number | null>(null);

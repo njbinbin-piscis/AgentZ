@@ -61,6 +61,9 @@ interface TabContextMenu {
 interface IDEProps {
   projectDir: string | null;
   onOpenFolder: () => void;
+  recentProjects?: { path: string; name: string }[];
+  onOpenRecentProject?: (dir: string) => void;
+  onRemoveRecentProject?: (dir: string) => void;
   /** Insert file/dir chips into the chat composer (opens chat if needed). */
   onSendToChat?: (paths: string[]) => void;
   /** Insert a terminal selection chip into the chat composer. */
@@ -118,6 +121,9 @@ function collectSelectedPaths(nodes: FileNode[], selected: Set<string>): string[
 export default function CodeZWorkspace({
   projectDir,
   onOpenFolder,
+  recentProjects = [],
+  onOpenRecentProject,
+  onRemoveRecentProject,
   onSendToChat,
   onSendTerminalToChat,
   openPathRequest,
@@ -1409,6 +1415,37 @@ export default function CodeZWorkspace({
                 {t("remote.dialog.open")}
               </button>
               <div style={{ fontSize: 12, opacity: 0.6 }}>{t("ide.noProjectDirHint")}</div>
+              {recentProjects.length > 0 && onOpenRecentProject && (
+                <div className="ide-recent-projects">
+                  <div className="ide-recent-projects-title">{t("app.recentProjects")}</div>
+                  <div className="ide-recent-projects-list">
+                    {recentProjects.slice(0, 8).map((p) => (
+                      <div key={p.path} className="ide-recent-project-row">
+                        <button
+                          type="button"
+                          className="ide-recent-project-item"
+                          title={p.path}
+                          onClick={() => onOpenRecentProject(p.path)}
+                        >
+                          <span className="ide-recent-project-name">{p.name}</span>
+                          <span className="ide-recent-project-path">{p.path}</span>
+                        </button>
+                        {onRemoveRecentProject && (
+                          <button
+                            type="button"
+                            className="ide-recent-project-remove"
+                            title={t("app.removeRecentProject")}
+                            aria-label={t("app.removeRecentProject")}
+                            onClick={() => onRemoveRecentProject(p.path)}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : fileLoading ? (
             <div className="ide-file-loading">

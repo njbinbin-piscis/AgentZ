@@ -5,6 +5,22 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.15] - 2026-10-18
+
+### Added
+
+- Shared recent-projects list across CodeZ and WorkZ. Clicking the titlebar folder button or project path opens a menu with "Choose Folder…" and the recent projects from `workz.json` (including projects added in WorkZ). The CodeZ empty-project screen also lists recent projects for one-click opening.
+
+### Changed
+
+- Clicking a CodeZ-origin session inside WorkZ now opens and continues it directly in WorkZ instead of switching the window to CodeZ. Both modes act as synchronized views over the same project and session database; only WorkZ's projectless sessions remain specific to WorkZ.
+
+### Known limits
+
+- This release has not passed the upgrade acceptance gates. The unaccepted items and user test cases remain in `docs/upgrade/acceptance-0.9.12.md`.
+- Installers are unsigned. macOS and Linux builds were not run on real machines.
+- Other limits listed under 0.9.14 still apply.
+
 ## [0.9.14] - 2026-10-18
 
 ### Fixed

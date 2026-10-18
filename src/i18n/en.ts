@@ -389,6 +389,9 @@ const en = {
     fontScaleTitle: "Adjust interface font size",
     activityOpen: "Open",
     activityChange: "Chg",
+    chooseFolder: "Choose Folder…",
+    recentProjects: "Recent Projects",
+    removeRecentProject: "Remove from recent list",
   },
 
   ide: {

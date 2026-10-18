@@ -379,6 +379,9 @@ const zh = {
     fontScaleTitle: "调整界面字体大小",
     activityOpen: "打开",
     activityChange: "更换",
+    chooseFolder: "选择文件夹…",
+    recentProjects: "最近打开的项目",
+    removeRecentProject: "从最近列表中移除",
   },
 
   ide: {
