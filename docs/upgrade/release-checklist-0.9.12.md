@@ -16,9 +16,14 @@
 - [x] `cargo test -p agentz-task-state`：通过。
 - [x] `node scripts/upgrade-version-check.mjs`：通过。
 
+## 发布决策
+
+- 2026-10-18，用户明确授权以豁免方式发布 0.9.12：不启用 `release-readiness` 发布门禁（`scripts/upgrade-release-gate.mjs` 未接入 `release.yml`），未通过的台账项在发布说明与 `docs/upgrade/acceptance-0.9.12.md` 中标注。
+- 该豁免只适用于 0.9.12，不改变 `RELEASE.md` 对后续版本的门禁要求。
+
 ## 未完成（已知）
 
-- [ ] 发布门禁：`.github/workflows/release.yml` 的 `release-readiness` 任务要求 M2 至 M9 与 MB 通过、AZ-069 完成。本次未提交该门禁，需用户决定是否启用（见 `RELEASE.md`）。
+- [ ] 发布门禁：`.github/workflows/release.yml` 的 `release-readiness` 任务要求 M2 至 M9 与 MB 通过、AZ-069 完成。0.9.12 未接入该门禁，后续版本需在发布前决定是否启用。
 - [ ] 用户验收：按 `docs/upgrade/acceptance-0.9.12.md` 的测试用例在发布版本上逐项验证。
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings` 仍有 0.9.11 之前就存在的告警，本版本未修复。
 - [ ] 安装包签名（AZ-064）。
