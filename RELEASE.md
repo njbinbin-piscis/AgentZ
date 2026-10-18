@@ -1,6 +1,6 @@
 # AgentZ release procedure
 
-Current source version: **0.9.12**. This is a source and release-candidate label, not a claim that an installer or stable release passed acceptance. See the [historical support baseline](docs/upgrade/evidence/AZ-005-support-matrix.md), [current upgrade progress](docs/upgrade/progress.md), [0.9.12 release notes](docs/upgrade/release-notes-0.9.12.md), and [0.9.12 checklist](docs/upgrade/release-checklist-0.9.12.md) for the recorded scope and open checks.
+Current source version: **0.9.13**. This is a source and release-candidate label, not a claim that an installer or stable release passed acceptance. See the [historical support baseline](docs/upgrade/evidence/AZ-005-support-matrix.md), [current upgrade progress](docs/upgrade/progress.md), [0.9.13 release notes](docs/upgrade/release-notes-0.9.13.md), and [0.9.13 checklist](docs/upgrade/release-checklist-0.9.13.md) for the recorded scope and open checks.
 
 ## Build and distribution boundary
 

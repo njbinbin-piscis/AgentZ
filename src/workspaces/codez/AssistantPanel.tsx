@@ -56,13 +56,7 @@ import { formatUserMessageDisplay } from "../../components/chatFileRefs";
 import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import AssistantMessageList from "./AssistantMessageList";
 import TaskPanel from "../../components/TaskPanel";
-import DurablePlanActions from "./DurablePlanActions";
-import RunHistoryPanel from "./RunHistoryPanel";
-import TaskDetailsPanel from "./TaskDetailsPanel";
-import DeliveryReviewPanel from "./DeliveryReviewPanel";
-import TaskArtifactViewer from "./TaskArtifactViewer";
-import type { ArtifactText } from "../../services/tauri/taskArtifacts";
-import type { DurablePlan } from "../../services/tauri/chatPlan";
+import { queryTaskPlan, type DurablePlan } from "../../services/tauri/chatPlan";
 import {
   truncateToolResultForUi,
   upsertToolStep,
@@ -140,8 +134,6 @@ interface AssistantPanelProps {
 interface QueuedTurn {
   text: string;
   attachment: ChatAttachment | null;
-  artifactRef?: { artifact_id: string; version: number; payload_sha256: string; expected_binding: ArtifactText["scope"] };
-  artifactScopeHandle?: string;
   clearPlan: false;
   /** Bubble label when it differs from the model-facing prompt (auto-resume). */
   displayText?: string;
@@ -234,9 +226,6 @@ export default function AssistantPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [turnDiffsByTurnId, setTurnDiffsByTurnId] = useState<Record<string, JournalFileDiff[]>>({});
   const [input, setInput] = useState("");
-  const [pendingArtifact, setPendingArtifact] = useState<{
-    project: string; session: string; reference: NonNullable<QueuedTurn["artifactRef"]>;
-  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // True when the current error is a model-setup problem (key missing/rejected); shows a Settings action.
@@ -256,7 +245,6 @@ export default function AssistantPanel({
     return () => window.removeEventListener(SETTINGS_CLOSED_EVENT, check);
   }, []);
   const [queuedView, setQueuedView] = useState<string[]>([]);
-  const [artifactViewKey, setArtifactViewKey] = useState<string | null>(null);
   const [files, setFiles] = useState<string[]>([]);
   const [mention, setMention] = useState<MentionState | null>(null);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
@@ -377,8 +365,6 @@ export default function AssistantPanel({
     sessionRef.current = null;
     setSessionReadOnly(false);
     setPermissionRequest(null);
-    setArtifactViewKey(null);
-    setPendingArtifact(null);
     historyCursorRef.current = { sessionId: "", offset: 0 };
     setHasMoreOlder(false);
     queueRef.current = [];
@@ -815,8 +801,6 @@ export default function AssistantPanel({
       const res = await chatSend({
         prompt: turn.text,
         displayPrompt: displayText,
-        artifactRef: turn.artifactRef,
-        artifactScopeHandle: turn.artifactScopeHandle,
         sessionId: turnSessionId,
         projectDir: projectDir!,
         attachment: turn.attachment,
@@ -903,12 +887,12 @@ export default function AssistantPanel({
   };
 
   const doSend = useCallback(
-    (text: string, att: ChatAttachment | null, artifact?: QueuedTurn["artifactRef"], scopeHandle?: string) => {
+    (text: string, att: ChatAttachment | null) => {
       if (busy) {
-        queueRef.current.push({ text, attachment: att, artifactRef: artifact, artifactScopeHandle: scopeHandle, clearPlan: false });
+        queueRef.current.push({ text, attachment: att, clearPlan: false });
         setQueuedView(queuedLabels(queueRef.current));
       } else {
-        void runTurnRef.current({ text, attachment: att, artifactRef: artifact, artifactScopeHandle: scopeHandle, clearPlan: false });
+        void runTurnRef.current({ text, attachment: att, clearPlan: false });
       }
     },
     [busy],
@@ -944,23 +928,15 @@ export default function AssistantPanel({
       done();
       return;
     }
-    const selectedArtifact = pendingArtifact?.project === projectDir && pendingArtifact.session === sessionRef.current
-      ? pendingArtifact.reference : undefined;
-    if (pendingArtifact && (!selectedArtifact || !artifactScope)) {
-      setError("Artifact scope changed; reopen the artifact before continuing.");
-      done();
-      return;
-    }
     composerDbg("submit → clear input & chips");
     clearComposer();
-    setPendingArtifact(null);
     // A fresh user request restarts the auto-resume budget.
     autoResumeRef.current = 0;
 
     inputHistory.push(text);
     composerDbg("submit → doSend");
     // Ordinary Send always continues the task; local projection cannot authorize replacement.
-    doSend(text, pendingAttachment, selectedArtifact, selectedArtifact ? artifactScope?.handle : undefined);
+    doSend(text, pendingAttachment);
     done();
   }, [
     sessionReadOnly,
@@ -970,12 +946,9 @@ export default function AssistantPanel({
     projectDir,
     doSend,
     inputHistory,
-    t,
     busy,
     mention,
     clearComposer,
-    pendingArtifact,
-    artifactScope,
   ]);
 
   const onModeChange = useCallback(
@@ -1069,8 +1042,6 @@ export default function AssistantPanel({
   }, [showSessions, refreshSessions]);
 
   const newSession = useCallback(() => {
-    setArtifactViewKey(null);
-    setPendingArtifact(null);
     setPermissionRequest(null);
     sessionRef.current = null;
     setSessionReadOnly(false);
@@ -1094,8 +1065,6 @@ export default function AssistantPanel({
 
   const switchSession = useCallback(
     async (id: string, source?: string) => {
-      setArtifactViewKey(null);
-      setPendingArtifact(null);
       setPermissionRequest(null);
       try {
         sessionRef.current = id;
@@ -1109,6 +1078,13 @@ export default function AssistantPanel({
         // when the user scrolls up.
         stickToBottomRef.current = true;
         await syncMessagesFromDb(id);
+        if (artifactScope?.handle) {
+          void queryTaskPlan(artifactScope.handle, id)
+            .then((r) => {
+              if (sessionRef.current === id && r.current) applyPersistedPlan(r.current);
+            })
+            .catch(() => {});
+        }
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
             const el = scrollRef.current;
@@ -1125,7 +1101,7 @@ export default function AssistantPanel({
         setError(String(e));
       }
     },
-    [projectDir, syncMessagesFromDb, clearSessionArtifacts, clearCards],
+    [projectDir, syncMessagesFromDb, clearSessionArtifacts, clearCards, artifactScope, applyPersistedPlan],
   );
 
   // After a restart, reopen the session that was active when the app closed.
@@ -1505,27 +1481,6 @@ export default function AssistantPanel({
         open={taskPanelOpen}
         onOpenChange={setTaskPanelOpen}
       />
-      <DurablePlanActions projectDir={projectDir} sessionId={sessionRef.current}
-        busy={busy} onPlanChanged={applyPersistedPlan} />
-      <RunHistoryPanel projectDir={projectDir} sessionId={sessionRef.current} busy={busy} />
-      <TaskDetailsPanel projectDir={projectDir} sessionId={sessionRef.current} busy={busy} />
-      {projectDir && sessionRef.current && <>
-        <DeliveryReviewPanel projectDir={projectDir} sessionId={sessionRef.current}
-          onOpenArtifacts={() => setArtifactViewKey(JSON.stringify([projectDir, sessionRef.current]))} />
-        {artifactViewKey === JSON.stringify([projectDir, sessionRef.current]) && <TaskArtifactViewer
-          key={artifactViewKey} projectDir={projectDir} sessionId={sessionRef.current}
-          onClose={() => setArtifactViewKey(null)}
-          onContinue={(version: ArtifactText) => {
-            if (version.scope.task_id !== sessionRef.current || artifactViewKey !== JSON.stringify([projectDir, sessionRef.current])) return false;
-            setPendingArtifact({ project: projectDir, session: sessionRef.current,
-              reference: { artifact_id: version.metadata.artifact_id, version: version.metadata.version,
-                payload_sha256: version.metadata.payload_sha256, expected_binding: version.scope } });
-            setInput(old => old || t("chat.continueArtifactPrompt"));
-            setArtifactViewKey(null);
-            requestAnimationFrame(() => taRef.current?.focus());
-            return true;
-          }} />}
-      </>}
 
       <AssistantMessageList
         messages={messages}
@@ -1583,12 +1538,6 @@ export default function AssistantPanel({
         </div>
       )}
 
-      {pendingArtifact && (
-        <div className="agentz-assistant-artifact-ref">
-          {t("chat.continueArtifactSelected", { id: pendingArtifact.reference.artifact_id, version: pendingArtifact.reference.version })}
-          <button type="button" onClick={() => setPendingArtifact(null)}>{t("chat.continueArtifactRemove")}</button>
-        </div>
-      )}
       <ChatComposer
         value={input}
         onChange={onInputChange}

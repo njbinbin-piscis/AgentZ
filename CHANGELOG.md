@@ -5,6 +5,20 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.13] - 2026-10-18
+
+### Changed
+
+- Removed the extra panels that 0.9.12 left inside the CodeZ and WorkZ chat windows: durable plan refresh, run history, task details, delivery review, artifact and task-file viewers, and the WorkZ reminder bar. Those controls repeated the existing task list, the header usage ring, and the top-right changes and artifacts drawer.
+- The persisted task plan still loads into the collapsible task list when a session opens. There is no manual refresh button.
+- WorkZ team, agent, and isolate controls sit in the bottom bar again. The unstyled "advanced options" disclosure is gone.
+
+### Known limits
+
+- This release has not passed the upgrade acceptance gates. The unaccepted items and user test cases remain in `docs/upgrade/acceptance-0.9.12.md`.
+- Installers are unsigned. macOS and Linux builds were not run on real machines.
+- Other limits listed under 0.9.12 still apply.
+
 ## [0.9.12] - 2026-10-18
 
 ### Added

@@ -36,7 +36,6 @@ import {
 } from "./theme";
 import { syncEditorThemeWithAppearance } from "./workspaces/codez/themeStore";
 import CodeZWorkspace from "./workspaces/codez";
-import TaskFileViewer from "./workspaces/codez/TaskFileViewer";
 import WorkZWorkspace, { type WikiBuildAction } from "./workspaces/workz";
 import SettingsPanel from "./workspaces/codez/SettingsPanel";
 import { OPEN_SETTINGS_EVENT, SETTINGS_CLOSED_EVENT } from "./workspaces/codez/firstRun";
@@ -101,7 +100,6 @@ export default function App() {
   }, []);
   const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
   const [projectDir, setProjectDir] = useState<string | null>(null);
-  const [taskFileRoute, setTaskFileRoute] = useState<{ authorityProject: string; sessionId: string } | null>(null);
   const [inboxTaskRoute, setInboxTaskRoute] = useState<{ projectDir: string; taskId: string; nonce: number } | null>(null);
   const projectNavigationBusy = useRef(false);
   const currentProjectRef = useRef(projectDir);
@@ -447,7 +445,6 @@ export default function App() {
       const previousScope = projectDir ? getProjectScope(projectDir) : null;
       if (previousScope) await revokeProjectScope(previousScope.handle);
       if (!stillCurrent()) return false;
-      setTaskFileRoute(null);
       setProjectDir(dir);
       if (!isRemoteDir(dir)) {
         try {
@@ -510,16 +507,6 @@ export default function App() {
     [switchProject],
   );
 
-  const openTaskFilesInCodeZ = useCallback(
-    async (authorityProject: string, sessionId: string) => {
-      if (!authorityProject || !sessionId) return;
-      if (!await switchProject(authorityProject)) return;
-      setTaskFileRoute({ authorityProject, sessionId });
-      setMode("codez");
-    },
-    [switchProject],
-  );
-
   const closeProject = useCallback(async () => {
     if (!projectDir || projectNavigationBusy.current) return;
     projectNavigationBusy.current = true;
@@ -559,7 +546,6 @@ export default function App() {
       setBrowserOpen(false);
       setChatInsertElement(null);
       void browserClose().catch(() => {});
-      setTaskFileRoute(null);
       setProjectDir(null);
     } catch (e) {
       console.error("closeProject failed:", e);
@@ -1000,14 +986,6 @@ export default function App() {
                 onWorkspacePatch={handleWorkspacePatch}
                 onRegisterNavigationSnapshot={registerNavigationSnapshot}
               />
-              {taskFileRoute && projectDir && normProjectPath(taskFileRoute.authorityProject) === normProjectPath(projectDir) && (
-                <TaskFileViewer
-                  key={JSON.stringify(taskFileRoute)}
-                  projectDir={taskFileRoute.authorityProject}
-                  sessionId={taskFileRoute.sessionId}
-                  onClose={() => setTaskFileRoute(null)}
-                />
-              )}
             </div>
             <div
               className="agentz-ide-chat-resize"
@@ -1037,7 +1015,6 @@ export default function App() {
             openTaskRequest={inboxTaskRoute}
             onOpenFolder={pickFolder}
             onOpenProjectInCodeZ={(dir) => void openProjectInCodeZ(dir)}
-            onOpenTaskFilesInCodeZ={(authorityProject, sessionId) => void openTaskFilesInCodeZ(authorityProject, sessionId)}
             onOpenSessionInCodeZ={(projectPath, sessionId, source) => void openSessionInCodeZ(projectPath, sessionId, source)}
             wikiBuildNonce={wikiBuildNonce}
             wikiBuildAction={wikiBuildAction}

@@ -46,14 +46,7 @@ import {
 } from "../../components/chatComposerUtils";
 import { visionCapable } from "../../components/visionUtils";
 import TaskPanel from "../../components/TaskPanel";
-import TaskReminderPanel from "../../components/TaskReminderPanel";
-import DurablePlanActions from "../codez/DurablePlanActions";
-import RunHistoryPanel from "../codez/RunHistoryPanel";
-import TaskDetailsPanel from "../codez/TaskDetailsPanel";
-import TaskFileViewer from "../codez/TaskFileViewer";
-import TaskArtifactViewer from "../codez/TaskArtifactViewer";
-import DeliveryReviewPanel from "../codez/DeliveryReviewPanel";
-import type { DurablePlan } from "../../services/tauri/chatPlan";
+import { queryTaskPlan, type DurablePlan } from "../../services/tauri/chatPlan";
 import { createProjectlessSession, lookupProjectlessSession, getProjectScope, pickProjectScope, restoreProjectScope } from "../../services/tauri/projectScope";
 import ToolTrace, { interleaveTools } from "../../components/ToolTrace";
 import Markdown from "../codez/Markdown";
@@ -100,8 +93,6 @@ interface WorkZWorkspaceProps {
   onOpenFolder: () => void;
   /** Switch the CodeZ project to `dir` and show CodeZ. */
   onOpenProjectInCodeZ?: (dir: string) => void;
-  /** Show a host-authorized, read-only task file view in CodeZ. */
-  onOpenTaskFilesInCodeZ?: (authorityProject: string, sessionId: string) => void;
   /** Open a project's CodeZ-origin session in CodeZ (its home view) instead of continuing it here. */
   onOpenSessionInCodeZ?: (projectDir: string, sessionId: string, source: string) => void;
   /** Increment from title bar to trigger repo wiki generation. */
@@ -182,7 +173,6 @@ export default function WorkZWorkspace({
   projectDir: appProjectDir,
   openTaskRequest,
   onOpenProjectInCodeZ,
-  onOpenTaskFilesInCodeZ,
   onOpenSessionInCodeZ,
   wikiBuildNonce = 0,
   wikiBuildAction = "overview",
@@ -216,8 +206,6 @@ export default function WorkZWorkspace({
     })));
   }, []);
   const [taskPanelOpen, setTaskPanelOpen] = useState(false);
-  const [fileViewKey, setFileViewKey] = useState<string | null>(null);
-  const [artifactViewKey, setArtifactViewKey] = useState<string | null>(null);
   const [isolate, setIsolate] = useState(
     () => localStorage.getItem("agentz-workz-isolate") === "1",
   );
@@ -1078,8 +1066,6 @@ export default function WorkZWorkspace({
       }
       try {
         const request = ++openTaskRequestRef.current;
-        setFileViewKey(null);
-        setArtifactViewKey(null);
         const meta = tasks.find((task) => task.id === id);
         applyTaskModeBinding(meta);
         setCwd(meta?.cwd ?? null);
@@ -1129,6 +1115,14 @@ export default function WorkZWorkspace({
           })),
         );
         setPlanItems([]);
+        const scope = planProject?.selected === projectDir ? getProjectScope(planProject.canonical) : null;
+        if (scope?.handle) {
+          void queryTaskPlan(scope.handle, id)
+            .then((r) => {
+              if (sessionRef.current === id && r.current) applyPersistedPlan(r.current);
+            })
+            .catch(() => {});
+        }
         setError(environmentResult.status === "rejected" ? String(environmentResult.reason) : null);
         setPreviewPath(null);
         refreshGitChanges();
@@ -1137,7 +1131,7 @@ export default function WorkZWorkspace({
         setError(String(e));
       }
     },
-    [projectDir, isFree, refreshGitChanges, tasks, applyTaskModeBinding, clearCards],
+    [projectDir, isFree, refreshGitChanges, tasks, applyTaskModeBinding, clearCards, planProject, applyPersistedPlan],
   );
 
   // After a restart, reopen the task that was active when the app closed.
@@ -1720,41 +1714,6 @@ export default function WorkZWorkspace({
           open={taskPanelOpen}
           onOpenChange={setTaskPanelOpen}
         />
-        {!activeTeam && !activePoolId && <DurablePlanActions
-          projectDir={planProject?.selected === projectDir ? planProject.canonical : null}
-          sessionId={sessionRef.current} busy={busy} onPlanChanged={applyPersistedPlan} />}
-        {!activeTeam && !activePoolId && <RunHistoryPanel
-          projectDir={planProject?.selected === projectDir ? planProject.canonical : null}
-          sessionId={sessionRef.current} busy={busy} />}
-        {!activeTeam && !activePoolId && <TaskDetailsPanel
-          projectDir={planProject?.selected === projectDir ? planProject.canonical : null}
-          sessionId={sessionRef.current} busy={busy} />}
-        {!activeTeam && !activePoolId && planProject?.selected === projectDir && sessionRef.current && <>
-          {!isFree && <TaskReminderPanel key={`${planProject.canonical}:${sessionRef.current}`}
-            projectDir={planProject.canonical} taskId={sessionRef.current}
-            chinese={(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh")} />}
-          {onOpenTaskFilesInCodeZ && <button type="button" onClick={() => {
-            const sessionId = sessionRef.current;
-            if (sessionId) onOpenTaskFilesInCodeZ(planProject.canonical, sessionId);
-          }}>
-            {(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh") ? "在 CodeZ 查看任务文件（只读）" : "View task files in CodeZ (read-only)"}
-          </button>}
-          <DeliveryReviewPanel projectDir={planProject.canonical} sessionId={sessionRef.current}
-            onReviewChanges={!busy && worktree?.id === sessionRef.current ? () => setReviewTask(worktree) : undefined}
-            onOpenArtifacts={() => setArtifactViewKey(JSON.stringify([planProject.canonical, sessionRef.current]))} />
-          <button type="button" onClick={() => setFileViewKey(JSON.stringify([planProject.canonical, sessionRef.current]))}>
-            {(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh") ? "查看任务文件（只读）" : "View task files (read-only)"}
-          </button>
-          {fileViewKey === JSON.stringify([planProject.canonical, sessionRef.current]) && <TaskFileViewer
-            key={fileViewKey} projectDir={planProject.canonical} sessionId={sessionRef.current}
-            onClose={() => setFileViewKey(null)} />}
-          <button type="button" onClick={() => setArtifactViewKey(JSON.stringify([planProject.canonical, sessionRef.current]))}>
-            {(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh") ? "任务产物版本" : "Task artifact versions"}
-          </button>
-          {artifactViewKey === JSON.stringify([planProject.canonical, sessionRef.current]) && <TaskArtifactViewer
-            key={artifactViewKey} projectDir={planProject.canonical} sessionId={sessionRef.current}
-            onClose={() => setArtifactViewKey(null)} />}
-        </>}
 
         <div className="agentz-workz-isolate-bar">
           <div className="agentz-workz-bar-left">
@@ -1785,9 +1744,6 @@ export default function WorkZWorkspace({
               </label>
             )}
 
-            <details>
-              <summary>{(i18n.resolvedLanguage ?? i18n.language ?? "").startsWith("zh") ? "高级选项" : "Advanced options"}</summary>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {isolate && !isFree && !taskBound && (
               <div className="agentz-workz-pill-menu" title={t("agent.startSourceHint")}>
                 <DropdownSelect
@@ -1854,8 +1810,6 @@ export default function WorkZWorkspace({
                 />
               </div>
             )}
-              </div>
-            </details>
           </div>
 
           <div className="agentz-workz-bar-right">
