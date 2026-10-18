@@ -111,11 +111,18 @@ interface WorkZWorkspaceProps {
  */
 const LAST_TASK_KEY_PREFIX = "agentz-workz-last-task:";
 
+/** Older versions stored Windows paths with the verbatim `\\?\` prefix; saved values may still have it. */
+function plainPath(path: string): string {
+  if (path.startsWith("\\\\?\\UNC\\")) return "\\\\" + path.slice(8);
+  if (/^\\\\\?\\[A-Za-z]:\\/.test(path)) return path.slice(4);
+  return path;
+}
+
 /** Remember the open WorkZ task so a restart can reopen it (per project). */
 function rememberLastTask(projectDir: string | null | undefined, id: string | null): void {
   if (!projectDir) return;
   try {
-    const key = LAST_TASK_KEY_PREFIX + projectDir;
+    const key = LAST_TASK_KEY_PREFIX + plainPath(projectDir);
     if (id) localStorage.setItem(key, id);
     else localStorage.removeItem(key);
   } catch {
@@ -125,7 +132,10 @@ function rememberLastTask(projectDir: string | null | undefined, id: string | nu
 
 function readLastTask(projectDir: string): string | null {
   try {
-    return localStorage.getItem(LAST_TASK_KEY_PREFIX + projectDir);
+    return (
+      localStorage.getItem(LAST_TASK_KEY_PREFIX + plainPath(projectDir)) ??
+      localStorage.getItem(LAST_TASK_KEY_PREFIX + projectDir)
+    );
   } catch {
     return null;
   }
@@ -144,7 +154,8 @@ function readScope(appProjectDir: string | null): WorkzScope {
     const raw = localStorage.getItem(SCOPE_KEY);
     if (raw) {
       const v = JSON.parse(raw) as WorkzScope;
-      if (v.kind === "free" || (v.kind === "project" && v.dir)) return v;
+      if (v.kind === "free") return v;
+      if (v.kind === "project" && v.dir) return { kind: "project", dir: plainPath(v.dir) };
     }
   } catch {
     // fall through to default
@@ -163,7 +174,9 @@ function readCollapsed(): Record<string, boolean> {
 function readRecentCwds(): string[] {
   try {
     const v = JSON.parse(localStorage.getItem(RECENT_CWDS_KEY) ?? "[]");
-    return Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, 8) : [];
+    if (!Array.isArray(v)) return [];
+    const plain = v.filter((x): x is string => typeof x === "string").map(plainPath);
+    return plain.filter((x, i) => plain.indexOf(x) === i).slice(0, 8);
   } catch {
     return [];
   }

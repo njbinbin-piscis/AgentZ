@@ -64,11 +64,48 @@ fn store_path(config_dir: &Path) -> PathBuf {
     config_dir.join(STORE_FILE)
 }
 
+/// Earlier versions stored canonical Windows paths with the verbatim `\\?\` prefix. The same
+/// folder then appeared twice, once with and once without it. Drop the prefix when it is safe.
+fn strip_verbatim(path: &str) -> String {
+    let text = path.trim();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{rest}");
+    }
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        let bytes = rest.as_bytes();
+        if bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && &bytes[1..3] == br":\" {
+            return rest.to_string();
+        }
+    }
+    text.to_string()
+}
+
+/// Rewrite stored paths without the verbatim prefix and merge entries that now collide,
+/// keeping the most recent `last_opened`.
+fn dedupe_projects(store: &mut Store) {
+    let mut merged: Vec<StoredProject> = Vec::with_capacity(store.projects.len());
+    for project in store.projects.drain(..) {
+        let path = strip_verbatim(&project.path);
+        let key = norm_key(&path);
+        if let Some(existing) = merged.iter_mut().find(|p| norm_key(&p.path) == key) {
+            existing.last_opened = existing.last_opened.max(project.last_opened);
+        } else {
+            merged.push(StoredProject {
+                path,
+                last_opened: project.last_opened,
+            });
+        }
+    }
+    store.projects = merged;
+}
+
 fn load_store(config_dir: &Path) -> Store {
-    std::fs::read_to_string(store_path(config_dir))
+    let mut store: Store = std::fs::read_to_string(store_path(config_dir))
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    dedupe_projects(&mut store);
+    store
 }
 
 fn save_store(config_dir: &Path, store: &Store) -> Result<(), String> {
@@ -78,7 +115,7 @@ fn save_store(config_dir: &Path, store: &Store) -> Result<(), String> {
 }
 
 fn norm_key(path: &str) -> String {
-    let s = path.trim().replace('\\', "/");
+    let s = strip_verbatim(path).replace('\\', "/");
     let s = s.trim_end_matches('/');
     if cfg!(windows) {
         s.to_lowercase()
@@ -110,7 +147,9 @@ fn touch_project(store: &mut Store, path: &str, now: i64) {
         return;
     }
     store.projects.push(StoredProject {
-        path: path.trim().trim_end_matches(['/', '\\']).to_string(),
+        path: strip_verbatim(path)
+            .trim_end_matches(['/', '\\'])
+            .to_string(),
         last_opened: now,
     });
     store
@@ -197,7 +236,8 @@ pub async fn workz_overview(app: AppHandle) -> Result<WorkzOverview, String> {
 #[tauri::command]
 pub async fn workz_project_add(app: AppHandle, path: String) -> Result<WorkzOverview, String> {
     let config_dir = resolve_global_config_dir(&app)?;
-    let trimmed = path.trim();
+    let stripped = strip_verbatim(&path);
+    let trimmed = stripped.as_str();
     if trimmed.is_empty() || !Path::new(trimmed).is_dir() {
         return Err(format!("directory not found: {trimmed}"));
     }
@@ -293,6 +333,38 @@ mod tests {
         touch_project(&mut s, "D:/other", 9);
         remove_project(&mut s, "D:\\other\\");
         assert!(s.projects.iter().all(|p| !p.path.contains("other")));
+    }
+
+    #[test]
+    fn verbatim_prefixed_entries_merge_with_plain_ones() {
+        let mut s = Store {
+            projects: vec![
+                StoredProject {
+                    path: r"\\?\C:\Projects\AgentZ".into(),
+                    last_opened: 5,
+                },
+                StoredProject {
+                    path: r"C:\Projects\AgentZ".into(),
+                    last_opened: 2,
+                },
+                StoredProject {
+                    path: r"\\?\UNC\srv\share\p".into(),
+                    last_opened: 1,
+                },
+            ],
+            default_work_dir: None,
+        };
+        dedupe_projects(&mut s);
+        assert_eq!(s.projects.len(), 2);
+        assert_eq!(s.projects[0].path, r"C:\Projects\AgentZ");
+        assert_eq!(s.projects[0].last_opened, 5);
+        assert_eq!(s.projects[1].path, r"\\srv\share\p");
+
+        // A prefixed path from the renderer matches the plain entry and removes it.
+        touch_project(&mut s, r"\\?\C:\Projects\AgentZ", 9);
+        assert_eq!(s.projects.len(), 2);
+        remove_project(&mut s, r"\\?\C:\Projects\AgentZ");
+        assert_eq!(s.projects.len(), 1);
     }
 
     #[test]

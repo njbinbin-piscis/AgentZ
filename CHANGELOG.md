@@ -5,6 +5,19 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.14] - 2026-10-18
+
+### Fixed
+
+- On Windows, the WorkZ session list no longer shows the same project twice. Versions up to 0.9.11 saved project paths with the `\\?\` prefix in `workz.json`, and the list treated them as different from the plain path. Saved projects are cleaned and merged on load. The merged list is written back the next time a project is added or removed.
+- WorkZ also strips the prefix from the saved scope, the recent working directories, and the per-project last task, so those no longer point at a second copy of the project.
+
+### Known limits
+
+- This release has not passed the upgrade acceptance gates. The unaccepted items and user test cases remain in `docs/upgrade/acceptance-0.9.12.md`.
+- Installers are unsigned. macOS and Linux builds were not run on real machines.
+- Other limits listed under 0.9.13 still apply.
+
 ## [0.9.13] - 2026-10-18
 
 ### Changed
