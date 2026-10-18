@@ -283,10 +283,11 @@
   position: absolute;
   inset: -3px;
   border-radius: 50%;
-  border: 2px solid rgba(124, 106, 247, 0.2);
-  border-top-color: #f5f3ff;
-  border-right-color: rgba(167, 139, 250, 0.95);
+  border: 2px solid rgba(124, 106, 247, 0.22);
+  border-top-color: var(--accent, #7c6af7);
+  border-right-color: var(--accent-hover, #9585ff);
   animation: agentz-composer-spin 0.9s linear infinite;
+  will-change: transform;
   pointer-events: none;
 }
 
@@ -324,5 +325,6 @@
 }
 
 @keyframes agentz-composer-spin {
-  to { transform: rotate(360deg); }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

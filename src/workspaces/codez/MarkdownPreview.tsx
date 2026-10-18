@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -11,12 +11,14 @@ interface MarkdownPreviewProps {
   content: string;
 }
 
+let previewMermaidCounter = 0;
+
 function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const id = useMemo(() => `mmd-${Math.random().toString(36).slice(2)}`, []);
 
   useEffect(() => {
     let cancelled = false;
+    const id = `mmd-preview-${++previewMermaidCounter}`;
     ref.current?.classList.remove("agentz-md-mermaid-error");
     (async () => {
       try {
@@ -28,12 +30,14 @@ function MermaidBlock({ code }: { code: string }) {
           ref.current.textContent = String(e);
           ref.current.classList.add("agentz-md-mermaid-error");
         }
+      } finally {
+        document.getElementById(`d${id}`)?.remove();
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [code, id]);
+  }, [code]);
 
   return <div className="agentz-md-mermaid" ref={ref} />;
 }

@@ -79,29 +79,34 @@ class RenderErrorBoundary extends Component<
 
 function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const idRef = useRef(`mermaid-${++mermaidIdCounter}`);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ref.current) return;
     let cancelled = false;
-    const id = idRef.current;
+    const id = `mermaid-${++mermaidIdCounter}`;
     setError(null);
     ref.current.innerHTML = "";
 
     const render = async () => {
       try {
         const mermaid = await loadMermaid();
-        await mermaid.parse(code, { suppressErrors: false });
         const { svg } = await mermaid.render(id, code);
         if (!cancelled && ref.current) {
-          ref.current.innerHTML = sanitizeMermaidSvg(svg);
+          const safeSvg = sanitizeMermaidSvg(svg);
+          if (safeSvg) {
+            ref.current.innerHTML = safeSvg;
+          } else {
+            setError("Empty Mermaid SVG output");
+          }
         }
       } catch (e) {
         if (!cancelled) {
           console.warn("[Markdown] Mermaid render failed:", e);
           setError(String(e));
         }
+      } finally {
+        document.getElementById(`d${id}`)?.remove();
       }
     };
 
@@ -250,8 +255,8 @@ function Markdown({
             },
             pre: ({ children }) => <>{children}</>,
             code: ({ className, children, ...props }) => {
-              const text = String(children).replace(/\n$/, "");
-              const match = /language-(\w+)/.exec(className || "");
+              const text = extractText(children).replace(/\n$/, "");
+              const match = /language-([\w-]+)/.exec(className || "");
               const lang = match?.[1]?.toLowerCase();
               const isBlock = Boolean(className?.includes("language-") || text.includes("\n"));
 

@@ -5,6 +5,21 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.16] - 2026-10-18
+
+### Fixed
+
+- Mermaid diagrams in chat no longer render as empty boxes. Sanitization kept Mermaid's `<style>` and `<foreignObject>` labels, and parsing switched from strict XML to HTML so `<br>` and CSS `>` selectors no longer blank the SVG.
+- Session forks get numbered titles such as `(1) Title (fork @ checkpoint)` and `(2) Title (fork)`. Nested fork suffixes are stripped before numbering, and the next free index is `max + 1` across existing sessions that share the same root title.
+- The stop-button ring keeps spinning when the OS reports `prefers-reduced-motion` (for example remote desktop or accessibility settings). Progress spinners are exempt from the one-shot animation rule.
+- Remote connect, project template, task review, and skill revision panels follow the light and dark theme tokens instead of hardcoded dark fallbacks from undefined `--agentz-*` variables.
+
+### Known limits
+
+- This release has not passed the upgrade acceptance gates. The unaccepted items and user test cases remain in `docs/upgrade/acceptance-0.9.12.md`.
+- Installers are unsigned. macOS and Linux builds were not run on real machines.
+- Other limits listed under 0.9.15 still apply.
+
 ## [0.9.15] - 2026-10-18
 
 ### Added

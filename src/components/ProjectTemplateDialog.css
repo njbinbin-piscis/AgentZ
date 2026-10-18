@@ -15,9 +15,10 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: 12px;
-  background: var(--agentz-panel-bg, #1e1e1e);
-  border: 1px solid var(--agentz-border, #333);
-  color: var(--agentz-text, #eee);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
 }
 
 .agentz-tpl-header {
@@ -63,8 +64,8 @@
 }
 
 .agentz-tpl-list label.active {
-  border-color: var(--agentz-accent, #7c6af7);
-  background: rgba(124, 106, 247, 0.12);
+  border-color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .agentz-tpl-name {
@@ -94,22 +95,30 @@
   gap: 0.5rem;
   margin-top: 0;
   padding: 0.85rem 1.5rem 1.25rem;
-  border-top: 1px solid var(--agentz-border, #333);
+  border-top: 1px solid var(--border);
 }
 
 .agentz-tpl-actions button {
   padding: 0.45rem 0.9rem;
   border-radius: 6px;
-  border: 1px solid var(--agentz-border, #444);
+  border: 1px solid var(--border);
   background: transparent;
   color: inherit;
   cursor: pointer;
 }
 
+.agentz-tpl-actions button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
 .agentz-tpl-actions button.primary {
-  background: var(--agentz-accent, #7c6af7);
+  background: var(--accent);
   border-color: transparent;
   color: #fff;
+}
+
+.agentz-tpl-actions button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 .agentz-command-list {
@@ -124,7 +133,7 @@
 .agentz-command-item {
   padding: 0.65rem 0.75rem;
   border-radius: 8px;
-  border: 1px solid var(--agentz-border, #333);
+  border: 1px solid var(--border);
 }
 
 .agentz-command-head {

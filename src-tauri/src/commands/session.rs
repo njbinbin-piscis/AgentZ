@@ -585,6 +585,74 @@ pub async fn chat_get_messages_page(
     .await
 }
 
+/// Strip leading `(N) ` prefixes and trailing ` (fork)` / ` (fork @ checkpoint)` suffixes
+/// from a session title, returning `(root_title, first_leading_number, had_fork_suffix)`.
+fn parse_fork_title(raw: &str) -> (&str, Option<u32>, bool) {
+    let mut s = raw.trim();
+    let mut had_suffix = false;
+    loop {
+        if let Some(rest) = s.strip_suffix("(fork @ checkpoint)") {
+            s = rest.trim_end();
+            had_suffix = true;
+        } else if let Some(rest) = s.strip_suffix("(fork)") {
+            s = rest.trim_end();
+            had_suffix = true;
+        } else {
+            break;
+        }
+    }
+    let mut first_num: Option<u32> = None;
+    while let Some(after_open) = s.strip_prefix('(') {
+        let Some((digits, after_close)) = after_open.split_once(')') else {
+            break;
+        };
+        let Ok(n) = digits.parse::<u32>() else {
+            break;
+        };
+        if n == 0 {
+            break;
+        }
+        let rest = after_close.trim_start();
+        if rest.is_empty() {
+            break;
+        }
+        if first_num.is_none() {
+            first_num = Some(n);
+        }
+        s = rest;
+    }
+    let root = if s.is_empty() { "Chat" } else { s };
+    (root, first_num, had_suffix)
+}
+
+/// Build the next numbered fork title `(N) <root> (fork [@ checkpoint])` by scanning
+/// existing session titles that share the same root title.
+fn next_fork_title<I, S>(existing_titles: I, source_title: &str, at_checkpoint: bool) -> String
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    let (root, _, _) = parse_fork_title(source_title);
+    let mut max_num: u32 = 0;
+    for item in existing_titles {
+        let (other_root, num, had_suffix) = parse_fork_title(item.as_ref());
+        if other_root == root {
+            if let Some(n) = num {
+                max_num = max_num.max(n);
+            } else if had_suffix {
+                max_num = max_num.max(1);
+            }
+        }
+    }
+    let next = max_num + 1;
+    let suffix = if at_checkpoint {
+        "(fork @ checkpoint)"
+    } else {
+        "(fork)"
+    };
+    format!("({next}) {root} {suffix}")
+}
+
 /// Fork a session — optionally copy only up to a checkpoint message (inclusive).
 #[tauri::command]
 pub async fn chat_fork_session(
@@ -601,12 +669,21 @@ pub async fn chat_fork_session(
             .ok_or_else(|| format!("session '{session_id}' not found"))?;
 
         let fork_title = title.unwrap_or_else(|| {
-            let base = source.title.unwrap_or_else(|| "Chat".to_string());
-            if up_to_message_id.is_some() {
-                format!("{base} (fork @ checkpoint)")
+            let resolved_base = if is_workz_task_source(&source.source) {
+                resolve_workz_task_list_title(db, &source)
+            } else if is_codez_source(&source.source) {
+                resolve_codez_list_title(db, &source)
             } else {
-                format!("{base} (fork)")
+                source.title.clone()
             }
+            .unwrap_or_else(|| "Chat".to_string());
+            let existing = db.list_sessions(500, 0).unwrap_or_default();
+            let existing_titles = existing.iter().filter_map(|s| s.title.as_deref());
+            next_fork_title(
+                existing_titles,
+                &resolved_base,
+                up_to_message_id.is_some(),
+            )
         });
         let fork_source = if source.source == SOURCE_LEGACY {
             normalize_source(&source.source).to_string()
@@ -731,4 +808,33 @@ pub async fn chat_delete_session(
             .map_err(|e| format!("delete_session failed: {e}"))
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fork_title_numbers_increment_and_strip_nested_affixes() {
+        let existing: Vec<&str> = vec!["实现 OAuth 登录"];
+        let first = next_fork_title(&existing, "实现 OAuth 登录", true);
+        assert_eq!(first, "(1) 实现 OAuth 登录 (fork @ checkpoint)");
+
+        let existing = vec!["实现 OAuth 登录", &first];
+        let second = next_fork_title(&existing, "实现 OAuth 登录", true);
+        assert_eq!(second, "(2) 实现 OAuth 登录 (fork @ checkpoint)");
+
+        // Forking from an already-forked session strips both `(1)` and `(fork @ checkpoint)`
+        // instead of nesting `(1) (1) ... (fork @ checkpoint) (fork @ checkpoint)`.
+        let existing = vec!["实现 OAuth 登录", &first, &second];
+        let third_from_fork = next_fork_title(&existing, &first, false);
+        assert_eq!(third_from_fork, "(3) 实现 OAuth 登录 (fork)");
+
+        // Legacy unnumbered forks count as `(1)` so the next fork becomes `(2)`.
+        let legacy = vec!["修复路径 (fork @ checkpoint)"];
+        assert_eq!(
+            next_fork_title(&legacy, "修复路径 (fork @ checkpoint)", true),
+            "(2) 修复路径 (fork @ checkpoint)"
+        );
+    }
 }

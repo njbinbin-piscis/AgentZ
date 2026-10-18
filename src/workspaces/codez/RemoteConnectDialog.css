@@ -5,18 +5,22 @@
 .agentz-remote-dialog input {
   padding: 0.4rem 0.55rem;
   border-radius: 6px;
-  border: 1px solid var(--agentz-border, #444);
-  background: var(--bg-primary, transparent);
-  color: inherit;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text);
 }
 
 .agentz-remote-dialog .agentz-remote-row button {
   padding: 0.4rem 0.8rem;
   border-radius: 6px;
-  border: 1px solid var(--agentz-border, #444);
+  border: 1px solid var(--border);
   background: transparent;
   color: inherit;
   cursor: pointer;
+}
+
+.agentz-remote-dialog .agentz-remote-row button:hover:not(:disabled) {
+  background: var(--bg-hover);
 }
 
 .agentz-remote-dialog button:disabled {
@@ -33,15 +37,19 @@
 .agentz-remote-kinds button {
   padding: 0.35rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid var(--agentz-border, #444);
+  border: 1px solid var(--border);
   background: transparent;
   color: inherit;
   cursor: pointer;
 }
 
+.agentz-remote-kinds button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
 .agentz-remote-kinds button.active {
-  border-color: var(--agentz-accent, #7c6af7);
-  background: rgba(124, 106, 247, 0.16);
+  border-color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .agentz-remote-row {
@@ -89,7 +97,7 @@
 .agentz-remote-dirs {
   max-height: 45vh;
   overflow-y: auto;
-  border: 1px solid var(--agentz-border, #333);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.25rem;
 }

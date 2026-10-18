@@ -1,5 +1,5 @@
 .agentz-workz-skill-revisions {
-  border-top: 1px solid var(--agentz-border, rgba(255, 255, 255, 0.08));
+  border-top: 1px solid var(--border);
   padding: 0.65rem 0.75rem;
   font-size: 0.78rem;
 }
