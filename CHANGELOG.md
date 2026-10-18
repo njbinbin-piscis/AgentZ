@@ -5,6 +5,19 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.18] - 2026-10-19
+
+### Changed
+
+- WorkZ chat bubbles use the conversation column instead of a fixed pixel cap. Agent replies span 80% of the column (10% gutter on each side) and grow when the window is maximized. User messages stay right-aligned and leave at least 10% empty on the left.
+- Mermaid diagrams scale to the bubble width, so a wider window enlarges the figure.
+
+### Known limits
+
+- This release has not passed the upgrade acceptance gates. The unaccepted items and user test cases remain in `docs/upgrade/acceptance-0.9.12.md`.
+- Installers are unsigned. macOS and Linux builds were not run on real machines.
+- Other limits listed under 0.9.17 still apply.
+
 ## [0.9.17] - 2026-10-19
 
 ### Fixed

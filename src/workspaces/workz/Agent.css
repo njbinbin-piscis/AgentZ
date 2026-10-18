@@ -230,19 +230,24 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: min(92%, 720px);
   margin-bottom: 10px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .agentz-workz-msg.user {
   align-self: flex-end;
   align-items: flex-end;
+  /* Right-aligned; at least 10% of the column stays empty on the left. */
+  max-width: 90%;
 }
 
 .agentz-workz-msg.assistant {
-  align-self: flex-start;
-  align-items: flex-start;
-  max-width: min(96%, 820px);
+  align-self: center;
+  align-items: stretch;
+  /* 10% gutter on each side of the conversation column. */
+  width: 80%;
+  max-width: none;
 }
 
 .agentz-workz-msg-role {
