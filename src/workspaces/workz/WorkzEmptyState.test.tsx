@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WorkzEmptyState, { WORKZ_STARTER_SCENARIOS } from "./WorkzEmptyState";
@@ -49,5 +51,16 @@ describe("WorkzEmptyState (R10-12)", () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0][0].id).toBe("code");
     expect(onSelect.mock.calls[0][0].recommendIsolate).toBe(true);
+  });
+
+  it("styles starter cards with theme-aware CSS tokens for both dark and light themes", () => {
+    const agentCss = fs.readFileSync(path.resolve(__dirname, "./Agent.css"), "utf8");
+    const indexCss = fs.readFileSync(path.resolve(__dirname, "../../index.css"), "utf8");
+
+    expect(agentCss).toContain(".agentz-workz-starter-card");
+    expect(agentCss).not.toContain("#181822");
+    expect(agentCss).toMatch(/\.agentz-workz-starter-card\s*\{[\s\S]*?background:\s*var\(--bg-elev\)/);
+    expect(indexCss).toMatch(/\[data-theme="light"\][\s\S]*?--bg-elev:\s*#ffffff/);
+    expect(indexCss).toMatch(/\[data-theme="light"\][\s\S]*?--bg-panel:\s*#ffffff/);
   });
 });

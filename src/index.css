@@ -4,7 +4,12 @@
   /* App shell (titlebar, chat, agent) */
   --bg: #0e0e14;
   --bg-elev: #14141c;
+  --bg-elev-1: #12121a;
   --bg-elev-2: #1b1b26;
+  --bg-panel: #14141c;
+  --bg-elevated: #1b1b26;
+  --bg-input: #161622;
+  --surface-2: #20202c;
   --border: #2a2a38;
   --text: #e8e8f0;
   --text-dim: #9a9ab0;
@@ -39,7 +44,12 @@
 [data-theme="light"] {
   --bg: #f4f4f8;
   --bg-elev: #ffffff;
+  --bg-elev-1: #f8f8fc;
   --bg-elev-2: #ececf4;
+  --bg-panel: #ffffff;
+  --bg-elevated: #ececf4;
+  --bg-input: #ffffff;
+  --surface-2: #ececf4;
   --border: #d4d4e0;
   --text: #1a1a24;
   --text-dim: #5c5c72;
