@@ -9,7 +9,7 @@ type CommandCallback = (...args: unknown[]) => unknown;
 
 export class ExtHostCommands implements ExtHostCommandsShape {
   private readonly proxy: MainThreadCommandsShape;
-  private readonly commands = new Map<string, CommandCallback>();
+  private readonly commands = new Map<string, CommandCallback[]>();
   private readonly argumentConverters: ((arg: unknown) => unknown)[] = [];
 
   constructor(rpc: IRPCProtocol) {
@@ -22,11 +22,21 @@ export class ExtHostCommands implements ExtHostCommandsShape {
 
   registerCommand(id: string, callback: CommandCallback, thisArg?: unknown): Disposable {
     if (!id.trim()) throw new Error("invalid command id");
-    if (this.commands.has(id)) throw new Error(`command '${id}' already exists`);
-    this.commands.set(id, thisArg ? callback.bind(thisArg) : callback);
-    this.proxy.$registerCommand(id);
+    const bound: CommandCallback = thisArg ? callback.bind(thisArg) : callback;
+    const stack = this.commands.get(id);
+    if (!stack) {
+      this.commands.set(id, [bound]);
+      this.proxy.$registerCommand(id);
+    } else {
+      stack.push(bound);
+    }
     return new Disposable(() => {
-      if (this.commands.delete(id)) {
+      const cur = this.commands.get(id);
+      if (!cur) return;
+      const idx = cur.lastIndexOf(bound);
+      if (idx >= 0) cur.splice(idx, 1);
+      if (cur.length === 0) {
+        this.commands.delete(id);
         this.proxy.$unregisterCommand(id);
       }
     });
@@ -46,7 +56,8 @@ export class ExtHostCommands implements ExtHostCommandsShape {
   }
 
   async $executeContributedCommand(id: string, args: unknown[]): Promise<unknown> {
-    const callback = this.commands.get(id);
+    const stack = this.commands.get(id);
+    const callback = stack?.[stack.length - 1];
     if (!callback) {
       throw new Error(`command '${id}' not found`);
     }

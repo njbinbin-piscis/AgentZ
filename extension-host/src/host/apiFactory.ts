@@ -17,10 +17,21 @@ export interface ExtensionContext {
   workspaceState: Memento;
   asAbsolutePath(relative: string): string;
   storageUri?: types.Uri;
+  storagePath?: string;
   globalStorageUri: types.Uri;
+  globalStoragePath: string;
   logUri: types.Uri;
+  logPath: string;
   extensionMode: number;
-  secrets: { get(k: string): Promise<string | undefined>; store(k: string, v: string): Promise<void>; delete(k: string): Promise<void> };
+  extension: Record<string, unknown>;
+  environmentVariableCollection: Record<string, unknown>;
+  languageModelAccessInformation: Record<string, unknown>;
+  secrets: {
+    get(k: string): Promise<string | undefined>;
+    store(k: string, v: string): Promise<void>;
+    delete(k: string): Promise<void>;
+    onDidChange: types.Event<{ key: string }>;
+  };
 }
 
 export class Memento {
@@ -66,12 +77,107 @@ export class Memento {
   }
 }
 
+const packageJsonCache = new Map<string, Record<string, unknown>>();
+
+export function readRawPackageJson(extensionPath: string): Record<string, unknown> | undefined {
+  if (!extensionPath) return undefined;
+  const cached = packageJsonCache.get(extensionPath);
+  if (cached) return cached;
+  try {
+    const pkgPath = path.join(extensionPath, "package.json");
+    if (fs.existsSync(pkgPath)) {
+      const parsed = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as Record<string, unknown>;
+      packageJsonCache.set(extensionPath, parsed);
+      return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+export function buildExtensionObject(
+  desc: ExtensionDescriptionDto,
+  activateExt?: (id: string) => Promise<unknown>,
+): Record<string, unknown> {
+  const rawPkg = readRawPackageJson(desc.extensionPath);
+  return {
+    id: desc.id,
+    extensionUri: types.Uri.file(desc.extensionPath),
+    extensionPath: desc.extensionPath,
+    isActive: true,
+    packageJSON: {
+      ...(rawPkg ?? {}),
+      name: desc.name,
+      publisher: desc.publisher,
+      version: desc.version,
+      displayName: desc.displayName ?? rawPkg?.displayName,
+      main: desc.main ?? rawPkg?.main,
+      activationEvents: desc.activationEvents,
+      contributes: desc.contributes ?? rawPkg?.contributes,
+      engines: desc.engines ?? rawPkg?.engines,
+    },
+    extensionKind: types.ExtensionKind.Workspace,
+    exports: undefined,
+    activate: () => (activateExt ? activateExt(desc.id) : Promise.resolve(undefined)),
+  };
+}
+
+function matchSingleSelector(
+  sel: unknown,
+  doc: { uri?: types.Uri; languageId?: string; fileName?: string } | undefined,
+): number {
+  if (!doc) return 0;
+  if (typeof sel === "string") {
+    if (sel === "*") return 5;
+    return sel === doc.languageId ? 10 : 0;
+  }
+  if (sel && typeof sel === "object") {
+    const filter = sel as { language?: string; scheme?: string; pattern?: string | { pattern?: string } };
+    let score = 0;
+    if (filter.scheme) {
+      if (filter.scheme === "*") score = Math.max(score, 5);
+      else if (filter.scheme === doc.uri?.scheme) score = 10;
+      else return 0;
+    }
+    if (filter.language) {
+      if (filter.language === "*") score = Math.max(score, 5);
+      else if (filter.language === doc.languageId) score = 10;
+      else return 0;
+    }
+    if (filter.pattern) {
+      score = Math.max(score, 5);
+    }
+    return score;
+  }
+  return 0;
+}
+
+function matchDocumentSelector(
+  selector: unknown,
+  document: { uri?: types.Uri; languageId?: string; fileName?: string } | undefined,
+): number {
+  if (Array.isArray(selector)) {
+    let best = 0;
+    for (const s of selector) {
+      const score = matchDocumentSelector(s, document);
+      if (score > best) best = score;
+    }
+    return best;
+  }
+  return matchSingleSelector(selector, document);
+}
+
+const noopDisposable = () => new types.Disposable(() => undefined);
+
 export function createApiFactory(services: Services) {
   const s = services;
 
   const commands = {
-    registerCommand: (id: string, cb: (...a: unknown[]) => unknown, thisArg?: unknown) => s.commands.registerCommand(id, cb, thisArg),
-    registerTextEditorCommand: (id: string, cb: (...a: unknown[]) => unknown, thisArg?: unknown) => s.commands.registerCommand(id, cb, thisArg),
+    registerCommand: (id: string, cb: (...a: unknown[]) => unknown, thisArg?: unknown) =>
+      s.commands.registerCommand(id, cb, thisArg),
+    registerTextEditorCommand: (id: string, cb: (...a: unknown[]) => unknown, thisArg?: unknown) =>
+      s.commands.registerCommand(id, cb, thisArg),
     executeCommand: <T>(id: string, ...args: unknown[]) => s.commands.executeCommand<T>(id, ...args),
     getCommands: () => s.commands.getCommands(),
   };
@@ -80,6 +186,7 @@ export function createApiFactory(services: Services) {
     document,
     selection: new types.Selection(0, 0, 0, 0),
     selections: [new types.Selection(0, 0, 0, 0)],
+    visibleRanges: [new types.Range(0, 0, 0, 0)],
     options: { tabSize: 2, insertSpaces: true },
     viewColumn: types.ViewColumn.One,
     edit: () => Promise.resolve(true),
@@ -90,10 +197,34 @@ export function createApiFactory(services: Services) {
     hide: () => undefined,
   });
 
+  const tabGroups = {
+    all: [] as unknown[],
+    activeTabGroup: {
+      isActive: true,
+      viewColumn: types.ViewColumn.One,
+      activeTab: undefined,
+      tabs: [] as unknown[],
+    },
+    onDidChangeTabGroups: new types.EventEmitter<{
+      opened: readonly unknown[];
+      closed: readonly unknown[];
+      changed: readonly unknown[];
+    }>().event,
+    onDidChangeTabs: new types.EventEmitter<{
+      opened: readonly unknown[];
+      closed: readonly unknown[];
+      changed: readonly unknown[];
+    }>().event,
+    close: () => Promise.resolve(true),
+  };
+
   const window = {
     showInformationMessage: (m: string, ...r: unknown[]) => s.window.showInformationMessage(m, ...r),
     showWarningMessage: (m: string, ...r: unknown[]) => s.window.showWarningMessage(m, ...r),
     showErrorMessage: (m: string, ...r: unknown[]) => s.window.showErrorMessage(m, ...r),
+    showOpenDialog: () => Promise.resolve(undefined),
+    showSaveDialog: () => Promise.resolve(undefined),
+    showWorkspaceFolderPick: () => Promise.resolve(undefined),
     createStatusBarItem: (
       a?: string | types.StatusBarAlignment,
       b?: types.StatusBarAlignment | number,
@@ -136,7 +267,16 @@ export function createApiFactory(services: Services) {
     createWebviewPanel: (viewType: string, title: string, showOptions: any, options?: any) =>
       s.webviews.createWebviewPanel(viewType, title, showOptions, options),
     registerWebviewViewProvider: () => s.webviews.registerWebviewViewProvider(),
-    createTextEditorDecorationType: () => new types.Disposable(() => undefined),
+    registerWebviewPanelSerializer: noopDisposable,
+    registerCustomEditorProvider: noopDisposable,
+    registerUriHandler: noopDisposable,
+    registerFileDecorationProvider: noopDisposable,
+    registerTerminalLinkProvider: noopDisposable,
+    registerTerminalProfileProvider: noopDisposable,
+    createTextEditorDecorationType: noopDisposable,
+    tabGroups,
+    activeColorTheme: { kind: types.ColorThemeKind.Dark },
+    onDidChangeActiveColorTheme: new types.EventEmitter<{ kind: number }>().event,
     get activeTextEditor() {
       const doc = s.documents.getActiveDocument();
       return doc ? wrapEditor(doc) : undefined;
@@ -144,13 +284,23 @@ export function createApiFactory(services: Services) {
     get visibleTextEditors() {
       return s.documents.all().map((document) => wrapEditor(document));
     },
-    onDidChangeActiveTextEditor: (l: (e: unknown) => unknown) =>
-      s.documents.onDidChangeActiveEmitter.event((doc) => l(doc ? wrapEditor(doc) : undefined)),
+    onDidChangeActiveTextEditor: (
+      l: (e: unknown) => unknown,
+      thisArgs?: unknown,
+      disposables?: { dispose(): unknown }[],
+    ) =>
+      s.documents.onDidChangeActiveEmitter.event(
+        (doc) => l.call(thisArgs, doc ? wrapEditor(doc) : undefined),
+        undefined,
+        disposables,
+      ),
     onDidChangeVisibleTextEditors: new types.EventEmitter<unknown[]>().event,
     onDidChangeTextEditorSelection: new types.EventEmitter<unknown>().event,
     onDidChangeTextEditorVisibleRanges: new types.EventEmitter<unknown>().event,
+    onDidChangeTextEditorOptions: new types.EventEmitter<unknown>().event,
+    onDidChangeTextEditorViewColumn: new types.EventEmitter<unknown>().event,
     onDidChangeWindowState: new types.EventEmitter<{ focused: boolean }>().event,
-    state: { focused: true },
+    state: { focused: true, active: true },
     showTextDocument: async (uriOrDoc: unknown) => {
       if (!uriOrDoc) return undefined;
       const targetUri =
@@ -174,15 +324,20 @@ export function createApiFactory(services: Services) {
     get name() {
       return s.workspace.workspaceFolders[0]?.name;
     },
+    get workspaceFile() {
+      return undefined;
+    },
     get textDocuments() {
       return s.documents.all();
     },
+    notebookDocuments: [] as unknown[],
     get isTrusted() {
       return true;
     },
     onDidGrantWorkspaceTrust: new types.EventEmitter<void>().event,
     getConfiguration: (section?: string) => s.workspace.getConfiguration(section),
     getWorkspaceFolder: (uri: types.Uri) => s.workspace.getWorkspaceFolder(uri),
+    updateWorkspaceFolders: () => true,
     asRelativePath: (pathOrUri: string | types.Uri) => {
       const p = typeof pathOrUri === "string" ? pathOrUri : pathOrUri.fsPath;
       const root = s.workspace.rootPath;
@@ -240,6 +395,7 @@ export function createApiFactory(services: Services) {
       }
       return existing;
     },
+    openNotebookDocument: async () => undefined,
     createFileSystemWatcher: (
       globPattern: string | types.RelativePattern,
       ignoreCreateEvents?: boolean,
@@ -255,7 +411,8 @@ export function createApiFactory(services: Services) {
     registerTaskProvider: (type: string, provider: any) => s.tasks.registerTaskProvider(type, provider),
     registerNotebookSerializer: (viewType: string, serializer: any) =>
       s.notebook.registerNotebookSerializer(viewType, serializer),
-    registerTextDocumentContentProvider: () => new types.Disposable(() => undefined),
+    registerTextDocumentContentProvider: noopDisposable,
+    registerFileSystemProvider: noopDisposable,
     applyEdit: () => s.workspace.applyEdit(),
     saveAll: () => Promise.resolve(true),
     onDidChangeConfiguration: s.workspace.onDidChangeConfigurationEmitter.event,
@@ -265,46 +422,131 @@ export function createApiFactory(services: Services) {
     onDidChangeTextDocument: s.documents.onDidChangeEmitter.event,
     onDidSaveTextDocument: new types.EventEmitter<unknown>().event,
     onWillSaveTextDocument: new types.EventEmitter<unknown>().event,
+    onDidOpenNotebookDocument: new types.EventEmitter<unknown>().event,
+    onDidCloseNotebookDocument: new types.EventEmitter<unknown>().event,
+    onDidChangeNotebookDocument: new types.EventEmitter<unknown>().event,
+    onDidSaveNotebookDocument: new types.EventEmitter<unknown>().event,
+    onDidCreateFiles: new types.EventEmitter<{ readonly files: readonly types.Uri[] }>().event,
+    onDidDeleteFiles: new types.EventEmitter<{ readonly files: readonly types.Uri[] }>().event,
+    onDidRenameFiles: new types.EventEmitter<{
+      readonly files: readonly { readonly oldUri: types.Uri; readonly newUri: types.Uri }[];
+    }>().event,
+    onWillCreateFiles: new types.EventEmitter<unknown>().event,
+    onWillDeleteFiles: new types.EventEmitter<unknown>().event,
+    onWillRenameFiles: new types.EventEmitter<unknown>().event,
     fs: s.workspace.createFileSystem(),
   };
 
   const languages = {
-    registerCompletionItemProvider: (sel: any, provider: any, ...triggers: string[]) => s.languageFeatures.registerCompletionItemProvider(sel, provider, triggers),
-    registerHoverProvider: (sel: any, provider: any) => s.languageFeatures.registerHoverProvider(sel, provider),
-    registerDefinitionProvider: (sel: any, provider: any) => s.languageFeatures.registerDefinitionProvider(sel, provider),
-    registerReferenceProvider: (sel: any, provider: any) => s.languageFeatures.registerReferenceProvider(sel, provider),
-    registerDocumentHighlightProvider: (sel: any, provider: any) => s.languageFeatures.registerDocumentHighlightProvider(sel, provider),
-    registerDocumentSymbolProvider: (sel: any, provider: any) => s.languageFeatures.registerDocumentSymbolProvider(sel, provider),
-    registerDocumentFormattingEditProvider: (sel: any, provider: any) => s.languageFeatures.registerDocumentFormattingEditProvider(sel, provider),
-    registerCodeActionsProvider: (sel: any, provider: any) => s.languageFeatures.registerCodeActionsProvider(sel, provider),
-    registerSignatureHelpProvider: (sel: any, provider: any, ...triggers: string[]) => s.languageFeatures.registerSignatureHelpProvider(sel, provider, triggers),
+    match: (selector: unknown, document: { uri?: types.Uri; languageId?: string; fileName?: string }) =>
+      matchDocumentSelector(selector, document),
+    setLanguageConfiguration: noopDisposable,
+    getDiagnostics: () => [],
+    onDidChangeDiagnostics: new types.EventEmitter<{ readonly uris: readonly types.Uri[] }>().event,
+    createLanguageStatusItem: (id: string, selector: unknown) => ({
+      id,
+      name: id,
+      selector,
+      severity: types.LanguageStatusSeverity.Information,
+      text: "",
+      detail: "",
+      busy: false,
+      command: undefined,
+      accessibilityInformation: undefined,
+      dispose: () => undefined,
+    }),
+    registerCompletionItemProvider: (sel: any, provider: any, ...triggers: string[]) =>
+      s.languageFeatures.registerCompletionItemProvider(sel, provider, triggers),
+    registerHoverProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerHoverProvider(sel, provider),
+    registerDefinitionProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerDefinitionProvider(sel, provider),
+    registerDeclarationProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerDefinitionProvider(sel, {
+        provideDefinition: (doc: unknown, pos: unknown, tok: unknown) =>
+          provider?.provideDeclaration?.(doc, pos, tok),
+      }),
+    registerTypeDefinitionProvider: noopDisposable,
+    registerImplementationProvider: noopDisposable,
+    registerReferenceProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerReferenceProvider(sel, provider),
+    registerDocumentHighlightProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerDocumentHighlightProvider(sel, provider),
+    registerDocumentSymbolProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerDocumentSymbolProvider(sel, provider),
+    registerWorkspaceSymbolProvider: noopDisposable,
+    registerDocumentFormattingEditProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerDocumentFormattingEditProvider(sel, provider),
+    registerDocumentRangeFormattingEditProvider: noopDisposable,
+    registerOnTypeFormattingEditProvider: noopDisposable,
+    registerCodeActionsProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerCodeActionsProvider(sel, provider),
+    registerCodeLensProvider: noopDisposable,
+    registerSignatureHelpProvider: (sel: any, provider: any, ...triggers: string[]) =>
+      s.languageFeatures.registerSignatureHelpProvider(
+        sel,
+        provider,
+        Array.isArray(triggers[0]) ? triggers[0] : triggers,
+      ),
+    registerRenameProvider: noopDisposable,
+    registerDocumentLinkProvider: noopDisposable,
+    registerColorProvider: noopDisposable,
+    registerFoldingRangeProvider: noopDisposable,
+    registerSelectionRangeProvider: noopDisposable,
+    registerCallHierarchyProvider: noopDisposable,
+    registerTypeHierarchyProvider: noopDisposable,
+    registerLinkedEditingRangeProvider: noopDisposable,
+    registerInlayHintsProvider: noopDisposable,
+    registerInlineValuesProvider: noopDisposable,
+    registerInlineCompletionItemProvider: noopDisposable,
+    registerDocumentSemanticTokensProvider: noopDisposable,
+    registerDocumentRangeSemanticTokensProvider: noopDisposable,
+    registerEvaluatableExpressionProvider: noopDisposable,
+    registerDocumentDropEditProvider: noopDisposable,
+    registerDocumentPasteEditProvider: noopDisposable,
     createDiagnosticCollection: (name?: string) => s.workspace.createDiagnosticCollection(name),
     getLanguages: () => Promise.resolve<string[]>([]),
-    setTextDocumentLanguage: () => Promise.resolve(undefined),
+    setTextDocumentLanguage: (doc: unknown) => Promise.resolve(doc),
   };
 
   const scm = {
-    createSourceControl: (id: string, label: string, rootUri?: types.Uri) => s.scm.createSourceControl(id, label, rootUri),
+    createSourceControl: (id: string, label: string, rootUri?: types.Uri) =>
+      s.scm.createSourceControl(id, label, rootUri),
   };
 
   const tasks = {
     registerTaskProvider: (type: string, provider: any) => s.tasks.registerTaskProvider(type, provider),
     executeTask: (task: unknown) => s.tasks.executeTask(task),
+    fetchTasks: () => Promise.resolve([]),
+    taskExecutions: [] as unknown[],
     onDidStartTask: new types.EventEmitter<unknown>().event,
     onDidEndTask: new types.EventEmitter<unknown>().event,
+    onDidStartTaskProcess: new types.EventEmitter<unknown>().event,
+    onDidEndTaskProcess: new types.EventEmitter<unknown>().event,
   };
 
   const debug = {
-    registerDebugConfigurationProvider: (type: string, provider: any) => s.debug.registerDebugConfigurationProvider(type, provider),
+    registerDebugConfigurationProvider: (type: string, provider: any) =>
+      s.debug.registerDebugConfigurationProvider(type, provider),
     registerDebugAdapterDescriptorFactory: () => s.debug.registerDebugAdapterDescriptorFactory(),
+    registerDebugAdapterTrackerFactory: noopDisposable,
     startDebugging: (folder: unknown, config: any) => s.debug.startDebugging(folder, config),
+    stopDebugging: () => Promise.resolve(),
+    addBreakpoints: () => undefined,
+    removeBreakpoints: () => undefined,
     onDidStartDebugSession: s.debug.onDidStartDebugSessionEmitter.event,
     onDidTerminateDebugSession: s.debug.onDidTerminateDebugSessionEmitter.event,
+    onDidChangeActiveDebugSession: new types.EventEmitter<unknown>().event,
     onDidReceiveDebugSessionCustomEvent: s.debug.onDidReceiveDebugSessionCustomEvent.event,
+    onDidChangeBreakpoints: new types.EventEmitter<unknown>().event,
+    activeDebugConsole: {
+      append: () => undefined,
+      appendLine: () => undefined,
+    },
     get activeDebugSession() {
       return undefined;
     },
-    breakpoints: [],
+    breakpoints: [] as unknown[],
   };
 
   const tests = {
@@ -312,7 +554,27 @@ export function createApiFactory(services: Services) {
   };
 
   const notebooks = {
-    registerNotebookSerializer: (viewType: string, serializer: any) => s.notebook.registerNotebookSerializer(viewType, serializer),
+    registerNotebookSerializer: (viewType: string, serializer: any) =>
+      s.notebook.registerNotebookSerializer(viewType, serializer),
+    createNotebookController: () => ({
+      id: "notebook-controller",
+      notebookType: "*",
+      label: "",
+      supportedLanguages: [],
+      supportsExecutionOrder: false,
+      executeHandler: undefined,
+      interruptHandler: undefined,
+      onDidChangeSelectedNotebooks: new types.EventEmitter<unknown>().event,
+      createNotebookCellExecution: () => ({
+        start: () => undefined,
+        end: () => undefined,
+        clearOutput: () => Promise.resolve(),
+        appendOutput: () => Promise.resolve(),
+        replaceOutput: () => Promise.resolve(),
+      }),
+      updateNotebookAffinity: () => undefined,
+      dispose: () => undefined,
+    }),
   };
 
   const env = {
@@ -348,27 +610,12 @@ export function createApiFactory(services: Services) {
     allExtensions?: () => ExtensionDescriptionDto[],
     activateExt?: (id: string) => Promise<unknown>,
   ): Record<string, unknown> {
-    const toExtensionObject = (desc: ExtensionDescriptionDto) => ({
-      id: desc.id,
-      extensionUri: types.Uri.file(desc.extensionPath),
-      extensionPath: desc.extensionPath,
-      isActive: true,
-      packageJSON: {
-        name: desc.name,
-        publisher: desc.publisher,
-        version: desc.version,
-        displayName: desc.displayName,
-        main: desc.main,
-        activationEvents: desc.activationEvents,
-        contributes: desc.contributes,
-        engines: desc.engines,
-      },
-      extensionKind: types.ExtensionKind.Workspace,
-      exports: undefined,
-      activate: () => (activateExt ? activateExt(desc.id) : Promise.resolve(undefined)),
-    });
+    const toExtensionObject = (desc: ExtensionDescriptionDto) =>
+      buildExtensionObject(desc, activateExt);
 
     return {
+      // Export all concrete runtime classes and enums from types-impl
+      ...types,
       // namespaces
       commands,
       window: {
@@ -416,56 +663,6 @@ export function createApiFactory(services: Services) {
       },
       // version
       version: HOST_VSCODE_VERSION,
-      // types
-      Uri: types.Uri,
-      Position: types.Position,
-      Range: types.Range,
-      Selection: types.Selection,
-      Location: types.Location,
-      Disposable: types.Disposable,
-      EventEmitter: types.EventEmitter,
-      CancellationTokenSource: types.CancellationTokenSource,
-      MarkdownString: types.MarkdownString,
-      CompletionItem: types.CompletionItem,
-      CompletionList: types.CompletionList,
-      SnippetString: types.SnippetString,
-      Hover: types.Hover,
-      Diagnostic: types.Diagnostic,
-      DiagnosticRelatedInformation: types.DiagnosticRelatedInformation,
-      TextEdit: types.TextEdit,
-      WorkspaceEdit: types.WorkspaceEdit,
-      CodeAction: types.CodeAction,
-      CodeActionKind: types.CodeActionKind,
-      DocumentSymbol: types.DocumentSymbol,
-      SignatureHelp: types.SignatureHelp,
-      SignatureInformation: types.SignatureInformation,
-      ParameterInformation: types.ParameterInformation,
-      ThemeIcon: types.ThemeIcon,
-      ThemeColor: types.ThemeColor,
-      TreeItem: types.TreeItem,
-      RelativePattern: types.RelativePattern,
-      FileSystemError: types.FileSystemError,
-      // enums
-      CompletionItemKind: types.CompletionItemKind,
-      DiagnosticSeverity: types.DiagnosticSeverity,
-      SymbolKind: types.SymbolKind,
-      StatusBarAlignment: types.StatusBarAlignment,
-      ConfigurationTarget: types.ConfigurationTarget,
-      ViewColumn: types.ViewColumn,
-      TreeItemCollapsibleState: types.TreeItemCollapsibleState,
-      FileType: types.FileType,
-      EndOfLine: types.EndOfLine,
-      TextEditorRevealType: types.TextEditorRevealType,
-      QuickPickItemKind: types.QuickPickItemKind,
-      ProgressLocation: types.ProgressLocation,
-      LogLevel: types.LogLevel,
-      UIKind: types.UIKind,
-      ExtensionKind: types.ExtensionKind,
-      ExtensionMode: types.ExtensionMode,
-      TextDocumentSaveReason: types.TextDocumentSaveReason,
-      OverviewRulerLane: types.OverviewRulerLane,
-      CodeActionTriggerKind: types.CodeActionTriggerKind,
-      SignatureHelpTriggerKind: types.SignatureHelpTriggerKind,
     };
   };
 }

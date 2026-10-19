@@ -819,6 +819,7 @@ const en = {
     compatHost: "Host VS Code API {{version}}",
     compatOk: "All {{count}} extensions passed compatibility checks.",
     compatVersion: "Incompatible versions (skipped)",
+    compatActivationError: "Extension activation errors",
     compatProposals: "Unsupported proposed APIs",
     compatMissingApis: "Unimplemented runtime APIs ({{count}})",
     compatBadgeOk: "Compatible",

@@ -14,9 +14,65 @@ import {
   InitDataDto,
 } from "../common/protocol";
 import { Services } from "./services";
-import { createApiFactory, ExtensionContext, Memento } from "./apiFactory";
-import { Uri } from "./types-impl";
+import { buildExtensionObject, createApiFactory, ExtensionContext, Memento } from "./apiFactory";
+import { EventEmitter, Uri } from "./types-impl";
 import { satisfies } from "./semver";
+
+function extractConfigurationDefaults(contributes: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!contributes || typeof contributes !== "object") return out;
+  const rawConfig = (contributes as { configuration?: unknown }).configuration;
+  const blocks = Array.isArray(rawConfig) ? rawConfig : rawConfig ? [rawConfig] : [];
+  for (const block of blocks) {
+    if (!block || typeof block !== "object") continue;
+    const props = (block as { properties?: Record<string, unknown> }).properties;
+    if (!props || typeof props !== "object") continue;
+    for (const [key, schema] of Object.entries(props)) {
+      if (schema && typeof schema === "object" && "default" in schema) {
+        out[key] = (schema as { default: unknown }).default;
+      }
+    }
+  }
+  return out;
+}
+
+function workspaceContainsMatch(root: string, rawPattern: string): boolean {
+  const cleanRel = rawPattern.replace(/^\*\*\/+/, "").replace(/^\.\/+/, "");
+  if (!cleanRel) return false;
+  if (!cleanRel.includes("*")) {
+    try {
+      if (fs.existsSync(path.join(root, cleanRel))) return true;
+    } catch {
+      // ignore
+    }
+    if (rawPattern.startsWith("**/")) {
+      try {
+        for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+          if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
+            if (fs.existsSync(path.join(root, entry.name, cleanRel))) return true;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return false;
+  }
+  if (cleanRel.startsWith("*/") && !cleanRel.slice(2).includes("*")) {
+    const subRel = cleanRel.slice(2);
+    try {
+      if (fs.existsSync(path.join(root, subRel))) return true;
+      for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name !== "node_modules" && !entry.name.startsWith(".")) {
+          if (fs.existsSync(path.join(root, entry.name, subRel))) return true;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return false;
+}
 
 // Proposed API names this host actually implements. Anything an extension
 // declares in `enabledApiProposals` outside this set is reported as unsupported.
@@ -43,7 +99,22 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
   }
 
   register(descriptions: ExtensionDescriptionDto[]): void {
+    const configDefaults: Record<string, unknown> = {};
     for (const d of descriptions) {
+      if (d.extensionPath && (d.contributes === undefined || d.engines === undefined)) {
+        const diskDesc = readExtensionDescription(d.extensionPath);
+        if (diskDesc) {
+          d.contributes ??= diskDesc.contributes;
+          d.engines ??= diskDesc.engines;
+          d.enabledApiProposals ??= diskDesc.enabledApiProposals;
+          d.displayName ??= diskDesc.displayName;
+          d.main ??= diskDesc.main;
+          if (!d.activationEvents || d.activationEvents.length === 0) {
+            d.activationEvents = diskDesc.activationEvents;
+          }
+        }
+      }
+      Object.assign(configDefaults, extractConfigurationDefaults(d.contributes));
       const events = new Set<string>(d.activationEvents ?? []);
       const contrib = d.contributes as Record<string, unknown> | undefined;
       if (contrib && typeof contrib === "object") {
@@ -82,6 +153,7 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
       d.activationEvents = [...events];
       this.registry.set(d.id, d);
     }
+    this.services.workspace.registerConfigurationDefaults(configDefaults);
   }
 
   private apiForExtension(description: ExtensionDescriptionDto): Record<string, unknown> {
@@ -121,7 +193,7 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
       compatible,
       reason,
       unsupportedProposals: unsupported.length ? unsupported : undefined,
-      activated: false,
+      activated: compatible && !d.main,
     };
   }
 
@@ -164,6 +236,24 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
     const globalStorageDir = description.extensionPath
       ? path.join(description.extensionPath, ".globalStorage")
       : "";
+    const workspaceStorageDir = globalStorageDir ? path.join(globalStorageDir, "workspace") : undefined;
+    const logDir = path.join(description.extensionPath, ".log");
+    const envCollection = new Map<string, { value: string; type: number }>();
+    const createEnvCollection = (): Record<string, unknown> => ({
+      persistent: true,
+      description: undefined,
+      replace: (variable: string, value: string) => envCollection.set(variable, { value, type: 1 }),
+      append: (variable: string, value: string) => envCollection.set(variable, { value, type: 2 }),
+      prepend: (variable: string, value: string) => envCollection.set(variable, { value, type: 3 }),
+      get: (variable: string) => envCollection.get(variable),
+      forEach: (cb: (variable: string, mutator: { value: string; type: number }, collection: unknown) => void) => {
+        envCollection.forEach((v, k) => cb(k, v, envCollection));
+      },
+      delete: (variable: string) => envCollection.delete(variable),
+      clear: () => envCollection.clear(),
+      getScoped: () => createEnvCollection(),
+      [Symbol.iterator]: () => envCollection.entries(),
+    });
     return {
       subscriptions,
       extensionPath: description.extensionPath,
@@ -171,14 +261,24 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
       globalState: new Memento(globalStorageDir ? path.join(globalStorageDir, "globalState.json") : undefined),
       workspaceState: new Memento(globalStorageDir ? path.join(globalStorageDir, "workspaceState.json") : undefined),
       asAbsolutePath: (relative: string) => path.join(description.extensionPath, relative),
-      storageUri: globalStorageDir ? Uri.file(path.join(globalStorageDir, "workspace")) : undefined,
+      storageUri: workspaceStorageDir ? Uri.file(workspaceStorageDir) : undefined,
+      storagePath: workspaceStorageDir,
       globalStorageUri: Uri.file(globalStorageDir || path.join(description.extensionPath, ".globalStorage")),
-      logUri: Uri.file(path.join(description.extensionPath, ".log")),
+      globalStoragePath: globalStorageDir || path.join(description.extensionPath, ".globalStorage"),
+      logUri: Uri.file(logDir),
+      logPath: logDir,
       extensionMode: 1,
+      extension: buildExtensionObject(description, (id: string) => this.activate(id).then((a) => a.exports)),
+      environmentVariableCollection: createEnvCollection(),
+      languageModelAccessInformation: {
+        onDidChange: new EventEmitter<void>().event,
+        canSendRequest: () => false,
+      },
       secrets: {
         get: () => Promise.resolve(undefined),
         store: () => Promise.resolve(),
         delete: () => Promise.resolve(),
+        onDidChange: new EventEmitter<{ key: string }>().event,
       },
     };
   }
@@ -299,16 +399,10 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
         for (const ev of d.activationEvents) {
           if (!ev.startsWith("workspaceContains:")) continue;
           const rawPattern = ev.slice("workspaceContains:".length).trim();
-          const cleanRel = rawPattern.replace(/^\*\*\/+/, "").replace(/^\.\/+/, "");
-          if (!cleanRel || cleanRel.includes("*")) continue;
           for (const root of roots) {
-            try {
-              if (fs.existsSync(path.join(root, cleanRel))) {
-                matchedEvents.add(ev);
-                break;
-              }
-            } catch {
-              // ignore
+            if (workspaceContainsMatch(root, rawPattern)) {
+              matchedEvents.add(ev);
+              break;
             }
           }
         }
@@ -364,6 +458,7 @@ export function scanExtensions(extensionsDir: string): ExtensionDescriptionDto[]
   for (const entry of fs.readdirSync(extensionsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const dir = path.join(extensionsDir, entry.name);
+    if (fs.existsSync(path.join(dir, ".disabled"))) continue;
     // VS Code .vsix unpack to an `extension/` subdir; support both layouts.
     const inner = path.join(dir, "extension");
     const target = fs.existsSync(path.join(inner, "package.json")) ? inner : dir;

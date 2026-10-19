@@ -796,6 +796,7 @@ const zh = {
     compatHost: "宿主 VS Code API {{version}}",
     compatOk: "全部 {{count}} 个扩展均通过兼容性检查。",
     compatVersion: "版本不兼容（已跳过激活）",
+    compatActivationError: "扩展激活异常",
     compatProposals: "使用了未支持的 proposed API",
     compatMissingApis: "运行时调用到的未实现 API（{{count}}）",
     compatBadgeOk: "兼容",

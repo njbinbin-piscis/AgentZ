@@ -12,6 +12,25 @@ function log(msg: string): void {
   process.stderr.write(msg + "\n");
 }
 
+const redirectConsole = (...args: unknown[]): void => {
+  const text = args
+    .map((a) => {
+      if (typeof a === "string") return a;
+      if (a instanceof Error) return a.stack ?? a.message;
+      try {
+        return JSON.stringify(a);
+      } catch {
+        return String(a);
+      }
+    })
+    .join(" ");
+  log(`[console] ${text}`);
+};
+console.log = redirectConsole;
+console.info = redirectConsole;
+console.debug = redirectConsole;
+console.warn = redirectConsole;
+
 function main(): void {
   log("[host] AgentZ extension host starting");
 

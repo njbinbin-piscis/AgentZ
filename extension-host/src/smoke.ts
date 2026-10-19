@@ -14,6 +14,8 @@ import {
 } from "./common/protocol";
 import { Services } from "./host/services";
 import { ExtHostExtensionService, readExtensionDescription } from "./host/extensionService";
+import { createApiFactory } from "./host/apiFactory";
+import * as types from "./host/types-impl";
 import { RelativePattern, Uri } from "./host/types-impl";
 
 function pairedTransports(): [ITransport, ITransport] {
@@ -134,6 +136,65 @@ async function run(): Promise<void> {
   assert(statThrew, "fs.stat throws FileNotFound for missing file");
   const pkgStat = await fsApi.stat(Uri.file(path.join(sampleDir, "package.json")));
   assert(pkgStat.size > 0, "fs.stat returns size for existing package.json");
+
+  // 8. LanguageClient / rust-analyzer base classes are constructible and extensible
+  class CustomCodeLens extends types.CodeLens {}
+  class CustomDocumentLink extends types.DocumentLink {}
+  class CustomCallHierarchyItem extends types.CallHierarchyItem {}
+  class CustomTypeHierarchyItem extends types.TypeHierarchyItem {}
+  class CustomSymbolInformation extends types.SymbolInformation {}
+  class CustomInlayHint extends types.InlayHint {}
+  class CustomCancellationError extends types.CancellationError {}
+  const dummyRange = new types.Range(0, 0, 0, 5);
+  assert(new CustomCodeLens(dummyRange) instanceof types.CodeLens, "CodeLens extensible");
+  assert(new CustomDocumentLink(dummyRange) instanceof types.DocumentLink, "DocumentLink extensible");
+  assert(
+    new CustomCallHierarchyItem(types.SymbolKind.Function, "fn", "", winUri, dummyRange, dummyRange) instanceof
+      types.CallHierarchyItem,
+    "CallHierarchyItem extensible",
+  );
+  assert(
+    new CustomTypeHierarchyItem(types.SymbolKind.Struct, "S", "", winUri, dummyRange, dummyRange) instanceof
+      types.TypeHierarchyItem,
+    "TypeHierarchyItem extensible",
+  );
+  assert(
+    new CustomSymbolInformation("sym", types.SymbolKind.Variable, "c", new types.Location(winUri, dummyRange)) instanceof
+      types.SymbolInformation,
+    "SymbolInformation extensible",
+  );
+  assert(
+    new CustomInlayHint(new types.Position(0, 0), "u32") instanceof types.InlayHint,
+    "InlayHint extensible",
+  );
+  assert(new CustomCancellationError() instanceof Error, "CancellationError extensible");
+
+  // 9. EventEmitter supports thisArgs and disposables array
+  const emitter = new types.EventEmitter<number>();
+  const bucket: types.Disposable[] = [];
+  const ctxObj = { mult: 3, out: 0 };
+  emitter.event(
+    function (this: typeof ctxObj, v: number) {
+      this.out = v * this.mult;
+    },
+    ctxObj,
+    bucket,
+  );
+  emitter.fire(7);
+  assert(ctxObj.out === 21 && bucket.length === 1, "EventEmitter honors thisArgs and disposables");
+
+  // 10. API factory surface for rust-analyzer / vscode-languageclient
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const vscodeApi = createApiFactory(services)(desc, () => [desc], async () => ({})) as any;
+  assert(Array.isArray(vscodeApi.window.tabGroups.all), "window.tabGroups.all is array");
+  assert(typeof vscodeApi.languages.match === "function", "languages.match is function");
+  assert(typeof vscodeApi.languages.setLanguageConfiguration === "function", "languages.setLanguageConfiguration is function");
+  assert(typeof vscodeApi.languages.registerCallHierarchyProvider === "function", "languages.registerCallHierarchyProvider is function");
+  assert(typeof vscodeApi.languages.registerInlayHintsProvider === "function", "languages.registerInlayHintsProvider is function");
+  const tv = vscodeApi.window.createTreeView("smoke.tree", { treeDataProvider: { getTreeItem: (e: unknown) => e, getChildren: () => [] } });
+  assert(typeof tv.onDidChangeVisibility === "function", "TreeView.onDidChangeVisibility is function");
+  const tc = vscodeApi.tests.createTestController("smoke.tests", "Smoke Tests");
+  assert(typeof tc.items.replace === "function" && typeof tc.createTestRun === "function", "TestController items.replace & createTestRun");
 
   console.log("\nSMOKE OK — all assertions passed");
   console.log(`  commands: ${registered.join(", ")}`);

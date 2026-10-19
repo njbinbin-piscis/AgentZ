@@ -4,27 +4,74 @@
 import * as dto from "../common/dto";
 import { IRPCProtocol } from "../common/proxyIdentifier";
 import { ExtHostTestingShape, MainContext, MainThreadTestingShape } from "../common/protocol";
-import { Disposable, Range, Uri } from "./types-impl";
+import { CancellationTokenSource, Disposable, EventEmitter, Range, Uri } from "./types-impl";
+
+export class TestItemCollection implements Iterable<[string, TestItem]> {
+  private readonly map = new Map<string, TestItem>();
+  constructor(
+    private readonly owner: TestItem | undefined,
+    private readonly onChanged?: () => void,
+  ) {}
+  add(item: TestItem): void {
+    item.parent = this.owner;
+    this.map.set(item.id, item);
+    this.onChanged?.();
+  }
+  delete(id: string): void {
+    this.map.delete(id);
+    this.onChanged?.();
+  }
+  get(id: string): TestItem | undefined {
+    return this.map.get(id);
+  }
+  replace(items: readonly TestItem[]): void {
+    this.map.clear();
+    for (const i of items) {
+      i.parent = this.owner;
+      this.map.set(i.id, i);
+    }
+    this.onChanged?.();
+  }
+  forEach(cb: (item: TestItem, collection: TestItemCollection) => unknown, thisArg?: unknown): void {
+    for (const item of this.map.values()) {
+      cb.call(thisArg, item, this);
+    }
+  }
+  get size(): number {
+    return this.map.size;
+  }
+  values(): IterableIterator<TestItem> {
+    return this.map.values();
+  }
+  clear(): void {
+    this.map.clear();
+  }
+  [Symbol.iterator](): Iterator<[string, TestItem]> {
+    return this.map.entries();
+  }
+}
 
 class TestItem {
-  children = new Map<string, TestItem>();
+  readonly children: TestItemCollection;
+  parent?: TestItem;
   range?: Range;
-  constructor(public id: string, public label: string, public uri?: Uri) {}
-  get childCollection() {
-    const self = this;
-    return {
-      add: (item: TestItem) => self.children.set(item.id, item),
-      delete: (id: string) => self.children.delete(id),
-      get: (id: string) => self.children.get(id),
-      replace: (items: TestItem[]) => {
-        self.children.clear();
-        for (const i of items) self.children.set(i.id, i);
-      },
-      forEach: (cb: (item: TestItem) => void) => self.children.forEach(cb),
-      get size() {
-        return self.children.size;
-      },
-    };
+  canResolveChildren = false;
+  busy = false;
+  description?: string;
+  sortText?: string;
+  error?: string;
+  tags: unknown[] = [];
+
+  constructor(
+    public id: string,
+    public label: string,
+    public uri?: Uri,
+    onChanged?: () => void,
+  ) {
+    this.children = new TestItemCollection(this, onChanged);
+  }
+  get childCollection(): TestItemCollection {
+    return this.children;
   }
 }
 
@@ -34,7 +81,12 @@ function toDto(item: TestItem, parentId?: string): dto.TestItemDto {
     label: item.label,
     uri: item.uri?.toJSON(),
     range: item.range
-      ? { startLine: item.range.start.line, startCharacter: item.range.start.character, endLine: item.range.end.line, endCharacter: item.range.end.character }
+      ? {
+          startLine: item.range.start.line,
+          startCharacter: item.range.start.character,
+          endLine: item.range.end.line,
+          endCharacter: item.range.end.character,
+        }
       : undefined,
     parentId,
     children: [...item.children.values()].map((c) => toDto(c, item.id)),
@@ -42,41 +94,85 @@ function toDto(item: TestItem, parentId?: string): dto.TestItemDto {
 }
 
 class TestController {
-  readonly items = new Map<string, TestItem>();
-  private runHandlers: ((request: unknown) => void)[] = [];
-  constructor(public readonly id: string, public label: string, private readonly publish: () => void) {}
-  createTestItem(id: string, label: string, uri?: Uri): TestItem {
-    return new TestItem(id, label, uri);
+  readonly items: TestItemCollection;
+  resolveHandler?: (item: TestItem | undefined) => Thenable<void> | void;
+  refreshHandler?: (token: unknown) => Thenable<void> | void;
+  private runHandlers: ((request: unknown, token: unknown) => void)[] = [];
+
+  constructor(
+    public readonly id: string,
+    public label: string,
+    private readonly publish: () => void,
+  ) {
+    this.items = new TestItemCollection(undefined, this.publish);
   }
-  get itemsCollection() {
-    const self = this;
+  createTestItem(id: string, label: string, uri?: Uri): TestItem {
+    return new TestItem(id, label, uri, this.publish);
+  }
+  get itemsCollection(): TestItemCollection {
+    return this.items;
+  }
+  createRunProfile(
+    label: string,
+    kind: number,
+    runHandler: (request: unknown, token: unknown) => void,
+    isDefault?: boolean,
+    tag?: unknown,
+    supportsContinuousRun?: boolean,
+  ): {
+    label: string;
+    kind: number;
+    isDefault: boolean;
+    tag: unknown;
+    supportsContinuousRun: boolean;
+    runHandler: (request: unknown, token: unknown) => void;
+    configureHandler: undefined;
+    onDidChangeDefault: ReturnType<typeof ExtHostTesting.emitter<boolean>>["event"];
+    dispose(): void;
+  } {
+    this.runHandlers.push(runHandler);
+    const defaultEmitter = new EventEmitter<boolean>();
     return {
-      add: (item: TestItem) => {
-        self.items.set(item.id, item);
-        self.publish();
-      },
-      delete: (id: string) => {
-        self.items.delete(id);
-        self.publish();
-      },
-      replace: (items: TestItem[]) => {
-        self.items.clear();
-        for (const i of items) self.items.set(i.id, i);
-        self.publish();
-      },
-      forEach: (cb: (item: TestItem) => void) => self.items.forEach(cb),
-      get: (id: string) => self.items.get(id),
-      get size() {
-        return self.items.size;
-      },
+      label,
+      kind,
+      isDefault: !!isDefault,
+      tag,
+      supportsContinuousRun: !!supportsContinuousRun,
+      runHandler,
+      configureHandler: undefined,
+      onDidChangeDefault: defaultEmitter.event,
+      dispose: () => defaultEmitter.dispose(),
     };
   }
-  createRunProfile(_label: string, _kind: number, runHandler: (request: unknown) => void): { dispose(): void } {
-    this.runHandlers.push(runHandler);
-    return { dispose: () => undefined };
+  createTestRun(_request: unknown, name?: string, persist = true) {
+    const cts = new CancellationTokenSource();
+    const disposeEmitter = new EventEmitter<void>();
+    return {
+      name,
+      token: cts.token,
+      isPersisted: persist,
+      enqueued: (_test: unknown) => undefined,
+      started: (_test: unknown) => undefined,
+      skipped: (_test: unknown) => undefined,
+      failed: (_test: unknown, _message: unknown, _duration?: number) => undefined,
+      errored: (_test: unknown, _message: unknown, _duration?: number) => undefined,
+      passed: (_test: unknown, _duration?: number) => undefined,
+      appendOutput: (_output: string, _location?: unknown, _test?: unknown) => undefined,
+      addCoverage: (_fileCoverage: unknown) => undefined,
+      end: () => {
+        disposeEmitter.fire();
+        disposeEmitter.dispose();
+        cts.dispose();
+      },
+      onDidDispose: disposeEmitter.event,
+    };
+  }
+  invalidateTestResults(_items?: unknown): void {
+    /* no-op */
   }
   run(request: unknown): void {
-    for (const h of this.runHandlers) h(request);
+    const cts = new CancellationTokenSource();
+    for (const h of this.runHandlers) h(request, cts.token);
   }
   snapshot(): dto.TestItemDto[] {
     return [...this.items.values()].map((i) => toDto(i));
@@ -93,7 +189,9 @@ export class ExtHostTesting implements ExtHostTestingShape {
     this.proxy = rpc.getProxy(MainContext.MainThreadTesting);
   }
   createTestController(id: string, label: string): TestController {
-    const controller = new TestController(id, label, () => this.proxy.$publishTestItems(id, controller.snapshot()));
+    const controller = new TestController(id, label, () =>
+      this.proxy.$publishTestItems(id, controller.snapshot()),
+    );
     this.controllers.set(id, controller);
     this.proxy.$registerTestController(id, label);
     return controller;
@@ -105,5 +203,8 @@ export class ExtHostTesting implements ExtHostTestingShape {
   }
   static disposable(): Disposable {
     return new Disposable(() => undefined);
+  }
+  static emitter<T>(): EventEmitter<T> {
+    return new EventEmitter<T>();
   }
 }

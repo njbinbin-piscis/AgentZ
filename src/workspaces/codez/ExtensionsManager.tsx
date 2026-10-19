@@ -462,6 +462,12 @@ export default function ExtensionsManager({ projectDir = null }: ExtensionsManag
           </div>
           {(() => {
             const incompatible = compat.extensions.filter((e) => !e.compatible);
+            const versionIncompatible = incompatible.filter(
+              (e) => !e.reason?.startsWith("Activation error:"),
+            );
+            const activationFailed = incompatible.filter((e) =>
+              e.reason?.startsWith("Activation error:"),
+            );
             const proposalUsers = compat.extensions.filter((e) => e.unsupportedProposals?.length);
             if (
               incompatible.length === 0 &&
@@ -476,10 +482,21 @@ export default function ExtensionsManager({ projectDir = null }: ExtensionsManag
             }
             return (
               <>
-                {incompatible.length > 0 && (
+                {versionIncompatible.length > 0 && (
                   <div className="agentz-compat-group">
                     <div className="agentz-compat-group-title">{tr("extensions.compatVersion")}</div>
-                    {incompatible.map((e) => (
+                    {versionIncompatible.map((e) => (
+                      <div key={e.id} className="agentz-compat-row warn">
+                        <span>{e.displayName || e.id}</span>
+                        <span className="agentz-compat-reason">{e.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {activationFailed.length > 0 && (
+                  <div className="agentz-compat-group">
+                    <div className="agentz-compat-group-title">{tr("extensions.compatActivationError")}</div>
+                    {activationFailed.map((e) => (
                       <div key={e.id} className="agentz-compat-row warn">
                         <span>{e.displayName || e.id}</span>
                         <span className="agentz-compat-reason">{e.reason}</span>

@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-10-20
+
+### Fixed
+
+- **rust-analyzer activation**: The extension host now exports the `vscode` classes and language APIs that `rust-analyzer` and `vscode-languageclient` extend or call during activation (`CodeLens`, `InlayHint`, `CallHierarchyItem`, `tabGroups`, language providers, tree views, and test controllers). Duplicate command ids from `rust-analyzer` and `rust-analyzer-no-server` no longer abort activation, and extension `console.log` output stays off the JSON-RPC stdout stream.
+- **Extensions panel**: Activation failures are listed separately from engine version mismatches, instead of all being labeled as skipped incompatible versions.
+
 ## [1.0.1] - 2026-10-20
 
 ### Fixed

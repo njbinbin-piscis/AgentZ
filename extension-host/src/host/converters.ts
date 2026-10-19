@@ -30,22 +30,30 @@ export function fromUri(u: types.Uri): dto.UriComponents {
 
 function fromMarkdown(value: string | types.MarkdownString): string | dto.MarkdownStringDto {
   if (typeof value === "string") return value;
-  return { value: value.value, isTrusted: value.isTrusted, supportThemeIcons: value.supportThemeIcons };
+  return { value: value.value, isTrusted: Boolean(value.isTrusted), supportThemeIcons: value.supportThemeIcons };
 }
 
 export function fromCompletionItem(item: types.CompletionItem): dto.CompletionItemDto {
   const isSnippet = item.insertText instanceof types.SnippetString;
   const insertText = item.insertText instanceof types.SnippetString ? item.insertText.value : item.insertText;
+  const labelStr = typeof item.label === "string" ? item.label : item.label.label;
+  const detailStr =
+    item.detail ?? (typeof item.label === "object" && item.label !== null ? item.label.detail : undefined);
+  const resolvedRange = item.range
+    ? "inserting" in item.range
+      ? item.range.replacing ?? item.range.inserting
+      : item.range
+    : undefined;
   return {
-    label: item.label,
+    label: labelStr,
     kind: item.kind,
-    detail: item.detail,
+    detail: detailStr,
     documentation: item.documentation ? fromMarkdown(item.documentation) : undefined,
     sortText: item.sortText,
     filterText: item.filterText,
-    insertText: insertText ?? item.label,
+    insertText: insertText ?? labelStr,
     insertTextIsSnippet: isSnippet,
-    range: item.range ? fromRange(item.range) : undefined,
+    range: resolvedRange ? fromRange(resolvedRange) : undefined,
     commitCharacters: item.commitCharacters,
     preselect: item.preselect,
   };
@@ -63,12 +71,17 @@ export function fromLocation(loc: types.Location): dto.LocationDto {
 }
 
 export function fromDiagnostic(d: types.Diagnostic): dto.DiagnosticDto {
+  const rawCode = d.code;
+  const codeVal: string | number | undefined =
+    typeof rawCode === "string" || typeof rawCode === "number"
+      ? rawCode
+      : rawCode?.value;
   return {
     range: fromRange(d.range),
     message: d.message,
     severity: d.severity,
     source: d.source,
-    code: d.code,
+    code: codeVal,
     relatedInformation: d.relatedInformation?.map((r) => ({
       location: fromLocation(r.location),
       message: r.message,
@@ -129,12 +142,15 @@ export function fromSignatureHelp(h: types.SignatureHelp): dto.SignatureHelpDto 
 export function fromTreeItem(item: types.TreeItem, handle: string, parentHandle?: string): dto.TreeItemDto {
   let iconId: string | undefined;
   if (item.iconPath instanceof types.ThemeIcon) iconId = item.iconPath.id;
+  const labelStr = typeof item.label === "string" ? item.label : item.label?.label;
+  const descStr = typeof item.description === "string" ? item.description : undefined;
+  const tooltipStr = typeof item.tooltip === "string" ? item.tooltip : item.tooltip?.value;
   return {
     handle,
     parentHandle,
-    label: item.label,
-    description: item.description,
-    tooltip: item.tooltip,
+    label: labelStr,
+    description: descStr,
+    tooltip: tooltipStr,
     iconId,
     collapsibleState: item.collapsibleState,
     contextValue: item.contextValue,

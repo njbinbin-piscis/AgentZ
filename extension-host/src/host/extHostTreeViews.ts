@@ -52,9 +52,49 @@ export class ExtHostTreeViews implements ExtHostTreeViewsShape {
     });
   }
 
-  createTreeView(viewId: string, options: { treeDataProvider: TreeDataProvider }): { dispose(): void; reveal(): Promise<void> } {
+  createTreeView(viewId: string, options: { treeDataProvider: TreeDataProvider }): {
+    visible: boolean;
+    selection: readonly unknown[];
+    message?: string;
+    title?: string;
+    description?: string;
+    badge?: { tooltip: string; value: number };
+    onDidExpandElement: ReturnType<typeof ExtHostTreeViews.emitter<{ element: unknown }>>["event"];
+    onDidCollapseElement: ReturnType<typeof ExtHostTreeViews.emitter<{ element: unknown }>>["event"];
+    onDidChangeSelection: ReturnType<typeof ExtHostTreeViews.emitter<{ selection: readonly unknown[] }>>["event"];
+    onDidChangeVisibility: ReturnType<typeof ExtHostTreeViews.emitter<{ visible: boolean }>>["event"];
+    onDidChangeCheckboxState: ReturnType<typeof ExtHostTreeViews.emitter<{ items: readonly [unknown, number][] }>>["event"];
+    dispose(): void;
+    reveal(_item?: unknown, _options?: unknown): Promise<void>;
+  } {
     const d = this.registerTreeDataProvider(viewId, options.treeDataProvider);
-    return { dispose: () => d.dispose(), reveal: () => Promise.resolve() };
+    const expandEmitter = new EventEmitter<{ element: unknown }>();
+    const collapseEmitter = new EventEmitter<{ element: unknown }>();
+    const selectionEmitter = new EventEmitter<{ selection: readonly unknown[] }>();
+    const visibilityEmitter = new EventEmitter<{ visible: boolean }>();
+    const checkboxEmitter = new EventEmitter<{ items: readonly [unknown, number][] }>();
+    return {
+      visible: false,
+      selection: [],
+      message: undefined,
+      title: undefined,
+      description: undefined,
+      badge: undefined,
+      onDidExpandElement: expandEmitter.event,
+      onDidCollapseElement: collapseEmitter.event,
+      onDidChangeSelection: selectionEmitter.event,
+      onDidChangeVisibility: visibilityEmitter.event,
+      onDidChangeCheckboxState: checkboxEmitter.event,
+      dispose: () => {
+        expandEmitter.dispose();
+        collapseEmitter.dispose();
+        selectionEmitter.dispose();
+        visibilityEmitter.dispose();
+        checkboxEmitter.dispose();
+        d.dispose();
+      },
+      reveal: () => Promise.resolve(),
+    };
   }
 
   private async refresh(viewId: string): Promise<void> {

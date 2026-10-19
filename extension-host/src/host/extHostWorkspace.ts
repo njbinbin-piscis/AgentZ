@@ -15,53 +15,125 @@ import {
 import * as conv from "./converters";
 import { Diagnostic, Disposable, EventEmitter, FileSystemError, FileType, RelativePattern, Uri } from "./types-impl";
 
+function setNestedProperty(target: Record<string, unknown>, dottedKey: string, value: unknown): void {
+  const parts = dottedKey.split(".").filter(Boolean);
+  if (parts.length === 0) return;
+  let cur: Record<string, unknown> = target;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    const existing = cur[part];
+    if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+      cur[part] = {};
+    }
+    cur = cur[part] as Record<string, unknown>;
+  }
+  cur[parts[parts.length - 1]] = value;
+}
+
 export class WorkspaceConfiguration {
+  private readonly _section!: string | undefined;
+  private readonly _data!: Record<string, unknown>;
+  private readonly _defaults!: Record<string, unknown>;
+  private readonly _proxy!: MainThreadWorkspaceShape;
+
   constructor(
-    private readonly section: string | undefined,
-    private readonly data: Record<string, unknown>,
-    private readonly proxy: MainThreadWorkspaceShape,
-  ) {}
+    section: string | undefined,
+    data: Record<string, unknown>,
+    proxy: MainThreadWorkspaceShape,
+    defaults: Record<string, unknown> = {},
+  ) {
+    Object.defineProperty(this, "_section", { value: section, enumerable: false });
+    Object.defineProperty(this, "_data", { value: data, enumerable: false });
+    Object.defineProperty(this, "_defaults", { value: defaults, enumerable: false });
+    Object.defineProperty(this, "_proxy", { value: proxy, enumerable: false });
+
+    const prefix = section ? `${section}.` : "";
+    const merged: Record<string, unknown> = { ...defaults, ...data };
+    for (const [k, v] of Object.entries(merged)) {
+      if (prefix) {
+        if (k.startsWith(prefix)) {
+          setNestedProperty(this as unknown as Record<string, unknown>, k.slice(prefix.length), v);
+        }
+      } else {
+        setNestedProperty(this as unknown as Record<string, unknown>, k, v);
+      }
+    }
+    if (section && section in merged && merged[section] && typeof merged[section] === "object") {
+      Object.assign(this, merged[section]);
+    }
+  }
   private key(k: string): string {
-    return this.section ? `${this.section}.${k}` : k;
+    return this._section ? `${this._section}.${k}` : k;
   }
   get<T>(key: string, defaultValue?: T): T | undefined {
     const full = this.key(key);
-    if (full in this.data && this.data[full] !== undefined) return this.data[full] as T;
-    if (this.section && this.section in this.data) {
-      const sub = this.data[this.section] as Record<string, unknown> | undefined;
+    if (full in this._data && this._data[full] !== undefined) return this._data[full] as T;
+    if (this._section && this._section in this._data) {
+      const sub = this._data[this._section] as Record<string, unknown> | undefined;
       if (sub && typeof sub === "object" && key in sub && sub[key] !== undefined) return sub[key] as T;
     }
+    if (full in this._defaults && this._defaults[full] !== undefined) return this._defaults[full] as T;
     return defaultValue;
   }
   has(key: string): boolean {
-    return this.get(key) !== undefined;
+    const full = this.key(key);
+    return full in this._data || full in this._defaults;
   }
-  inspect<T>(key: string): { key: string; defaultValue?: T; globalValue?: T; workspaceValue?: T } {
-    const val = this.get<T>(key);
+  inspect<T>(key: string): {
+    key: string;
+    defaultValue?: T;
+    globalValue?: T;
+    workspaceValue?: T;
+    workspaceFolderValue?: T;
+  } {
+    const full = this.key(key);
+    const userVal = full in this._data ? (this._data[full] as T) : undefined;
+    const defVal = full in this._defaults ? (this._defaults[full] as T) : undefined;
     return {
-      key: this.key(key),
-      defaultValue: undefined,
-      globalValue: val,
-      workspaceValue: val,
+      key: full,
+      defaultValue: defVal,
+      globalValue: userVal,
+      workspaceValue: userVal,
+      workspaceFolderValue: undefined,
     };
   }
   update(key: string, value: unknown, target = 1): Promise<void> {
     const full = this.key(key);
-    this.data[full] = value;
-    return this.proxy.$updateConfiguration(full, value, target as number);
+    this._data[full] = value;
+    return this._proxy.$updateConfiguration(full, value, target as number);
   }
 }
 
 export class DiagnosticCollection {
   constructor(public readonly name: string, private readonly proxy: MainThreadDiagnosticsShape) {}
   private store = new Map<string, Diagnostic[]>();
-  set(uri: Uri, diagnostics?: Diagnostic[]): void {
+  set(uriOrEntries: Uri | readonly [Uri, readonly Diagnostic[] | undefined][], diagnostics?: readonly Diagnostic[]): void {
+    if (Array.isArray(uriOrEntries)) {
+      for (const [uri, diags] of uriOrEntries) {
+        if (!diags) this.store.delete(uri.toString());
+        else this.store.set(uri.toString(), [...diags]);
+      }
+      this.flush();
+      return;
+    }
+    const uri = uriOrEntries as Uri;
     if (!diagnostics) {
       this.store.delete(uri.toString());
     } else {
-      this.store.set(uri.toString(), diagnostics);
+      this.store.set(uri.toString(), [...diagnostics]);
     }
     this.flush();
+  }
+  get(uri: Uri): readonly Diagnostic[] | undefined {
+    return this.store.get(uri.toString());
+  }
+  has(uri: Uri): boolean {
+    return this.store.has(uri.toString());
+  }
+  forEach(cb: (uri: Uri, diagnostics: readonly Diagnostic[], collection: DiagnosticCollection) => unknown, thisArg?: unknown): void {
+    for (const [k, v] of this.store.entries()) {
+      cb.call(thisArg, Uri.parse(k), v, this);
+    }
   }
   delete(uri: Uri): void {
     this.store.delete(uri.toString());
@@ -268,6 +340,7 @@ export class ExtHostWorkspace implements ExtHostWorkspaceShape, ExtHostConfigura
   private readonly diagProxy: MainThreadDiagnosticsShape;
   private folders: Uri[] = [];
   private configData: Record<string, unknown> = {};
+  private configDefaults: Record<string, unknown> = {};
   private watcherSeq = 0;
 
   readonly onDidChangeConfigurationEmitter = new EventEmitter<{ affectsConfiguration: (s: string) => boolean }>();
@@ -283,6 +356,10 @@ export class ExtHostWorkspace implements ExtHostWorkspaceShape, ExtHostConfigura
     this.configData = config;
   }
 
+  registerConfigurationDefaults(defaults: Record<string, unknown>): void {
+    Object.assign(this.configDefaults, defaults);
+  }
+
   get workspaceFolders(): { uri: Uri; name: string; index: number }[] {
     return this.folders.map((uri, index) => ({
       uri,
@@ -295,7 +372,7 @@ export class ExtHostWorkspace implements ExtHostWorkspaceShape, ExtHostConfigura
   }
 
   getConfiguration(section?: string): WorkspaceConfiguration {
-    return new WorkspaceConfiguration(section, this.configData, this.proxy);
+    return new WorkspaceConfiguration(section, this.configData, this.proxy, this.configDefaults);
   }
 
   getWorkspaceFolder(uri: Uri): { uri: Uri; name: string; index: number } | undefined {
