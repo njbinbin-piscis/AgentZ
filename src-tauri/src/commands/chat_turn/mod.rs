@@ -423,36 +423,41 @@ pub async fn run_agentz_turn(
     }
     let approval_project_dir = agentz_task_state::canonical_root(Path::new(&approval_project_dir))
         .map_err(anyhow::Error::msg)?;
-    let (workspace_root, projectless_app_data) = {
-        let free_root =
-            agentz_task_state::canonical_root(&super::projects::free_sessions_path(&config_dir))
-                .ok();
-        if free_root.as_deref() == Some(approval_project_dir.as_str()) {
-            let app_data = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| anyhow!("projectless app data unavailable: {e}"))?;
-            match super::project_scope::projectless_session_directory(
-                &app_data,
-                Path::new(&approval_project_dir),
-                &session_id,
-            )
-            .map_err(anyhow::Error::msg)?
-            {
-                Some(directory) => (
-                    agentz_task_state::canonical_root(&directory).map_err(anyhow::Error::msg)?,
-                    Some(app_data),
-                ),
-                None => (workspace_root, None),
-            }
-        } else {
-            (workspace_root, None)
+    let is_free_scope =
+        agentz_task_state::canonical_root(&super::projects::free_sessions_path(&config_dir))
+            .ok()
+            .as_deref()
+            == Some(approval_project_dir.as_str());
+    let (workspace_root, projectless_app_data) = if is_free_scope {
+        let app_data = app
+            .path()
+            .app_data_dir()
+            .map_err(|e| anyhow!("projectless app data unavailable: {e}"))?;
+        match super::project_scope::projectless_session_directory(
+            &app_data,
+            Path::new(&approval_project_dir),
+            &session_id,
+        )
+        .map_err(anyhow::Error::msg)?
+        {
+            Some(directory) => (
+                agentz_task_state::canonical_root(&directory).map_err(anyhow::Error::msg)?,
+                Some(app_data),
+            ),
+            None => (workspace_root, None),
         }
+    } else {
+        (workspace_root, None)
     };
-    let require_binding = workspace_root != approval_project_dir
-        || agentz_task_state::load(Path::new(&approval_project_dir), &session_id)
+    let has_registered_env =
+        agentz_task_state::load(Path::new(&approval_project_dir), &session_id)
             .map_err(anyhow::Error::msg)?
             .is_some();
+    let require_binding = if is_free_scope {
+        projectless_app_data.is_some() || has_registered_env
+    } else {
+        workspace_root != approval_project_dir || has_registered_env
+    };
     let mut early_binding = crate::runtime::approval::resolve_binding_for_mode(
         Path::new(&approval_project_dir),
         Path::new(&workspace_root),
@@ -520,7 +525,8 @@ pub async fn run_agentz_turn(
             event_sink.clone(),
             capability,
         )
-        .map_err(anyhow::Error::msg)?;
+        .map_err(anyhow::Error::msg)?
+        .with_projectless_app_data(projectless_app_data.clone());
         tool.publish_recovered_projection()
             .await
             .map_err(anyhow::Error::msg)?;
@@ -734,6 +740,7 @@ pub async fn run_agentz_turn(
             confirmation_responses.is_some(),
             (&run_id, &attempt_id),
             projectless_app_data,
+            Some(require_binding),
         )
         .await
         .map_err(|e| anyhow!(e))?

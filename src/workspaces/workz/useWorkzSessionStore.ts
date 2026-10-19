@@ -211,9 +211,13 @@ export function useWorkzSessionStore({
     })));
   }, []);
   const [taskPanelOpen, setTaskPanelOpen] = useState(false);
-  const [isolate, setIsolate] = useState(
+  const [isolate, setIsolateState] = useState(
     () => localStorage.getItem("agentz-workz-isolate") !== "0",
   );
+  const setIsolate = useCallback((next: boolean) => {
+    setIsolateState(next);
+    localStorage.setItem("agentz-workz-isolate", next ? "1" : "0");
+  }, []);
   const [worktree, setWorktree] = useState<AgentTaskInfo | null>(null);
   const [startMode, setStartMode] = useState<"commit" | "working">("working");
   const [startBase, setStartBase] = useState("");
@@ -521,10 +525,6 @@ export function useWorkzSessionStore({
     };
   }, [workflowRunId]);
 
-  useEffect(() => {
-    localStorage.setItem("agentz-workz-isolate", isolate ? "1" : "0");
-  }, [isolate]);
-
   const clearAttachment = useCallback(() => {
     setAttachment(null);
     if (attachmentPreview?.startsWith("blob:")) URL.revokeObjectURL(attachmentPreview);
@@ -543,6 +543,7 @@ export function useWorkzSessionStore({
     setPreviewPath(null);
     setPlanItems([]);
     setWorktree(null);
+    setIsolateState(localStorage.getItem("agentz-workz-isolate") !== "0");
     setReviewTask(null);
     liveRef.current = false;
     discardStreamDelta();
@@ -855,12 +856,17 @@ export function useWorkzSessionStore({
 
     const isForeground = () => foregroundTaskKeyRef.current === taskKey;
     let environmentResolved = false;
+    const activeProject =
+      !isFree && projectDir
+        ? (overview?.projects.find((p) => p.path === projectDir) ?? null)
+        : null;
+    const effectiveIsolate = isolate && !isFree && activeProject?.kind !== "dir";
 
     try {
       const wt = await resolveTaskWorktree({
         projectDir: projectDir!,
         taskId: effectiveSessionId,
-        isolate,
+        isolate: effectiveIsolate,
         isFree,
         resuming: !!startSession,
         startMode,
@@ -903,7 +909,7 @@ export function useWorkzSessionStore({
         sessionId: effectiveSessionId,
         projectDir: projectDir!,
         workspaceDir: wt?.worktree_path ?? runCwd,
-        requireTaskEnvironment: !!wt || (isolate && !isFree),
+        requireTaskEnvironment: !!wt || effectiveIsolate,
         attachment: att,
         chatMode: "agent",
         clearPlan: false,
@@ -1057,6 +1063,7 @@ export function useWorkzSessionStore({
     setGoal("");
     clearAttachment();
     setWorktree(null);
+    setIsolateState(localStorage.getItem("agentz-workz-isolate") !== "0");
     setCwd(null);
     setManagedWorkspace(null);
     openTaskRequestRef.current += 1;
@@ -1101,7 +1108,9 @@ export function useWorkzSessionStore({
         const restoredEnvironment =
           environmentResult.status === "fulfilled" ? environmentResult.value : null;
         setWorktree(restoredEnvironment);
-        if (restoredEnvironment) setIsolate(true);
+        if (environmentResult.status === "fulfilled") {
+          setIsolateState(Boolean(restoredEnvironment));
+        }
         // Switching to a different task detaches live streaming from the
         // previous foreground run (it keeps going in the background). We show
         // the opened task's persisted history; if it is itself running, its
@@ -1558,19 +1567,43 @@ export function useWorkzSessionStore({
   }, [taskBound, activeTeam, activeAgentId, isWorkflowTeam, t]);
 
   const teamOptions = useMemo((): DropdownOption[] => {
-    const opts: DropdownOption[] = [{ id: "", label: t("agent.teamNone") }];
+    const opts: DropdownOption[] = [
+      {
+        id: "",
+        label: t("agent.teamNone"),
+        title: t("agent.teamHint"),
+      },
+    ];
     for (const tm of teams) {
-      opts.push({ id: tm.id, label: tm.name });
+      const isWf = tm.mode === "workflow";
+      const modeLabel = isWf ? t("workflow.modeWorkflow") : t("workflow.modeSwarm");
+      const modeTip = isWf ? t("agent.teamHintWorkflow") : t("agent.teamHintSwarm");
+      const desc = tm.description?.trim();
+      opts.push({
+        id: tm.id,
+        label: tm.name,
+        hint: desc ? `${modeLabel} · ${desc}` : modeLabel,
+        title: desc ? `${modeTip}\n${desc}` : modeTip,
+      });
     }
     return opts;
   }, [teams, t]);
 
   const agentOptions = useMemo((): DropdownOption[] => {
-    const opts: DropdownOption[] = [{ id: "", label: t("agent.agentGeneric") }];
+    const opts: DropdownOption[] = [
+      {
+        id: "",
+        label: t("agent.agentGeneric"),
+        title: t("agent.agentHint"),
+      },
+    ];
     for (const a of agents) {
+      const desc = a.description?.trim();
       opts.push({
         id: a.id,
         label: `${a.icon ? `${a.icon} ` : ""}${a.name}`,
+        hint: desc || undefined,
+        title: desc || a.name,
       });
     }
     return opts;

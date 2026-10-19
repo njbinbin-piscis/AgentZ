@@ -165,14 +165,17 @@ export default function WorkzComposerBar({
       <div className="agentz-workz-isolate-bar">
         <div className="agentz-workz-bar-left">
           {isFree ? (
-            <div className="agentz-workz-pill-menu" title={t("workz.cwdTitle")}>
-              <span className="agentz-workz-pill-label">{t("workz.cwdLabel")}</span>
+            <div className="agentz-workz-pill-menu">
+              <span className="agentz-workz-pill-label" title={t("workz.cwdTitle")}>
+                {t("workz.cwdLabel")}
+              </span>
               <DropdownSelect
                 variant="pill"
                 placement="up"
                 value={freeTaskWorkspace ?? ""}
                 options={cwdOptions}
                 disabled={busy || !!managedWorkspace}
+                title={t("workz.cwdTitle")}
                 onChange={onChangeCwd}
               />
             </div>
@@ -192,12 +195,13 @@ export default function WorkzComposerBar({
           )}
 
           {isolate && !isFree && !taskBound && (
-            <div className="agentz-workz-pill-menu" title={t("agent.startSourceHint")}>
+            <div className="agentz-workz-pill-menu">
               <button
                 type="button"
                 data-testid="workz-sandbox-advanced-btn"
                 className="agentz-workz-pill-btn"
                 disabled={busy}
+                title={t("agent.startSourceHint")}
                 onClick={() => setSandboxAdvancedOpen((prev) => !prev)}
               >
                 {t("workz.sandboxAdvancedToggle")}
@@ -209,6 +213,7 @@ export default function WorkzComposerBar({
                     placement="up"
                     value={startMode}
                     disabled={busy}
+                    title={t("agent.startSourceHint")}
                     options={[
                       { id: "working", label: t("agent.startWorking") },
                       { id: "commit", label: t("agent.startCommit") },
@@ -243,23 +248,36 @@ export default function WorkzComposerBar({
               {(betaSwarmExpanded || Boolean(activeTeam)) && (
                 <div
                   className={`agentz-workz-pill-menu${taskBound ? " is-locked" : ""}`}
-                  title={
-                    taskBound
-                      ? t("agent.modeLocked")
-                      : activeTeam
-                        ? selectedTeam?.mode === "workflow"
-                          ? t("agent.teamHintWorkflow")
-                          : t("agent.teamHintSwarm")
-                        : t("agent.teamHint")
-                  }
                 >
-                  <span className="agentz-workz-pill-label">{t("agent.team")} (Beta)</span>
+                  <span
+                    className="agentz-workz-pill-label"
+                    title={
+                      taskBound
+                        ? t("agent.modeLocked")
+                        : activeTeam
+                          ? selectedTeam?.mode === "workflow"
+                            ? t("agent.teamHintWorkflow")
+                            : t("agent.teamHintSwarm")
+                          : t("agent.teamHint")
+                    }
+                  >
+                    {t("agent.team")} (Beta)
+                  </span>
                   <DropdownSelect
                     variant="pill"
                     placement="up"
                     value={activeTeam}
                     options={teamOptions}
                     disabled={busy || taskBound}
+                    title={
+                      taskBound
+                        ? t("agent.modeLocked")
+                        : activeTeam
+                          ? selectedTeam?.mode === "workflow"
+                            ? t("agent.teamHintWorkflow")
+                            : t("agent.teamHintSwarm")
+                          : t("agent.teamHint")
+                    }
                     onChange={onChangeTeam}
                   />
                 </div>
@@ -270,15 +288,20 @@ export default function WorkzComposerBar({
           {!activeTeam && agents.length > 0 && (
             <div
               className={`agentz-workz-pill-menu${taskBound ? " is-locked" : ""}`}
-              title={taskBound ? t("agent.modeLocked") : t("agent.agentHint")}
             >
-              <span className="agentz-workz-pill-label">{t("agent.agentLabel")}</span>
+              <span
+                className="agentz-workz-pill-label"
+                title={taskBound ? t("agent.modeLocked") : t("agent.agentHint")}
+              >
+                {t("agent.agentLabel")}
+              </span>
               <DropdownSelect
                 variant="pill"
                 placement="up"
                 value={activeAgentId}
                 options={agentOptions}
                 disabled={busy || taskBound}
+                title={taskBound ? t("agent.modeLocked") : t("agent.agentHint")}
                 onChange={onChangeAgent}
               />
             </div>

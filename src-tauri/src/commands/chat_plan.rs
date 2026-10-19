@@ -259,7 +259,9 @@ pub(crate) async fn existing_binding(
     .await?;
     let workspace = PathBuf::from(agentz_task_state::canonical_root(Path::new(&workspace))?);
     let project_id = agentz_task_state::canonical_root(project)?;
-    let require_binding = registered || workspace.as_path() != Path::new(&project_id);
+    let require_binding = registered
+        || projectless_app_data.is_some()
+        || (!free_scope && workspace.as_path() != Path::new(&project_id));
     // Metadata-only host identity required by the existing resolver API. It is
     // never queued, started, persisted as a Run, or used to authorize tool execution.
     let metadata_id = uuid::Uuid::new_v4().to_string();

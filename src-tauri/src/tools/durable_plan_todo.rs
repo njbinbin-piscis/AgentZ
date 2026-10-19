@@ -1,5 +1,5 @@
 //! Unregistered draft: caller must own an active Run/environment lease.
-use crate::runtime::{approval::resolve_binding, durable_plan::DurablePlanSession};
+use crate::runtime::{approval::resolve_binding_for_mode, durable_plan::DurablePlanSession};
 use agentz_task_state::{
     approval::Binding,
     plan::{PlanBinding, PlanStore},
@@ -75,6 +75,7 @@ impl ActiveAttemptCapability {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime::approval::resolve_binding;
     use serde_json::json;
     struct Directory(PathBuf);
     impl Drop for Directory {
@@ -314,6 +315,66 @@ mod tests {
             .unwrap()
             .is_none());
     }
+    #[tokio::test]
+    async fn projectless_session_binding_recovers_and_writes_plan_without_task_environment() {
+        let root = Directory(
+            std::env::temp_dir().join(format!("agentz-plan-projectless-{}", uuid::Uuid::new_v4())),
+        );
+        let app_data = root.0.join("app-data");
+        let project = root.0.join("workz-free");
+        std::fs::create_dir_all(&app_data).unwrap();
+        std::fs::create_dir_all(&project).unwrap();
+        let store = agentz_task_state::projectless::AppDataStore::initialize(&app_data).unwrap();
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let dir_id = uuid::Uuid::new_v4().to_string();
+        let workspace = store.create_task(&dir_id).unwrap();
+        store.bind_session(&project, &session_id, &dir_id).unwrap();
+        let mut binding = resolve_binding_for_mode(
+            &project,
+            &workspace,
+            &session_id,
+            "run-projectless",
+            true,
+            Some(&app_data),
+        )
+        .await
+        .unwrap();
+        binding.attempt_id = "attempt-projectless".into();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let sink = Arc::new(Recorder::default());
+        let (guard, capability) = ActiveAttemptGuard::acquire(binding.clone()).unwrap();
+        let tool = DurablePlanTodoTool::new(
+            project.clone(),
+            workspace.clone(),
+            binding,
+            true,
+            "projectless goal".into(),
+            PlanStore::open(&project).unwrap(),
+            cancel.clone(),
+            piscis_kernel::agent::plan::new_plan_store(),
+            sink.clone(),
+            capability,
+        )
+        .unwrap()
+        .with_projectless_app_data(Some(app_data));
+        let recovered = tool.publish_recovered_projection().await.unwrap();
+        assert!(recovered.is_empty());
+        let ctx = ToolContext {
+            session_id,
+            workspace_root: workspace,
+            bypass_permissions: false,
+            settings: Arc::new(piscis_kernel::agent::tool::ToolSettings::default()),
+            max_iterations: None,
+            memory_owner_id: "test".into(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel,
+            loop_halt: None,
+        };
+        let out = tool.call(input(), &ctx).await.unwrap();
+        assert!(!out.is_error, "unexpected error: {}", out.content);
+        drop(guard);
+    }
 }
 pub struct DurablePlanTodoTool {
     state: Mutex<State>,
@@ -321,6 +382,7 @@ pub struct DurablePlanTodoTool {
     workspace: PathBuf,
     binding: Binding,
     require_binding: bool,
+    projectless_app_data: Option<PathBuf>,
     objective: String,
     new_id: String,
     cancel: Arc<AtomicBool>,
@@ -361,6 +423,7 @@ impl DurablePlanTodoTool {
             workspace,
             binding,
             require_binding,
+            projectless_app_data: None,
             objective,
             new_id: uuid::Uuid::new_v4().to_string(),
             cancel,
@@ -368,6 +431,10 @@ impl DurablePlanTodoTool {
             sink,
             capability,
         })
+    }
+    pub fn with_projectless_app_data(mut self, projectless_app_data: Option<PathBuf>) -> Self {
+        self.projectless_app_data = projectless_app_data;
+        self
     }
     fn kernel_schema_tool(&self) -> piscis_kernel::tools::plan_todo::PlanTodoTool {
         piscis_kernel::tools::plan_todo::PlanTodoTool {
@@ -384,12 +451,13 @@ impl DurablePlanTodoTool {
     pub async fn publish_recovered_projection(&self) -> Result<Vec<PlanTodoItem>, String> {
         let state = self.state.lock().await;
         let mut cache = self.cache.lock().await;
-        let mut fresh = resolve_binding(
+        let mut fresh = resolve_binding_for_mode(
             &self.project,
             &self.workspace,
             &self.binding.task_id,
             &self.binding.run_id,
             self.require_binding,
+            self.projectless_app_data.as_deref(),
         )
         .await?;
         fresh.attempt_id = self.binding.attempt_id.clone();
@@ -458,12 +526,13 @@ impl Tool for DurablePlanTodoTool {
         // Acquire publication capacity before committing so no await separates commit/cache/event.
         let mut state = self.state.lock().await;
         let mut cache = self.cache.lock().await;
-        let mut fresh = match resolve_binding(
+        let mut fresh = match resolve_binding_for_mode(
             &self.project,
             &self.workspace,
             &self.binding.task_id,
             &self.binding.run_id,
             self.require_binding,
+            self.projectless_app_data.as_deref(),
         )
         .await
         {

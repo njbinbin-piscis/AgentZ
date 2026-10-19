@@ -112,7 +112,9 @@ pub(crate) async fn resolve_observation(
         &root,
         session_id,
         &uuid::Uuid::new_v4().to_string(),
-        registered.is_some() || root != project,
+        registered.is_some()
+            || projectless_app_data.is_some()
+            || (!(metadata.workz && metadata.cwd.is_some()) && root != project),
         projectless_app_data.as_deref(),
     )
     .await?;

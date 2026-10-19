@@ -5,6 +5,7 @@ export interface DropdownOption {
   id: string;
   label: string;
   hint?: string;
+  title?: string;
 }
 
 function ChevronDown() {
@@ -144,7 +145,7 @@ export default function DropdownSelect({
         id={id}
         className={`agentz-dropdown-trigger${accentWhenSet && value ? " has-value-accent" : ""}`}
         disabled={disabled}
-        title={title}
+        title={title ?? selected?.title ?? selected?.hint}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -163,6 +164,7 @@ export default function DropdownSelect({
           className={`agentz-dropdown-popup${useFixedMenu ? " is-fixed" : ""}`}
           style={useFixedMenu ? popupStyle : undefined}
           role="listbox"
+          title=""
         >
           {options.length === 0 ? (
             <div className="agentz-dropdown-empty">{placeholder ?? "—"}</div>
@@ -172,6 +174,7 @@ export default function DropdownSelect({
                 key={opt.id || "__empty"}
                 type="button"
                 role="option"
+                title={opt.title ?? opt.hint}
                 aria-selected={opt.id === value}
                 className={opt.id === value ? "active" : ""}
                 onClick={() => {
@@ -262,6 +265,7 @@ export function DropdownMultiSelect({
           style={popupStyle}
           role="listbox"
           aria-multiselectable="true"
+          title=""
         >
           {options.length === 0 ? (
             onEmptyHintClick ? (
@@ -280,6 +284,7 @@ export function DropdownMultiSelect({
                   key={opt.id}
                   type="button"
                   role="option"
+                  title={opt.title ?? opt.hint}
                   aria-selected={active}
                   className={active ? "active" : ""}
                   onClick={() => toggle(opt.id)}

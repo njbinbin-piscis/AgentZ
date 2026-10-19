@@ -260,6 +260,7 @@ impl ApprovalHooks {
             interactive,
             identity,
             None,
+            None,
         )
         .await
     }
@@ -276,11 +277,14 @@ impl ApprovalHooks {
         interactive: bool,
         identity: (&str, &str),
         projectless_app_data: Option<PathBuf>,
+        require_binding_override: Option<bool>,
     ) -> Result<Self, String> {
         let project = PathBuf::from(agentz_task_state::canonical_root(&project)?);
         let workspace = PathBuf::from(agentz_task_state::canonical_root(&workspace)?);
-        let require_binding =
-            workspace != project || agentz_task_state::load(&project, session)?.is_some();
+        let require_binding = match require_binding_override {
+            Some(explicit) => explicit,
+            None => workspace != project || agentz_task_state::load(&project, session)?.is_some(),
+        };
         let mut binding = resolve_binding_for_mode(
             &project,
             &workspace,
@@ -697,6 +701,7 @@ impl Drop for PendingGuard {
         }
     }
 }
+#[cfg(test)]
 pub(crate) async fn resolve_binding(
     project: &Path,
     workspace: &Path,

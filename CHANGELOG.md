@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Wired built-in workbench commands (`workbench.action.reloadWindow`, `workbench.action.openSettings`, `vscode.open`, `workbench.action.terminal.*`) and on-demand `onCommand:<id>` activation in `MainThreadCommands`, editor title run actions in `EditorTabs.tsx`, and live terminal command execution in `Terminal.tsx`.
   - Propagated runtime extension activation failures back to `compatStore` so the Extensions panel reflects actual activation errors.
 - **Workspace & Approval UX Refinements**:
+  - Fixed `WorkZ` free-mode (`projectless`) task turns failing with `isolated task has no registered environment; explicit recovery/binding required` by propagating `projectless_app_data` into `DurablePlanTodoTool` and aligning `chat_send`, `chat_turn`, `chat_plan`, and `task_view` binding checks, while syncing `isolate` state with restored session environments and non-Git folders.
+  - Fixed `WorkZ` team selector tooltips showing workflow team hints on all options by preventing outer container `title` inheritance onto `.agentz-dropdown-popup` items and attaching per-option mode-specific hints (`workflow` vs `swarm`) in `teamOptions`.
   - Improved `WorkZ` artifact path extraction and file preview resolution, interactive permission card layout, and project edge panel interactions.
 
 ## [1.0.0] - 2026-10-19

@@ -284,24 +284,53 @@ pub async fn chat_send(
         std::path::Path::new(&project),
         session_id.as_deref().expect("host assigned session"),
     )?;
+    let config_dir = resolve_config_dir(&app)?;
+    let project_canonical = agentz_task_state::canonical_root(std::path::Path::new(&project))?;
+    let is_free_scope =
+        agentz_task_state::canonical_root(&super::projects::free_sessions_path(&config_dir))
+            .ok()
+            .as_deref()
+            == Some(project_canonical.as_str());
+    let projectless_binding = if is_free_scope {
+        use tauri::Manager as _;
+        let app_data = app
+            .path()
+            .app_data_dir()
+            .map_err(|e| format!("projectless app data unavailable: {e}"))?;
+        super::project_scope::projectless_session_directory(
+            &app_data,
+            std::path::Path::new(&project_canonical),
+            session_id.as_deref().expect("host assigned session"),
+        )?
+        .map(|directory| (app_data, directory))
+    } else {
+        None
+    };
+    let effective_workspace_dir = match (&projectless_binding, workspace_dir.as_deref()) {
+        (Some((_, directory)), None) => Some(directory.to_string_lossy().into_owned()),
+        _ => workspace_dir.clone(),
+    };
+    let require_env = require_task_environment.unwrap_or(false);
     // When an isolated worktree is provided, the agent works inside it (and the
     // journal tracks its files) while sessions stay in the main project's DB.
     let agent_workspace = super::agent_task::resolve_task_workspace(
         std::path::Path::new(&project),
         session_id.as_deref(),
-        workspace_dir.as_deref(),
-        require_task_environment.unwrap_or(false),
+        effective_workspace_dir.as_deref(),
+        require_env && projectless_binding.is_none(),
     )
     .await?;
     let kernel = open_project_kernel_state(&app, &project)?;
-    let config_dir = resolve_config_dir(&app)?;
     let run_id = uuid::Uuid::new_v4().to_string();
-    let mut binding = crate::runtime::approval::resolve_binding(
+    let mut binding = crate::runtime::approval::resolve_binding_for_mode(
         std::path::Path::new(&project),
         std::path::Path::new(&agent_workspace),
         session_id.as_deref().expect("host assigned session"),
         &run_id,
-        require_task_environment.unwrap_or(false),
+        require_env || projectless_binding.is_some(),
+        projectless_binding
+            .as_ref()
+            .map(|(app_data, _)| app_data.as_path()),
     )
     .await?;
     binding.attempt_id = uuid::Uuid::new_v4().to_string();
@@ -355,7 +384,7 @@ pub async fn chat_send(
         std::path::Path::new(&project),
         session_id.as_deref(),
         Some(&agent_workspace),
-        require_task_environment.unwrap_or(false),
+        require_env && projectless_binding.is_none(),
     )
     .await?;
     let journal = Arc::new(crate::journal::open_project_journal(&agent_workspace)?);

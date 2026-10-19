@@ -1206,7 +1206,7 @@ const en = {
     teamNone: "Single agent",
     modeLocked: "This task is bound to its mode. Start a new task to switch team or agent.",
     teamHint:
-      "With a team selected, the coordinator dispatches work to member assistants via collaboration-pool tools",
+      "Choose a Swarm team (coordinator dispatches to member assistants) or a Workflow team (runs your designed graph deterministically)",
     teamHintSwarm:
       "Swarm team: the main agent coordinates, splitting work to member assistants via collaboration-pool tools and integrating results.",
     teamHintWorkflow:
