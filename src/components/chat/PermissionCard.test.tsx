@@ -152,5 +152,14 @@ describe("bound approval card", () => {
     await act(async () => { view = create(<PermissionCard request={spoof} onResolved={vi.fn()} />); });
     const text=JSON.stringify(view!.toJSON()); expect(text).toContain("task-a"); expect(text).not.toContain("forged");
   });
+  it("submits alwaysAllow=true when Always allow button is clicked", async () => {
+    respond.mockResolvedValue(undefined);
+    const done = await render();
+    const alwaysAllowBtn = view!.root.findAllByType("button")[2];
+    expect(alwaysAllowBtn.props.children).toBe("Always allow");
+    await act(async () => { await alwaysAllowBtn.props.onClick(); });
+    expect(respond).toHaveBeenCalledWith("approval:a", true, "digest-a", true);
+    expect(done).toHaveBeenCalledOnce();
+  });
 
 });

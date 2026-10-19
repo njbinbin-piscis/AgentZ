@@ -32,6 +32,10 @@ import type { EditorSnapshot, LayoutSnapshot } from "../../services/tauri/worksp
 import { editorSnapshotFromTabs } from "../../services/tauri/workspace";
 import { useProjectEdgeActions, useProjectEdgeState } from "../../contexts/ProjectEdgeContext";
 import { normalizeRelPath, shouldWatchPath } from "../../utils/pathFilter";
+import {
+  relativizeArtifactPath,
+  resolveArtifactFullPath,
+} from "../workz/artifactPaths";
 import { perfCounters } from "../../utils/perfCounters";
 import { startOwnedWatcher } from "./watcherLifecycle";
 import { EditorConflictTracker, type CapturedOperation, type DiskConflictInfo } from "./editorConflict";
@@ -782,18 +786,24 @@ export function useCodezWorkspace({
   }, [projectDir]);
 
   const openFile = useCallback(
-    async (path: string, readOnly = false) => {
-      if (isRecoveryPath(path)) {
-        if (tabsRef.current.some(tab => tab.path === path)) setActiveTabPath(path);
+    async (rawPath: string, readOnly = false) => {
+      if (isRecoveryPath(rawPath)) {
+        if (tabsRef.current.some(tab => tab.path === rawPath)) setActiveTabPath(rawPath);
         return;
       }
+      // Artifact / git paths may arrive as absolute Windows paths
+      // (`D:/projects/…/file.md`); relativize under the project so the tab
+      // key matches tree paths and the read never double-joins the root.
+      const path = projectDir
+        ? relativizeArtifactPath(rawPath, [projectDir])
+        : rawPath;
       const existing = tabsRef.current.find((t) => t.path === path);
       if (existing) {
         setActiveTabPath(path);
         return;
       }
 
-      const fullPath = projectDir ? `${projectDir}/${path}` : path;
+      const fullPath = projectDir ? resolveArtifactFullPath(projectDir, path) : path;
       const capturedGeneration = editorGeneration.current;
       const request = ++openSequence.current;
       openRequests.current.set(path, request);
@@ -1302,6 +1312,35 @@ export function useCodezWorkspace({
   }, [tabContextMenu]);
 
   const { paletteCommands } = useCodezShortcuts({ t, projectDir, activeTabPathRef, saveFile, handleTabClose, closeAllTabs, onOpenFolder, setBottomOpen, setSidebarTab, setSidebarCollapsed, setRemoteDialogOpen, setPaletteMode, setPaletteOpen });
+
+  useEffect(() => {
+    const onShowTerminal = () => {
+      openBottomPanel("terminal");
+    };
+    const onOpenExt = () => {
+      openExtensionsSidebar();
+    };
+    const onOpenFile = (e: Event) => {
+      const p = (e as CustomEvent<{ path?: string }>).detail?.path;
+      if (p) void openFile(p);
+    };
+    const onOpenPalette = (e: Event) => {
+      const mode = (e as CustomEvent<{ mode?: "files" | "commands" }>).detail?.mode;
+      setPaletteMode(mode === "files" ? "files" : "commands");
+      setPaletteOpen(true);
+    };
+    window.addEventListener("agentz-show-terminal", onShowTerminal);
+    window.addEventListener("agentz-open-extensions", onOpenExt);
+    window.addEventListener("agentz-open-file", onOpenFile);
+    window.addEventListener("agentz-open-palette", onOpenPalette);
+    return () => {
+      window.removeEventListener("agentz-show-terminal", onShowTerminal);
+      window.removeEventListener("agentz-open-extensions", onOpenExt);
+      window.removeEventListener("agentz-open-file", onOpenFile);
+      window.removeEventListener("agentz-open-palette", onOpenPalette);
+    };
+  }, [openBottomPanel, openExtensionsSidebar, openFile, setPaletteMode, setPaletteOpen]);
+
   useEffect(() => {
     if (!projectDir || !onWorkspacePatch) return;
     const timer = window.setTimeout(() => {

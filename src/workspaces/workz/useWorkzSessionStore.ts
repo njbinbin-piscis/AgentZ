@@ -607,8 +607,14 @@ export function useWorkzSessionStore({
   }, [refreshTasks, refreshGitChanges]);
 
   useEffect(() => {
-    setArtifacts(collectArtifacts(steps));
-  }, [steps, setArtifacts]);
+    setArtifacts(
+      collectArtifacts(steps, undefined, [
+        worktree?.worktree_path,
+        freeTaskWorkspace,
+        projectDir,
+      ]),
+    );
+  }, [steps, setArtifacts, worktree?.worktree_path, freeTaskWorkspace, projectDir]);
 
   // Stream kernel events into the in-flight step. The event channel is shared
   // with the IDE chat panel and with any background Agent tasks, so we only

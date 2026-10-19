@@ -5,6 +5,22 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-10-20
+
+### Fixed
+
+- **Status Bar Model Switcher i18n & Codicon Rendering**:
+  - Added missing `chat.modelTitle` and `chat.defaultModel` translations in `src/i18n/zh.ts` and `src/i18n/en.ts` so hovering over the status bar model pill shows the localized tooltip instead of raw key placeholders.
+  - Added VS Code `$(codicon)` token parsing (`formatCodiconText`) in `IdeStatusBar.tsx` and `QuickInput.tsx` so status bar items and QuickPick entries render clean icons (`⧉`, `▶`, `✓`, `↻`, etc.) instead of raw `$(versions)` or `$Version` text.
+- **VS Code Extension Host Compatibility & Interactive UI**:
+  - Normalized Windows `Uri.fsPath` and `RelativePattern` in `extension-host/src/host/types-impl.ts` (stripping leading `/` on Windows drive paths) so extensions spawning child processes with `workspaceFolders[0].uri.fsPath` as `cwd` succeed on Windows.
+  - Implemented `FileSystemWatcher` (`onDidCreate`, `onDidChange`, `onDidDelete`, `dispose`) and `FileSystemError.FileNotFound` on `workspace.fs.stat` in `extension-host/src/host/extHostWorkspace.ts`, preventing extension `activate()` crashes before command registration and fixing lockfile detection.
+  - Made `StatusBarItem` properties reactive after `.show()`, persisted `Memento` (`globalState` / `workspaceState`) to disk, and added `vscode.window.terminals`, `onDidOpenTerminal`, `onDidCloseTerminal`, `createQuickPick`, `createInputBox`, `vscode.env.openExternal`, and `vscode.extensions.getExtension`.
+  - Wired built-in workbench commands (`workbench.action.reloadWindow`, `workbench.action.openSettings`, `vscode.open`, `workbench.action.terminal.*`) and on-demand `onCommand:<id>` activation in `MainThreadCommands`, editor title run actions in `EditorTabs.tsx`, and live terminal command execution in `Terminal.tsx`.
+  - Propagated runtime extension activation failures back to `compatStore` so the Extensions panel reflects actual activation errors.
+- **Workspace & Approval UX Refinements**:
+  - Improved `WorkZ` artifact path extraction and file preview resolution, interactive permission card layout, and project edge panel interactions.
+
 ## [1.0.0] - 2026-10-19
 
 ### Added

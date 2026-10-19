@@ -2,6 +2,8 @@
 // Mirrors VS Code's createApiFactoryAndRegisterActors: namespaces backed by the
 // ExtHost* services, plus the concrete types and enums.
 
+import * as fs from "fs";
+import * as path from "path";
 import { Services } from "./services";
 import * as types from "./types-impl";
 import { ExtensionDescriptionDto } from "../common/dto";
@@ -23,12 +25,37 @@ export interface ExtensionContext {
 
 export class Memento {
   private data: Record<string, unknown> = {};
+
+  constructor(private readonly storageFilePath?: string) {
+    if (this.storageFilePath) {
+      try {
+        if (fs.existsSync(this.storageFilePath)) {
+          const raw = fs.readFileSync(this.storageFilePath, "utf8");
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            this.data = parsed as Record<string, unknown>;
+          }
+        }
+      } catch {
+        // Ignore corrupt/unreadable state file
+      }
+    }
+  }
+
   get<T>(key: string, defaultValue?: T): T | undefined {
     return key in this.data ? (this.data[key] as T) : defaultValue;
   }
   update(key: string, value: unknown): Promise<void> {
     if (value === undefined) delete this.data[key];
     else this.data[key] = value;
+    if (this.storageFilePath) {
+      try {
+        fs.mkdirSync(path.dirname(this.storageFilePath), { recursive: true });
+        fs.writeFileSync(this.storageFilePath, JSON.stringify(this.data, null, 2), "utf8");
+      } catch {
+        // Best-effort persistence
+      }
+    }
     return Promise.resolve();
   }
   keys(): string[] {
@@ -49,30 +76,92 @@ export function createApiFactory(services: Services) {
     getCommands: () => s.commands.getCommands(),
   };
 
+  const wrapEditor = (document: unknown) => ({
+    document,
+    selection: new types.Selection(0, 0, 0, 0),
+    selections: [new types.Selection(0, 0, 0, 0)],
+    options: { tabSize: 2, insertSpaces: true },
+    viewColumn: types.ViewColumn.One,
+    edit: () => Promise.resolve(true),
+    insertSnippet: () => Promise.resolve(true),
+    setDecorations: () => undefined,
+    revealRange: () => undefined,
+    show: () => undefined,
+    hide: () => undefined,
+  });
+
   const window = {
     showInformationMessage: (m: string, ...r: unknown[]) => s.window.showInformationMessage(m, ...r),
     showWarningMessage: (m: string, ...r: unknown[]) => s.window.showWarningMessage(m, ...r),
     showErrorMessage: (m: string, ...r: unknown[]) => s.window.showErrorMessage(m, ...r),
-    createStatusBarItem: (a?: types.StatusBarAlignment, p?: number) => s.window.createStatusBarItem(a, p),
-    createOutputChannel: (name: string) => s.window.createOutputChannel(name),
-    showQuickPick: (items: unknown, options?: { placeHolder?: string; canPickMany?: boolean }) => s.window.showQuickPick(items, options),
-    showInputBox: (options?: { prompt?: string; value?: string; placeHolder?: string; password?: boolean }) => s.window.showInputBox(options),
-    createTerminal: (o?: string | { name?: string }) => s.window.createTerminal(o),
-    setStatusBarMessage: (t: string) => s.window.setStatusBarMessage(t),
-    withProgress: <R>(o: unknown, t: (p: { report: (v: unknown) => void }, token: unknown) => Thenable<R>) => s.window.withProgress(o, t),
-    registerTreeDataProvider: (viewId: string, provider: any) => s.treeViews.registerTreeDataProvider(viewId, provider),
+    createStatusBarItem: (
+      a?: string | types.StatusBarAlignment,
+      b?: types.StatusBarAlignment | number,
+      c?: number,
+    ) => s.window.createStatusBarItem(a, b, c),
+    createOutputChannel: (name: string, options?: string | { log?: boolean }) =>
+      s.window.createOutputChannel(name, options),
+    showQuickPick: (items: unknown, options?: { placeHolder?: string; title?: string; canPickMany?: boolean }) =>
+      s.window.showQuickPick(items, options),
+    showInputBox: (options?: {
+      prompt?: string;
+      title?: string;
+      value?: string;
+      placeHolder?: string;
+      password?: boolean;
+    }) => s.window.showInputBox(options),
+    createQuickPick: () => s.window.createQuickPick(),
+    createInputBox: () => s.window.createInputBox(),
+    createTerminal: (o?: string | { name?: string; cwd?: string | { fsPath?: string } }) =>
+      s.window.createTerminal(o),
+    get terminals() {
+      return s.window.terminals;
+    },
+    get activeTerminal() {
+      return s.window.activeTerminal;
+    },
+    onDidOpenTerminal: s.window.onDidOpenTerminalEmitter.event,
+    onDidCloseTerminal: s.window.onDidCloseTerminalEmitter.event,
+    onDidChangeActiveTerminal: s.window.onDidChangeActiveTerminalEmitter.event,
+    onDidChangeTerminalState: s.window.onDidChangeTerminalStateEmitter.event,
+    setStatusBarMessage: (t: string, hideAfter?: number | Thenable<unknown>) =>
+      s.window.setStatusBarMessage(t, hideAfter),
+    withProgress: <R>(
+      o: unknown,
+      t: (p: { report: (v: unknown) => void }, token: unknown) => Thenable<R>,
+    ) => s.window.withProgress(o, t),
+    registerTreeDataProvider: (viewId: string, provider: any) =>
+      s.treeViews.registerTreeDataProvider(viewId, provider),
     createTreeView: (viewId: string, options: any) => s.treeViews.createTreeView(viewId, options),
-    createWebviewPanel: (viewType: string, title: string, showOptions: any, options?: any) => s.webviews.createWebviewPanel(viewType, title, showOptions, options),
+    createWebviewPanel: (viewType: string, title: string, showOptions: any, options?: any) =>
+      s.webviews.createWebviewPanel(viewType, title, showOptions, options),
     registerWebviewViewProvider: () => s.webviews.registerWebviewViewProvider(),
+    createTextEditorDecorationType: () => new types.Disposable(() => undefined),
     get activeTextEditor() {
       const doc = s.documents.getActiveDocument();
-      return doc ? { document: doc } : undefined;
+      return doc ? wrapEditor(doc) : undefined;
     },
     get visibleTextEditors() {
-      return s.documents.all().map((document) => ({ document }));
+      return s.documents.all().map((document) => wrapEditor(document));
     },
-    onDidChangeActiveTextEditor: (l: (e: unknown) => unknown) => s.documents.onDidChangeActiveEmitter.event((doc) => l(doc ? { document: doc } : undefined)),
-    showTextDocument: () => Promise.resolve(undefined),
+    onDidChangeActiveTextEditor: (l: (e: unknown) => unknown) =>
+      s.documents.onDidChangeActiveEmitter.event((doc) => l(doc ? wrapEditor(doc) : undefined)),
+    onDidChangeVisibleTextEditors: new types.EventEmitter<unknown[]>().event,
+    onDidChangeTextEditorSelection: new types.EventEmitter<unknown>().event,
+    onDidChangeTextEditorVisibleRanges: new types.EventEmitter<unknown>().event,
+    onDidChangeWindowState: new types.EventEmitter<{ focused: boolean }>().event,
+    state: { focused: true },
+    showTextDocument: async (uriOrDoc: unknown) => {
+      if (!uriOrDoc) return undefined;
+      const targetUri =
+        typeof uriOrDoc === "object" && uriOrDoc !== null && "uri" in uriOrDoc
+          ? (uriOrDoc as { uri: types.Uri }).uri
+          : (uriOrDoc as types.Uri);
+      if (targetUri) {
+        await s.commands.executeCommand("vscode.open", targetUri.toString());
+      }
+      return undefined;
+    },
   };
 
   const workspace = {
@@ -88,24 +177,94 @@ export function createApiFactory(services: Services) {
     get textDocuments() {
       return s.documents.all();
     },
+    get isTrusted() {
+      return true;
+    },
+    onDidGrantWorkspaceTrust: new types.EventEmitter<void>().event,
     getConfiguration: (section?: string) => s.workspace.getConfiguration(section),
     getWorkspaceFolder: (uri: types.Uri) => s.workspace.getWorkspaceFolder(uri),
-    findFiles: (include: string, exclude?: string, maxResults?: number) => s.workspace.findFiles(include, exclude, maxResults),
-    openTextDocument: (uriOrPath: types.Uri | string) => {
+    asRelativePath: (pathOrUri: string | types.Uri) => {
+      const p = typeof pathOrUri === "string" ? pathOrUri : pathOrUri.fsPath;
+      const root = s.workspace.rootPath;
+      if (root && p.startsWith(root)) {
+        return p.slice(root.length).replace(/^[/\\]+/, "").replace(/\\/g, "/");
+      }
+      return p;
+    },
+    findFiles: (
+      include: string | types.RelativePattern,
+      exclude?: string | types.RelativePattern | null,
+      maxResults?: number,
+    ) => s.workspace.findFiles(include, exclude, maxResults),
+    openTextDocument: async (uriOrPath?: types.Uri | string | { language?: string; content?: string }) => {
+      if (!uriOrPath || (typeof uriOrPath === "object" && !("scheme" in uriOrPath))) {
+        const opts = (uriOrPath ?? {}) as { language?: string; content?: string };
+        const untitledUri = types.Uri.parse(`untitled:Untitled-${Date.now()}`);
+        s.documents.$acceptModelOpened({
+          uri: untitledUri.toJSON(),
+          languageId: opts.language ?? "plaintext",
+          versionId: 1,
+          lines: (opts.content ?? "").split(/\r?\n/),
+          eol: "\n",
+        });
+        return s.documents.getDocument(untitledUri.toJSON());
+      }
       const uri = typeof uriOrPath === "string" ? types.Uri.file(uriOrPath) : uriOrPath;
       const existing = s.documents.getDocument(uri.toJSON());
-      return Promise.resolve(existing);
+      if (existing) return existing;
+      try {
+        if (uri.scheme === "file" && uri.fsPath && fs.existsSync(uri.fsPath)) {
+          const content = await fs.promises.readFile(uri.fsPath, "utf8");
+          const ext = path.extname(uri.fsPath).toLowerCase();
+          const langMap: Record<string, string> = {
+            ".ts": "typescript",
+            ".tsx": "typescriptreact",
+            ".js": "javascript",
+            ".jsx": "javascriptreact",
+            ".json": "json",
+            ".md": "markdown",
+            ".rs": "rust",
+            ".py": "python",
+          };
+          s.documents.$acceptModelOpened({
+            uri: uri.toJSON(),
+            languageId: langMap[ext] ?? "plaintext",
+            versionId: 1,
+            lines: content.split(/\r?\n/),
+            eol: "\n",
+          });
+          return s.documents.getDocument(uri.toJSON());
+        }
+      } catch {
+        // ignore
+      }
+      return existing;
     },
-    createFileSystemWatcher: () => s.workspace.registerFileSystemWatcher(),
+    createFileSystemWatcher: (
+      globPattern: string | types.RelativePattern,
+      ignoreCreateEvents?: boolean,
+      ignoreChangeEvents?: boolean,
+      ignoreDeleteEvents?: boolean,
+    ) =>
+      s.workspace.registerFileSystemWatcher(
+        globPattern,
+        ignoreCreateEvents,
+        ignoreChangeEvents,
+        ignoreDeleteEvents,
+      ),
     registerTaskProvider: (type: string, provider: any) => s.tasks.registerTaskProvider(type, provider),
-    registerNotebookSerializer: (viewType: string, serializer: any) => s.notebook.registerNotebookSerializer(viewType, serializer),
+    registerNotebookSerializer: (viewType: string, serializer: any) =>
+      s.notebook.registerNotebookSerializer(viewType, serializer),
+    registerTextDocumentContentProvider: () => new types.Disposable(() => undefined),
     applyEdit: () => s.workspace.applyEdit(),
+    saveAll: () => Promise.resolve(true),
     onDidChangeConfiguration: s.workspace.onDidChangeConfigurationEmitter.event,
     onDidChangeWorkspaceFolders: s.workspace.onDidChangeWorkspaceFoldersEmitter.event,
     onDidOpenTextDocument: s.documents.onDidOpenEmitter.event,
     onDidCloseTextDocument: s.documents.onDidCloseEmitter.event,
     onDidChangeTextDocument: s.documents.onDidChangeEmitter.event,
     onDidSaveTextDocument: new types.EventEmitter<unknown>().event,
+    onWillSaveTextDocument: new types.EventEmitter<unknown>().event,
     fs: s.workspace.createFileSystem(),
   };
 
@@ -158,21 +317,57 @@ export function createApiFactory(services: Services) {
 
   const env = {
     appName: "AgentZ",
+    appRoot: typeof process !== "undefined" ? process.cwd() : "",
     appHost: "desktop",
     uriScheme: "agentz",
-    language: "en",
+    language: "zh-cn",
     machineId: "agentz-machine",
     sessionId: `agentz-${Date.now()}`,
     isNewAppInstall: false,
     isTelemetryEnabled: false,
+    onDidChangeTelemetryEnabled: new types.EventEmitter<boolean>().event,
+    remoteName: undefined,
+    shell: typeof process !== "undefined" ? (process.env.COMSPEC || process.env.SHELL || "") : "",
+    uiKind: types.UIKind.Desktop,
     clipboard: {
-      readText: () => Promise.resolve(""),
-      writeText: (_v: string) => Promise.resolve(),
+      readText: async () => (await s.commands.executeCommand<string>("vscode.env.clipboard.readText")) ?? "",
+      writeText: async (v: string) => {
+        await s.commands.executeCommand("vscode.env.clipboard.writeText", v);
+      },
     },
-    openExternal: (_uri: types.Uri) => Promise.resolve(true),
+    openExternal: async (uri: types.Uri | string) => {
+      const target = typeof uri === "string" ? uri : uri.toString();
+      const res = await s.commands.executeCommand<boolean>("vscode.open", target);
+      return res ?? true;
+    },
+    asExternalUri: (uri: types.Uri) => Promise.resolve(uri),
   };
 
-  return function api(extension: ExtensionDescriptionDto): Record<string, unknown> {
+  return function api(
+    extension: ExtensionDescriptionDto,
+    allExtensions?: () => ExtensionDescriptionDto[],
+    activateExt?: (id: string) => Promise<unknown>,
+  ): Record<string, unknown> {
+    const toExtensionObject = (desc: ExtensionDescriptionDto) => ({
+      id: desc.id,
+      extensionUri: types.Uri.file(desc.extensionPath),
+      extensionPath: desc.extensionPath,
+      isActive: true,
+      packageJSON: {
+        name: desc.name,
+        publisher: desc.publisher,
+        version: desc.version,
+        displayName: desc.displayName,
+        main: desc.main,
+        activationEvents: desc.activationEvents,
+        contributes: desc.contributes,
+        engines: desc.engines,
+      },
+      extensionKind: types.ExtensionKind.Workspace,
+      exports: undefined,
+      activate: () => (activateExt ? activateExt(desc.id) : Promise.resolve(undefined)),
+    });
+
     return {
       // namespaces
       commands,
@@ -190,9 +385,34 @@ export function createApiFactory(services: Services) {
       notebooks,
       env,
       extensions: {
-        getExtension: () => undefined,
-        all: [],
+        getExtension: (id: string) => {
+          const list = allExtensions ? allExtensions() : [extension];
+          const found = list.find((e) => e.id.toLowerCase() === id.toLowerCase());
+          return found ? toExtensionObject(found) : undefined;
+        },
+        get all() {
+          const list = allExtensions ? allExtensions() : [extension];
+          return list.map(toExtensionObject);
+        },
         onDidChange: new types.EventEmitter<void>().event,
+      },
+      l10n: {
+        t: (message: string | { message: string; args?: Record<string, unknown> | unknown[] }, ...args: unknown[]) => {
+          const raw = typeof message === "string" ? message : message.message;
+          const replacements = typeof message === "string" ? args : message.args;
+          if (!replacements) return raw;
+          if (Array.isArray(replacements)) {
+            return raw.replace(/\{(\d+)\}/g, (m, idx) =>
+              replacements[Number(idx)] !== undefined ? String(replacements[Number(idx)]) : m,
+            );
+          }
+          const dict = replacements as Record<string, unknown>;
+          return raw.replace(/\{([a-zA-Z0-9_]+)\}/g, (m, key) =>
+            dict[key] !== undefined ? String(dict[key]) : m,
+          );
+        },
+        bundle: undefined,
+        uri: undefined,
       },
       // version
       version: HOST_VSCODE_VERSION,
@@ -224,6 +444,7 @@ export function createApiFactory(services: Services) {
       ThemeColor: types.ThemeColor,
       TreeItem: types.TreeItem,
       RelativePattern: types.RelativePattern,
+      FileSystemError: types.FileSystemError,
       // enums
       CompletionItemKind: types.CompletionItemKind,
       DiagnosticSeverity: types.DiagnosticSeverity,
@@ -235,7 +456,16 @@ export function createApiFactory(services: Services) {
       FileType: types.FileType,
       EndOfLine: types.EndOfLine,
       TextEditorRevealType: types.TextEditorRevealType,
-      ExtensionMode: { Production: 1, Development: 2, Test: 3 },
+      QuickPickItemKind: types.QuickPickItemKind,
+      ProgressLocation: types.ProgressLocation,
+      LogLevel: types.LogLevel,
+      UIKind: types.UIKind,
+      ExtensionKind: types.ExtensionKind,
+      ExtensionMode: types.ExtensionMode,
+      TextDocumentSaveReason: types.TextDocumentSaveReason,
+      OverviewRulerLane: types.OverviewRulerLane,
+      CodeActionTriggerKind: types.CodeActionTriggerKind,
+      SignatureHelpTriggerKind: types.SignatureHelpTriggerKind,
     };
   };
 }

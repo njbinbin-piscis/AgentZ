@@ -345,19 +345,26 @@ export function useAssistantSession({
   /** Bumped on send/clear so in-flight paste/attach callbacks cannot re-add chips. */
   const composerGenRef = useRef(0);
   const handledAttachNonceRef = useRef<number | null>(null);
-  /** Session-scoped agent tool outputs (not git status). */
-  const sessionArtifactsRef = useRef<Set<string>>(new Set());
+  /** Session-scoped agent tool outputs (not git status), newest first. */
+  const sessionArtifactsRef = useRef<string[]>([]);
 
   const clearSessionArtifacts = useCallback(() => {
-    sessionArtifactsRef.current = new Set();
+    sessionArtifactsRef.current = [];
     setArtifacts([]);
   }, [setArtifacts]);
 
   useEffect(() => {
-    const paths = new Set(sessionArtifactsRef.current);
-    for (const p of collectArtifactsFromToolSteps(toolSteps)) paths.add(p);
-    setArtifacts([...paths].sort((a, b) => a.localeCompare(b)));
-  }, [toolSteps, setArtifacts]);
+    // Incoming steps are newest-first; anything they touched moves ahead of
+    // artifacts carried over from earlier turns.
+    const incoming = collectArtifactsFromToolSteps(toolSteps, [projectDir]);
+    const incomingSet = new Set(incoming);
+    const merged = [
+      ...incoming,
+      ...sessionArtifactsRef.current.filter((p) => !incomingSet.has(p)),
+    ];
+    sessionArtifactsRef.current = merged;
+    setArtifacts(merged);
+  }, [toolSteps, setArtifacts, projectDir]);
 
   useEffect(() => {
     sessionRef.current = null;
@@ -658,8 +665,13 @@ export function useAssistantSession({
             );
             const ended = next.find((step) => step.id === evt.id);
             if (ended) {
-              const p = pathFromToolEvent(ended.name, ended.input, evt.result);
-              if (p) sessionArtifactsRef.current.add(p);
+              const p = pathFromToolEvent(ended.name, ended.input, evt.result, [projectDir]);
+              if (p) {
+                sessionArtifactsRef.current = [
+                  p,
+                  ...sessionArtifactsRef.current.filter((x) => x !== p),
+                ];
+              }
             }
             return next;
           });

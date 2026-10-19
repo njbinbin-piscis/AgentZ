@@ -33,10 +33,16 @@ export default function WebviewHost({ webview }: { webview: WebviewState }) {
     };
   }, [webview.handle]);
 
-  const appNonce = typeof document === "undefined"
-    ? undefined
-    : document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce
-      ?? (import.meta.env.DEV ? "agentz-webview-dev-nonce" : undefined);
+  const appNonce = useMemo(
+    () =>
+      (typeof document !== "undefined"
+        ? document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce
+        : undefined) ??
+      (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : undefined),
+    [webview.handle],
+  );
   const scriptsEnabled = webview.enableScripts && Boolean(appNonce);
   const srcDoc = useMemo(
     () => buildWebviewSrcDoc(webview.html, scriptsEnabled, appNonce, webview.resourceToken),

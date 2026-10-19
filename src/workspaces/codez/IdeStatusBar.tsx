@@ -31,6 +31,57 @@ export function estimateTokenCostUsd(inputTokens: number, outputTokens: number):
   return `$${totalUsd.toFixed(3)}`;
 }
 
+const CODICON_GLYPHS: Record<string, string> = {
+  versions: "⧉",
+  layers: "⧉",
+  package: "⧉",
+  play: "▶",
+  "run-all": "▶",
+  "debug-start": "▶",
+  check: "✓",
+  pass: "✓",
+  verified: "✓",
+  error: "✕",
+  close: "✕",
+  warning: "⚠",
+  alert: "⚠",
+  info: "ℹ",
+  sync: "↻",
+  loading: "↻",
+  refresh: "↻",
+  gear: "⚙",
+  "settings-gear": "⚙",
+  tools: "⚙",
+  terminal: ">_",
+  console: ">_",
+  "cloud-download": "↓",
+  download: "↓",
+  "arrow-down": "↓",
+  add: "+",
+  plus: "+",
+  trash: "🗑",
+  trashcan: "🗑",
+  "git-branch": "⑂",
+  "source-control": "⑂",
+  search: "⌕",
+  zap: "⚡",
+  flame: "⚡",
+  rocket: "⚡",
+};
+
+/** Convert VS Code `$(codicon)` tokens and uninterpolated `$Version` placeholders into clean display text. */
+export function formatCodiconText(raw: string): string {
+  if (!raw) return "";
+  return raw
+    .replace(/\$\(([a-zA-Z0-9_-]+)(?:~[a-zA-Z0-9_-]+)?\)/g, (_m, name: string) => {
+      const glyph = CODICON_GLYPHS[name.toLowerCase()];
+      return glyph ?? "";
+    })
+    .replace(/\$\{?Version\}?/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function formatCompactTokens(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
@@ -38,8 +89,9 @@ export function formatCompactTokens(tokens: number): string {
 }
 
 /**
- * Full-width application status bar. Extension indicator opens the marketplace
- * when the host is off, or extension output when running.
+ * Full-width application status bar. The extension indicator always opens
+ * the Extensions sidebar (marketplace + installed extensions); extension
+ * output lives in the bottom panel and is opened from there, not from here.
  */
 export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions, onOpenRemote }: IdeStatusBarProps) {
   const { t } = useTranslation();
@@ -107,30 +159,31 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
   const left = statusBar.filter((s) => s.alignment === 1);
   const right = statusBar.filter((s) => s.alignment === 2);
 
-  const renderItem = (entry: (typeof statusBar)[number]) => (
-    <button
-      key={entry.id}
-      className="ide-status-item"
-      title={entry.tooltip}
-      style={entry.color ? { color: entry.color } : undefined}
-      onClick={() => entry.command && void extensionService.executeCommand(entry.command)}
-    >
-      {entry.text}
-    </button>
-  );
+  const renderItem = (entry: (typeof statusBar)[number]) => {
+    const label = formatCodiconText(entry.text);
+    const tip = formatCodiconText(entry.tooltip ?? entry.name ?? "");
+    return (
+      <button
+        key={entry.id}
+        type="button"
+        className="ide-status-item"
+        title={tip || undefined}
+        style={entry.color ? { color: entry.color } : undefined}
+        onClick={() =>
+          entry.command && void extensionService.executeCommand(entry.command, entry.arguments ?? [])
+        }
+      >
+        {label}
+      </button>
+    );
+  };
 
+  // The [Extensions] indicator must land on the Extensions sidebar tab in every
+  // host state. Routing it to the bottom "output" panel when running was a
+  // dead end: with no output channels that panel falls back to the terminal,
+  // so the click appeared to open the terminal instead of the plugins page.
+  // Starting the host stays available inside the Extensions sidebar itself.
   const handleExtClick = () => {
-    if (running) {
-      onOpenPanel("output");
-      return;
-    }
-    if (projectDir) {
-      void extensionService.start(projectDir).then(() => {
-        if (extensionService.isRunning) onOpenPanel("output");
-        else onOpenExtensions();
-      }).catch(() => onOpenExtensions());
-      return;
-    }
     onOpenExtensions();
   };
 
@@ -165,6 +218,8 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
         </button>
       )}
       <button
+        type="button"
+        data-testid="statusbar-extensions"
         className={`ide-status-item ide-status-ext ${running ? "running" : ""}`}
         title={running ? t("extensions.hostRunning") : t("extensions.hostOffHint")}
         onClick={handleExtClick}

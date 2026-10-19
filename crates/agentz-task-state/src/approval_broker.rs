@@ -1,6 +1,10 @@
 use super::approval::{ApprovalStore, Binding, Intent, Status};
 use serde_json::Value;
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::{Arc, RwLock},
+};
 use tokio::sync::{oneshot, Mutex};
 
 struct Pending {
@@ -15,16 +19,77 @@ struct Pending {
 pub struct ApprovalBroker {
     boot_id: String,
     pending: Arc<Mutex<HashMap<String, Pending>>>,
+    always_allowed: Arc<RwLock<HashSet<String>>>,
 }
 impl ApprovalBroker {
     pub fn new(boot_id: String) -> Self {
         Self {
             boot_id,
             pending: Arc::new(Mutex::new(HashMap::new())),
+            always_allowed: Arc::new(RwLock::new(HashSet::new())),
         }
     }
     pub fn boot_id(&self) -> &str {
         &self.boot_id
+    }
+    pub fn grant_always_allow(&self, action: &str) {
+        let normalized = action.trim().to_ascii_lowercase();
+        if normalized.is_empty() {
+            return;
+        }
+        if let Ok(mut guard) = self.always_allowed.write() {
+            if matches!(
+                normalized.as_str(),
+                "shell" | "bash" | "powershell" | "powershell_query" | "code_run"
+            ) {
+                guard.insert("shell".into());
+                guard.insert("code_run".into());
+            }
+            guard.insert(normalized);
+        }
+    }
+    pub fn set_always_allowed(&self, actions: impl IntoIterator<Item = String>) {
+        if let Ok(mut guard) = self.always_allowed.write() {
+            guard.clear();
+            for action in actions {
+                let normalized = action.trim().to_ascii_lowercase();
+                if !normalized.is_empty() {
+                    if matches!(
+                        normalized.as_str(),
+                        "shell" | "bash" | "powershell" | "powershell_query" | "code_run"
+                    ) {
+                        guard.insert("shell".into());
+                        guard.insert("code_run".into());
+                    }
+                    guard.insert(normalized);
+                }
+            }
+        }
+    }
+    pub fn is_always_allowed(&self, action: &str) -> bool {
+        let normalized = action.trim().to_ascii_lowercase();
+        let Ok(guard) = self.always_allowed.read() else {
+            return false;
+        };
+        if guard.contains("*") || guard.contains(&normalized) {
+            return true;
+        }
+        if matches!(
+            normalized.as_str(),
+            "shell" | "bash" | "powershell" | "powershell_query" | "code_run"
+        ) && guard.contains("shell")
+        {
+            return true;
+        }
+        false
+    }
+    pub async fn pending_action(&self, id: &str) -> Option<String> {
+        self.pending
+            .lock()
+            .await
+            .get(id)
+            .filter(|pending| !pending.response.is_closed())
+            .map(|pending| pending.intent.action.clone())
     }
     pub async fn request(
         &self,

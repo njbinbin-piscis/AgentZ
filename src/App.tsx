@@ -148,11 +148,15 @@ export default function App() {
   } | null>(null);
   const [browserOpen, setBrowserOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // Inline "open Settings" actions (first-run checklist, setup errors) dispatch this event.
+  // Inline "open Settings" actions (first-run checklist, setup errors, extensions) dispatch this event.
   useEffect(() => {
     const open = () => setSettingsOpen(true);
     window.addEventListener(OPEN_SETTINGS_EVENT, open);
-    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, open);
+    window.addEventListener("agentz-open-settings", open);
+    return () => {
+      window.removeEventListener(OPEN_SETTINGS_EVENT, open);
+      window.removeEventListener("agentz-open-settings", open);
+    };
   }, []);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryInitial, setLibraryInitial] = useState<LibraryInitialState | null>(null);

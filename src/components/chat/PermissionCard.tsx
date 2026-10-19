@@ -61,7 +61,7 @@ export default function PermissionCard({
     const timer = setTimeout(() => setClock(Date.now()), Math.min(expiresMs - Date.now(), 2147483647));
     return () => clearTimeout(timer);
   }, [expiresMs, previewKey]);
-  const resolve = async (approved: boolean) => {
+  const resolve = async (approved: boolean, alwaysAllow = false) => {
     if (!mounted.current || currentId.current !== previewKey) return;
     if (submittedKey.current === previewKey) return;
     if (approved && signal.requestId.startsWith("approval:") && !request.approval?.digest) return;
@@ -75,7 +75,11 @@ export default function PermissionCard({
     setSubmitting(true);
     setError(null);
     try {
-      await respondPermissionRequest(request.requestId, approved, request.approval?.digest);
+      if (alwaysAllow) {
+        await respondPermissionRequest(request.requestId, approved, request.approval?.digest, true);
+      } else {
+        await respondPermissionRequest(request.requestId, approved, request.approval?.digest);
+      }
       if (mounted.current && currentId.current === requestId) onResolved();
     } catch (reason) {
       if (!mounted.current || currentId.current !== requestId) return;
@@ -88,30 +92,37 @@ export default function PermissionCard({
     if (mounted.current && currentId.current === previewKey) onResolved();
   };
   const localDismiss = expired || !!previewError;
+  const allowDisabled = submitting || expired || (request.requestId.startsWith("approval:") && !request.approval?.digest);
 
   return (
     <section className="interactive-card agentz-permission-card" aria-live="polite">
       <strong>Permission required</strong>
       <p>{request.description}</p>
       {request.approval && (
-        <p>Task: {request.approval.taskId} · Environment: {request.approval.environmentId}
+        <p className="agentz-permission-meta">Task: {request.approval.taskId} · Environment: {request.approval.environmentId}
           <br />Expires: {new Date(request.approval.expiresMs).toLocaleString()}
         </p>
       )}
-      {request.approval?.resource != null && <pre>{JSON.stringify(request.approval.resource, null, 2)}</pre>}
-      <code>{request.toolName}</code>
+      {request.approval?.resource != null && <pre className="agentz-permission-resource">{JSON.stringify(request.approval.resource, null, 2)}</pre>}
+      <code className="agentz-permission-tool">{request.toolName}</code>
       <pre className="agentz-permission-input">{JSON.stringify(request.toolInput, null, 2)}</pre>
       {error && <div className="agentz-inline-edit-error">{error}</div>}
       {previewError && <div role="alert" className="agentz-inline-edit-error">{previewError}</div>}
       {expired && <p role="status">This approval has expired. Request a new operation.</p>}
       <div className="ic-actions">
-        <button type="button" disabled={submitting} onClick={() => localDismiss ? dismiss() : void resolve(false)}>
+        <button type="button" className="ic-btn ic-btn-default" disabled={submitting} onClick={() => localDismiss ? dismiss() : void resolve(false)}>
           {localDismiss ? "Dismiss" : "Deny"}
         </button>
-        <button type="button" className="ic-primary" disabled={submitting || expired || (request.requestId.startsWith("approval:") && !request.approval?.digest)} onClick={() => void resolve(true)}>
+        <button type="button" className="ic-btn ic-btn-primary ic-primary" disabled={allowDisabled} onClick={() => void resolve(true)}>
           Allow once
         </button>
-        {previewError && <button type="button" onClick={() => setPreviewAttempt(attempt => attempt + 1)}>Retry preview</button>}
+        {previewError ? (
+          <button type="button" className="ic-btn ic-btn-default" onClick={() => setPreviewAttempt(attempt => attempt + 1)}>Retry preview</button>
+        ) : (
+          <button type="button" className="ic-btn ic-btn-always-allow" disabled={allowDisabled} onClick={() => void resolve(true, true)}>
+            Always allow
+          </button>
+        )}
       </div>
     </section>
   );

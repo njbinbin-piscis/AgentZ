@@ -75,6 +75,12 @@ pub struct SaveLlmSettings {
     pub context_window: u32,
     pub max_iterations: u32,
     pub policy_mode: String,
+    #[serde(default = "default_enabled")]
+    pub confirm_shell_commands: bool,
+    #[serde(default = "default_enabled")]
+    pub confirm_file_writes: bool,
+    #[serde(default)]
+    pub always_allow_tools: Vec<String>,
     pub enable_streaming: bool,
     #[serde(default)]
     pub temperature: Option<f32>,
@@ -115,6 +121,9 @@ pub struct LlmSettingsDto {
     pub context_window: u32,
     pub max_iterations: u32,
     pub policy_mode: String,
+    pub confirm_shell_commands: bool,
+    pub confirm_file_writes: bool,
+    pub always_allow_tools: Vec<String>,
     pub enable_streaming: bool,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
@@ -385,6 +394,9 @@ fn to_dto(settings: &Settings, config_dir: String) -> LlmSettingsDto {
         context_window: settings.context_window,
         max_iterations: settings.max_iterations,
         policy_mode: settings.policy_mode.clone(),
+        confirm_shell_commands: settings.confirm_shell_commands,
+        confirm_file_writes: settings.confirm_file_writes,
+        always_allow_tools: settings.always_allow_tools.clone(),
         enable_streaming: settings.enable_streaming,
         temperature: settings.temperature,
         top_p: settings.top_p,
@@ -590,6 +602,43 @@ fn validate_scalar_secret_updates(updates: &SaveLlmSettings) -> Result<(), Strin
     Ok(())
 }
 
+fn sync_approval_broker(app: &AppHandle, settings: &Settings) {
+    use tauri::Manager;
+    if let Some(state) = app.try_state::<crate::state::AppState>() {
+        let mut allowed = settings.always_allow_tools.clone();
+        if !settings.confirm_shell_commands
+            && !allowed.iter().any(|t| t.eq_ignore_ascii_case("shell"))
+        {
+            allowed.push("shell".into());
+        }
+        state.approval_broker.set_always_allowed(allowed);
+    }
+}
+
+pub(crate) async fn persist_always_allow_tool(app: &AppHandle, tool_name: &str) {
+    let trimmed = tool_name.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    let _write_guard = settings_write_guard().await;
+    if let Ok((mut settings, _)) = load_settings(app) {
+        if matches!(
+            trimmed.to_ascii_lowercase().as_str(),
+            "shell" | "bash" | "powershell" | "powershell_query" | "code_run"
+        ) {
+            settings.confirm_shell_commands = false;
+        }
+        if !settings
+            .always_allow_tools
+            .iter()
+            .any(|existing| existing.eq_ignore_ascii_case(trimmed))
+        {
+            settings.always_allow_tools.push(trimmed.to_string());
+        }
+        let _ = settings.save();
+    }
+}
+
 #[tauri::command]
 pub async fn save_settings(
     app: AppHandle,
@@ -601,6 +650,7 @@ pub async fn save_settings(
 
     apply_settings_updates(&mut settings, updates);
     settings.save().map_err(|e| e.to_string())?;
+    sync_approval_broker(&app, &settings);
     Ok(to_dto(&settings, config_dir))
 }
 
@@ -617,6 +667,7 @@ pub async fn save_settings_with_secrets(
     let (mut settings, config_dir) = load_settings(&app)?;
     apply_settings_transaction(&mut settings, updates, deletions, replacements)?;
     settings.save().map_err(|error| error.to_string())?;
+    sync_approval_broker(&app, &settings);
     Ok(to_dto(&settings, config_dir))
 }
 
@@ -645,6 +696,30 @@ fn apply_settings_updates(settings: &mut Settings, updates: SaveLlmSettings) {
     settings.context_window = updates.context_window;
     settings.max_iterations = updates.max_iterations.clamp(1, 1_000);
     settings.policy_mode = updates.policy_mode;
+    settings.confirm_shell_commands = updates.confirm_shell_commands;
+    settings.confirm_file_writes = updates.confirm_file_writes;
+    let mut always_allow: Vec<String> = Vec::new();
+    for item in updates.always_allow_tools {
+        let trimmed = item.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if updates.confirm_shell_commands
+            && matches!(
+                trimmed.to_ascii_lowercase().as_str(),
+                "shell" | "bash" | "powershell" | "powershell_query" | "code_run"
+            )
+        {
+            continue;
+        }
+        if !always_allow
+            .iter()
+            .any(|existing| existing.eq_ignore_ascii_case(trimmed))
+        {
+            always_allow.push(trimmed.to_string());
+        }
+    }
+    settings.always_allow_tools = always_allow;
     settings.enable_streaming = updates.enable_streaming;
     settings.temperature = updates.temperature;
     settings.top_p = updates.top_p;

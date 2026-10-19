@@ -373,6 +373,91 @@ export class ExtensionService {
     return this.handles?.commands.list() ?? [];
   }
 
+  /** Return all manifest-contributed and runtime-registered commands with human-readable titles. */
+  listContributedCommands(): { command: string; title: string; category?: string }[] {
+    const out = new Map<string, { command: string; title: string; category?: string }>();
+    const extensions = this.handles?.initData.extensions ?? [];
+    for (const ext of extensions) {
+      const contrib = ext.contributes as Record<string, unknown> | undefined;
+      const cmds = contrib?.commands;
+      if (!Array.isArray(cmds)) continue;
+      for (const raw of cmds) {
+        if (!raw || typeof raw !== "object") continue;
+        const c = raw as { command?: unknown; title?: unknown; category?: unknown };
+        if (typeof c.command !== "string" || !c.command) continue;
+        const title =
+          typeof c.title === "string" && c.title
+            ? c.title
+            : c.command;
+        const category =
+          typeof c.category === "string" && c.category
+            ? c.category
+            : ext.displayName || ext.name;
+        out.set(c.command, { command: c.command, title, category });
+      }
+    }
+    for (const id of this.listCommands()) {
+      if (!out.has(id) && !id.startsWith("_")) {
+        out.set(id, { command: id, title: id });
+      }
+    }
+    return [...out.values()];
+  }
+
+  /** Return extension-contributed `editor/title` and `editor/title/run` actions matching the active file. */
+  listEditorTitleActions(activeFilePath?: string | null): { command: string; title: string }[] {
+    const extensions = this.handles?.initData.extensions ?? [];
+    if (extensions.length === 0) return [];
+    const cmdTitles = new Map<string, string>();
+    for (const item of this.listContributedCommands()) {
+      cmdTitles.set(item.command, item.title);
+    }
+    const fileName = activeFilePath
+      ? activeFilePath.replace(/\\/g, "/").split("/").pop() ?? ""
+      : "";
+    const extName = fileName.includes(".") ? `.${fileName.split(".").pop()}` : "";
+
+    const matchesWhen = (when?: string): boolean => {
+      if (!when || !when.trim()) return true;
+      const clauses = when.split(/&&/).map((s) => s.trim());
+      for (const clause of clauses) {
+        const eqMatch = clause.match(/^resourceFilename\s*==\s*(.+)$/);
+        if (eqMatch) {
+          if (fileName !== eqMatch[1].trim().replace(/^['"]|['"]$/g, "")) return false;
+          continue;
+        }
+        const extMatch = clause.match(/^resourceExtname\s*==\s*(.+)$/);
+        if (extMatch) {
+          if (extName !== extMatch[1].trim().replace(/^['"]|['"]$/g, "")) return false;
+          continue;
+        }
+        const ctxVal = this.handles?.commands.getContextKey(clause);
+        if (ctxVal === false) return false;
+      }
+      return true;
+    };
+
+    const actions = new Map<string, { command: string; title: string }>();
+    for (const ext of extensions) {
+      const contrib = ext.contributes as Record<string, unknown> | undefined;
+      const menus = contrib?.menus as Record<string, unknown> | undefined;
+      if (!menus || typeof menus !== "object") continue;
+      for (const menuKey of ["editor/title", "editor/title/run"]) {
+        const entries = menus[menuKey];
+        if (!Array.isArray(entries)) continue;
+        for (const raw of entries) {
+          if (!raw || typeof raw !== "object") continue;
+          const entry = raw as { command?: unknown; when?: unknown };
+          if (typeof entry.command !== "string" || !entry.command) continue;
+          if (!matchesWhen(typeof entry.when === "string" ? entry.when : undefined)) continue;
+          const title = cmdTitles.get(entry.command) ?? entry.command;
+          actions.set(entry.command, { command: entry.command, title });
+        }
+      }
+    }
+    return [...actions.values()];
+  }
+
   /** Fire an activation event (e.g. onLanguage:python, onCommand:foo). */
   async activateByEvent(event: string): Promise<void> {
     if (!this.rpc) return;

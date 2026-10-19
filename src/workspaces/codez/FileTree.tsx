@@ -97,6 +97,12 @@ interface CreatingState {
 /** Join project root with a tree-relative path for Tauri `ide_file_action` / read / write. */
 export function joinProjectPath(projectDir: string, relativePath: string): string {
   const root = projectDir.replace(/[/\\]+$/, "");
+  // An already-absolute path (`D:/…`, `D:\…`, `/…`, `\\host\…`) must never
+  // be re-joined onto the root — that produced `D:\root/D:/root/file`.
+  const normalized = relativePath.replace(/\\/g, "/");
+  if (/^[A-Za-z]:\//.test(normalized) || normalized.startsWith("/")) {
+    return relativePath;
+  }
   const rel = relativePath.replace(/^[/\\]+/, "");
   if (!rel) return root;
   const sep = root.includes("\\") ? "\\" : "/";

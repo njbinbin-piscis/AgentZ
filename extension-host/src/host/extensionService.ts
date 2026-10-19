@@ -44,12 +44,61 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
 
   register(descriptions: ExtensionDescriptionDto[]): void {
     for (const d of descriptions) {
+      const events = new Set<string>(d.activationEvents ?? []);
+      const contrib = d.contributes as Record<string, unknown> | undefined;
+      if (contrib && typeof contrib === "object") {
+        const cmds = contrib.commands;
+        if (Array.isArray(cmds)) {
+          for (const c of cmds) {
+            if (c && typeof c === "object" && typeof (c as { command?: unknown }).command === "string") {
+              events.add(`onCommand:${(c as { command: string }).command}`);
+            }
+          }
+        }
+        const langs = contrib.languages;
+        if (Array.isArray(langs)) {
+          for (const l of langs) {
+            if (l && typeof l === "object" && typeof (l as { id?: unknown }).id === "string") {
+              events.add(`onLanguage:${(l as { id: string }).id}`);
+            }
+          }
+        }
+        const views = contrib.views;
+        if (views && typeof views === "object") {
+          for (const viewList of Object.values(views as Record<string, unknown>)) {
+            if (Array.isArray(viewList)) {
+              for (const v of viewList) {
+                if (v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string") {
+                  events.add(`onView:${(v as { id: string }).id}`);
+                }
+              }
+            }
+          }
+        }
+      }
+      if (events.size === 0 && d.main) {
+        events.add("onStartupFinished");
+      }
+      d.activationEvents = [...events];
       this.registry.set(d.id, d);
     }
   }
 
   private apiForExtension(description: ExtensionDescriptionDto): Record<string, unknown> {
-    return this.apiFactory(description);
+    return this.apiFactory(
+      description,
+      () => [...this.registry.values()],
+      (id: string) => this.activate(id).then((a) => a.exports),
+    );
+  }
+
+  private notifyCompatUpdated(): void {
+    void this.services.commands
+      .executeCommand("_agentz.updateCompat", {
+        hostVersion: HOST_VSCODE_VERSION,
+        extensions: [...this.compat.values()],
+      })
+      .catch(() => undefined);
   }
 
   /** Evaluate engines.vscode + enabledApiProposals against this host. */
@@ -94,9 +143,11 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
 
   private findOwningExtension(filename?: string): ExtensionDescriptionDto | undefined {
     if (!filename) return undefined;
+    const normFile = filename.replace(/\\/g, "/").toLowerCase();
     let best: ExtensionDescriptionDto | undefined;
     for (const d of this.registry.values()) {
-      if (filename.startsWith(d.extensionPath) && (!best || d.extensionPath.length > best.extensionPath.length)) {
+      const normExt = d.extensionPath.replace(/\\/g, "/").toLowerCase();
+      if (normExt && normFile.startsWith(normExt) && (!best || d.extensionPath.length > best.extensionPath.length)) {
         best = d;
       }
     }
@@ -110,14 +161,18 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
   private makeContext(description: ExtensionDescriptionDto): ExtensionContext {
     const extensionUri = Uri.file(description.extensionPath);
     const subscriptions: { dispose(): unknown }[] = [];
+    const globalStorageDir = description.extensionPath
+      ? path.join(description.extensionPath, ".globalStorage")
+      : "";
     return {
       subscriptions,
       extensionPath: description.extensionPath,
       extensionUri,
-      globalState: new Memento(),
-      workspaceState: new Memento(),
+      globalState: new Memento(globalStorageDir ? path.join(globalStorageDir, "globalState.json") : undefined),
+      workspaceState: new Memento(globalStorageDir ? path.join(globalStorageDir, "workspaceState.json") : undefined),
       asAbsolutePath: (relative: string) => path.join(description.extensionPath, relative),
-      globalStorageUri: Uri.file(path.join(description.extensionPath, ".globalStorage")),
+      storageUri: globalStorageDir ? Uri.file(path.join(globalStorageDir, "workspace")) : undefined,
+      globalStorageUri: Uri.file(globalStorageDir || path.join(description.extensionPath, ".globalStorage")),
       logUri: Uri.file(path.join(description.extensionPath, ".log")),
       extensionMode: 1,
       secrets: {
@@ -150,7 +205,10 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
       if (!description.main) {
         this.logger(`[ext] ${id} has no main; declarative-only`);
         const c = this.compat.get(id);
-        if (c) c.activated = true;
+        if (c) {
+          c.activated = true;
+          this.notifyCompatUpdated();
+        }
         return activated;
       }
       const mainPath = path.isAbsolute(description.main) ? description.main : path.join(description.extensionPath, description.main);
@@ -163,9 +221,20 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
           activated.exports = await mod.activate(context);
         }
         const c = this.compat.get(id);
-        if (c) c.activated = true;
+        if (c) {
+          c.activated = true;
+          this.notifyCompatUpdated();
+        }
       } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
         this.logger(`[ext] activation failed for ${id}: ${err instanceof Error ? err.stack : String(err)}`);
+        const c = this.compat.get(id);
+        if (c) {
+          c.compatible = false;
+          c.activated = false;
+          c.reason = `Activation error: ${errMsg}`;
+          this.notifyCompatUpdated();
+        }
         throw err;
       }
       return activated;
@@ -216,10 +285,38 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
     );
   }
 
-  // Synchronously activate everything that requests "*" or onStartupFinished.
+  // Synchronously activate everything that requests "*", onStartupFinished, or matching workspaceContains.
   async activateStartup(): Promise<void> {
     await this.$activateByEvent("*");
     await this.$activateByEvent("onStartupFinished");
+    const roots = this.services.workspace.workspaceFolders
+      .map((f) => f.uri.fsPath)
+      .filter((p): p is string => !!p);
+    if (roots.length > 0) {
+      const matchedEvents = new Set<string>();
+      for (const d of this.registry.values()) {
+        if (this.activated.has(d.id)) continue;
+        for (const ev of d.activationEvents) {
+          if (!ev.startsWith("workspaceContains:")) continue;
+          const rawPattern = ev.slice("workspaceContains:".length).trim();
+          const cleanRel = rawPattern.replace(/^\*\*\/+/, "").replace(/^\.\/+/, "");
+          if (!cleanRel || cleanRel.includes("*")) continue;
+          for (const root of roots) {
+            try {
+              if (fs.existsSync(path.join(root, cleanRel))) {
+                matchedEvents.add(ev);
+                break;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+      }
+      for (const ev of matchedEvents) {
+        await this.$activateByEvent(ev);
+      }
+    }
   }
 }
 

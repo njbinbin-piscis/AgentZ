@@ -89,6 +89,9 @@ const DEFAULT_FORM: LlmSettings = {
   context_window: 0,
   max_iterations: 200,
   policy_mode: "balanced",
+  confirm_shell_commands: true,
+  confirm_file_writes: true,
+  always_allow_tools: [],
   enable_streaming: true,
   temperature: null,
   top_p: null,
@@ -260,6 +263,9 @@ function toForm(data: SettingsResponse): LlmSettings {
     max_iterations: data.max_iterations ?? 200,
     context_window: data.context_window ?? 0,
     policy_mode: data.policy_mode || "balanced",
+    confirm_shell_commands: data.confirm_shell_commands ?? true,
+    confirm_file_writes: data.confirm_file_writes ?? true,
+    always_allow_tools: data.always_allow_tools ?? [],
     enable_streaming: data.enable_streaming ?? true,
     temperature: data.temperature ?? null,
     top_p: data.top_p ?? null,
@@ -654,6 +660,95 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     ]}
                     onChange={(v) => update("policy_mode", v)}
                   />
+                </div>
+
+                <div className="agentz-settings-field">
+                  <label className="agentz-settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={form.confirm_shell_commands ?? true}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setForm((prev) => {
+                          const current = prev.always_allow_tools ?? [];
+                          const nextTools = checked
+                            ? current.filter((item) => item !== "shell" && item !== "code_run")
+                            : current.includes("shell")
+                              ? current
+                              : [...current, "shell"];
+                          return {
+                            ...prev,
+                            confirm_shell_commands: checked,
+                            always_allow_tools: nextTools,
+                          };
+                        });
+                      }}
+                    />
+                    {t("settings.confirmShellCommands")}
+                  </label>
+                  <p className="agentz-settings-hint">{t("settings.confirmShellCommandsHint")}</p>
+                </div>
+
+                <div className="agentz-settings-field">
+                  <label className="agentz-settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={form.confirm_file_writes ?? true}
+                      onChange={(e) => update("confirm_file_writes", e.target.checked)}
+                    />
+                    {t("settings.confirmFileWrites")}
+                  </label>
+                  <p className="agentz-settings-hint">{t("settings.confirmFileWritesHint")}</p>
+                </div>
+
+                <div className="agentz-settings-field">
+                  <label>{t("settings.alwaysAllowTools")}</label>
+                  <div className="agentz-permission-chips">
+                    {[
+                      { id: "shell", label: t("settings.toolPermShell") },
+                      { id: "code_run", label: t("settings.toolPermCodeRun") },
+                      { id: "read_lints", label: t("settings.toolPermReadLints") },
+                      { id: "lsp", label: t("settings.toolPermLsp") },
+                      { id: "browser", label: t("settings.toolPermBrowser") },
+                      { id: "*", label: t("settings.toolPermAll") },
+                    ].map((tool) => {
+                      const list = form.always_allow_tools ?? [];
+                      const active =
+                        list.includes(tool.id) ||
+                        (tool.id === "shell" && form.confirm_shell_commands === false);
+                      return (
+                        <button
+                          key={tool.id}
+                          type="button"
+                          className={`agentz-permission-chip ${active ? "active" : ""}`}
+                          onClick={() => {
+                            setForm((prev) => {
+                              const current = prev.always_allow_tools ?? [];
+                              const isCurrentlyActive =
+                                current.includes(tool.id) ||
+                                (tool.id === "shell" && prev.confirm_shell_commands === false);
+                              const nextTools = isCurrentlyActive
+                                ? current.filter((item) => item !== tool.id)
+                                : [...current.filter((item) => item !== tool.id), tool.id];
+                              const nextConfirmShell =
+                                tool.id === "shell"
+                                  ? isCurrentlyActive
+                                  : prev.confirm_shell_commands;
+                              return {
+                                ...prev,
+                                confirm_shell_commands: nextConfirmShell,
+                                always_allow_tools: nextTools,
+                              };
+                            });
+                          }}
+                        >
+                          {active ? "✓ " : ""}
+                          {tool.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="agentz-settings-hint">{t("settings.alwaysAllowToolsHint")}</p>
                 </div>
 
                 <div className="agentz-settings-field">

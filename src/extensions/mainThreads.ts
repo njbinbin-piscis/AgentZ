@@ -9,6 +9,7 @@ import type { IRPCProtocol } from "./common/proxyIdentifier";
 import {
   ExtHostContext,
   MainContext,
+  type CompatReportDto,
   type InitDataDto,
   type MainThreadCommandsShape,
   type MainThreadDebugShape,
@@ -47,6 +48,7 @@ import { uriToIdePath } from "../services/tauri/editorUri";
 import { ideApi } from "../services/tauri/ide";
 import { diskStamps } from "../services/diskStamps";
 import { extensionUiStore } from "./extensionUiStore";
+import { compatStore } from "./compatStore";
 
 export interface MainThreadContext {
   rpc: IRPCProtocol;
@@ -58,11 +60,36 @@ export interface MainThreadContext {
 
 // ── Commands ────────────────────────────────────────────────────────────────
 
+const BUILTIN_COMMANDS = new Set([
+  "_agentz.updateCompat",
+  "setContext",
+  "vscode.open",
+  "revealLine",
+  "workbench.action.files.save",
+  "workbench.action.closeActiveEditor",
+  "workbench.action.reloadWindow",
+  "workbench.action.restartExtensionHost",
+  "workbench.action.openSettings",
+  "workbench.action.openGlobalSettings",
+  "workbench.view.extensions",
+  "workbench.extensions.action.showInstalledExtensions",
+  "workbench.action.showCommands",
+  "workbench.action.quickOpen",
+  "workbench.action.terminal.toggleTerminal",
+  "workbench.action.terminal.new",
+  "workbench.action.terminal.focus",
+  "vscode.env.clipboard.readText",
+  "vscode.env.clipboard.writeText",
+]);
+
 export class MainThreadCommands implements MainThreadCommandsShape {
   private readonly registered = new Set<string>();
+  private readonly contextKeys = new Map<string, unknown>();
   private readonly extHost;
+  private readonly extHostExt;
   constructor(rpc: IRPCProtocol) {
     this.extHost = rpc.getProxy(ExtHostContext.ExtHostCommands);
+    this.extHostExt = rpc.getProxy(ExtHostContext.ExtHostExtensionService);
   }
   $registerCommand(id: string): void {
     this.registered.add(id);
@@ -78,19 +105,111 @@ export class MainThreadCommands implements MainThreadCommandsShape {
     if (this.registered.has(id)) {
       return this.extHost.$executeContributedCommand(id, args);
     }
+    if (BUILTIN_COMMANDS.has(id)) {
+      return this.builtin(id, args);
+    }
+    try {
+      await this.extHostExt.$activateByEvent(`onCommand:${id}`);
+    } catch {
+      // ignore activation error
+    }
+    if (this.registered.has(id)) {
+      return this.extHost.$executeContributedCommand(id, args);
+    }
     return this.builtin(id, args);
   }
   list(): string[] {
     return [...this.registered];
   }
+  getContextKey(key: string): unknown {
+    return this.contextKeys.get(key);
+  }
+  private openExternalUrl(url: string): void {
+    void invoke("plugin:shell|open", { path: url }).catch(() => {
+      if (typeof window !== "undefined" && typeof window.open === "function") {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    });
+  }
   private builtin(id: string, args: unknown[]): unknown {
-    // A small set of workbench built-ins extensions commonly call.
     switch (id) {
-      case "setContext":
+      case "_agentz.updateCompat": {
+        const report = args[0] as CompatReportDto | undefined;
+        if (report && Array.isArray(report.extensions)) {
+          compatStore.setReport(report);
+        }
         return undefined;
-      case "vscode.open":
+      }
+      case "setContext":
+        if (typeof args[0] === "string") {
+          this.contextKeys.set(args[0], args[1]);
+        }
+        return undefined;
+      case "vscode.open": {
+        const target = args[0];
+        if (!target) return false;
+        if (typeof target === "string") {
+          if (/^https?:\/\//i.test(target)) {
+            this.openExternalUrl(target);
+            return true;
+          }
+          const filePath = target.startsWith("file:")
+            ? uriToIdePath(monaco.Uri.parse(target))
+            : target;
+          window.dispatchEvent(new CustomEvent("agentz-open-file", { detail: { path: filePath } }));
+          return true;
+        }
+        if (typeof target === "object" && "scheme" in (target as Record<string, unknown>)) {
+          const uriDto = target as UriComponents;
+          if (uriDto.scheme === "http" || uriDto.scheme === "https") {
+            const url = conv.dtoToUri(uriDto).toString(true);
+            this.openExternalUrl(url);
+            return true;
+          }
+          const filePath = uriToIdePath(conv.dtoToUri(uriDto));
+          window.dispatchEvent(new CustomEvent("agentz-open-file", { detail: { path: filePath } }));
+          return true;
+        }
+        return false;
+      }
+      case "workbench.action.reloadWindow":
+      case "workbench.action.restartExtensionHost":
+        window.dispatchEvent(new CustomEvent("agentz-reload-window"));
+        return undefined;
+      case "workbench.action.openSettings":
+      case "workbench.action.openGlobalSettings":
+        window.dispatchEvent(
+          new CustomEvent("agentz-open-settings", {
+            detail: { query: typeof args[0] === "string" ? args[0] : undefined },
+          }),
+        );
+        return undefined;
+      case "workbench.view.extensions":
+      case "workbench.extensions.action.showInstalledExtensions":
+        window.dispatchEvent(new CustomEvent("agentz-open-extensions"));
+        return undefined;
+      case "workbench.action.showCommands":
+        window.dispatchEvent(new CustomEvent("agentz-open-palette", { detail: { mode: "commands" } }));
+        return undefined;
+      case "workbench.action.quickOpen":
+        window.dispatchEvent(new CustomEvent("agentz-open-palette", { detail: { mode: "files" } }));
+        return undefined;
+      case "workbench.action.terminal.toggleTerminal":
+      case "workbench.action.terminal.new":
+      case "workbench.action.terminal.focus":
+        window.dispatchEvent(new CustomEvent("agentz-show-terminal"));
+        return undefined;
+      case "vscode.env.clipboard.readText":
+        return typeof navigator !== "undefined" && navigator.clipboard?.readText
+          ? navigator.clipboard.readText().catch(() => "")
+          : Promise.resolve("");
+      case "vscode.env.clipboard.writeText":
+        return typeof navigator !== "undefined" && navigator.clipboard?.writeText
+          ? navigator.clipboard.writeText(String(args[0] ?? "")).catch(() => undefined)
+          : Promise.resolve();
       case "revealLine":
       case "workbench.action.files.save":
+      case "workbench.action.closeActiveEditor":
         return undefined;
       default:
         console.debug("[ext] unhandled builtin command", id, args);
@@ -531,7 +650,12 @@ export class MainThreadWebviews implements MainThreadWebviewsShape {
 
 export class MainThreadTerminal implements MainThreadTerminalShape {
   constructor(private readonly ctx: MainThreadContext) {}
-  async $createTerminal(id: string, _name: string): Promise<void> {
+  async $createTerminal(id: string, name: string): Promise<void> {
+    window.dispatchEvent(
+      new CustomEvent("agentz-ext-terminal-create", {
+        detail: { id, name, projectDir: this.ctx.projectDir },
+      }),
+    );
     try {
       await invoke<void>("ide_terminal_create", { terminalId: id, projectDir: this.ctx.projectDir });
     } catch {
@@ -539,10 +663,17 @@ export class MainThreadTerminal implements MainThreadTerminalShape {
     }
   }
   $sendText(id: string, text: string, addNewLine: boolean): void {
-    void invoke("ide_terminal_write", { terminalId: id, data: addNewLine ? text + "\n" : text });
+    const data = addNewLine ? text + "\n" : text;
+    window.dispatchEvent(new CustomEvent("agentz-show-terminal", { detail: { id } }));
+    window.dispatchEvent(
+      new CustomEvent("agentz-ext-terminal-send", {
+        detail: { id, text, addNewLine, data },
+      }),
+    );
+    void invoke("ide_terminal_write", { terminalId: id, data }).catch(() => undefined);
   }
-  $show(_id: string): void {
-    window.dispatchEvent(new CustomEvent("agentz-show-terminal"));
+  $show(id: string): void {
+    window.dispatchEvent(new CustomEvent("agentz-show-terminal", { detail: { id } }));
   }
   $dispose(id: string): void {
     invoke("ide_terminal_destroy", { terminalId: id }).catch((err: unknown) => {

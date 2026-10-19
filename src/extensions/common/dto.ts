@@ -162,10 +162,13 @@ export interface StatusBarEntryDto {
   text: string;
   tooltip?: string;
   command?: string;
+  arguments?: unknown[];
   alignment: number; // 1 left, 2 right
   priority?: number;
   color?: string;
   backgroundColor?: string;
+  name?: string;
+  extensionId?: string;
 }
 
 export interface MessageOptionsDto {
@@ -191,6 +194,7 @@ export interface QuickPickItemDto {
   description?: string;
   detail?: string;
   picked?: boolean;
+  kind?: number;
 }
 
 export interface WebviewOptionsDto {

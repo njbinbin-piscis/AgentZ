@@ -720,3 +720,34 @@
 .agentz-ext-remove:hover {
   color: #f87171;
 }
+
+.agentz-permission-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.agentz-permission-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.agentz-permission-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.agentz-permission-chip.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+

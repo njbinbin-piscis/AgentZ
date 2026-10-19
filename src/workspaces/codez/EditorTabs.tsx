@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { isBrowserTab } from "./browserTab";
+import { extensionService } from "../../extensions/extensionService";
+import { useExtensionUi } from "../../extensions/ui/useExtensionUi";
 import type { OpenTab } from "./types";
 
 interface TabContextMenu {
@@ -39,7 +41,9 @@ export default function EditorTabs({
   onDismissContextMenu,
 }: EditorTabsProps) {
   const { t } = useTranslation();
+  const { running: extRunning } = useExtensionUi();
   const tabsRef = useRef<HTMLDivElement>(null);
+  const titleActions = extRunning ? extensionService.listEditorTitleActions(activeTabPath) : [];
 
   useEffect(() => {
     const el = tabsRef.current;
@@ -99,6 +103,24 @@ export default function EditorTabs({
             </span>
           </div>
         ))}
+        {titleActions.length > 0 && (
+          <div
+            className="ide-tab-actions"
+            style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, padding: "0 8px" }}
+          >
+            {titleActions.map((act) => (
+              <button
+                key={act.command}
+                type="button"
+                className="ide-status-item"
+                title={act.title}
+                onClick={() => void extensionService.executeCommand(act.command)}
+              >
+                ▶ {act.title}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {contextMenu && (

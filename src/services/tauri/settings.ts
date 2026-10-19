@@ -37,6 +37,9 @@ export interface LlmSettings {
   context_window: number;
   max_iterations: number;
   policy_mode: string;
+  confirm_shell_commands?: boolean;
+  confirm_file_writes?: boolean;
+  always_allow_tools?: string[];
   enable_streaming: boolean;
   temperature?: number | null;
   top_p?: number | null;

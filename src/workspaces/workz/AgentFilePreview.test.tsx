@@ -124,4 +124,31 @@ describe("AgentFilePreview editable canvas (R10-09 & R10-07)", () => {
       content: "# Draft Plan\nStep 1: init\nStep 2: verify\n",
     });
   });
+
+  it("opens an absolute Windows artifact path without double-joining the project root", async () => {
+    await act(async () => {
+      root = create(
+        <AgentFilePreview
+          projectDir={"D:\\projects\\AgentZ"}
+          path="D:/projects/AgentZ/MODULE_DEPENDENCY_GRAPH.md"
+          onClose={() => {}}
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Regression: this used to read
+    // `D:\projects\AgentZ/D:/projects/AgentZ/MODULE_DEPENDENCY_GRAPH.md`.
+    expect(readFileMock).toHaveBeenCalledWith(
+      "D:/projects/AgentZ/MODULE_DEPENDENCY_GRAPH.md",
+    );
+    expect(readFileMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("AgentZ/D:"),
+    );
+    expect(gitDiffMock).toHaveBeenCalledWith(
+      "D:\\projects\\AgentZ",
+      "MODULE_DEPENDENCY_GRAPH.md",
+    );
+  });
 });

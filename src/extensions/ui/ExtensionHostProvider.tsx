@@ -81,6 +81,18 @@ export default function ExtensionHostProvider({
     };
   }, []);
 
+  useEffect(() => {
+    if (!projectDir || !enabled) return;
+    const onReloadWindow = () => {
+      extensionUiStore.setHostError(null);
+      void extensionService.start(projectDir, { force: true }).catch((e) => {
+        extensionUiStore.setHostError(String(e));
+      });
+    };
+    window.addEventListener("agentz-reload-window", onReloadWindow);
+    return () => window.removeEventListener("agentz-reload-window", onReloadWindow);
+  }, [projectDir, enabled]);
+
   if (!enabled) return null;
 
   return (

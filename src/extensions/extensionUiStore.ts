@@ -19,7 +19,7 @@ export interface MessageToast {
 
 export interface QuickPickRequest {
   id: number;
-  items: { label: string; description?: string; detail?: string; picked?: boolean }[];
+  items: { label: string; description?: string; detail?: string; picked?: boolean; kind?: number }[];
   placeHolder?: string;
   canPickMany: boolean;
   resolve: (value: unknown) => void;

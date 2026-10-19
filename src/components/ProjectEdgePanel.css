@@ -286,6 +286,67 @@
   white-space: nowrap;
 }
 
+/* ── Artifacts filter / sort toolbar ────────────────────────────────── */
+.agentz-edge-artifacts-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 0;
+  flex-wrap: wrap;
+}
+
+.agentz-edge-artifacts-filter {
+  position: relative;
+  flex: 1;
+  min-width: 110px;
+  display: flex;
+  align-items: center;
+}
+
+.agentz-edge-artifacts-search {
+  width: 100%;
+  background: var(--bg-elev-2, #1b1b26);
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 5px;
+  color: inherit;
+  font-size: 12px;
+  padding: 4px 22px 4px 8px;
+  outline: none;
+}
+
+.agentz-edge-artifacts-search:focus {
+  border-color: var(--accent, #7c6af7);
+}
+
+.agentz-edge-artifacts-clear {
+  position: absolute;
+  right: 2px;
+  background: transparent;
+  border: 0;
+  color: var(--text-dim, #9a9ab0);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 3px 5px;
+  line-height: 1;
+}
+
+.agentz-edge-artifacts-sort {
+  background: var(--bg-elev-2, #1b1b26);
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 5px;
+  color: inherit;
+  font-size: 11px;
+  padding: 3px 4px;
+  max-width: 104px;
+  cursor: pointer;
+}
+
+.agentz-edge-artifacts-count {
+  font-size: 10px;
+  color: var(--text-dim, #9a9ab0);
+  white-space: nowrap;
+}
+
 /* ── Flat artifacts list (no tree) ──────────────────────────────────── */
 .agentz-edge-artifacts-flat {
   list-style: none;
@@ -296,8 +357,9 @@
 .agentz-edge-artifact-item {
   width: 100%;
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
   padding: 5px 8px;
   background: transparent;
   border: 0;
@@ -322,4 +384,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
+}
+
+.agentz-edge-artifact-path {
+  font-size: 10px;
+  color: var(--text-dim, #9a9ab0);
+  font-family: Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }

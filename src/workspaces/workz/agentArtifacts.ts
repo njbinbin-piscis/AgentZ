@@ -1,4 +1,5 @@
 import type { GitFileStatus } from "../codez/types";
+import { relativizeArtifactPath } from "./artifactPaths";
 
 export interface AgentToolEvent {
   id: string;
@@ -28,26 +29,30 @@ function pathFromToolInput(input: unknown): string | undefined {
   return undefined;
 }
 
-/** Extract a relative file path from tool name + payload. */
+/** Extract a file path from tool name + payload, relativized to `roots` when possible. */
 export function pathFromToolEvent(
   name: string,
   input: unknown,
   result?: string,
+  roots: Array<string | null | undefined> = [],
 ): string | undefined {
   const fromInput = pathFromToolInput(input);
-  if (fromInput) return normalizeArtifactPath(fromInput);
+  if (fromInput) return normalizeArtifactPath(fromInput, roots);
 
   if (!result) return undefined;
   const n = name.toLowerCase();
   if (n.includes("file") || n.includes("write") || n.includes("read") || n.includes("edit")) {
     const m = result.match(/(?:^|\s)([^\s'"]+\.[a-zA-Z0-9]+)(?:\s|$)/);
-    if (m?.[1]) return normalizeArtifactPath(m[1]);
+    if (m?.[1]) return normalizeArtifactPath(m[1], roots);
   }
   return undefined;
 }
 
-export function normalizeArtifactPath(raw: string): string {
-  return raw.replace(/\\/g, "/").replace(/^[/\\]+/, "");
+export function normalizeArtifactPath(
+  raw: string,
+  roots: Array<string | null | undefined> = [],
+): string {
+  return relativizeArtifactPath(raw, roots);
 }
 
 export interface ToolStepLike {
@@ -56,32 +61,55 @@ export interface ToolStepLike {
   result?: string;
 }
 
-/** Agent-produced paths from tool invocations in the current UI step list. */
-export function collectArtifactsFromToolSteps(toolSteps: ToolStepLike[]): string[] {
-  const paths = new Set<string>();
-  for (const step of toolSteps) {
-    const p = pathFromToolEvent(step.name, step.input, step.result);
-    if (p) paths.add(p);
-  }
-  return [...paths].sort((a, b) => a.localeCompare(b));
+/**
+ * Order paths newest-first: the last tool invocation that touched a path
+ * determines its position, so later-generated artifacts sort to the front
+ * and re-generated files bubble back to the top.
+ */
+function newestFirstByLastTouch(entries: string[]): string[] {
+  const lastTouch = new Map<string, number>();
+  entries.forEach((p, i) => {
+    if (p) lastTouch.set(p, i);
+  });
+  return [...lastTouch.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p);
 }
 
-/** Agent-produced paths from persisted WorkZ step history (not git status). */
-export function collectArtifactsFromSteps(steps: AgentStep[]): string[] {
-  const paths = new Set<string>();
+/** Agent-produced paths from tool invocations in the current UI step list, newest first. */
+export function collectArtifactsFromToolSteps(
+  toolSteps: ToolStepLike[],
+  roots: Array<string | null | undefined> = [],
+): string[] {
+  const entries: string[] = [];
+  for (const step of toolSteps) {
+    const p = pathFromToolEvent(step.name, step.input, step.result, roots);
+    if (p) entries.push(p);
+  }
+  return newestFirstByLastTouch(entries);
+}
+
+/** Agent-produced paths from persisted WorkZ step history (not git status), newest first. */
+export function collectArtifactsFromSteps(
+  steps: AgentStep[],
+  roots: Array<string | null | undefined> = [],
+): string[] {
+  const entries: string[] = [];
   for (const step of steps) {
     for (const tool of step.tools) {
       const p =
         tool.path != null
-          ? normalizeArtifactPath(tool.path)
-          : pathFromToolEvent(tool.name, tool.input, tool.result);
-      if (p) paths.add(p);
+          ? normalizeArtifactPath(tool.path, roots)
+          : pathFromToolEvent(tool.name, tool.input, tool.result, roots);
+      if (p) entries.push(p);
     }
   }
-  return [...paths].sort((a, b) => a.localeCompare(b));
+  return newestFirstByLastTouch(entries);
 }
 
 /** @deprecated Prefer {@link collectArtifactsFromSteps} — git changes belong in the Changes tab. */
-export function collectArtifacts(steps: AgentStep[], _changes?: GitFileStatus[]): string[] {
-  return collectArtifactsFromSteps(steps);
+export function collectArtifacts(
+  steps: AgentStep[],
+  _changes?: GitFileStatus[],
+  roots: Array<string | null | undefined> = [],
+): string[] {
+  return collectArtifactsFromSteps(steps, roots);
 }

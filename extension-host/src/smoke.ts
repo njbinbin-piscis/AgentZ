@@ -14,6 +14,7 @@ import {
 } from "./common/protocol";
 import { Services } from "./host/services";
 import { ExtHostExtensionService, readExtensionDescription } from "./host/extensionService";
+import { RelativePattern, Uri } from "./host/types-impl";
 
 function pairedTransports(): [ITransport, ITransport] {
   let aHandler: ((m: RpcMessage) => void) | undefined;
@@ -110,6 +111,29 @@ async function run(): Promise<void> {
   assert(!!completions && completions.items.length === 1, "completion returned 1 item");
   assert(completions!.items[0].label === "agentzHello", "completion label");
   assert(completions!.items[0].insertTextIsSnippet === true, "completion is snippet");
+
+  // 5. Uri.fsPath strips leading slash on Windows drive paths
+  const winUri = Uri.file("C:\\Projects\\AgentZ");
+  assert(!winUri.fsPath.startsWith("/"), `Uri.fsPath has no leading slash for drive letter: ${winUri.fsPath}`);
+
+  // 6. FileSystemWatcher implements onDidCreate / onDidChange / onDidDelete / dispose
+  const watcher = services.workspace.registerFileSystemWatcher(new RelativePattern(winUri, ".nvmrc"));
+  assert(typeof watcher.onDidCreate === "function", "watcher.onDidCreate is function");
+  assert(typeof watcher.onDidChange === "function", "watcher.onDidChange is function");
+  assert(typeof watcher.onDidDelete === "function", "watcher.onDidDelete is function");
+  watcher.dispose();
+
+  // 7. ExtHostFileSystem.stat throws FileSystemError.FileNotFound for missing files
+  const fsApi = services.workspace.createFileSystem();
+  let statThrew = false;
+  try {
+    await fsApi.stat(Uri.file(path.join(sampleDir, "non-existent-lockfile.lockb")));
+  } catch (e) {
+    statThrew = (e as { code?: string }).code === "FileNotFound";
+  }
+  assert(statThrew, "fs.stat throws FileNotFound for missing file");
+  const pkgStat = await fsApi.stat(Uri.file(path.join(sampleDir, "package.json")));
+  assert(pkgStat.size > 0, "fs.stat returns size for existing package.json");
 
   console.log("\nSMOKE OK — all assertions passed");
   console.log(`  commands: ${registered.join(", ")}`);

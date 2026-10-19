@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useProjectEdgeActions, useProjectEdgeState } from "../contexts/ProjectEdgeContext";
+import {
+  filterArtifactPaths,
+  normalizePathSlashes,
+  sortArtifactPaths,
+  type ArtifactSortMode,
+} from "../workspaces/workz/artifactPaths";
 import EdgeBookmarkDrawer from "./EdgeBookmarkDrawer";
 import "./ProjectEdgePanel.css";
 
@@ -15,8 +21,13 @@ type EdgeTabId = "changes" | "artifacts";
 
 /** Extract the bare filename from a path (last segment). */
 function basename(p: string): string {
-  const parts = p.split("/");
+  const parts = normalizePathSlashes(p).split("/");
   return parts[parts.length - 1] ?? p;
+}
+
+function dirname(p: string): string {
+  const parts = normalizePathSlashes(p).split("/");
+  return parts.slice(0, -1).join("/");
 }
 
 export default function ProjectEdgePanel({
@@ -34,6 +45,10 @@ export default function ProjectEdgePanel({
 
   const [activeTab, setActiveTab] = useState<EdgeTabId>("changes");
   const [forceDismissed, setForceDismissed] = useState(false);
+  const [artifactQuery, setArtifactQuery] = useState("");
+  // Default: time sort, newest first — artifacts arrive newest-first from
+  // the collectors, so time-desc is just the incoming order.
+  const [artifactSort, setArtifactSort] = useState<ArtifactSortMode>("time-desc");
 
   const hasChanges = gitChanges.length > 0 || pendingReview != null;
   const hasArtifacts = artifacts.length > 0;
@@ -58,17 +73,29 @@ export default function ProjectEdgePanel({
   const isPinned = pendingReview != null && !forceDismissed;
   const isHidden = !hasChanges && !hasArtifacts;
 
+  // Deduped in arrival order (newest first); no alphabetical re-sort here —
+  // ordering is the sort control's job below.
   const flatArtifacts = useMemo(() => {
     const seen = new Set<string>();
-    const list: { path: string; name: string }[] = [];
+    const list: { path: string; name: string; dir: string }[] = [];
     for (const p of artifacts) {
       if (seen.has(p)) continue;
       seen.add(p);
-      list.push({ path: p, name: basename(p) });
+      list.push({ path: p, name: basename(p), dir: dirname(p) });
     }
-    list.sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
     return list;
   }, [artifacts]);
+
+  const visibleArtifacts = useMemo(() => {
+    const filtered = filterArtifactPaths(
+      flatArtifacts.map((a) => a.path),
+      artifactQuery,
+    );
+    const byPath = new Map(flatArtifacts.map((a) => [a.path, a]));
+    return sortArtifactPaths(filtered, artifactSort)
+      .map((p) => byPath.get(p))
+      .filter((a): a is { path: string; name: string; dir: string } => Boolean(a));
+  }, [flatArtifacts, artifactQuery, artifactSort]);
 
   const handleClose = useCallback(() => {
     setForceDismissed(true);
@@ -197,9 +224,60 @@ export default function ProjectEdgePanel({
 
         {activeTab === "artifacts" && (
           <>
-            {flatArtifacts.length > 0 ? (
+            {flatArtifacts.length > 0 && (
+              <div className="agentz-edge-artifacts-tools">
+                <div className="agentz-edge-artifacts-filter">
+                  <input
+                    type="search"
+                    className="agentz-edge-artifacts-search"
+                    data-testid="artifact-filter-input"
+                    value={artifactQuery}
+                    onChange={(e) => setArtifactQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setArtifactQuery("");
+                    }}
+                    placeholder={t("agent.artifactSearchPlaceholder")}
+                    aria-label={t("agent.artifactSearchPlaceholder")}
+                  />
+                  {artifactQuery && (
+                    <button
+                      type="button"
+                      className="agentz-edge-artifacts-clear"
+                      data-testid="artifact-filter-clear"
+                      onClick={() => setArtifactQuery("")}
+                      title={t("common.close")}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <select
+                  className="agentz-edge-artifacts-sort"
+                  data-testid="artifact-sort-select"
+                  value={artifactSort}
+                  onChange={(e) => setArtifactSort(e.target.value as ArtifactSortMode)}
+                  aria-label={t("agent.artifactSortLabel")}
+                  title={t("agent.artifactSortLabel")}
+                >
+                  <option value="time-desc">{t("agent.artifactSortTimeDesc")}</option>
+                  <option value="time-asc">{t("agent.artifactSortTimeAsc")}</option>
+                  <option value="name-asc">{t("agent.artifactSortNameAsc")}</option>
+                  <option value="name-desc">{t("agent.artifactSortNameDesc")}</option>
+                  <option value="path-asc">{t("agent.artifactSortPathAsc")}</option>
+                </select>
+                {artifactQuery.trim() && (
+                  <span className="agentz-edge-artifacts-count" data-testid="artifact-filter-count">
+                    {t("agent.artifactFilteredCount", {
+                      filtered: visibleArtifacts.length,
+                      total: flatArtifacts.length,
+                    })}
+                  </span>
+                )}
+              </div>
+            )}
+            {visibleArtifacts.length > 0 ? (
               <ul className="agentz-edge-artifacts-flat">
-                {flatArtifacts.map((a) => (
+                {visibleArtifacts.map((a) => (
                   <li key={a.path}>
                     <button
                       type="button"
@@ -208,12 +286,17 @@ export default function ProjectEdgePanel({
                       title={a.path}
                     >
                       <span className="agentz-edge-artifact-name">{a.name}</span>
+                      {a.dir && <span className="agentz-edge-artifact-path">{a.dir}</span>}
                     </button>
                   </li>
                 ))}
               </ul>
             ) : (
-              <div className="agentz-edge-empty">{t("agent.noArtifacts")}</div>
+              <div className="agentz-edge-empty">
+                {flatArtifacts.length > 0
+                  ? t("agent.noMatchingArtifacts")
+                  : t("agent.noArtifacts")}
+              </div>
             )}
           </>
         )}

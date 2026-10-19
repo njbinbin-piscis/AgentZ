@@ -6,7 +6,13 @@ import type { FileContent } from "../codez/types";
 import Markdown from "../codez/Markdown";
 import ImagePreview from "../codez/ImagePreview";
 import { isHtmlPath, isImagePath, isMarkdownPath } from "../codez/FileIcon";
-import { resolveArtifactFullPath, isPdfPath } from "./artifactPaths";
+import {
+  isAbsoluteArtifactPath,
+  normalizePathSlashes,
+  relativizeArtifactPath,
+  resolveArtifactFullPath,
+  isPdfPath,
+} from "./artifactPaths";
 
 interface AgentFilePreviewProps {
   projectDir: string;
@@ -93,7 +99,11 @@ export default function AgentFilePreview({
   const [savedFlash, setSavedFlash] = useState(false);
 
   const fullPath = resolveArtifactFullPath(projectDir, path, workspaceDir);
-  const fileName = path.split("/").pop() ?? path;
+  // git diff / recent-edit bookkeeping key on project-relative paths; an
+  // absolute artifact path must not be handed to them verbatim.
+  const relPath = relativizeArtifactPath(path, [workspaceDir, projectDir]);
+  const diffPath = isAbsoluteArtifactPath(relPath) ? null : relPath;
+  const fileName = normalizePathSlashes(path).split("/").pop() ?? path;
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +118,9 @@ export default function AgentFilePreview({
       try {
         const [read, diff] = await Promise.all([
           ideApi.readFile(fullPath),
-          ideApi.gitDiff(projectDir, path).catch(() => null),
+          diffPath
+            ? ideApi.gitDiff(projectDir, diffPath).catch(() => null)
+            : Promise.resolve(null),
         ]);
         if (cancelled) return;
         setFile(read);
@@ -156,14 +168,14 @@ export default function AgentFilePreview({
       const digest = await ideApi.writeFile(fullPath, draftContent, file.sha256 ?? undefined);
       recordUserRecentEdit({
         projectDir: workspaceDir || projectDir,
-        path,
+        path: relPath,
         beforeContent,
         afterContent: draftContent,
       });
       if (workspaceDir && workspaceDir !== projectDir) {
         recordUserRecentEdit({
           projectDir,
-          path,
+          path: relPath,
           beforeContent,
           afterContent: draftContent,
         });
@@ -180,7 +192,7 @@ export default function AgentFilePreview({
     } finally {
       setSaving(false);
     }
-  }, [file, isEditableText, saving, fullPath, draftContent, workspaceDir, projectDir, path]);
+  }, [file, isEditableText, saving, fullPath, draftContent, workspaceDir, projectDir, relPath]);
 
   const handleContinueWithEdits = useCallback(async () => {
     if (isDirty) {
@@ -255,7 +267,7 @@ export default function AgentFilePreview({
           onClick={() =>
             onOpenInCodeZ({
               worktreePath: workspaceDir || projectDir,
-              filePath: path,
+              filePath: relPath,
             })
           }
         >

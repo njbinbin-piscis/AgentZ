@@ -64,6 +64,8 @@ function TerminalSession({
   const unlistenRef = useRef<(() => void) | null>(null);
   const initializedRef = useRef(false);
   const backendIdRef = useRef<string | null>(null);
+  const readyRef = useRef(false);
+  const pendingExtWritesRef = useRef<string[]>([]);
   const [activatedProject, setActivatedProject] = useState<string | null>(null);
   const selectionCallbackRef = useRef(onSendSelectionToChat);
   selectionCallbackRef.current = onSendSelectionToChat;
@@ -178,6 +180,13 @@ function TerminalSession({
         await lease.dispose().catch(() => {});
         return;
       }
+      readyRef.current = true;
+      if (pendingExtWritesRef.current.length > 0) {
+        const queued = pendingExtWritesRef.current.splice(0);
+        for (const chunk of queued) {
+          ideApi.terminalWrite(backendId, chunk).catch(() => {});
+        }
+      }
       requestAnimationFrame(() => {
         if (cancelled) return;
         fitTerminal();
@@ -189,6 +198,7 @@ function TerminalSession({
 
     return () => {
       cancelled = true;
+      readyRef.current = false;
       unlistenRef.current?.();
       unlistenRef.current = null;
       void lease?.dispose().catch(() => {});
@@ -199,6 +209,29 @@ function TerminalSession({
       initializedRef.current = false;
     };
   }, [terminalId, projectDir, activatedProject, fitTerminal]);
+
+  useEffect(() => {
+    const onExtSend = (e: Event) => {
+      if (!visibilityRef.current.active) return;
+      const detail = (e as CustomEvent<{ text?: string; addNewLine?: boolean; data?: string }>).detail;
+      const chunk =
+        typeof detail?.data === "string"
+          ? detail.data
+          : typeof detail?.text === "string"
+            ? detail.addNewLine !== false
+              ? `${detail.text}\r`
+              : detail.text
+            : "";
+      if (!chunk) return;
+      if (readyRef.current && backendIdRef.current) {
+        ideApi.terminalWrite(backendIdRef.current, chunk).catch(() => {});
+      } else {
+        pendingExtWritesRef.current.push(chunk);
+      }
+    };
+    window.addEventListener("agentz-ext-terminal-send", onExtSend);
+    return () => window.removeEventListener("agentz-ext-terminal-send", onExtSend);
+  }, []);
 
   useEffect(() => {
     if (!active || !panelVisible) return;

@@ -22,6 +22,25 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+#[derive(Clone, Debug)]
+pub struct AutoApprovalPolicy {
+    pub policy_mode: String,
+    pub confirm_shell_commands: bool,
+    pub confirm_file_writes: bool,
+    pub always_allow_tools: Vec<String>,
+}
+
+impl Default for AutoApprovalPolicy {
+    fn default() -> Self {
+        Self {
+            policy_mode: "balanced".into(),
+            confirm_shell_commands: true,
+            confirm_file_writes: true,
+            always_allow_tools: Vec::new(),
+        }
+    }
+}
+
 pub struct ApprovalHooks {
     project: PathBuf,
     workspace: PathBuf,
@@ -34,6 +53,7 @@ pub struct ApprovalHooks {
     registry: Arc<ToolRegistry>,
     cancel: Arc<AtomicBool>,
     interactive: bool,
+    auto_approval: AutoApprovalPolicy,
     claimed: Mutex<HashMap<String, (String, Intent)>>,
     delegated: Mutex<HashMap<String, bool>>,
 }
@@ -284,8 +304,38 @@ impl ApprovalHooks {
             registry,
             cancel,
             interactive,
+            auto_approval: AutoApprovalPolicy::default(),
             claimed: Mutex::new(HashMap::new()),
             delegated: Mutex::new(HashMap::new()),
+        })
+    }
+    pub fn with_auto_approval(mut self, auto_approval: AutoApprovalPolicy) -> Self {
+        self.auto_approval = auto_approval;
+        self
+    }
+    fn is_auto_approved(&self, tool_name: &str) -> bool {
+        if self.broker.is_always_allowed(tool_name) {
+            return true;
+        }
+        if self.auto_approval.policy_mode.eq_ignore_ascii_case("dev") {
+            return true;
+        }
+        let is_shell = matches!(
+            tool_name,
+            "shell" | "bash" | "powershell" | "powershell_query" | "code_run"
+        );
+        if !self.auto_approval.confirm_shell_commands && is_shell {
+            return true;
+        }
+        self.auto_approval.always_allow_tools.iter().any(|allowed| {
+            let trimmed = allowed.trim();
+            trimmed == "*"
+                || trimmed.eq_ignore_ascii_case(tool_name)
+                || (is_shell
+                    && matches!(
+                        trimmed.to_ascii_lowercase().as_str(),
+                        "shell" | "bash" | "powershell" | "powershell_query" | "code_run"
+                    ))
         })
     }
     fn path(&self) -> PathBuf {
@@ -390,6 +440,7 @@ impl ApprovalHooks {
         if ordinary_file
             || internal
             || (!capability_tool && tool.is_read_only() && !tool.needs_confirmation(ev.input))
+            || self.is_auto_approved(ev.tool_name)
         {
             return Ok(());
         }

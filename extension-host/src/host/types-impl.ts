@@ -101,7 +101,14 @@ export class Uri implements dto.UriComponents {
     public readonly fragment: string,
   ) {}
   get fsPath(): string {
-    return this.path;
+    let p = this.path;
+    if (/^\/[a-zA-Z]:/.test(p)) {
+      p = p.slice(1);
+    }
+    if (/^[a-zA-Z]:/.test(p) && typeof process !== "undefined" && process.platform === "win32") {
+      return p.replace(/\//g, "\\");
+    }
+    return p;
   }
   with(change: { scheme?: string; authority?: string; path?: string; query?: string; fragment?: string }): Uri {
     return new Uri(
@@ -410,7 +417,23 @@ export class TreeItem {
 }
 
 export class RelativePattern {
-  constructor(public base: string | Uri, public pattern: string) {}
+  public readonly baseUri: Uri;
+  public readonly base: string;
+  constructor(base: string | Uri | { uri: Uri }, public pattern: string) {
+    if (typeof base === "string") {
+      this.baseUri = Uri.file(base);
+      this.base = base;
+    } else if (base && typeof base === "object" && "uri" in base && base.uri) {
+      this.baseUri = base.uri;
+      this.base = base.uri.fsPath;
+    } else if (base && typeof base === "object" && "fsPath" in base) {
+      this.baseUri = base as Uri;
+      this.base = (base as Uri).fsPath;
+    } else {
+      this.baseUri = Uri.file("");
+      this.base = "";
+    }
+  }
 }
 
 export enum FileType {
@@ -430,4 +453,115 @@ export enum TextEditorRevealType {
   InCenter = 1,
   InCenterIfOutsideViewport = 2,
   AtTop = 3,
+}
+
+export enum QuickPickItemKind {
+  Separator = -1,
+  Default = 0,
+}
+
+export enum StatusBarAlignment {
+  Left = 1,
+  Right = 2,
+}
+
+export enum ProgressLocation {
+  SourceControl = 1,
+  Window = 10,
+  Notification = 15,
+}
+
+export enum LogLevel {
+  Off = 0,
+  Trace = 1,
+  Debug = 2,
+  Info = 3,
+  Warning = 4,
+  Error = 5,
+}
+
+export enum UIKind {
+  Desktop = 1,
+  Web = 2,
+}
+
+export enum ExtensionKind {
+  UI = 1,
+  Workspace = 2,
+}
+
+export enum ExtensionMode {
+  Production = 1,
+  Development = 2,
+  Test = 3,
+}
+
+export enum ConfigurationTarget {
+  Global = 1,
+  Workspace = 2,
+  WorkspaceFolder = 3,
+}
+
+export enum TextDocumentSaveReason {
+  Manual = 1,
+  AfterDelay = 2,
+  FocusOut = 3,
+}
+
+export enum OverviewRulerLane {
+  Left = 1,
+  Center = 2,
+  Right = 4,
+  Full = 7,
+}
+
+export enum CodeActionTriggerKind {
+  Invoke = 1,
+  Automatic = 2,
+}
+
+export enum SignatureHelpTriggerKind {
+  Invoke = 1,
+  TriggerCharacter = 2,
+  ContentChange = 3,
+}
+
+export class FileSystemError extends Error {
+  readonly code: string;
+
+  constructor(messageOrUri?: string | Uri, code = "Unknown") {
+    const msg =
+      typeof messageOrUri === "string"
+        ? messageOrUri
+        : messageOrUri
+          ? `${code}: ${messageOrUri.toString()}`
+          : code;
+    super(msg);
+    this.code = code;
+    this.name = `FileSystemError (${code})`;
+  }
+
+  static FileNotFound(messageOrUri?: string | Uri): FileSystemError {
+    return new FileSystemError(messageOrUri, "FileNotFound");
+  }
+
+  static FileExists(messageOrUri?: string | Uri): FileSystemError {
+    return new FileSystemError(messageOrUri, "FileExists");
+  }
+
+  static FileNotADirectory(messageOrUri?: string | Uri): FileSystemError {
+    return new FileSystemError(messageOrUri, "FileNotADirectory");
+  }
+
+  static FileIsADirectory(messageOrUri?: string | Uri): FileSystemError {
+    return new FileSystemError(messageOrUri, "FileIsADirectory");
+  }
+
+  static NoPermissions(messageOrUri?: string | Uri): FileSystemError {
+    return new FileSystemError(messageOrUri, "NoPermissions");
+  }
+
+  static Unavailable(messageOrUri?: string | Uri): FileSystemError {
+    return new FileSystemError(messageOrUri, "Unavailable");
+  }
 }

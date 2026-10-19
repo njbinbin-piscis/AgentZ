@@ -69,6 +69,10 @@ const PRIVILEGED: &[(&str, &str)] = &[
     ),
     ("confirm_file_writes", "Ask before writing files"),
     (
+        "always_allow_tools",
+        "Tool names permanently auto-approved without confirmation",
+    ),
+    (
         "allow_outside_workspace",
         "Allow file access outside the workspace",
     ),
@@ -192,6 +196,10 @@ pub fn validate(key: &str, v: &Value) -> Result<(), String> {
                 Err(format!("`{key}` must be true or false"))
             }
         }
+        "always_allow_tools" => match v.as_array() {
+            Some(items) if items.iter().all(|item| item.is_string()) => Ok(()),
+            _ => Err("`always_allow_tools` must be an array of strings".into()),
+        },
         _ => Ok(()),
     }
 }

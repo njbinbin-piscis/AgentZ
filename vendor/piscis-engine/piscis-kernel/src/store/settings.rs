@@ -300,6 +300,9 @@ pub struct Settings {
     /// Whether to show permission dialogs for file writes
     #[serde(default = "default_true")]
     pub confirm_file_writes: bool,
+    /// Tool names permanently auto-approved by user (e.g. ["shell", "code_run"] or ["*"])
+    #[serde(default)]
+    pub always_allow_tools: Vec<String>,
     /// Run browser in headless mode (invisible). false = user can see the browser window.
     #[serde(default = "default_true")]
     pub browser_headless: bool,
@@ -798,6 +801,7 @@ impl Default for Settings {
             model_runtime_profiles: HashMap::new(),
             confirm_shell_commands: true,
             confirm_file_writes: true,
+            always_allow_tools: Vec::new(),
             browser_headless: true,
             policy_mode: default_policy_mode(),
             tool_rate_limit_per_minute: default_tool_rate_limit(),

@@ -594,6 +594,7 @@ pub async fn run_agentz_turn(
         enable_streaming,
         confirm_shell_commands,
         confirm_file_writes,
+        always_allow_tools,
         auto_compact_threshold,
         fallback_models,
         compaction,
@@ -611,6 +612,7 @@ pub async fn run_agentz_turn(
             runtime.stream.unwrap_or(s.enable_streaming),
             s.confirm_shell_commands,
             s.confirm_file_writes,
+            s.always_allow_tools.clone(),
             s.auto_compact_input_tokens_threshold,
             s.fallback_models.clone(),
             CompactionSettings::from_settings(&s),
@@ -706,14 +708,25 @@ pub async fn run_agentz_turn(
             app.clone(),
             Some(db.clone()),
         ));
+    let approval_broker = app
+        .state::<crate::state::AppState>()
+        .approval_broker
+        .clone();
+    let mut synced_always_allow = always_allow_tools.clone();
+    if !confirm_shell_commands
+        && !synced_always_allow
+            .iter()
+            .any(|t| t.eq_ignore_ascii_case("shell"))
+    {
+        synced_always_allow.push("shell".into());
+    }
+    approval_broker.set_always_allowed(synced_always_allow);
     let approval_hooks = Arc::new(
         crate::runtime::approval::ApprovalHooks::new_with_identity_scope(
             PathBuf::from(&approval_project_dir),
             PathBuf::from(&workspace_root),
             &session_id,
-            app.state::<crate::state::AppState>()
-                .approval_broker
-                .clone(),
+            approval_broker,
             event_sink.clone(),
             hooks,
             registry.clone(),
@@ -723,7 +736,13 @@ pub async fn run_agentz_turn(
             projectless_app_data,
         )
         .await
-        .map_err(|e| anyhow!(e))?,
+        .map_err(|e| anyhow!(e))?
+        .with_auto_approval(crate::runtime::approval::AutoApprovalPolicy {
+            policy_mode: policy_mode.clone(),
+            confirm_shell_commands,
+            confirm_file_writes,
+            always_allow_tools: always_allow_tools.clone(),
+        }),
     );
     if approval_hooks.binding() != &early_binding {
         return Err(anyhow!(
