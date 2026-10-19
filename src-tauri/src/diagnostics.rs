@@ -711,6 +711,17 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    fn remove_link(path: &Path) -> std::io::Result<()> {
+        #[cfg(windows)]
+        {
+            std::fs::remove_dir(path)
+        }
+        #[cfg(unix)]
+        {
+            std::fs::remove_file(path)
+        }
+    }
+
     #[test]
     fn linked_connector_directory_fails_closed_before_export() {
         let dir = std::env::temp_dir().join(format!("agentz-diag-{}", uuid::Uuid::new_v4()));
@@ -733,7 +744,7 @@ mod tests {
         std::os::unix::fs::symlink(&external, &link).expect("create connector symlink");
         let rejected = export_redacted_logs(&dir, &json!({})).is_err();
         let no_export = !dir.join("exports").exists();
-        std::fs::remove_dir(&link).expect("remove only connector link");
+        remove_link(&link).expect("remove only connector link");
         assert!(rejected);
         assert!(no_export);
         std::fs::create_dir(&link).unwrap();
@@ -751,7 +762,7 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(&external, &child).expect("create connector child symlink");
         let child_rejected = export_redacted_logs(&dir, &json!({})).is_err();
-        std::fs::remove_dir(&child).expect("remove only connector child link");
+        remove_link(&child).expect("remove only connector child link");
         assert!(child_rejected);
         assert!(!dir.join("exports").exists());
         let _ = std::fs::remove_dir_all(&dir);
@@ -780,7 +791,7 @@ mod tests {
         std::os::unix::fs::symlink(&external, &logs).expect("create logs symlink");
         assert!(preview_redacted_logs(&dir, &json!({})).is_err());
         assert!(export_redacted_logs(&dir, &json!({})).is_err());
-        std::fs::remove_dir(&logs).expect("remove only logs link");
+        remove_link(&logs).expect("remove only logs link");
         std::fs::create_dir(&logs).unwrap();
         std::fs::write(logs.join("agentz.log"), "local marker\n").unwrap();
         let exports = dir.join("exports");
@@ -798,7 +809,7 @@ mod tests {
         std::os::unix::fs::symlink(&external, &exports).expect("create exports symlink");
         assert!(export_redacted_logs(&dir, &json!({})).is_err());
         assert_eq!(std::fs::read_dir(&external).unwrap().count(), 1);
-        std::fs::remove_dir(&exports).expect("remove only exports link");
+        remove_link(&exports).expect("remove only exports link");
         let _ = std::fs::remove_dir_all(&dir);
         let _ = std::fs::remove_dir_all(&external);
     }

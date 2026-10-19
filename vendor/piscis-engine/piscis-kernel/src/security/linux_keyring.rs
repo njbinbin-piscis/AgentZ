@@ -20,9 +20,32 @@ fn attributes(account: &str) -> HashMap<&str, &str> {
     ])
 }
 
+#[cfg(debug_assertions)]
+fn in_memory_keyring() -> Option<&'static std::sync::Mutex<HashMap<String, Vec<u8>>>> {
+    if std::env::var("AGENTZ_TEST_INMEMORY_KEYRING").as_deref() != Ok("1") {
+        return None;
+    }
+    static STORE: std::sync::OnceLock<std::sync::Mutex<HashMap<String, Vec<u8>>>> =
+        std::sync::OnceLock::new();
+    Some(STORE.get_or_init(Default::default))
+}
+
 pub(super) fn protect(key: &[u8]) -> Result<Vec<u8>> {
     ensure!(key.len() == 32, "Invalid master key length");
     let reference = uuid::Uuid::new_v4().hyphenated().to_string().into_bytes();
+    #[cfg(debug_assertions)]
+    if let Some(store) = in_memory_keyring() {
+        let account = identity(&reference)?;
+        let mut map = store
+            .lock()
+            .map_err(|_| anyhow::anyhow!("In-memory keyring poisoned"))?;
+        ensure!(
+            !map.contains_key(account),
+            "Secret Service identity collision"
+        );
+        map.insert(account.to_string(), key.to_vec());
+        return Ok(reference);
+    }
     let service = SecretService::connect(EncryptionType::Dh)
         .context("Linux encrypted credential service unavailable")?;
     // No session-only fallback, collection creation, unlock, or prompt execution.
@@ -80,6 +103,18 @@ pub(super) fn protect(key: &[u8]) -> Result<Vec<u8>> {
 
 pub(super) fn read(reference: &[u8]) -> Result<Vec<u8>> {
     let account = identity(reference)?;
+    #[cfg(debug_assertions)]
+    if let Some(store) = in_memory_keyring() {
+        let map = store
+            .lock()
+            .map_err(|_| anyhow::anyhow!("In-memory keyring poisoned"))?;
+        let key = map
+            .get(account)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Secret Service credential missing or ambiguous"))?;
+        ensure!(key.len() == 32, "Invalid Secret Service master key length");
+        return Ok(key);
+    }
     let service = SecretService::connect(EncryptionType::Dh)
         .context("Linux encrypted credential service unavailable")?;
     let collection = service.get_default_collection()?;
@@ -101,6 +136,14 @@ pub(super) fn read(reference: &[u8]) -> Result<Vec<u8>> {
 
 pub(super) fn remove(reference: &[u8]) -> Result<()> {
     let account = identity(reference)?;
+    #[cfg(debug_assertions)]
+    if let Some(store) = in_memory_keyring() {
+        let mut map = store
+            .lock()
+            .map_err(|_| anyhow::anyhow!("In-memory keyring poisoned"))?;
+        map.remove(account);
+        return Ok(());
+    }
     let service = SecretService::connect(EncryptionType::Dh)
         .context("Linux encrypted credential service unavailable during cleanup")?;
     let collection = service.get_default_collection()?;

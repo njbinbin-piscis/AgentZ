@@ -68,4 +68,6 @@ jobs:
       - name: cargo clippy (workspace, deny warnings)
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: cargo test (workspace)
+        env:
+          AGENTZ_TEST_INMEMORY_KEYRING: "1"
         run: cargo test --workspace
