@@ -1,0 +1,5 @@
+# AZ-063 post-signoff backup and migration audit
+
+The 1.0.0 engineering fixtures pass locally, but the backup CLI accepts `--quiesced true` from its caller without coordinating with the AgentZ host or obtaining an exclusive database lock. It rejects detected SQLite WAL/SHM/journal sidecars and compares before/after inventories, yet those checks cannot establish a coherent live snapshot if another process writes between scans. The restore command is a `restore-preview` into a new path; native application recovery and task/session/environment identity validation remain untested. Historical fixtures cover settings and skill layout for v0.9.0/v0.9.12, not those persisted task identities.
+
+The R10-20 evidence now states these limits explicitly. This audit does not change the ADR-006 1.0.0 local engineering sign-off or claim that native recovery/rollback passed. AZ-063's existing `next_action` still lists host-enforced quiescence, coherent SQLite snapshot and native restore acceptance; those items require implementation and evidence before the broader roadmap can be considered complete.

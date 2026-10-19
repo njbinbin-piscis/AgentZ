@@ -14,6 +14,8 @@
 - [x] `node scripts/upgrade-plan.mjs validate` 与 `node scripts/upgrade-plan.verify.mjs` 零错误通过。
 - [x] Rust 核心契约、浏览器世代引用、脱敏导出、预算记账、工作树合并与快照回滚测试通过。
 
+本地备份夹具通过不代表应用内写入者已被强制静默、在线 SQLite 快照原子性或原生恢复与回滚已验收；这些缺口记录在 [AZ-063 后续审计](evidence/AZ-063-2026-10-19-post-signoff-audit.md)。
+
 ## 外部依赖豁免（ADR-006）
 
 - 按 `docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md` 架构决策，商业代码签名证书、跨平台物理真机与外部真实用户 Beta 队列标记为 `waived:ADR-006` 外部基础设施项，不阻塞 1.0.0 本地工程正式基线签署。

@@ -4,6 +4,7 @@ const api = vi.hoisted(() => ({ create: vi.fn(), destroy: vi.fn(), listen: vi.fn
 vi.mock("../../services/tauri/ide", () => ({ ideApi: { terminalCreate: api.create, terminalDestroy: api.destroy, terminalWrite: api.write, terminalResize: api.resize, terminalIsAlive: api.alive, terminalCount: api.count, terminalDestroyAll: api.destroyAll }, onTerminalOutput: api.listen }));
 vi.mock("../../services/tauri/confirm", () => ({ confirmDialog: api.confirm }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock("../../i18n", () => ({ default: { t: (key: string) => key } }));
 vi.mock("./useAppTheme", () => ({ cssVar: (_: string, fallback: string) => fallback }));
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: class { fit() {} } }));
 vi.mock("@xterm/addon-web-links", () => ({ WebLinksAddon: class {} }));

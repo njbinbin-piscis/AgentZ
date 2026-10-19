@@ -332,16 +332,23 @@ export default function App() {
     let disposed = false;
     void listen("app-before-close", () => {
       void (async () => {
+        let cancelledByUser = false;
         try {
-          const running = await invoke<number>("chat_running_count");
-          if (running > 0 && !window.confirm(t("app.exitWhileRunning"))) return;
+          const running = await invoke<number>("chat_running_count").catch(() => 0);
+          if (running > 0 && !window.confirm(t("app.exitWhileRunning"))) {
+            cancelledByUser = true;
+            return;
+          }
           setExitToast(true);
-          if (running > 0) await invoke("chat_cancel_all");
+          if (running > 0) await invoke("chat_cancel_all").catch(() => {});
           await persistWorkspace();
-          await workspaceCloseAck();
         } catch (e) {
           console.error("workspace close failed:", e);
           setExitToast(false);
+        } finally {
+          if (!cancelledByUser) {
+            await workspaceCloseAck().catch(() => {});
+          }
         }
       })();
     }).then((fn) => {

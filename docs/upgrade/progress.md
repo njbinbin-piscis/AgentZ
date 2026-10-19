@@ -1,6 +1,6 @@
 # AgentZ 实施进度
 
-更新时间：2026/10/19 16:32:44（Asia/Tokyo）；由台账自动生成。
+更新时间：2026/10/19 17:39:43（Asia/Tokyo）；由台账自动生成。
 
 任务：83；已验收：65；执行/评审：0；阻塞：0。
 
@@ -81,8 +81,8 @@ Gate通过：M0, M1, M2, M3, M4, M5, M6, M7, M8, M9, MB。
 - AZ-060 消除长任务资源增长：owned_pty_model_listener_watcher_extension_graph_snapshot_candidate；下一步：Exercise concurrent Tauri terminal-create command invocations and a real repository graph-build close, then run the two-hour close/restart soak against a frozen AZ-057 budget.。
 - AZ-061 统一诊断关联和脱敏导出：bounded_redacted_log_manifest_candidate_unreviewed；下一步：Verify task/run/environment/tool fields with a real failing tool and native export, then run all-source secret scan after AZ-031.。
 - AZ-062 建立评测趋势与质量门禁：local_trend_gate_and_count_reconciliation_candidate_unreviewed；下一步：Wire the gate to the stable lifecycle harness, collect repeated actual desktop/model summaries, then perform unified review.。
-- AZ-063 版本化数据迁移与备份恢复：offline_encrypted_backup_output_entry_hardened_native_unverified；下一步：Integrate enforced writer quiescence and coherent SQLite snapshot capture; verify credential/task/session/environment binding in a restored new location using historical fixtures and a native recovery journey.。
-- AZ-064 签名、公证与安装器验收：local_gate_script_unwired_after_0_9_15_waiver_native_unverified；下一步：For the next non-waived release, wire release-readiness before publishing; obtain signing/notarization identities and clean test machines, then collect native install/start/uninstall/restore receipts before AZ-069 acceptance.。
+- AZ-063 版本化数据迁移与备份恢复：local_fixture_migration_and_operator_asserted_offline_backup_native_restore_unverified；下一步：Implement host-coordinated writer quiescence and a coherent SQLite snapshot, then test historical task/session/environment identity and native restore-to-new-location recovery before full-roadmap acceptance.。
+- AZ-064 签名、公证与安装器验收：release_workflow_guard_wired_locally_native_acceptance_unverified；下一步：Observe the guard in a non-publishing workflow rehearsal, then obtain signing identities and clean platform machines for signed install, startup, uninstall and rollback receipts before accepting AZ-064.。
 - AZ-065 可信更新与失败恢复：not_started；下一步：After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment.。
 - AZ-066 首次成功任务引导：first_task_project_tool_connection_guidance_local_checks_passed；下一步：Review first-task UI with real tool/environment failures; run five clean signed-build first-use journeys using an authorized model after upstream dependencies are accepted.。
 - AZ-067 同步支持文档与发布说明：current_0_9_15_local_docs_consistent_native_unverified；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the frozen candidate.。

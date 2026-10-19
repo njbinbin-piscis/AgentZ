@@ -41,8 +41,8 @@ vi.mock("../../hooks/useAppSettings", () => ({
   useAppSettings: () => ({
     appSettings: null,
     llmProviders: [
-      { id: "claude-sonnet", name: "Claude Sonnet", provider: "anthropic", model: "claude-3-7" },
-      { id: "gpt-4o", name: "GPT-4o", provider: "openai", model: "gpt-4o" },
+      { id: "claude-sonnet", label: "Claude Sonnet", provider: "anthropic", model: "claude-3-7" },
+      { id: "gpt-4o", label: "GPT-4o", provider: "openai", model: "gpt-4o" },
     ],
     defaultModelLabel: "Default (Claude)",
     defaultModelHint: "",

@@ -1,7 +1,7 @@
 # R10-20 Evidence: Historical Data Migration Fixtures, Writer Quiescence & SQLite Coherent Backup/Restore
 
 - **Date**: 2026-10-19
-- **Task**: `R10-20` — Verify 2 historical version migration fixtures (`v0.9.0` & `v0.9.12`), enforce writer quiescence and SQLite sidecar-free consistency in `scripts/upgrade-data-inventory.mjs` & `scripts/upgrade-data-backup.mjs`, and pass encrypted backup/restore drills.
+- **Task**: `R10-20` — Verify 2 historical version migration fixtures (`v0.9.0` & `v0.9.12`), require an operator assertion of writer quiescence and check for SQLite sidecars in `scripts/upgrade-data-inventory.mjs` & `scripts/upgrade-data-backup.mjs`, and pass synthetic encrypted backup/restore drills.
 
 ## 1. Historical Version Migration Fixtures (`v0.9.0` & `v0.9.12` -> `1.0.0`)
 
@@ -23,6 +23,8 @@ Added `historical_v090_and_v0912_fixtures_migrate_cleanly_to_1_0` in `src-tauri/
   - Requires `--quiesced true`, matching `config.json` + `.secret_key`, and **rejects backup creation if any active SQLite WAL/SHM/journal sidecar exists** either before or after encryption (`Active SQLite sidecar files detected`).
   - Encrypts all objects with `scrypt-N32768-r8-p1` + `aes-256-gcm` authenticated encryption, verifies before/after SHA-256 inventory parity, and marks `snapshot_consistent: true`.
   - Restores only into a new, unoccupied directory outside source and bundle roots (`restore-preview`).
+
+The `--quiesced true` flag is an operator assertion; the CLI does not stop or lock AgentZ writers. Absence of WAL/SHM/journal files and before/after inventory parity are useful guards but do not prove an atomic live SQLite snapshot or native application recovery. The fixture migrations exercise settings and skill layout, not historical task/session/environment identity restoration. These are remaining acceptance gaps, not results of this local test.
 
 ## 3. Verification Results
 

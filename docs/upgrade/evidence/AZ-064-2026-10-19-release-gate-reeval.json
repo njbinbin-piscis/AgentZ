@@ -1,0 +1,24 @@
+[
+  {
+    "id": "AZ-064",
+    "verified_state": "release_workflow_guard_wired_locally_native_acceptance_unverified",
+    "severity": "P1",
+    "finding": "The six publishing bundle jobs now depend on a release-readiness job that checks version, ledger and tag-matched release gate before tauri-action. Local gate and workflow integration tests pass, but GitHub Actions execution, signing, clean-machine installation and rollback remain unverified.",
+    "conclusion_proposal": "Keep deferred under ADR-006; do not equate local gate wiring with signed installer or native release acceptance.",
+    "next_action": "Observe the guard in a non-publishing workflow rehearsal, then obtain signing identities and clean platform machines for signed install, startup, uninstall and rollback receipts before accepting AZ-064.",
+    "remaining_work": [
+      "GitHub Actions guard execution receipt",
+      "Signing and notarization identities",
+      "Frozen signed artifact hashes",
+      "Clean-machine install/start/uninstall",
+      "Rollback and independent acceptance"
+    ],
+    "verification_gaps": [
+      "No GitHub Actions run of the new readiness job",
+      "No trusted signature, native installer journey or rollback evidence"
+    ],
+    "evidence": [
+      "docs/upgrade/evidence/AZ-064-2026-10-19-release-gate-wiring.md"
+    ]
+  }
+]

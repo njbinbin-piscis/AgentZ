@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { releaseGate } from './upgrade-release-gate.mjs';
 
 const accepted = () => ({
@@ -25,4 +26,24 @@ test('publishing rejects a mismatched version tag', () => {
   assert.deepEqual(releaseGate(accepted(), '0.9.11', 'refs/heads/main'), [
     'release ref refs/heads/main must be refs/tags/v0.9.11',
   ]);
+});
+
+test('every publishing bundle waits for the release-readiness workflow job', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
+  const jobs = [...workflow.matchAll(/^  ([\w-]+):\r?$/gm)];
+  const readiness = jobs.find((match) => match[1] === 'release-readiness');
+  assert.ok(readiness, 'release-readiness job must exist');
+  const readinessIndex = jobs.indexOf(readiness);
+  const readinessBody = workflow.slice(readiness.index, jobs[readinessIndex + 1]?.index);
+  assert.match(readinessBody, /node scripts\/upgrade-version-check\.mjs/);
+  assert.match(readinessBody, /node scripts\/upgrade-plan\.mjs validate/);
+  assert.match(readinessBody, /node scripts\/upgrade-release-gate\.mjs/);
+
+  const bundleJobs = jobs.filter((match) => match[1].startsWith('bundle-'));
+  assert.equal(bundleJobs.length, 6, 'all six platform bundle jobs must be checked');
+  for (const job of bundleJobs) {
+    const index = jobs.indexOf(job);
+    const body = workflow.slice(job.index, jobs[index + 1]?.index);
+    assert.match(body, /^    needs: release-readiness\r?$/m, `${job[1]} bypasses the release gate`);
+  }
 });

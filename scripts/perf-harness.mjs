@@ -61,6 +61,38 @@ assert.ok(
   `Main entry chunk ${entryChunk.name} (${entryChunk.bytes} bytes) exceeds 1.2 MB cold-start budget`,
 );
 
+for (const chunk of jsChunks) {
+  const chunkText = fs.readFileSync(path.join(distAssetsDir, chunk.name), "utf8");
+  assert.ok(
+    !/import\s*["']web-worker["']/.test(chunkText),
+    `Chunk ${chunk.name} contains unbundled bare specifier "web-worker"`,
+  );
+  if (chunk.name.startsWith("app-vendor-")) {
+    const imports = [...chunkText.matchAll(/from\s*["']\.\/([^"']+)["']/g)].map((m) => m[1]);
+    assert.deepEqual(
+      imports,
+      [],
+      `app-vendor chunk ${chunk.name} must remain leaf-free (found imports: ${imports.join(", ")})`,
+    );
+  }
+}
+
+for (const chunk of jsChunks) {
+  const chunkText = fs.readFileSync(path.join(distAssetsDir, chunk.name), "utf8");
+  assert.ok(
+    !/import\s*["']web-worker["']/.test(chunkText),
+    `Chunk ${chunk.name} contains unbundled bare specifier "web-worker"`,
+  );
+  if (chunk.name.startsWith("app-vendor-")) {
+    const imports = [...chunkText.matchAll(/from\s*["']\.\/([^"']+)["']/g)].map((m) => m[1]);
+    assert.deepEqual(
+      imports,
+      [],
+      `app-vendor chunk ${chunk.name} must remain leaf-free (found imports: ${imports.join(", ")})`,
+    );
+  }
+}
+
 // 3. Measure 50-cycle resource balance & memory footprint
 const memBefore = process.memoryUsage().rss;
 const resourceKinds = ["listener", "terminal", "editorModel", "extHostSession", "ptySession"];

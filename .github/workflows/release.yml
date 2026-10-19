@@ -28,8 +28,23 @@ env:
   NODE_OPTIONS: --max-old-space-size=4096
 
 jobs:
+  release-readiness:
+    name: Verify version and release gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/upgrade-version-check.mjs
+      - run: node scripts/upgrade-plan.mjs validate
+      - run: node scripts/upgrade-release-gate.mjs
+
   # ── Linux (x86_64) ────────────────────────────────────────────────
   bundle-linux-x86_64:
+    needs: release-readiness
     name: Bundle Linux x86_64 (.deb + AppImage)
     runs-on: ubuntu-22.04
     timeout-minutes: 120
@@ -102,6 +117,7 @@ jobs:
   # Native build on GitHub's ARM runner — cross-compiling glib/webkit from
   # x86_64 requires a full sysroot and breaks pkg-config without it.
   bundle-linux-aarch64:
+    needs: release-readiness
     name: Bundle Linux aarch64 (.deb + AppImage)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
@@ -172,6 +188,7 @@ jobs:
 
   # ── Windows (x86_64) ─────────────────────────────────────────────
   bundle-windows-x86_64:
+    needs: release-readiness
     name: Bundle Windows x86_64 (NSIS .exe)
     runs-on: windows-latest
     timeout-minutes: 120
@@ -227,6 +244,7 @@ jobs:
   # ── Windows (aarch64 / ARM64) ────────────────────────────────────
   # Native build on GitHub's Windows ARM runner (Snapdragon / ARM64 PCs).
   bundle-windows-aarch64:
+    needs: release-readiness
     name: Bundle Windows aarch64 (NSIS .exe)
     runs-on: windows-11-arm
     timeout-minutes: 120
@@ -285,6 +303,7 @@ jobs:
 
   # ── macOS (aarch64 / Apple Silicon) ──────────────────────────────
   bundle-macos-aarch64:
+    needs: release-readiness
     name: Bundle macOS aarch64 (.dmg + .app)
     runs-on: macos-14
     timeout-minutes: 120
@@ -343,6 +362,7 @@ jobs:
   # Runs on Apple Silicon and bundles a single universal2 installer that
   # natively supports both Intel and Apple Silicon (M-series) Macs.
   bundle-macos-universal:
+    needs: release-readiness
     name: Bundle macOS Universal (.dmg + .app)
     runs-on: macos-14
     timeout-minutes: 150

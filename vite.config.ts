@@ -23,21 +23,58 @@ export default defineConfig({
     minify: "esbuild",
     rollupOptions: {
       output: {
-        manualChunks: {
-          "app-vendor": ["react", "react-dom", "i18next", "react-i18next", "@tauri-apps/api"],
-          monaco: ["monaco-editor", "@monaco-editor/react"],
-          xterm: ["@xterm/xterm", "@xterm/addon-fit", "@xterm/addon-web-links"],
-          markdown: [
-            "react-markdown",
-            "remark-gfm",
-            "remark-math",
-            "rehype-highlight",
-            "rehype-katex",
-            "rehype-raw",
-            "rehype-sanitize",
-            "highlight.js",
-          ],
-          mermaid: ["mermaid", "elkjs", "reactflow"],
+        manualChunks(id) {
+          const norm = id.replace(/\\/g, "/");
+          if (norm.includes("commonjsHelpers")) {
+            return "app-vendor";
+          }
+          if (!norm.includes("/node_modules/")) {
+            return undefined;
+          }
+          if (
+            norm.includes("/node_modules/react/") ||
+            norm.includes("/node_modules/react-dom/") ||
+            norm.includes("/node_modules/scheduler/") ||
+            norm.includes("/node_modules/use-sync-external-store/") ||
+            norm.includes("/node_modules/i18next/") ||
+            norm.includes("/node_modules/react-i18next/") ||
+            norm.includes("/node_modules/@tauri-apps/")
+          ) {
+            return "app-vendor";
+          }
+          if (
+            norm.includes("/node_modules/monaco-editor/") ||
+            norm.includes("/node_modules/@monaco-editor/")
+          ) {
+            return "monaco";
+          }
+          if (norm.includes("/node_modules/@xterm/")) {
+            return "xterm";
+          }
+          if (
+            norm.includes("/node_modules/react-markdown/") ||
+            norm.includes("/node_modules/remark-") ||
+            norm.includes("/node_modules/rehype-") ||
+            norm.includes("/node_modules/unified/") ||
+            norm.includes("/node_modules/mdast-") ||
+            norm.includes("/node_modules/hast-") ||
+            norm.includes("/node_modules/micromark") ||
+            norm.includes("/node_modules/vfile") ||
+            norm.includes("/node_modules/highlight.js/") ||
+            norm.includes("/node_modules/lowlight/") ||
+            norm.includes("/node_modules/katex/")
+          ) {
+            return "markdown";
+          }
+          if (
+            norm.includes("/node_modules/mermaid/") ||
+            norm.includes("/node_modules/elkjs/") ||
+            norm.includes("/node_modules/reactflow/") ||
+            norm.includes("/node_modules/@reactflow/")
+          ) {
+            return "mermaid";
+          }
+          return undefined;
         },
       },
     },

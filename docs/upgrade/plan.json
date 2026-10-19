@@ -32263,31 +32263,40 @@
             "severity": "P1",
             "conclusion_proposal": "Keep pending until host-enforced writer quiescence, coherent snapshot capture, restore-to-new-location identity checks and historical migration fixtures are reviewed."
           }
+        },
+        {
+          "at": "2026-10-19T08:39:43.207Z",
+          "note": "2026-10-19 post-signoff audit clarifies operator-asserted quiescence and native recovery gaps",
+          "reeval": {
+            "verified_state": "local_fixture_migration_and_operator_asserted_offline_backup_native_restore_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Retain the historical 1.0.0 engineering decision but do not treat AZ-063 as native recovery or rollback acceptance; complete the listed gaps before declaring the full roadmap finished."
+          }
         }
       ],
       "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-063",
-        "verified_state": "offline_encrypted_backup_output_entry_hardened_native_unverified",
+        "verified_state": "local_fixture_migration_and_operator_asserted_offline_backup_native_restore_unverified",
         "severity": "P1",
-        "finding": "The offline encrypted backup candidate resolves physical output parents and rejects source aliases. It now treats dangling symlink/junction output entries as occupied, preventing replacement during create or restore-preview publication. Its authenticated manifest also rejects case-insensitive file/directory ancestor collisions before object reads or restore writes. Synthetic Windows junction, forged-manifest, oversized-passphrase, inventory and encrypted round-trip checks pass. Operator-attested quiescence still does not guarantee a coherent live SQLite snapshot; no native recovery ran.",
-        "conclusion_proposal": "Keep pending until host-enforced writer quiescence, coherent snapshot capture, restore-to-new-location identity checks and historical migration fixtures are reviewed.",
-        "next_action": "Integrate enforced writer quiescence and coherent SQLite snapshot capture; verify credential/task/session/environment binding in a restored new location using historical fixtures and a native recovery journey.",
+        "finding": "R10-20 local fixtures validate settings/skills migration and synthetic encrypted restore-preview. The CLI does not enforce host writer quiescence or an atomic SQLite snapshot, and it does not validate native task/session/environment identity after restore. AZ-063 is marked done for the ADR-006 local engineering baseline while its next_action still lists these broader acceptance gaps.",
+        "conclusion_proposal": "Retain the historical 1.0.0 engineering decision but do not treat AZ-063 as native recovery or rollback acceptance; complete the listed gaps before declaring the full roadmap finished.",
+        "next_action": "Implement host-coordinated writer quiescence and a coherent SQLite snapshot, then test historical task/session/environment identity and native restore-to-new-location recovery before full-roadmap acceptance.",
         "remaining_work": [
-          "Enforced writer quiescence and coherent live SQLite snapshot",
-          "Restore-to-new-location identity and credential validation",
-          "At least two historical-version migration/corruption fixtures",
-          "Native recovery and rollback acceptance"
+          "Host-coordinated writer quiescence",
+          "Coherent SQLite snapshot under concurrent writes",
+          "Historical task/session/environment migration fixtures",
+          "Native restore-to-new-location recovery and rollback drill"
         ],
         "verification_gaps": [
-          "Only an operator-attested offline copy and synthetic failure fixtures ran",
-          "No real user state, app-integrated snapshot or native restore journey"
+          "No exclusive host writer lock or SQLite online backup integration",
+          "No native recovery receipt or restored identity validation"
         ],
         "evidence": [
-          "docs/upgrade/evidence/AZ-063-2026-10-18-output-alias-guard.md",
-          "docs/upgrade/evidence/AZ-063-2026-10-16/implementation.md"
+          "docs/upgrade/evidence/AZ-063-2026-10-19-post-signoff-audit.md",
+          "docs/upgrade/evidence/R10-20-migration-and-backup.md"
         ],
-        "recorded_at": "2026-10-18T09:48:57.309Z"
+        "recorded_at": "2026-10-19T08:39:43.207Z"
       },
       "gui_status": "waived:ADR-006"
     },
@@ -32893,32 +32902,40 @@
             "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
           },
           "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
+        },
+        {
+          "at": "2026-10-19T08:36:16.824Z",
+          "note": "2026-10-19 release workflow guard wired locally; native acceptance remains deferred",
+          "reeval": {
+            "verified_state": "release_workflow_guard_wired_locally_native_acceptance_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep deferred under ADR-006; do not equate local gate wiring with signed installer or native release acceptance."
+          }
         }
       ],
       "reviewer": null,
       "reeval": {
         "id": "AZ-064",
-        "verified_state": "local_gate_script_unwired_after_0_9_15_waiver_native_unverified",
+        "verified_state": "release_workflow_guard_wired_locally_native_acceptance_unverified",
         "severity": "P1",
-        "finding": "The owner-authorized 0.9.15 checklist records another version-specific release-readiness waiver. The committed release workflow still does not invoke the local gate. The 0.9.15 version check passes, while the local gate refuses missing tag ref, open M2-M8/MB and unaccepted AZ-069. No signing, clean-machine installation or rollback receipt exists.",
-        "conclusion_proposal": "Keep blocked; wire the publishing prerequisite for a future non-waived release and retain external signing/native acceptance gaps.",
-        "next_action": "For the next non-waived release, wire release-readiness before publishing; obtain signing/notarization identities and clean test machines, then collect native install/start/uninstall/restore receipts before AZ-069 acceptance.",
+        "finding": "The six publishing bundle jobs now depend on a release-readiness job that checks version, ledger and tag-matched release gate before tauri-action. Local gate and workflow integration tests pass, but GitHub Actions execution, signing, clean-machine installation and rollback remain unverified.",
+        "conclusion_proposal": "Keep deferred under ADR-006; do not equate local gate wiring with signed installer or native release acceptance.",
+        "next_action": "Observe the guard in a non-publishing workflow rehearsal, then obtain signing identities and clean platform machines for signed install, startup, uninstall and rollback receipts before accepting AZ-064.",
         "remaining_work": [
-          "Wire a release guard for the next non-waived version",
+          "GitHub Actions guard execution receipt",
           "Signing and notarization identities",
           "Frozen signed artifact hashes",
           "Clean-machine install/start/uninstall",
           "Rollback and independent acceptance"
         ],
         "verification_gaps": [
-          "Current publishing workflow does not invoke the local gate",
+          "No GitHub Actions run of the new readiness job",
           "No trusted signature, native installer journey or rollback evidence"
         ],
         "evidence": [
-          "docs/upgrade/evidence/AZ-064-2026-10-18-0.9.15-state.md",
-          "docs/upgrade/release-checklist-0.9.15.md"
+          "docs/upgrade/evidence/AZ-064-2026-10-19-release-gate-wiring.md"
         ],
-        "recorded_at": "2026-10-18T09:18:33.681Z"
+        "recorded_at": "2026-10-19T08:36:16.824Z"
       },
       "gui_status": "waived:ADR-006"
     },

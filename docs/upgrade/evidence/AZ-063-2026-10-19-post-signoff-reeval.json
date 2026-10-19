@@ -1,0 +1,24 @@
+[
+  {
+    "id": "AZ-063",
+    "verified_state": "local_fixture_migration_and_operator_asserted_offline_backup_native_restore_unverified",
+    "severity": "P1",
+    "finding": "R10-20 local fixtures validate settings/skills migration and synthetic encrypted restore-preview. The CLI does not enforce host writer quiescence or an atomic SQLite snapshot, and it does not validate native task/session/environment identity after restore. AZ-063 is marked done for the ADR-006 local engineering baseline while its next_action still lists these broader acceptance gaps.",
+    "conclusion_proposal": "Retain the historical 1.0.0 engineering decision but do not treat AZ-063 as native recovery or rollback acceptance; complete the listed gaps before declaring the full roadmap finished.",
+    "next_action": "Implement host-coordinated writer quiescence and a coherent SQLite snapshot, then test historical task/session/environment identity and native restore-to-new-location recovery before full-roadmap acceptance.",
+    "remaining_work": [
+      "Host-coordinated writer quiescence",
+      "Coherent SQLite snapshot under concurrent writes",
+      "Historical task/session/environment migration fixtures",
+      "Native restore-to-new-location recovery and rollback drill"
+    ],
+    "verification_gaps": [
+      "No exclusive host writer lock or SQLite online backup integration",
+      "No native recovery receipt or restored identity validation"
+    ],
+    "evidence": [
+      "docs/upgrade/evidence/AZ-063-2026-10-19-post-signoff-audit.md",
+      "docs/upgrade/evidence/R10-20-migration-and-backup.md"
+    ]
+  }
+]

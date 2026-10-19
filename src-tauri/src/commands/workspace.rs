@@ -5,13 +5,15 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 
 use crate::commands::data_scope::resolve_global_config_dir;
+use crate::state::AppState;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EditorSnapshot {
@@ -117,13 +119,22 @@ fn sanitize_snapshot(mut snap: WorkspaceSnapshot) -> WorkspaceSnapshot {
     snap
 }
 
-/// Shared flag: set when the frontend has acked close so we allow destroy.
+/// Shared close state: tracks whether the frontend mounted and acked close so a
+/// broken/unresponsive webview can never trap the native window open.
 #[derive(Clone)]
-pub struct WorkspaceCloseGate(pub Arc<AtomicBool>);
+pub struct WorkspaceCloseGate {
+    pub allow_close: Arc<AtomicBool>,
+    pub frontend_ready: Arc<AtomicBool>,
+    pub last_close_request_ms: Arc<AtomicU64>,
+}
 
 impl Default for WorkspaceCloseGate {
     fn default() -> Self {
-        Self(Arc::new(AtomicBool::new(false)))
+        Self {
+            allow_close: Arc::new(AtomicBool::new(false)),
+            frontend_ready: Arc::new(AtomicBool::new(false)),
+            last_close_request_ms: Arc::new(AtomicU64::new(0)),
+        }
     }
 }
 
@@ -133,8 +144,18 @@ impl WorkspaceCloseGate {
     }
 }
 
+fn now_epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
 #[tauri::command]
 pub async fn workspace_load(app: AppHandle) -> Result<Option<WorkspaceSnapshot>, String> {
+    if let Some(gate) = app.try_state::<WorkspaceCloseGate>() {
+        gate.frontend_ready.store(true, Ordering::SeqCst);
+    }
     let dir = resolve_global_config_dir(&app)?;
     let path = workspace_state_path(&dir);
     let text = match std::fs::read_to_string(&path) {
@@ -162,24 +183,61 @@ pub async fn workspace_close_ack(
     window: WebviewWindow,
     gate: State<'_, WorkspaceCloseGate>,
 ) -> Result<(), String> {
-    gate.0.store(true, Ordering::SeqCst);
+    gate.allow_close.store(true, Ordering::SeqCst);
     window.destroy().map_err(|e| e.to_string())?;
     Ok(())
 }
 
-/// Install window close handler — emits `app-before-close` so the UI can save.
+/// Install window close handler — emits `app-before-close` so the UI can save,
+/// with a dead-man fallback so an unresponsive or unmounted webview never
+/// prevents closing the window.
 pub fn install_close_handler(app: &AppHandle, gate: WorkspaceCloseGate) {
     let handle = app.clone();
-    let gate_flag = gate.0.clone();
     if let Some(window) = app.get_webview_window("main") {
+        let win = window.clone();
         window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if gate_flag.load(Ordering::SeqCst) {
+                if gate.allow_close.load(Ordering::SeqCst) {
+                    return;
+                }
+                // If the frontend never finished initial mount, allow immediate close.
+                if !gate.frontend_ready.load(Ordering::SeqCst) {
+                    gate.allow_close.store(true, Ordering::SeqCst);
+                    return;
+                }
+                // Second close attempt within 3 seconds forces immediate close.
+                let now = now_epoch_ms();
+                let prev = gate.last_close_request_ms.swap(now, Ordering::SeqCst);
+                if prev > 0 && now.saturating_sub(prev) < 3_000 {
+                    gate.allow_close.store(true, Ordering::SeqCst);
+                    let _ = win.destroy();
                     return;
                 }
                 api.prevent_close();
-                gate_flag.store(false, Ordering::SeqCst);
+                gate.allow_close.store(false, Ordering::SeqCst);
                 let _ = handle.emit("app-before-close", ());
+
+                // Fallback: when no chat turn is running (no confirm dialog),
+                // destroy the window after 1.5s if the frontend fails to ack.
+                let app_for_timeout = handle.clone();
+                let win_for_timeout = win.clone();
+                let gate_for_timeout = gate.clone();
+                tauri::async_runtime::spawn(async move {
+                    let has_running_turns = if let Some(state) = app_for_timeout.try_state::<AppState>() {
+                        let single = state.chat_cancel.lock().await.is_some();
+                        let parallel = !state.task_cancel.lock().await.is_empty();
+                        single || parallel
+                    } else {
+                        false
+                    };
+                    if !has_running_turns {
+                        tokio::time::sleep(Duration::from_millis(1500)).await;
+                        if !gate_for_timeout.allow_close.load(Ordering::SeqCst) {
+                            gate_for_timeout.allow_close.store(true, Ordering::SeqCst);
+                            let _ = win_for_timeout.destroy();
+                        }
+                    }
+                });
             }
         });
     }

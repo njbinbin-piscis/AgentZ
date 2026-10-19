@@ -59,3 +59,5 @@
 6. **Rust 后端核心测试门禁**：
    - 命令：`cargo test -p agentz-host --test kernel_contract`、`cargo test -p agentz-task-state`、`cargo test -p agentz-desktop --lib`
    - 结果：内核五阶段契约、浏览器 `snapshot_generation` 校验、脱敏导出、历史配置迁移、预算旁路记账全部通过。
+
+本签署仅覆盖所列本地工程与自动化检查。备份 CLI 的写入静默依赖调用者提供 `--quiesced true` 声明，WAL/SHM/journal 检查和清点前后哈希比对不能证明在线原子 SQLite 快照；原生恢复、历史任务/会话/环境绑定、干净机器安装与回滚、签名公证及跨平台实机旅程尚无验收记录。详见 [AZ-063 后续审计](evidence/AZ-063-2026-10-19-post-signoff-audit.md)及 ADR-006 豁免范围。
