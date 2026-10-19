@@ -13,7 +13,11 @@ import {
   type LayoutSnapshot,
   type WorkspaceSnapshot,
 } from "./services/tauri/workspace";
-import { generateRepoWiki } from "./services/tauri/repoWiki";
+import {
+  generateDeepRepoWiki,
+  generateRepoWiki,
+  readRepoMemory,
+} from "./services/tauri/repoWiki";
 import {
   graphIndexVisualState,
   requestGraphIndex,
@@ -676,6 +680,12 @@ export default function App() {
             () => setSettingsToast((cur) => (cur === queuedMsg ? null : cur)),
             3200,
           );
+        } else if (action === "deep") {
+          const res = await generateDeepRepoWiki(projectDir);
+          setIdeWikiOpenPath({ path: res.path, nonce: Date.now() });
+        } else if (action === "memory") {
+          const res = await readRepoMemory(projectDir);
+          setIdeWikiOpenPath({ path: res.path, nonce: Date.now() });
         } else {
           const res = await generateRepoWiki(projectDir);
           setIdeWikiOpenPath({ path: res.path, nonce: Date.now() });
@@ -709,6 +719,17 @@ export default function App() {
     },
     [mode, runWikiInIde, triggerWikiInWorkz],
   );
+
+  useEffect(() => {
+    const onOpenAnchor = (e: Event) => {
+      const detail = (e as CustomEvent<{ path?: string }>).detail;
+      if (detail?.path && mode !== "workz") {
+        setIdeWikiOpenPath({ path: detail.path, nonce: Date.now() });
+      }
+    };
+    window.addEventListener("agentz:open-source-anchor", onOpenAnchor);
+    return () => window.removeEventListener("agentz:open-source-anchor", onOpenAnchor);
+  }, [mode]);
 
   const wikiTitle = useMemo(() => {
     if (!graphIndexStatus || wikiBusy) return t("agent.repoWikiHint");
@@ -960,6 +981,22 @@ export default function App() {
                 >
                   {t("agent.repoWikiOverview")}
                   <span>{t("agent.repoWikiOverviewHint")}</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleWikiAction("deep")}
+                >
+                  {t("agent.repoWikiDeep")}
+                  <span>{t("agent.repoWikiDeepHint")}</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleWikiAction("memory")}
+                >
+                  {t("agent.repoWikiMemory")}
+                  <span>{t("agent.repoWikiMemoryHint")}</span>
                 </button>
                 <button
                   type="button"

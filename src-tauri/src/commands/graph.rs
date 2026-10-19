@@ -89,11 +89,31 @@ fn rel_path(root: &Path, path: &Path) -> String {
         .replace('\\', "/")
 }
 
-fn top_module(path: &str) -> String {
-    match path.split_once('/') {
-        Some((head, _)) => head.to_string(),
-        None => "(root)".to_string(),
+/// Resolve a repository-relative path into a logical subsystem module.
+///
+/// Drills down past generic container roots (`src/`, `src-tauri/src/`, `packages/`,
+/// `crates/`) so monorepos and Tauri apps produce meaningful subsystem nodes
+/// (for example `src/workspaces/workz`, `src-tauri/commands`, `src-tauri/runtime`).
+pub fn logical_module(path: &str) -> String {
+    let norm = path.trim_start_matches('/').replace('\\', "/");
+    let parts: Vec<&str> = norm.split('/').filter(|s| !s.is_empty()).collect();
+    match parts.as_slice() {
+        [] => "(root)".to_string(),
+        [_single_file] => "(root)".to_string(),
+        ["src", "workspaces", ws, _, ..] => format!("src/workspaces/{ws}"),
+        ["src", "services", svc, _, ..] => format!("src/services/{svc}"),
+        ["src", sub, _, ..] => format!("src/{sub}"),
+        ["src-tauri", "src", sub, _, ..] => format!("src-tauri/{sub}"),
+        ["src-tauri", "src", _file] => "src-tauri/core".to_string(),
+        ["packages", pkg, _, ..] => format!("packages/{pkg}"),
+        ["crates", krate, _, ..] => format!("crates/{krate}"),
+        ["vendor", pkg, _, ..] => format!("vendor/{pkg}"),
+        [head, ..] => (*head).to_string(),
     }
+}
+
+fn top_module(path: &str) -> String {
+    logical_module(path)
 }
 
 fn file_node_id(rel: &str) -> String {
@@ -408,6 +428,113 @@ struct BuildState {
     nodes: Vec<GraphNode>,
     edges: Vec<GraphEdge>,
     file_imports: BTreeMap<String, Vec<String>>,
+    /// Tauri command name -> defining Rust file rel path.
+    tauri_commands: BTreeMap<String, String>,
+    /// Frontend file rel path -> invoked Tauri command names.
+    tauri_invokes: BTreeMap<String, Vec<String>>,
+}
+
+/// Extract `#[tauri::command]` function names defined in a Rust source file.
+pub fn extract_tauri_commands(content: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut saw_attr = false;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("//") {
+            continue;
+        }
+        if trimmed.contains("#[tauri::command") {
+            saw_attr = true;
+            continue;
+        }
+        if saw_attr {
+            if trimmed.starts_with("#[") || trimmed.is_empty() {
+                continue;
+            }
+            if let Some(pos) = trimmed.find("fn ") {
+                let after = &trimmed[pos + 3..];
+                let name: String = after
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                    .collect();
+                if !name.is_empty() {
+                    out.push(name);
+                }
+            }
+            saw_attr = false;
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Extract Tauri `invoke("cmd")` / `invoke<T>("cmd")` targets from TS/JS source.
+pub fn extract_tauri_invokes(content: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let bytes = content.as_bytes();
+    let needle = b"invoke";
+    let mut i = 0;
+    while i + needle.len() < bytes.len() {
+        if &bytes[i..i + needle.len()] == needle {
+            let prev_ok = i == 0
+                || !(bytes[i - 1].is_ascii_alphanumeric()
+                    || bytes[i - 1] == b'_'
+                    || bytes[i - 1] == b'$');
+            if prev_ok {
+                let mut j = i + needle.len();
+                while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+                    j += 1;
+                }
+                // Optional generic `<...>` (supports one level of nested `<>`)
+                if j < bytes.len() && bytes[j] == b'<' {
+                    let mut depth = 1usize;
+                    j += 1;
+                    while j < bytes.len() && depth > 0 {
+                        if bytes[j] == b'<' {
+                            depth += 1;
+                        } else if bytes[j] == b'>' {
+                            depth -= 1;
+                        }
+                        j += 1;
+                    }
+                    while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+                        j += 1;
+                    }
+                }
+                if j < bytes.len() && bytes[j] == b'(' {
+                    j += 1;
+                    while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+                        j += 1;
+                    }
+                    if j < bytes.len() && (bytes[j] == b'"' || bytes[j] == b'\'') {
+                        let quote = bytes[j];
+                        let start = j + 1;
+                        let mut end = start;
+                        while end < bytes.len() && bytes[end] != quote {
+                            end += 1;
+                        }
+                        if end < bytes.len() {
+                            if let Ok(cmd) = std::str::from_utf8(&bytes[start..end]) {
+                                let cmd = cmd.trim();
+                                if !cmd.is_empty()
+                                    && cmd
+                                        .chars()
+                                        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+                                {
+                                    out.push(cmd.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 impl BuildState {
@@ -426,6 +553,8 @@ impl BuildState {
             nodes: Vec::new(),
             edges: Vec::new(),
             file_imports: BTreeMap::new(),
+            tauri_commands: BTreeMap::new(),
+            tauri_invokes: BTreeMap::new(),
         }
     }
 
@@ -445,6 +574,17 @@ impl BuildState {
             return;
         }
         let content = String::from_utf8_lossy(&raw);
+        let ext = rel.rsplit('.').next().unwrap_or("");
+        if ext == "rs" {
+            for cmd in extract_tauri_commands(&content) {
+                self.tauri_commands.insert(cmd, rel.to_string());
+            }
+        } else if matches!(ext, "ts" | "tsx" | "js" | "jsx") {
+            let invokes = extract_tauri_invokes(&content);
+            if !invokes.is_empty() {
+                self.tauri_invokes.insert(rel.to_string(), invokes);
+            }
+        }
         let imports_raw = extract_imports(&content, rel);
         let mut resolved = Vec::new();
         for spec in imports_raw {
@@ -526,6 +666,30 @@ impl BuildState {
             }
         }
 
+        // Cross-language Tauri IPC edges: frontend TS invoke("cmd") -> backend #[tauri::command] fn cmd.
+        for (fe_rel, cmds) in &self.tauri_invokes {
+            for cmd in cmds {
+                if let Some(be_rel) = self.tauri_commands.get(cmd) {
+                    if fe_rel != be_rel {
+                        self.edges.push(GraphEdge {
+                            from: file_node_id(fe_rel),
+                            to: file_node_id(be_rel),
+                            kind: "ipc_calls".into(),
+                        });
+                        let from_mod = top_module(fe_rel);
+                        let to_mod = top_module(be_rel);
+                        if from_mod != to_mod {
+                            self.edges.push(GraphEdge {
+                                from: module_node_id(&from_mod),
+                                to: module_node_id(&to_mod),
+                                kind: "depends".into(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
         // Dedupe edges
         let mut seen = BTreeSet::new();
         self.edges
@@ -599,6 +763,63 @@ pub struct TourDoc {
     pub version: String,
     pub generated_at: String,
     pub stops: Vec<TourStop>,
+}
+
+/// 20-iteration PageRank (damping = 0.85) over file-level `imports` + `ipc_calls` edges.
+/// Returns node_id -> normalized rank score (sum = node count).
+pub fn compute_pagerank(doc: &GraphDoc) -> BTreeMap<String, f64> {
+    let file_ids: Vec<String> = doc
+        .nodes
+        .iter()
+        .filter(|n| n.kind == "file")
+        .map(|n| n.id.clone())
+        .collect();
+    let n = file_ids.len();
+    let mut scores: BTreeMap<String, f64> = BTreeMap::new();
+    if n == 0 {
+        return scores;
+    }
+    let id_set: BTreeSet<String> = file_ids.iter().cloned().collect();
+    let mut outgoing: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for id in &file_ids {
+        scores.insert(id.clone(), 1.0);
+        outgoing.insert(id.clone(), Vec::new());
+    }
+    for e in &doc.edges {
+        if matches!(e.kind.as_str(), "imports" | "ipc_calls" | "calls")
+            && id_set.contains(&e.from)
+            && id_set.contains(&e.to)
+            && e.from != e.to
+        {
+            outgoing.entry(e.from.clone()).or_default().push(e.to.clone());
+        }
+    }
+    let d = 0.85_f64;
+    let base = 1.0 - d;
+    for _ in 0..20 {
+        let mut next: BTreeMap<String, f64> = file_ids.iter().map(|id| (id.clone(), base)).collect();
+        let mut sink_sum = 0.0_f64;
+        for id in &file_ids {
+            let cur = scores.get(id).copied().unwrap_or(1.0);
+            let outs = outgoing.get(id).map(Vec::as_slice).unwrap_or(&[]);
+            if outs.is_empty() {
+                sink_sum += cur;
+            } else {
+                let share = d * cur / (outs.len() as f64);
+                for to in outs {
+                    if let Some(slot) = next.get_mut(to) {
+                        *slot += share;
+                    }
+                }
+            }
+        }
+        let sink_share = d * sink_sum / (n as f64);
+        for val in next.values_mut() {
+            *val += sink_share;
+        }
+        scores = next;
+    }
+    scores
 }
 
 /// Build a module reading-order tour from dependency topology.
@@ -793,6 +1014,70 @@ mod tests {
             &index,
         );
         assert_eq!(hit.as_deref(), Some("src/store/index.ts"));
+    }
+
+    #[test]
+    fn logical_module_drills_down_subsystems() {
+        assert_eq!(
+            logical_module("src/workspaces/workz/Agent.tsx"),
+            "src/workspaces/workz"
+        );
+        assert_eq!(
+            logical_module("src/services/tauri/repoWiki.ts"),
+            "src/services/tauri"
+        );
+        assert_eq!(
+            logical_module("src-tauri/src/commands/graph.rs"),
+            "src-tauri/commands"
+        );
+        assert_eq!(
+            logical_module("src-tauri/src/runtime/task_activity.rs"),
+            "src-tauri/runtime"
+        );
+        assert_eq!(logical_module("package.json"), "(root)");
+    }
+
+    #[test]
+    fn tauri_ipc_extraction_and_pagerank() {
+        let rs = r#"
+            #[tauri::command]
+            pub async fn chat_list_sessions(project_dir: Option<String>) -> Result<(), String> {
+                Ok(())
+            }
+        "#;
+        let ts = r#"
+            import { invoke } from "@tauri-apps/api/core";
+            export function listSessions() {
+                return invoke<Session[]>("chat_list_sessions", { projectDir: "." });
+            }
+        "#;
+        assert_eq!(extract_tauri_commands(rs), vec!["chat_list_sessions"]);
+        assert_eq!(extract_tauri_invokes(ts), vec!["chat_list_sessions"]);
+
+        let dir = std::env::temp_dir().join(format!("agentz-ipc-graph-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("src/services")).unwrap();
+        std::fs::create_dir_all(dir.join("src-tauri/src/commands")).unwrap();
+        std::fs::write(dir.join("src/services/api.ts"), ts).unwrap();
+        std::fs::write(dir.join("src-tauri/src/commands/session.rs"), rs).unwrap();
+
+        let doc = generate(&dir).expect("generate graph");
+        assert!(doc.edges.iter().any(|e| {
+            e.kind == "ipc_calls"
+                && e.from == "file:src/services/api.ts"
+                && e.to == "file:src-tauri/src/commands/session.rs"
+        }));
+        let pr = compute_pagerank(&doc);
+        let be_score = pr
+            .get("file:src-tauri/src/commands/session.rs")
+            .copied()
+            .unwrap_or(0.0);
+        let fe_score = pr.get("file:src/services/api.ts").copied().unwrap_or(0.0);
+        assert!(
+            be_score > fe_score,
+            "backend target of ipc_calls should rank higher than caller ({be_score} vs {fe_score})"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

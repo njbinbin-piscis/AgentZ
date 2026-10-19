@@ -414,6 +414,7 @@ fn builtin_tool_catalog() -> Vec<BuiltinToolInfo> {
         ("codebase_search", "Ranked code search across the repo", "ide"),
         ("graph_explore", "Repository structure: dependencies and blast radius", "ide"),
         ("graph_search", "Search modules, files and dependency edges", "ide"),
+        ("repo_memory", "Source-anchored repository architecture & pitfall notes", "ide"),
         ("symbol_search", "Find function/class/type definitions by name (tree-sitter)", "ide"),
         ("devenv", "Check the project dev environment and settle the environment todo", "ide"),
         ("impact", "Callers and files affected by changing a symbol", "ide"),

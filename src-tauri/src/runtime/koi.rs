@@ -219,6 +219,7 @@ async fn build_koi_registry(
     registry.register(Box::new(crate::tools::codebase_search::CodebaseSearchTool));
     registry.register(Box::new(crate::tools::graph_search::GraphSearchTool));
     registry.register(Box::new(crate::tools::graph_explore::GraphExploreTool));
+    registry.register(Box::new(crate::tools::repo_memory::RepoMemoryTool));
     registry.register(Box::new(crate::tools::symbols::SymbolSearchTool));
     registry.register(Box::new(crate::tools::symbols::ImpactTool));
 

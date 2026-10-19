@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   agentTaskApi,
@@ -6,6 +6,7 @@ import {
   type TaskFileView,
   type AgentTaskInfo,
 } from "../../services/tauri/agentTask";
+import { fetchCodeMap } from "../../services/tauri/codeMap";
 import { diffLines } from "../codez/lineDiff";
 import "./AgentTaskReview.css";
 
@@ -68,10 +69,39 @@ function TaskReviewContent({ projectDir, task, onClose, onResolved }: AgentTaskR
   const [error, setError] = useState<string | null>(null);
   const [archived, setArchived] = useState(false);
   const [recoveryRoot, setRecoveryRoot] = useState<string | null>(null);
+  const [impactByPath, setImpactByPath] = useState<Record<string, number>>({});
+  const [sortByImpact, setSortByImpact] = useState(true);
 
   const base = task.base_sha || task.base || "HEAD";
   // Frozen SHA is for comparison; merge/PR require the named target branch.
   const targetBranch = task.base || "HEAD";
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCodeMap(projectDir)
+      .then((map) => {
+        if (cancelled || !map.ready) return;
+        const next: Record<string, number> = {};
+        for (const f of map.files) {
+          next[f.path.replace(/\\/g, "/")] = f.imported_by;
+        }
+        setImpactByPath(next);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projectDir, refresh]);
+
+  const orderedChanges = useMemo(() => {
+    if (!sortByImpact || Object.keys(impactByPath).length === 0) return changes;
+    return [...changes].sort((a, b) => {
+      const ia = impactByPath[a.path.replace(/\\/g, "/")] ?? 0;
+      const ib = impactByPath[b.path.replace(/\\/g, "/")] ?? 0;
+      if (ib !== ia) return ib - ia;
+      return a.path.localeCompare(b.path);
+    });
+  }, [changes, impactByPath, sortByImpact]);
 
   useEffect(() => {
     let cancelled = false;
@@ -255,6 +285,14 @@ function TaskReviewContent({ projectDir, task, onClose, onResolved }: AgentTaskR
           <button
             type="button"
             disabled={archived || busy || loading}
+            onClick={() => setSortByImpact((v) => !v)}
+            title="Sort changed files by blast radius (importers count)"
+          >
+            {sortByImpact ? t("agent.reviewSortImpact") : t("agent.reviewSortPath")}
+          </button>
+          <button
+            type="button"
+            disabled={archived || busy || loading}
             onClick={() => setRefresh((n) => n + 1)}
           >
             {t("agent.reviewRefresh")}
@@ -275,26 +313,37 @@ function TaskReviewContent({ projectDir, task, onClose, onResolved }: AgentTaskR
             ) : changes.length === 0 ? (
               <div className="agentz-task-review-empty">{t("agent.reviewEmpty")}</div>
             ) : (
-              changes.map((c) => (
-                <button
-                  key={c.path}
-                  type="button"
-                  className={`agentz-task-review-file ${c.path === selected ? "active" : ""}`}
-                  onClick={() => setSelected(c.path)}
-                >
-                  <span className={`agentz-task-review-badge ${c.status}`}>
-                    {c.status.slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="agentz-task-review-path" title={c.path}>
-                    {c.old_path ? `${c.old_path} → ` : ""}
-                    {c.path}
-                    <small>
-                      {c.sources.map((s) => t(`agent.reviewSource.${s}`)).join(" · ")}
-                      {c.binary ? ` · ${t("agent.reviewBinary")}` : ""}
-                    </small>
-                  </span>
-                </button>
-              ))
+              orderedChanges.map((c) => {
+                const importers = impactByPath[c.path.replace(/\\/g, "/")] ?? 0;
+                return (
+                  <button
+                    key={c.path}
+                    type="button"
+                    className={`agentz-task-review-file ${c.path === selected ? "active" : ""}`}
+                    onClick={() => setSelected(c.path)}
+                  >
+                    <span className={`agentz-task-review-badge ${c.status}`}>
+                      {c.status.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="agentz-task-review-path" title={c.path}>
+                      {c.old_path ? `${c.old_path} → ` : ""}
+                      {c.path}
+                      <small>
+                        {c.sources.map((s) => t(`agent.reviewSource.${s}`)).join(" · ")}
+                        {c.binary ? ` · ${t("agent.reviewBinary")}` : ""}
+                        {importers > 0 ? (
+                          <span
+                            className={`agentz-task-review-impact ${importers >= 4 ? "high" : ""}`}
+                            title={`Blast radius: imported by ${importers} file(s)`}
+                          >
+                            {" · "}⚡{importers}
+                          </span>
+                        ) : null}
+                      </small>
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
           <div className="agentz-task-review-diff">

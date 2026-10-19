@@ -39,10 +39,7 @@ fn module_node_id(name: &str) -> String {
 }
 
 fn top_module(path: &str) -> String {
-    match path.split_once('/') {
-        Some((head, _)) => head.to_string(),
-        None => "(root)".to_string(),
-    }
+    crate::commands::graph::logical_module(path)
 }
 
 /// Validate graph completeness for agent reliance.
@@ -88,7 +85,7 @@ pub fn validate_graph(doc: &GraphDoc) -> GraphValidation {
 fn hub_files(doc: &GraphDoc, limit: usize) -> Vec<(String, usize)> {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     for e in &doc.edges {
-        if e.kind != "imports" {
+        if e.kind != "imports" && e.kind != "ipc_calls" {
             continue;
         }
         let Some(to) = e.to.strip_prefix("file:") else {
@@ -96,8 +93,16 @@ fn hub_files(doc: &GraphDoc, limit: usize) -> Vec<(String, usize)> {
         };
         *counts.entry(to.to_string()).or_default() += 1;
     }
+    let pr = crate::commands::graph::compute_pagerank(doc);
     let mut sorted: Vec<(String, usize)> = counts.into_iter().collect();
-    sorted.sort_by_key(|x| std::cmp::Reverse(x.1));
+    sorted.sort_by(|a, b| {
+        let score_a = pr.get(&format!("file:{}", a.0)).copied().unwrap_or(1.0) * (a.1 as f64 + 1.0);
+        let score_b = pr.get(&format!("file:{}", b.0)).copied().unwrap_or(1.0) * (b.1 as f64 + 1.0);
+        score_b
+            .partial_cmp(&score_a)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.1.cmp(&a.1))
+    });
     sorted.truncate(limit);
     sorted
 }

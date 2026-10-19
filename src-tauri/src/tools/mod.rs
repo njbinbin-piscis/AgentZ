@@ -15,6 +15,7 @@ pub mod graph_explore;
 pub mod graph_search;
 pub mod plan_mode_ui;
 pub mod remote_fs;
+pub mod repo_memory;
 pub mod settings_catalog;
 pub mod skill_manage;
 pub mod symbols;

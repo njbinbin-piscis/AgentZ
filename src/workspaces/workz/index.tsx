@@ -29,7 +29,11 @@ import {
   MISSING_TASK_ENVIRONMENT,
   resolveTaskWorktree,
 } from "../../services/tauri/taskEnvironment";
-import { generateRepoWiki } from "../../services/tauri/repoWiki";
+import {
+  generateDeepRepoWiki,
+  generateRepoWiki,
+  readRepoMemory,
+} from "../../services/tauri/repoWiki";
 import { requestGraphIndex } from "../../services/tauri/graphIndex";
 import AgentTaskReview from "./AgentTaskReview";
 import SessionSkillRevisions from "./SessionSkillRevisions";
@@ -84,7 +88,7 @@ import "./Agent.css";
 
 import type { LibraryInitialState } from "../codez/resources/types";
 
-export type WikiBuildAction = "overview" | "graph";
+export type WikiBuildAction = "overview" | "deep" | "memory" | "graph";
 
 interface WorkZWorkspaceProps {
   projectDir: string | null;
@@ -1196,6 +1200,12 @@ export default function WorkZWorkspace({
       try {
         if (action === "graph") {
           await requestGraphIndex(projectDir);
+        } else if (action === "deep") {
+          const res = await generateDeepRepoWiki(projectDir);
+          setPreviewPath(res.path);
+        } else if (action === "memory") {
+          const res = await readRepoMemory(projectDir);
+          setPreviewPath(res.path);
         } else {
           const res = await generateRepoWiki(projectDir);
           setPreviewPath(res.path);
@@ -1216,6 +1226,17 @@ export default function WorkZWorkspace({
     wikiTriggerRef.current = wikiBuildNonce;
     void buildWiki(wikiBuildAction);
   }, [wikiBuildNonce, wikiBuildAction, buildWiki]);
+
+  useEffect(() => {
+    const onOpenAnchor = (e: Event) => {
+      const detail = (e as CustomEvent<{ path?: string }>).detail;
+      if (detail?.path) {
+        setPreviewPath(detail.path);
+      }
+    };
+    window.addEventListener("agentz:open-source-anchor", onOpenAnchor);
+    return () => window.removeEventListener("agentz:open-source-anchor", onOpenAnchor);
+  }, [setPreviewPath]);
 
   const sameScope = useCallback(
     (dir: string) => (isFree ? dir === overview?.free_dir : dir === scope.dir),

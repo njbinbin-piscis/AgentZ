@@ -229,3 +229,12 @@
   border-color: #cf222e;
   color: #f85149;
 }
+
+.agentz-task-review-impact {
+  color: var(--accent, #58a6ff);
+  font-weight: 600;
+}
+
+.agentz-task-review-impact.high {
+  color: #f0883e;
+}

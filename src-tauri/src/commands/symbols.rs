@@ -38,6 +38,25 @@ pub struct FileSymbols {
     pub calls: Vec<CallRef>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SymbolSkeleton {
+    pub name: String,
+    pub kind: &'static str,
+    pub file: String,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub container: Option<String>,
+    pub signature: String,
+    pub doc: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct FileSkeleton {
+    pub file_doc: String,
+    pub symbols: Vec<SymbolSkeleton>,
+    pub calls: Vec<CallRef>,
+}
+
 #[derive(Debug, Default)]
 pub struct SymbolIndex {
     pub symbols: Vec<Symbol>,
@@ -268,6 +287,165 @@ pub fn extract_file(path: &Path, rel: &str, source: &str) -> Option<FileSymbols>
         &mut out,
     );
     Some(out)
+}
+
+fn extract_header_doc(lines: &[&str]) -> String {
+    let mut doc = Vec::new();
+    let mut in_block = false;
+    for line in lines.iter().take(30) {
+        let t = line.trim();
+        if t.is_empty() {
+            if !doc.is_empty() && !in_block {
+                break;
+            }
+            continue;
+        }
+        if t.starts_with("//!") || t.starts_with("///") {
+            let cleaned = t.trim_start_matches("//!").trim_start_matches("///").trim();
+            if !cleaned.is_empty() {
+                doc.push(cleaned.to_string());
+            }
+        } else if t.starts_with("/**") || t.starts_with("/*!") {
+            in_block = true;
+            let cleaned = t
+                .trim_start_matches("/**")
+                .trim_start_matches("/*!")
+                .trim_end_matches("*/")
+                .trim();
+            if !cleaned.is_empty() {
+                doc.push(cleaned.to_string());
+            }
+            if t.ends_with("*/") {
+                break;
+            }
+        } else if in_block {
+            if t.ends_with("*/") {
+                let cleaned = t.trim_end_matches("*/").trim_start_matches('*').trim();
+                if !cleaned.is_empty() {
+                    doc.push(cleaned.to_string());
+                }
+                break;
+            }
+            let cleaned = t.trim_start_matches('*').trim();
+            if !cleaned.is_empty() {
+                doc.push(cleaned.to_string());
+            }
+        } else if t.starts_with("# ") && !t.starts_with("#!") && !t.starts_with("#[") {
+            doc.push(t.trim_start_matches('#').trim().to_string());
+        } else {
+            break;
+        }
+        if doc.len() >= 4 {
+            break;
+        }
+    }
+    doc.join(" ")
+}
+
+fn extract_preceding_doc(lines: &[&str], start_line_1based: usize) -> String {
+    if start_line_1based <= 1 {
+        return String::new();
+    }
+    let mut idx = start_line_1based.saturating_sub(2);
+    let mut collected = Vec::new();
+    loop {
+        let Some(raw) = lines.get(idx) else { break };
+        let t = raw.trim();
+        if t.starts_with("#[") || t.starts_with('@') {
+            if idx == 0 {
+                break;
+            }
+            idx -= 1;
+            continue;
+        }
+        if t.starts_with("///") || t.starts_with("//") {
+            let cleaned = t.trim_start_matches("///").trim_start_matches("//").trim();
+            if !cleaned.is_empty() {
+                collected.push(cleaned.to_string());
+            }
+        } else if t.ends_with("*/") || t.starts_with('*') || t.starts_with("/**") {
+            let cleaned = t
+                .trim_start_matches("/**")
+                .trim_end_matches("*/")
+                .trim_start_matches('*')
+                .trim();
+            if !cleaned.is_empty() {
+                collected.push(cleaned.to_string());
+            }
+            if t.starts_with("/**") || t.starts_with("/*") {
+                break;
+            }
+        } else {
+            break;
+        }
+        if idx == 0 || collected.len() >= 3 {
+            break;
+        }
+        idx -= 1;
+    }
+    collected.reverse();
+    collected.join(" ")
+}
+
+fn extract_signature_line(lines: &[&str], start_line_1based: usize, end_line_1based: usize) -> String {
+    let start_idx = start_line_1based.saturating_sub(1);
+    let end_idx = end_line_1based
+        .saturating_sub(1)
+        .min(lines.len().saturating_sub(1))
+        .min(start_idx + 4);
+    let mut sig = String::new();
+    for line in lines.iter().take(end_idx + 1).skip(start_idx) {
+        let t = line.trim();
+        if t.starts_with("#[") {
+            continue;
+        }
+        if !sig.is_empty() {
+            sig.push(' ');
+        }
+        sig.push_str(t);
+        if t.contains('{') || t.ends_with(';') || t.ends_with(':') {
+            break;
+        }
+    }
+    if let Some(brace) = sig.find('{') {
+        sig.truncate(brace);
+    }
+    let sig = sig.trim().to_string();
+    if sig.chars().count() > 160 {
+        let truncated: String = sig.chars().take(157).collect();
+        format!("{truncated}...")
+    } else {
+        sig
+    }
+}
+
+pub fn extract_file_skeleton(path: &Path, rel: &str, source: &str) -> Option<FileSkeleton> {
+    let parsed = extract_file(path, rel, source)?;
+    let lines: Vec<&str> = source.lines().collect();
+    let file_doc = extract_header_doc(&lines);
+    let symbols = parsed
+        .symbols
+        .into_iter()
+        .map(|s| {
+            let signature = extract_signature_line(&lines, s.start_line, s.end_line);
+            let doc = extract_preceding_doc(&lines, s.start_line);
+            SymbolSkeleton {
+                name: s.name,
+                kind: s.kind,
+                file: s.file,
+                start_line: s.start_line,
+                end_line: s.end_line,
+                container: s.container,
+                signature,
+                doc,
+            }
+        })
+        .collect();
+    Some(FileSkeleton {
+        file_doc,
+        symbols,
+        calls: parsed.calls,
+    })
 }
 
 fn collect_source_files(root: &Path) -> Vec<PathBuf> {

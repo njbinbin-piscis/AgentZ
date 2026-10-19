@@ -52,6 +52,7 @@ pub fn install_if_remote(registry: &mut ToolRegistry, workspace_root: &str) {
             "codebase_search" => Box::new(crate::tools::codebase_search::CodebaseSearchTool),
             "graph_search" => Box::new(crate::tools::graph_search::GraphSearchTool),
             "graph_explore" => Box::new(crate::tools::graph_explore::GraphExploreTool),
+            "repo_memory" => Box::new(crate::tools::repo_memory::RepoMemoryTool),
             "symbol_search" => Box::new(crate::tools::symbols::SymbolSearchTool),
             _ => Box::new(crate::tools::symbols::ImpactTool),
         };
@@ -113,6 +114,7 @@ const MIRRORED_TOOLS: &[&str] = &[
     "codebase_search",
     "graph_search",
     "graph_explore",
+    "repo_memory",
     "symbol_search",
     "impact",
 ];

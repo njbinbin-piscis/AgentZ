@@ -202,14 +202,31 @@ function extractText(node: ReactNode): string {
   return "";
 }
 
+const SOURCE_ANCHOR_RE =
+  /^([A-Za-z0-9_./-]+\.(?:rs|ts|tsx|js|jsx|py|go|json|md|css|html|toml|yaml|yml)):(\d+)(?:-(\d+))?$/;
+
+function parseSourceAnchor(
+  raw: string,
+): { path: string; line: number; endLine?: number } | null {
+  const m = SOURCE_ANCHOR_RE.exec(raw.trim());
+  if (!m) return null;
+  const line = Number.parseInt(m[2], 10);
+  const endLine = m[3] ? Number.parseInt(m[3], 10) : undefined;
+  if (!Number.isFinite(line) || line < 1) return null;
+  return { path: m[1], line, endLine };
+}
+
 /** Renders assistant text as rich markdown (GFM, mermaid, HTML, KaTeX). */
 function Markdown({
   content,
   compact,
+  onOpenSourceAnchor,
 }: {
   content: string;
   /** Tighter spacing for embedded surfaces (e.g. chat_ui text blocks). */
   compact?: boolean;
+  /** Optional handler when user clicks a `path/to/file.ext:line` code anchor. */
+  onOpenSourceAnchor?: (anchor: { path: string; line: number; endLine?: number }) => void;
 }) {
   const fallback = (
     <pre className="agentz-markdown-fallback">
@@ -273,6 +290,41 @@ function Markdown({
                       {children}
                     </code>
                   </CodeBlock>
+                );
+              }
+              const anchor = parseSourceAnchor(text);
+              if (anchor) {
+                return (
+                  <code
+                    className="agentz-md-inline-code agentz-md-code-anchor"
+                    title={`Open ${anchor.path} (line ${anchor.line})`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenSourceAnchor) {
+                        onOpenSourceAnchor(anchor);
+                      }
+                      window.dispatchEvent(
+                        new CustomEvent("agentz:open-source-anchor", { detail: anchor }),
+                      );
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onOpenSourceAnchor) {
+                          onOpenSourceAnchor(anchor);
+                        }
+                        window.dispatchEvent(
+                          new CustomEvent("agentz:open-source-anchor", { detail: anchor }),
+                        );
+                      }
+                    }}
+                    {...props}
+                  >
+                    {children}
+                  </code>
                 );
               }
               return (

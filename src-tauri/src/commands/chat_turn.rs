@@ -1253,6 +1253,7 @@ fn build_tool_registry(
         registry.register(Box::new(crate::tools::codebase_search::CodebaseSearchTool));
         registry.register(Box::new(crate::tools::graph_search::GraphSearchTool));
         registry.register(Box::new(crate::tools::graph_explore::GraphExploreTool));
+        registry.register(Box::new(crate::tools::repo_memory::RepoMemoryTool));
         registry.register(Box::new(crate::tools::symbols::SymbolSearchTool));
         registry.register(Box::new(crate::tools::symbols::ImpactTool));
         if let Ok(config_dir) = crate::commands::data_scope::resolve_global_config_dir(&app) {
@@ -1776,7 +1777,8 @@ fn wiki_agent_coding_context(workspace_root: &str, chat_mode: &str) -> Option<St
     if let Some(excerpt) = crate::commands::graph_agent::coding_brief_excerpt(root, max_chars) {
         let mut block = format!(
             "## Repository coding brief (auto-injected)\n\
-             Structural map for navigation — use `graph_search` + `codebase_search` before editing.\n\
+             Structural map for navigation — use `graph_explore` + `codebase_search` before editing, \
+             and `repo_memory` to query/record source-anchored invariants.\n\
              Mention `@graph <topic>` for inline dependency context.\n\n{excerpt}"
         );
         if let Some(domains) = crate::commands::graph_agent::domain_context_excerpt(root, 6) {
@@ -1786,6 +1788,17 @@ fn wiki_agent_coding_context(workspace_root: &str, chat_mode: &str) -> Option<St
         if let Some(deep) = crate::commands::graph_agent::deep_wiki_excerpt(root, 1200) {
             block.push_str("\n\n## Deep wiki excerpt\n\n");
             block.push_str(&deep);
+        }
+        if let Ok(notes) = crate::commands::graph_db::query_repo_notes(root, None, false, 8) {
+            if !notes.is_empty() {
+                block.push_str("\n\n## Active repository memory notes (`.agentz/REPO_MEMORY.md`)\n\n");
+                for n in notes {
+                    block.push_str(&format!(
+                        "- **[{}]** `{}` — **{}**: {}\n",
+                        n.kind, n.scope_target, n.title, n.body
+                    ));
+                }
+            }
         }
         return Some(block);
     }
@@ -3154,7 +3167,19 @@ pub async fn run_agentz_turn(
         let model_ev = runtime.model.clone();
         let max_tokens_ev = runtime.max_tokens;
         let budget_post = budget_scope.clone();
+        let ws_root_ev = workspace_root.clone();
         tokio::spawn(async move {
+            crate::commands::post_turn::auto_extract_repo_notes(
+                ws_root_ev,
+                msgs_ev.clone(),
+                provider_ev.clone(),
+                api_key_ev.clone(),
+                base_url_ev.clone(),
+                model_ev.clone(),
+                max_tokens_ev,
+                budget_post.clone(),
+            )
+            .await;
             crate::commands::post_turn::run_post_turn_hooks(
                 &app_ev,
                 project_db_ev,

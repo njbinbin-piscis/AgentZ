@@ -194,3 +194,14 @@
   overflow-y: hidden;
   padding: 4px 0;
 }
+
+.agentz-md-code-anchor {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--accent, #58a6ff);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.agentz-md-code-anchor:hover {
+  background: rgba(88, 166, 255, 0.16);
+  color: var(--accent, #58a6ff);
+}

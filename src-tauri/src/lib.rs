@@ -242,8 +242,10 @@ pub fn run() {
             commands::browser::browser_close_guard,
             // Debug regression scenarios (browser E2E, etc.)
             commands::debug_scenarios::debug_scenarios_list,
-            // Repo Wiki — module/architecture overview from the index (M8)
+            // Repo Wiki — module/architecture overview from the index (M8) + DeepWiki & Repo Memory
             commands::repo_wiki::repo_wiki_generate,
+            commands::repo_wiki::repo_wiki_generate_deep,
+            commands::repo_wiki::repo_memory_read,
             // Knowledge graph — background index (CodeGraph-style)
             commands::graph::graph_index_rebuild,
             commands::graph::graph_index_status,

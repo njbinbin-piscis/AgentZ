@@ -39,9 +39,11 @@ pub fn agent_system_prompt(
            `action=grep` searches contents by regex (Cursor Glob/Grep equivalent).\n\
          - `codebase_search` — ranked search when you do not know exact strings; code \
            ranks above docs, use `kind=code` / `path` / `extensions` to narrow.\n\
-         - `graph_explore` / `graph_search` — repository structure: module and file \
-           dependencies, what imports a file, hub files. If the graph index is still \
-           building they say so; use `codebase_search` meanwhile.\n\
+         - `graph_explore` / `graph_search` — repository structure: AST symbol call graph, \
+           Tauri IPC cross-boundary edges, module dependencies, and blast radius.\n\
+         - `repo_memory` — source-anchored repository memory (`.agentz/REPO_MEMORY.md`): \
+           query module invariants/pitfalls before editing, and `record` non-obvious constraints \
+           with file/line citations after fixing complex bugs.\n\
          - `symbol_search` — find definitions by (partial) name with file and line range; \
            `impact` — callers (transitive) and files to re-check before changing a symbol.\n\
          - `lsp` — semantic navigation: `definition`, `references`, `hover`, `symbols` \

@@ -5,6 +5,22 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.19] - 2026-10-19
+
+### Added
+
+- The code graph now groups files into logical subsystems, extracts Tree-sitter symbols and call edges, and links frontend `invoke` calls to Rust `#[tauri::command]` handlers. PageRank ranks hub files.
+- `graph_explore` returns symbol definitions, call and IPC sites, and matching repository notes. CamelCase symbols are included.
+- Source-anchored repository memory (`repo_memory`, `.agentz/REPO_MEMORY.md`) records invariants and pitfalls. Editing a cited line range marks the note stale until it is verified.
+- Dual-track wiki: a fast architecture wiki (AST cards, PageRank tour, IPC diagram) and an incremental DeepWiki with per-module content-hash cache. The Wiki menu can open either file or the memory notes.
+- Built-in `repo-cartographer` skill. Markdown `path:line` anchors open the cited file. Task review can sort changed files by importer count.
+
+### Known limits
+
+- This release has not passed the upgrade acceptance gates. The unaccepted items and user test cases remain in `docs/upgrade/acceptance-0.9.12.md`.
+- Installers are unsigned. macOS and Linux builds were not run on real machines.
+- Other limits listed under 0.9.18 still apply.
+
 ## [0.9.18] - 2026-10-19
 
 ### Changed
