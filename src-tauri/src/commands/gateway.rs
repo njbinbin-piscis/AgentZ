@@ -143,6 +143,7 @@ fn im_to_dto(s: &Settings) -> ImSettingsDto {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod im_settings_dto_tests {
     use super::*;
 

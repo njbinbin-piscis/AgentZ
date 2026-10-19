@@ -1,4 +1,5 @@
 #![recursion_limit = "512"]
+#![allow(clippy::items_after_test_module)]
 //! AgentZ desktop host — Tauri application entry point.
 //!
 //! Bridges the React frontend (IDE / Agent modes) to native capabilities and,

@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WorkzEmptyState, { WORKZ_STARTER_SCENARIOS } from "./WorkzEmptyState";
@@ -53,9 +51,23 @@ describe("WorkzEmptyState (R10-12)", () => {
     expect(onSelect.mock.calls[0][0].recommendIsolate).toBe(true);
   });
 
-  it("styles starter cards with theme-aware CSS tokens for both dark and light themes", () => {
-    const agentCss = fs.readFileSync(path.resolve(__dirname, "./Agent.css"), "utf8");
-    const indexCss = fs.readFileSync(path.resolve(__dirname, "../../index.css"), "utf8");
+  it("styles starter cards with theme-aware CSS tokens for both dark and light themes", async () => {
+    const fsSpecifier = "node:fs";
+    const urlSpecifier = "node:url";
+    const fs = (await import(/* @vite-ignore */ fsSpecifier)) as {
+      readFileSync: (path: string, encoding: string) => string;
+    };
+    const url = (await import(/* @vite-ignore */ urlSpecifier)) as {
+      fileURLToPath: (u: URL) => string;
+    };
+    const agentCss = fs.readFileSync(
+      url.fileURLToPath(new URL("./Agent.css", import.meta.url)),
+      "utf8",
+    );
+    const indexCss = fs.readFileSync(
+      url.fileURLToPath(new URL("../../index.css", import.meta.url)),
+      "utf8",
+    );
 
     expect(agentCss).toContain(".agentz-workz-starter-card");
     expect(agentCss).not.toContain("#181822");

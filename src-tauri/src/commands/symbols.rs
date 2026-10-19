@@ -348,8 +348,7 @@ fn extract_preceding_doc(lines: &[&str], start_line_1based: usize) -> String {
     }
     let mut idx = start_line_1based.saturating_sub(2);
     let mut collected = Vec::new();
-    loop {
-        let Some(raw) = lines.get(idx) else { break };
+    while let Some(raw) = lines.get(idx) {
         let t = raw.trim();
         if t.starts_with("#[") || t.starts_with('@') {
             if idx == 0 {
@@ -474,17 +473,18 @@ fn collect_source_files(root: &Path) -> Vec<PathBuf> {
                     continue;
                 }
                 stack.push((path, depth + 1));
-            } else if meta.is_file() && meta.len() <= MAX_PARSE_BYTES && lang_for(&path).is_some() {
-                if path
+            } else if meta.is_file()
+                && meta.len() <= MAX_PARSE_BYTES
+                && lang_for(&path).is_some()
+                && path
                     .strip_prefix(root)
                     .ok()
                     .and_then(|relative| relative.to_str())
                     .is_some_and(|relative| {
                         crate::commands::codebase::safe_cached_source_path(root, relative)
                     })
-                {
-                    files.push(path);
-                }
+            {
+                files.push(path);
             }
         }
     }

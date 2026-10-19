@@ -16,6 +16,7 @@ function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 function id(value: unknown, max: number): asserts value is string {
+  // eslint-disable-next-line no-control-regex
   if (typeof value !== "string" || !value.trim() || value.length > max || /[\u0000-\u001f\u007f]/u.test(value))
     throw new Error("Invalid inbox identity");
 }

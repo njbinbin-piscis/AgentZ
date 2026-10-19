@@ -93,14 +93,12 @@ pub fn install_to_installed(
         .map(|metadata| metadata.requested_tools.clone())
         .unwrap_or_default();
     let added = provenance::added_tools(&previous_tools, &requested_tools);
-    if previous.is_some() {
-        if !added.is_empty() {
-            anyhow::bail!(
-                "skill update '{}' requests additional tools: {}. Review these capabilities and uninstall the existing skill before installing the update.",
-                skill.name,
-                added.join(", ")
-            );
-        }
+    if previous.is_some() && !added.is_empty() {
+        anyhow::bail!(
+            "skill update '{}' requests additional tools: {}. Review these capabilities and uninstall the existing skill before installing the update.",
+            skill.name,
+            added.join(", ")
+        );
     }
 
     let mut meta = SkillConfigMeta::installed(source, source_url, session_id);

@@ -518,14 +518,14 @@ fn apply_secret_replace(
     if value.is_empty() || value.len() > 64 * 1024 {
         return Err("secret replacement must be nonempty and at most 64 KiB".into());
     }
-    if let Some((kind, name, key)) = parse_mcp_map_reference(&reference) {
+    if let Some((kind, name, key)) = parse_mcp_map_reference(reference) {
         let values = mcp_map_mut(settings, kind, &name)
             .ok_or_else(|| "unknown secret reference".to_string())?;
         values.insert(key, value);
-    } else if let Some(args) = mcp_args_slot_mut(settings, &reference) {
+    } else if let Some(args) = mcp_args_slot_mut(settings, reference) {
         *args = parse_mcp_args_replacement(&value)?;
     } else {
-        *secret_slot_mut(settings, &reference)? = value;
+        *secret_slot_mut(settings, reference)? = value;
     }
     Ok(())
 }
@@ -546,14 +546,14 @@ pub async fn settings_secret_delete(
 }
 
 fn apply_secret_delete(settings: &mut Settings, reference: &str) -> Result<(), String> {
-    if let Some((kind, name, key)) = parse_mcp_map_reference(&reference) {
+    if let Some((kind, name, key)) = parse_mcp_map_reference(reference) {
         let values = mcp_map_mut(settings, kind, &name)
             .ok_or_else(|| "unknown secret reference".to_string())?;
         values.remove(&key);
-    } else if let Some(args) = mcp_args_slot_mut(settings, &reference) {
+    } else if let Some(args) = mcp_args_slot_mut(settings, reference) {
         args.clear();
     } else {
-        secret_slot_mut(settings, &reference)?.clear();
+        secret_slot_mut(settings, reference)?.clear();
     }
     Ok(())
 }

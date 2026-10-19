@@ -4,11 +4,11 @@ use agentz_task_state::plan::PlanBinding;
 use serde::Serialize;
 // Handle-verified text reads exist only on Windows (and in tests); keep these gated so
 // Linux/macOS release builds, which treat warnings as errors, do not fail on unused items.
-#[cfg(any(windows, test))]
+#[cfg(windows)]
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, State, WebviewWindow};
-#[cfg(any(windows, test))]
+#[cfg(windows)]
 const MAX_BYTES: u64 = 1_048_576;
 const MAX_NODES: usize = 1000;
 #[derive(Debug, Serialize)]

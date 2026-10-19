@@ -296,8 +296,7 @@ impl ApprovalHooks {
     }
     async fn fresh(&self, ev: &ToolHookEvent<'_>) -> Result<Binding, String> {
         if ev.session_id != self.binding.task_id
-            || PathBuf::from(agentz_task_state::canonical_root(ev.workspace_root)?)
-                != self.workspace
+            || agentz_task_state::canonical_root(ev.workspace_root)? != self.workspace
         {
             return Err("Tool invocation belongs to a different task/environment".into());
         }
@@ -610,7 +609,7 @@ impl Drop for ApprovalHooks {
         let intents = self
             .claimed
             .get_mut()
-            .map(|map| std::mem::take(map))
+            .map(std::mem::take)
             .unwrap_or_default();
         for (_, (_, intent)) in intents {
             let path = self.path();

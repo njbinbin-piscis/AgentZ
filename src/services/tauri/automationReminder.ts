@@ -6,6 +6,7 @@ export interface ReminderStatus {
 }
 
 function validId(value: string): void {
+  // eslint-disable-next-line no-control-regex
   if (!value.trim() || value.length > 256 || /[\u0000-\u001f\u007f]/u.test(value)) throw new Error("Invalid reminder identity");
 }
 

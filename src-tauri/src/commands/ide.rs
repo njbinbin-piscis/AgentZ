@@ -475,7 +475,7 @@ pub async fn ide_write_file(
             .map_err(|e| format!("Failed to create directories: {}", e))?;
     }
     write_atomically(&file_path, content.as_bytes())
-        .map(|digest| Some(digest))
+        .map(Some)
         .map_err(|e| format!("Failed to write: {e}"))
 }
 
@@ -2200,6 +2200,7 @@ mod terminal_tree_tests {
         TerminalOutputLog, TerminalRegistry, TerminalSession,
     };
     use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+    #[cfg(windows)]
     use std::time::{Duration, Instant};
 
     /// Open a real PTY and spawn `cmd` in it. The master must stay alive for
