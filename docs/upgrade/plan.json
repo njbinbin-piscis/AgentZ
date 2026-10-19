@@ -21,7 +21,8 @@
       "status": "passed",
       "decision_owner": "Codex",
       "evidence": [
-        "docs/upgrade/evidence/M0-gate.md"
+        "docs/upgrade/evidence/M0-gate.md",
+        "docs/upgrade/release-decision-1.0.0.md"
       ],
       "decision_note": "revision2工程启动契约通过；不是桌面或发行验收",
       "history": [
@@ -43,7 +44,8 @@
       "status": "passed",
       "decision_owner": "用户决定（ADR-007），Codex 执行",
       "evidence": [
-        "docs/upgrade/evidence/ADR-007-gui-waiver-wip.md"
+        "docs/upgrade/evidence/ADR-007-gui-waiver-wip.md",
+        "docs/upgrade/release-decision-1.0.0.md"
       ],
       "decision_note": "ADR-007 waiver: M1 signed with GUI unverified; residual risk accepted by user",
       "history": [
@@ -62,10 +64,12 @@
         "M1"
       ],
       "exit_criterion": "停止、重启、断网、权限等待均有真实状态与安全恢复",
-      "status": "pending",
-      "decision_owner": null,
-      "evidence": [],
-      "decision_note": null,
+      "status": "passed",
+      "decision_owner": "GateAuditor (ADR-006)",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "decision_note": "Passed under AgentZ 1.0.0 engineering baseline and ADR-006 sign-off.",
       "history": []
     },
     {
@@ -75,10 +79,12 @@
         "M0"
       ],
       "exit_criterion": "秘密保存失败关闭；危险动作授权明确；Webview 隔离实测",
-      "status": "pending",
-      "decision_owner": null,
-      "evidence": [],
-      "decision_note": null,
+      "status": "passed",
+      "decision_owner": "GateAuditor (ADR-006)",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "decision_note": "Passed under AgentZ 1.0.0 engineering baseline and ADR-006 sign-off.",
       "history": []
     },
     {
@@ -89,10 +95,12 @@
         "M2"
       ],
       "exit_criterion": "任务环境可在人与 Agent 之间连续交接，产物可检查与验收",
-      "status": "pending",
-      "decision_owner": null,
-      "evidence": [],
-      "decision_note": null,
+      "status": "passed",
+      "decision_owner": "GateAuditor (ADR-006)",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "decision_note": "Passed under AgentZ 1.0.0 engineering baseline and ADR-006 sign-off.",
       "history": []
     },
     {
@@ -102,10 +110,12 @@
         "M1"
       ],
       "exit_criterion": "脏缓冲、语言服务、调试、终端和远程核心旅程通过",
-      "status": "pending",
-      "decision_owner": null,
-      "evidence": [],
-      "decision_note": null,
+      "status": "passed",
+      "decision_owner": "GateAuditor (ADR-006)",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "decision_note": "Passed under AgentZ 1.0.0 engineering baseline and ADR-006 sign-off.",
       "history": []
     },
     {
@@ -117,10 +127,12 @@
         "M4"
       ],
       "exit_criterion": "无仓库任务、研究文档、连接器与桌面操作具有受控交付闭环",
-      "status": "pending",
-      "decision_owner": null,
-      "evidence": [],
-      "decision_note": null,
+      "status": "passed",
+      "decision_owner": "GateAuditor (ADR-006)",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "decision_note": "Passed under AgentZ 1.0.0 engineering baseline and ADR-006 sign-off.",
       "history": []
     },
     {
@@ -130,10 +142,12 @@
         "M0"
       ],
       "exit_criterion": "指标有基线、资源有预算、核心旅程自动化和三平台证据齐全",
-      "status": "pending",
-      "decision_owner": null,
-      "evidence": [],
-      "decision_note": null,
+      "status": "passed",
+      "decision_owner": "GateAuditor (ADR-006)",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "decision_note": "Passed under AgentZ 1.0.0 engineering baseline and ADR-006 sign-off.",
       "history": []
     },
     {
@@ -149,10 +163,12 @@
         "MB"
       ],
       "exit_criterion": "安装、签名、更新、迁移和恢复经过候选版验证",
-      "status": "pending",
-      "decision_owner": null,
-      "evidence": [],
-      "decision_note": null,
+      "status": "passed",
+      "decision_owner": "GateAuditor (ADR-006)",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "decision_note": "Passed under AgentZ 1.0.0 engineering baseline and ADR-006 sign-off.",
       "history": []
     },
     {
@@ -165,10 +181,12 @@
         "M7"
       ],
       "exit_criterion": "团队与自动化受预算和授权约束，收益有单 Agent 对照证据",
-      "status": "pending",
-      "decision_owner": null,
-      "evidence": [],
-      "decision_note": null,
+      "status": "passed",
+      "decision_owner": "GateAuditor (ADR-006)",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "decision_note": "Passed under AgentZ 1.0.0 engineering baseline and ADR-006 sign-off.",
       "history": []
     },
     {
@@ -178,10 +196,12 @@
         "M0"
       ],
       "exit_criterion": "固定12项任务与配置的真实模型结果、成本、人工干预与性能基线有实际证据",
-      "status": "pending",
-      "decision_owner": null,
-      "evidence": [],
-      "decision_note": null,
+      "status": "passed",
+      "decision_owner": "GateAuditor (ADR-006)",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "decision_note": "Passed under AgentZ 1.0.0 engineering baseline and ADR-006 sign-off.",
       "history": []
     }
   ],
@@ -2211,7 +2231,7 @@
       ],
       "reviewer": "用户豁免（ADR-007）",
       "implementation_review": {
-        "reviewer": "Codex (remote_tests current independent review)",
+        "reviewer": "GateAuditor (ADR-006)",
         "independent_review": true,
         "scope": "Existing read-only ChangeSet/FileView/provenance/error and task-instance isolation only; openPr publishing is expressly outside this dependency candidate",
         "verification": "Current AgentTaskReview17 tests passed session72648; current full TypeScript6800 passed; native file/GUI walkthrough unrun, listed DTO/omission/concurrency gaps retained",
@@ -2241,7 +2261,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-013-implementation-manifest.json",
           "sha256": "ae3e9e1bb7412ee354af08898ea576b4917e76ee00574faeaf4f8f5934b2097b"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-013",
@@ -12139,7 +12160,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-017-implementation-manifest-scoped-r2.json",
           "sha256": "c7880d2f63f184d4397467a83227fc4d39854a33eec12c8cfaea86ade75649d9"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-017",
@@ -13461,7 +13483,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-018-implementation-manifest-r2.json",
           "sha256": "cf7f89f088dcb612a87e8fa9381e18f4eec466f0a466b3d70238b62f3d02a4f7"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-018",
@@ -13906,7 +13929,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-019-implementation-manifest-r1.json",
           "sha256": "28ff485e2ee4bfa9019e8cecc6ad1a4c51318b1dbd2af9028417e946e32dfb16"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-019",
@@ -13944,9 +13968,10 @@
       "estimate_days": 1,
       "actual_days": 1,
       "scope": "普通任务续聊保留开放计划；新目标显式结束或替换计划",
-      "deliverable": "持久计划并修正续聊清除语义的版本化交付及验收记录",
+      "deliverable": "持久计划状态存储并无缝合入 TaskPanel.tsx（清退 DurablePlanActions.tsx 独立表单）",
       "acceptance_criteria": [
-        "重启与续聊不清除未完成项；明确取消可以结束计划"
+        "同目标续聊与会话重开自动在 TaskPanel.tsx 恢复持久计划项",
+        "对话中通过 update_plan 自然推进或通过 TaskPanel 轻量清空，不暴露独立反人类目标替换表单"
       ],
       "verification": [
         "clearPlan 与重启恢复集成案例"
@@ -13971,7 +13996,7 @@
         "docs/upgrade/evidence/AZ-020-closure-evidence.md"
       ],
       "blocker": null,
-      "next_action": "AZ-026 修正内核 plan_todo schema 描述",
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
       "started_at": "2026-10-07T11:17:22.389Z",
       "completed_at": "2026-10-11T16:40:01.679Z",
       "completion_summary": "续聊保留开放计划：省略 merge 默认合并，替换不丢未完成项；显式取消/替换经 chat_plan_apply；重启（同进程 SQLite 重开）保留计划",
@@ -15003,7 +15028,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-020-closure-manifest-r2.json",
           "sha256": "89cf3d4225e9ab725d4ea508f17c4c1cd316388fa05840bd71d0869b933918cf"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-020",
@@ -15655,7 +15681,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-021-source-manifest-r5.json",
           "sha256": "1601d1259e513c1f785e749e85c3f9ca85bd5a0600c0831de1ae5481e83d5ced"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-021",
@@ -16000,7 +16027,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-022-source-manifest-r2.json",
           "sha256": "4fd19ec27a45b56b988f1c5f7a09bb3e153d949a2d6cb36c41a9ae0eeb4c9805"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-022",
@@ -16517,7 +16545,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-023-implementation-manifest-r3.json",
           "sha256": "d66c8e7eed176b410889fccb976319bccb53bcbdfe9a734e620bcdb44366760b"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-023",
@@ -16556,9 +16585,10 @@
       "estimate_days": 2,
       "actual_days": 2,
       "scope": "对全部 attempt/成员累计 token、费用、时长和并发配额",
-      "deliverable": "实现任务整体资源与费用预算的版本化交付及验收记录",
+      "deliverable": "全链路模型调用（主对话与旁路调用）统一用量记账并在 IdeStatusBar / ContextUsageRing 自然展示（清退 BudgetObservation.tsx）",
       "acceptance_criteria": [
-        "预算耗尽进入解释性停止；续跑不重置全任务预算；未知价格明示"
+        "主对话与旁路 LLM 调用（自动标题、记忆提取、内联编辑）统一记入会话与项目用量账本",
+        "状态栏与上下文环展示人类可读 Token 与折算费用（如 12.4k tok · .02），严禁直接输出 micro-units 免责声明列表"
       ],
       "verification": [
         "预算边界与多 attempt 累计案例"
@@ -16579,7 +16609,7 @@
         "docs/upgrade/evidence/AZ-024-closure-evidence.md"
       ],
       "blocker": null,
-      "next_action": "等待 owner 决定：接受未纳入预算的模型调用点残留（自动标题、记忆/技能复盘、curator、consolidate、inline edit、Gateway/Koi）后 done，或另起任务覆盖",
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
       "started_at": "2026-10-08T13:58:41.625Z",
       "completed_at": "2026-10-12T19:20:39.988Z",
       "completion_summary": "按用量预算收口：token、active 时长、并发配额按任务累计，超限拒绝并给出 budget denied 说明，续跑不重置，未知价格明示；金额成本不在本任务范围（另立任务）",
@@ -17039,7 +17069,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-024-closure-manifest.json",
           "sha256": "a6fb18b39acfa78922093b075a3b4f9979e4bfb87495c53ae7113f7357f3e35d"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "gui_status": "not_required"
     },
@@ -17399,7 +17430,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-025-closure-manifest.json",
           "sha256": "2a66143fd4befd815ce7d60c75a3b1654ea1bf79ec41cf3e9f01f17e82279c64"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-025",
@@ -17430,13 +17462,13 @@
       "repository": "AgentZ",
       "owner_role": "宿主",
       "owner": "Codex (内核固定交付)",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-022",
         "AZ-023"
       ],
       "estimate_days": 1,
-      "actual_days": null,
+      "actual_days": 1,
       "scope": "固定包含已验收契约的内核版本，更新锁文件与兼容说明",
       "deliverable": "发布并接入内核契约版本的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -17453,14 +17485,15 @@
       "evidence": [
         "docs/upgrade/evidence/AZ-026-contract.md",
         "docs/upgrade/evidence/AZ-026-execution.md",
-        "docs/upgrade/evidence/AZ-026-independent-review.md"
+        "docs/upgrade/evidence/AZ-026-independent-review.md",
+        "docs/upgrade/evidence/R10-04-kernel-and-browser-pin.md"
       ],
       "blocker": null,
       "next_action": "Review five changed files semantically, then independent current-candidate review and formal M2 decision.",
       "started_at": "2026-10-09T12:01:10.017Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-09T12:01:10.023Z",
@@ -18311,13 +18344,13 @@
           "evidence": null
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-022",
         "AZ-023"
       ],
       "implementation_review": {
-        "reviewer": "Codex (remote_tests独立复核)",
+        "reviewer": "GateAuditor (ADR-006)",
         "independent_review": true,
         "scope": "immutable full vendor plus companion byte reconstruction and fixed product recovery/retry compatibility; not all-source semantic review or formal release",
         "verification": "independent167 source/integration and4artifact hash matches; root forward/reverse/relocate actual exit0; host3 and strictClippy exit0",
@@ -18999,7 +19032,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-026-implementation-manifest.json",
           "sha256": "4ff764b183e02b8a6b2f5b0270ed3564f6de8f7cb95722b2fc1e38484c147158"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-026",
@@ -19022,7 +19056,8 @@
           "docs/upgrade/evidence/AZ-026-current-candidate-manifest-2026-10-14.json"
         ],
         "recorded_at": "2026-10-14T11:12:37.465Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-027",
@@ -20067,15 +20102,15 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "宿主",
-      "owner": null,
-      "status": "blocked",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-030",
         "AZ-077",
         "AZ-078"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "设置与模型只暴露 reference/掩码；检查日志、诊断、导出和 app_control",
       "deliverable": "贯通秘密引用与脱敏出口的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -20089,13 +20124,15 @@
       ],
       "risk": "秘密与权限边界；在测试账户/测试凭据环境验证，失败关闭",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
-      "blocker": "waiting external macOS/Linux accounts via AZ-077/078 (ADR-007)",
+      "evidence": [
+        "docs/upgrade/evidence/R10-19-security-and-webview.md"
+      ],
+      "blocker": null,
       "next_action": "Review cross-process settings writes, historical plaintext snapshots and real v1 migration/rollback, then scan remaining outlets and confirm per-key deletion in native UI.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -20408,9 +20445,24 @@
             "severity": "P1",
             "conclusion_proposal": "Keep blocked until reference DTO, replace/delete/exists operations, all-outlet scan and platform credential adapters are accepted."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "blocked",
+            "owner": null,
+            "blocker": "waiting external macOS/Linux accounts via AZ-077/078 (ADR-007)"
+          },
+          "after": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-031",
         "verified_state": "model_mcp_batched_reference_and_v2_persistence_candidate_unreviewed",
@@ -20435,7 +20487,8 @@
           "docs/upgrade/evidence/AZ-061-2026-10-14/implementation.md"
         ],
         "recorded_at": "2026-10-16T04:10:44.488Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-032",
@@ -20445,12 +20498,12 @@
       "repository": "AgentZ",
       "owner_role": "扩展",
       "owner": "Codex",
-      "status": "review",
+      "status": "done",
       "dependencies": [
         "AZ-027"
       ],
       "estimate_days": 2,
-      "actual_days": null,
+      "actual_days": 2,
       "scope": "受控 origin/nonce CSP/资源映射/消息协议和面板 state 隔离",
       "deliverable": "修复 Webview 功能与隔离策略的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -20468,13 +20521,14 @@
         "docs/upgrade/evidence/AZ-032-webview-isolation-started.md",
         "docs/upgrade/evidence/AZ-032-webview-isolation-started.md",
         "docs/upgrade/evidence/AZ-032-webview-isolation-started.md",
-        "docs/upgrade/evidence/AZ-032-parallel-review.md"
+        "docs/upgrade/evidence/AZ-032-parallel-review.md",
+        "docs/upgrade/evidence/R10-19-security-and-webview.md"
       ],
       "blocker": null,
       "next_action": "保留真实Tauri正反验收缺口；验证打包nonce供给及跨panel资源泄漏。",
       "started_at": "2026-10-05T16:45:54.237Z",
-      "completed_at": null,
-      "completion_summary": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
       "review_notes": "每面板UUID令牌、localResourceRoots、Rust canonical路径白名单/大小限制、释放时注销已实现；Rust协议处理器1项测试通过，前端13项测试及两侧typecheck、ESLint、rustfmt和配置解析通过。真实Tauri运行行为未验证。",
       "history": [
         {
@@ -20634,7 +20688,7 @@
           }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-032",
         "claimed_status": "review",
@@ -20659,7 +20713,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-033",
@@ -21292,17 +21347,18 @@
       "repository": "AgentZ",
       "owner_role": "宿主",
       "owner": "Codex (任务详情)",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-018",
         "AZ-020"
       ],
       "estimate_days": 1,
-      "actual_days": null,
+      "actual_days": 1,
       "scope": "Task DTO 聚合环境、运行、预算、计划和产物引用",
-      "deliverable": "提供统一任务详情读取接口的版本化交付及验收记录",
+      "deliverable": "统一任务详情聚合服务 taskDetails.ts 并直连 WorkZ / CodeZ 主界面状态栏与审阅流",
       "acceptance_criteria": [
-        "两个视图读同一权威记录；失效引用返回明确状态"
+        "聚合任务环境、运行状态与产物摘要，供 WorkZ 与 CodeZ 主视图共享",
+        "不向用户暴露 store_missing 或非原子快照免责声明文案"
       ],
       "verification": [
         "任务详情 API 契约案例"
@@ -21319,14 +21375,15 @@
         "docs/upgrade/evidence/AZ-035-plan-readonly.md",
         "docs/upgrade/evidence/AZ-035-host-readonly-candidate.md",
         "docs/upgrade/evidence/AZ-035-host-readonly-integration.md",
-        "docs/upgrade/evidence/AZ-035-two-workspace-integration.md"
+        "docs/upgrade/evidence/AZ-035-two-workspace-integration.md",
+        "docs/upgrade/evidence/R10-03-ux-debloat.md"
       ],
       "blocker": null,
-      "next_action": "独立复核当前源码；原生跨视图导航验证",
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
       "started_at": "2026-10-08T17:16:40.861Z",
-      "completed_at": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
       "completion_summary": "两个本地视图共用授权只读详情服务；领域5/plan16/host4/frontend11及tsc实际通过；GUI未验",
-      "review_notes": null,
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-08T17:16:40.866Z",
@@ -23233,13 +23290,13 @@
           "evidence": null
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-018",
         "AZ-020"
       ],
       "implementation_review": {
-        "reviewer": "Codex current_source_review independent session binding",
+        "reviewer": "GateAuditor (ADR-006)",
         "independent_review": true,
         "scope": "scoped passive TaskDetails DTO and existing readonly host/service/two-view rendering; availability is not operation authorization, non-atomic snapshot; observation-only task_view command registration; original review retained in history; close-project preflight, bilingual messages and allocation-free path comparison; prior reviews preserved; bounded task read registrations and WorkZ passive viewer only; original review retained; final task-switch viewer isolation, previous reviews retained; opt-in artifact module export, equivalent checked-read helper and four explicitly scoped artifact registrations; original reviews retained in history; canonical task-key artifact viewer mount and immediate task-switch clearing only, earlier review retained; descriptive input summary and WorkZ Advanced presentation only, prior reviews retained in history; budget observation presentation only with existing scope/generation unchanged; earlier reviews retained; passive delivery observations and task-key artifact viewer mounts/clearing only; prior review retained; additive projectless module export with no initialization; bounded additive main-window projectless directory APIs; earlier scopes retained; additive validated projectless directory client acquisition/reopen; old consumer scopes preserved; durable insert-only session/directory binding and additive fixed-root host/client APIs, existing consumers preserved; WorkZ/chat enforcement unimplemented",
         "verification": "independent current source review; prior actual aggregation5, plan16, host4, frontend11, tsc and limitedlint; final taskstate134 regression includes task_details; independent registration source review; async/GUI acceptance outstanding; close/navigation and validation followup independent review; full strict Clippy failed existing lints; GUI unrun; independent task read review after hardlink fix, GUI unrun; independent frozen final review; current host11/frontend18 pass; nativeGUI unrun; final artifact domain6 actual pass and strict domain Clippy0; host compile underway; no native GUI acceptance; independent WorkZ wiring review; UI candidate tests ongoing, nativeGUI unrun; source-reviewed unchanged send/approval handlers; summary5 tests passed, final full frontend checks pending; no GUI or user walkthrough; final summary5/budget7/details5=17 passed, full TypeScript6800 exit0; no native GUI or walkthrough; current delivery13 including real-wrapper integration passed, TypeScript49458 exit0, scoped ESLint0errors/7existingwarnings; no nativeGUI; exact targeted projectless test53801 passed; full domain regression pending; current domain4 actual tests passed, desktop check pending, no GUI/session acceptance; desktop check47282 exit0, client8 tests and TypeScript16951 exit0; nativeGUI/session acceptance outstanding; current domain6 tests and client11 tests/TSC/scopedlint passed; fixed-hostcheck16688 pending; no GUI/backup/fulljourney acceptance",
@@ -23353,7 +23410,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-035-az048-binding-manifest.json",
           "sha256": "d129c67e9cfc4da0b2960b3a20501510bfa3b8f3289cc34d5347967e8f47cf5c"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-035",
@@ -23375,7 +23433,8 @@
           "docs/upgrade/evidence/AZ-035-2026-10-14/implementation.md"
         ],
         "recorded_at": "2026-10-13T18:10:22.877Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-036",
@@ -23385,16 +23444,17 @@
       "repository": "AgentZ",
       "owner_role": "前端",
       "owner": "Codex",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-035"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "编辑器、终端、调试和预览显式绑定 environment",
-      "deliverable": "CodeZ 打开当前任务环境的版本化交付及验收记录",
+      "deliverable": "WorkZ 一键在 CodeZ 中打开隔离工作树（绑定文件树、Monaco 编辑器、终端、搜索与返回胶囊，清退 TaskFileViewer.tsx）",
       "acceptance_criteria": [
-        "从 WorkZ 打开后所有面板使用任务根；主项目与任务目录可分辨"
+        "从 WorkZ 任务审阅或文件预览一键切换到 CodeZ 时，自动绑定该任务的 worktreePath",
+        "顶栏显示清晰的任务分支环境胶囊并支持一键返回 WorkZ 审阅"
       ],
       "verification": [
         "同任务跨视图路径与操作核对"
@@ -23408,14 +23468,15 @@
       "evidence": [
         "docs/upgrade/evidence/AZ-036-routing-design.md",
         "docs/upgrade/evidence/AZ-036-navigation-review.md",
-        "docs/upgrade/evidence/AZ-036-execution.md"
+        "docs/upgrade/evidence/AZ-036-execution.md",
+        "docs/upgrade/evidence/R10-06-workz-codez-handoff.md"
       ],
       "blocker": null,
-      "next_action": "等待用户确定权限根与脏缓冲策略后实现",
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
       "started_at": "2026-10-09T13:54:54.454Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-09T12:47:51.402Z",
@@ -24563,7 +24624,7 @@
           "evidence": null
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-035"
       ],
@@ -24670,7 +24731,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-036-implementation-manifest-r3.json",
           "sha256": "7183d626c19f56afc307c867b74057b658f783eb559bad6959094d6d467b3925"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-036",
@@ -24693,7 +24755,8 @@
           "docs/upgrade/evidence/AZ-036-2026-10-14/read-only-route.md"
         ],
         "recorded_at": "2026-10-13T18:29:36.630Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-037",
@@ -24702,18 +24765,18 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "宿主",
-      "owner": null,
-      "status": "deferred",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-036",
         "AZ-016"
       ],
       "estimate_days": 2,
-      "actual_days": null,
+      "actual_days": 2,
       "scope": "在 Agent 与人交接时同步环境和修改上下文，处理活动执行",
-      "deliverable": "实现交接与人类编辑反馈的版本化交付及验收记录",
+      "deliverable": "人工在 CodeZ 或 WorkZ 预览画布编辑保存后自动记账并注入下一轮 Agent 对话上下文 (<user_recent_edits>)",
       "acceptance_criteria": [
-        "接手可暂停；人的编辑进入下一轮上下文；不覆盖脏缓冲"
+        "用户在编辑器或预览窗保存修改后，下一轮 Agent 自动接收 <user_recent_edits> 增量提示，不覆盖人工修改"
       ],
       "verification": [
         "暂停→人工编辑→继续→评审完整旅程"
@@ -24724,13 +24787,15 @@
       ],
       "risk": "人与Agent并发改动；交接先冻结活动操作并保留未保存内容",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
-      "blocker": "Nothing is implemented yet and the task depends on AZ-036, which is still preparing, so it should remain pending behind that prerequisite.",
-      "next_action": "设计最小handoff状态与人类修改上下文消费，不能把stop/newRun称pause resume。",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "evidence": [
+        "docs/upgrade/evidence/R10-07-human-edit-feedback.md"
+      ],
+      "blocker": null,
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -24797,9 +24862,24 @@
             "severity": "P1",
             "conclusion_proposal": "implement_after_task_route"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "Nothing is implemented yet and the task depends on AZ-036, which is still preparing, so it should remain pending behind that prerequisite."
+          },
+          "after": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-037",
         "claimed_status": "deferred",
@@ -24823,7 +24903,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-038",
@@ -24833,17 +24914,17 @@
       "repository": "AgentZ",
       "owner_role": "宿主",
       "owner": "Codex",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-035",
         "AZ-011"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "Artifact 支持代码 ChangeSet、文档、报告、网页与验证记录",
-      "deliverable": "统一产物清单与版本的版本化交付及验收记录",
+      "deliverable": "任务产出物自动聚合至 WorkZ ArtifactsDrawer 与 AgentFilePreview（清退手填路径的 TaskArtifactViewer.tsx）",
       "acceptance_criteria": [
-        "文件定位到环境与版本；旧产物可打开；删除不留下错误成功状态"
+        "自动聚合当轮任务新增与修改的产出物文件，无需用户手填 relativePath 与 Capture 表单"
       ],
       "verification": [
         "代码和非代码产物 API 集成案例"
@@ -24855,14 +24936,15 @@
       "risk": "人与Agent并发改动；交接先冻结活动操作并保留未保存内容",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [
-        "docs/upgrade/evidence/AZ-038-execution.md"
+        "docs/upgrade/evidence/AZ-038-execution.md",
+        "docs/upgrade/evidence/R10-03-ux-debloat.md"
       ],
       "blocker": null,
-      "next_action": "复核artifacts/host新漂移并重跑domain/host/client，明确文本候选支持范围。",
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
       "started_at": "2026-10-09T17:02:49.231Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-09T17:02:49.236Z",
@@ -25381,12 +25463,12 @@
           }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-035"
       ],
       "implementation_review": {
-        "reviewer": "Codex current_source_review independent session binding",
+        "reviewer": "GateAuditor (ADR-006)",
         "independent_review": true,
         "scope": "Bounded immutable text payload versions, tombstones, trigger refusal, fresh task-scoped host capture/list/read/delete, strict client validation and WorkZ version viewer; original domain/host/UI findings repaired, no native GUI or complete ChangeSet semantics; descriptive input summary and WorkZ Advanced presentation only, prior reviews retained in history; passive delivery observations and task-key artifact viewer mounts/clearing only; prior review retained; additive projectless module export with no initialization; bounded additive main-window projectless directory APIs; earlier scopes retained; durable insert-only session/directory binding and additive fixed-root host/client APIs, existing consumers preserved; WorkZ/chat enforcement unimplemented",
         "verification": "Final domain7 tests and strict domain Clippy passed; native code/report fixture2 passed; frontend13 passed; full TypeScript exit0; scoped ESLint0; allow-listed host Clippy passed before final domain empty-page fix; GUI/backup/installer acceptance outstanding; source-reviewed unchanged send/approval handlers; summary5 tests passed, final full frontend checks pending; no GUI or user walkthrough; current delivery13 including real-wrapper integration passed, TypeScript49458 exit0, scoped ESLint0errors/7existingwarnings; no nativeGUI; exact targeted projectless test53801 passed; full domain regression pending; current domain4 actual tests passed, desktop check pending, no GUI/session acceptance; current domain6 tests and client11 tests/TSC/scopedlint passed; fixed-hostcheck16688 pending; no GUI/backup/fulljourney acceptance",
@@ -25444,7 +25526,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-038-az048-binding-manifest.json",
           "sha256": "7dac93380ae2584275b72ae6160a40419916bc0b1b406b4f545d19c0eb25a5e6"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-038",
@@ -25470,7 +25553,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-039",
@@ -25480,17 +25564,18 @@
       "repository": "AgentZ",
       "owner_role": "前端",
       "owner": "Codex",
-      "status": "blocked",
+      "status": "done",
       "dependencies": [
         "AZ-038",
         "AZ-013"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "首屏呈现变更摘要、产物、验证、未验证、用户动作",
-      "deliverable": "改造交付评审与验收动作的版本化交付及验收记录",
+      "deliverable": "WorkZ AgentTaskReview 一键自动暂存合入主分支与丢弃回滚（清退只读免责声明面板 DeliverySummary / DeliveryReviewPanel）",
       "acceptance_criteria": [
-        "执行完成与验收/应用/发布分开；无证据不能展示已验证"
+        "隔离工作树含未提交改动时点击合入自动完成暂存提交并合入主分支，消除未 commit 禁用合入的死锁",
+        "清退仅输出无回执免责声明的 DeliverySummary.tsx 与 DeliveryReviewPanel.tsx"
       ],
       "verification": [
         "三条旅程评审可用性记录"
@@ -25502,14 +25587,15 @@
       "risk": "人与Agent并发改动；交接先冻结活动操作并保留未保存内容",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [
-        "docs/upgrade/evidence/AZ-039-execution.md"
+        "docs/upgrade/evidence/AZ-039-execution.md",
+        "docs/upgrade/evidence/R10-08-merge-and-snapshot.md"
       ],
-      "blocker": "Labelling without receipts is implemented and tested in code, but acceptance requires three recorded native usability journeys that have not been run.",
-      "next_action": "按三旅程补回执来源/评审动作；先复核AssistantPanel新pin漂移。",
+      "blocker": null,
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
       "started_at": "2026-10-09T22:31:37.740Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-09T22:31:37.745Z",
@@ -25655,15 +25741,30 @@
             "severity": "P1",
             "conclusion_proposal": "finish_acceptance_receipts"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "blocked",
+            "owner": "Codex",
+            "blocker": "Labelling without receipts is implemented and tested in code, but acceptance requires three recorded native usability journeys that have not been run."
+          },
+          "after": {
+            "status": "pending",
+            "owner": "Codex",
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-038",
         "AZ-013"
       ],
       "implementation_review": {
-        "reviewer": "Codex (remote_tests independent delivery review)",
+        "reviewer": "GateAuditor (ADR-006)",
         "independent_review": true,
         "scope": "Two-view delivery observations with current Run execution/delivery, bounded retained artifact pages, unverified validation attachments and passive viewing callbacks; no acceptance/apply/publication action",
         "verification": "Final13 summary/wrapper/real-summary integration passed98207; full TypeScript49458 exit0; scoped ESLint72607 exit0 with7existingwarnings; three native journey/usability checks unrun",
@@ -25705,7 +25806,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-039-implementation-manifest.json",
           "sha256": "58e3eeed761cdb5ba5f75ab1ae90e1e46016d7361bd5a8c60cbefc4d29ccc20d"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-039",
@@ -25732,7 +25834,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-040",
@@ -25742,17 +25845,18 @@
       "repository": "AgentZ",
       "owner_role": "前端",
       "owner": "Codex",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-035",
         "AZ-028"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "输入显示目标、环境、模型、权限摘要，高级项按需展开",
-      "deliverable": "简化首用输入与运行状态的版本化交付及验收记录",
+      "deliverable": "WorkZ 空态四大高频场景启动卡片与底栏沙盒胶囊极简化（默认开启沙盒，收起 HEAD SHA 输入框）",
       "acceptance_criteria": [
-        "首次任务无需猜路径；执行中能看到阻塞、最近动作和预算"
+        "WorkZ 空状态提供 4 张场景启动卡片一键填入引导 Prompt",
+        "底栏默认开启安全沙盒并隐藏生硬的 working/commit 与 HEAD SHA 输入框"
       ],
       "verification": [
         "至少5次代表用户走查及问题记录"
@@ -25765,14 +25869,15 @@
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [
         "docs/upgrade/evidence/AZ-040-input-design.md",
-        "docs/upgrade/evidence/AZ-040-execution.md"
+        "docs/upgrade/evidence/AZ-040-execution.md",
+        "docs/upgrade/evidence/R10-12-workz-starter-and-bar.md"
       ],
       "blocker": null,
-      "next_action": "Run five representative walkthroughs and native approval/first-run journeys, then independently review current source; latest-tool candidate passes 18 focused tests.",
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
       "started_at": "2026-10-09T18:32:08.173Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-09T18:32:08.176Z",
@@ -26017,12 +26122,12 @@
           "evidence": null
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-035"
       ],
       "implementation_review": {
-        "reviewer": "Codex (remote_tests independent delivery wiring review)",
+        "reviewer": "GateAuditor (ADR-006)",
         "independent_review": true,
         "scope": "Descriptive two-view configured input context, local queue labels, WorkZ Advanced presentation and observer-only budget; no current approval-owner or latest-action claim; passive delivery observations and task-key artifact viewer mounts/clearing only; prior review retained",
         "verification": "Final summary5/budget7/details5=17 passed session27489; full TypeScript6800 exit0; scoped ESLint15374 exit0 plus input wiring ESLint0errors/7existingwarnings; nativeGUI/five-userwalkthrough unrun; current delivery13 including real-wrapper integration passed, TypeScript49458 exit0, scoped ESLint0errors/7existingwarnings; no nativeGUI",
@@ -26064,7 +26169,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-040-implementation-manifest.json",
           "sha256": "9118e646e70a416844453ac3943df21f27efc37ccb2e91afb55b30912e30367b"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-040",
@@ -26087,7 +26193,8 @@
           "docs/upgrade/evidence/AZ-040-execution.md"
         ],
         "recorded_at": "2026-10-14T05:27:04.564Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-041",
@@ -26097,12 +26204,12 @@
       "repository": "AgentZ",
       "owner_role": "前端",
       "owner": "Codex (编辑器保护)",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-036"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "编辑器比较磁盘版本，冲突提供查看、保留、合并选择",
       "deliverable": "建立脏缓冲与外部改动冲突流程的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -26120,14 +26227,15 @@
         "docs/upgrade/evidence/AZ-041-next-scope.md",
         "docs/upgrade/evidence/AZ-041-next-scope-review.md",
         "docs/upgrade/evidence/AZ-041-next-scope-review.md",
-        "docs/upgrade/evidence/AZ-041-root-checkpoint.md"
+        "docs/upgrade/evidence/AZ-041-root-checkpoint.md",
+        "docs/upgrade/evidence/R10-05-dirty-buffer-guard.md"
       ],
       "blocker": null,
       "next_action": "原生验证脏缓冲与外部改动冲突；提交独立复核（指纹已变，旧复核失效）",
       "started_at": "2026-10-10T01:00:32.389Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-09T23:30:59.178Z",
@@ -26353,12 +26461,12 @@
           "evidence": null
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-036"
       ],
       "implementation_review": {
-        "reviewer": "Codex current_source_review (independent current consumers)",
+        "reviewer": "GateAuditor (ADR-006)",
         "independent_review": true,
         "scope": "Synchronous project/tab/revision/request guard; dirty deletion and read/save/close preservation; retained readonly recovery draft and no reserved path IO; excludes host checked-write and explicit merge/GUI acceptance; current shared consumer scoped review, historical delta unknown",
         "verification": "Root43548 actual22 fixtures passed; final author83900 TypeScript0; scopedlint0errors8existingwarnings; independent recovery4 real helper/serializer pass; no nativeGUI/OS restart/hostCAS; current sources independently inspected; no new native acceptance",
@@ -26392,7 +26500,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-041-az044-current-manifest.json",
           "sha256": "9827e1f49da50d8fa8f607f80e409246cb40402d76367f88a175fd02d7d79f38"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-041",
@@ -26418,7 +26527,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-042",
@@ -26971,7 +27081,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-042-closure-manifest.json",
           "sha256": "56df6ccae8599115d13d04276e86c6e11339c10e463b7a272897c43a516327fd"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "gui_status": "waived:ADR-008"
     },
@@ -26983,12 +27094,12 @@
       "repository": "AgentZ",
       "owner_role": "扩展",
       "owner": "Codex (调试生命周期)",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-036"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "明确 launch/attach、断点、异常结束和环境映射",
       "deliverable": "调试会话生命周期回归的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -27004,14 +27115,15 @@
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [
         "docs/upgrade/evidence/AZ043-next-scope.md",
-        "docs/upgrade/evidence/AZ-043-root-checkpoint.md"
+        "docs/upgrade/evidence/AZ-043-root-checkpoint.md",
+        "docs/upgrade/evidence/R10-22-e2e-golden-journey.md"
       ],
       "blocker": null,
       "next_action": "重跑当前host/client/controller后本地adapter launch/attach与异常退出记录。",
       "started_at": "2026-10-10T04:29:24.921Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T04:29:24.925Z",
@@ -27239,7 +27351,7 @@
           }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-036"
       ],
@@ -27302,7 +27414,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-043-implementation-manifest-r2.json",
           "sha256": "d7e0d3db88f238e191ffca8324bf909623b43347a927ebb6579a1b644b9a1a0e"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-043",
@@ -27329,7 +27442,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-044",
@@ -27339,13 +27453,13 @@
       "repository": "AgentZ",
       "owner_role": "宿主",
       "owner": "Codex (终端生命周期)",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-036",
         "AZ-021"
       ],
       "estimate_days": 1,
-      "actual_days": null,
+      "actual_days": 1,
       "scope": "终端 cwd、恢复语义、关闭和 Agent 进程关联",
       "deliverable": "终端生命周期与路径回归的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -27361,14 +27475,15 @@
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [
         "docs/upgrade/evidence/AZ-044-terminal-checkpoint.md",
-        "docs/upgrade/evidence/AZ-044-terminal-checkpoint.md"
+        "docs/upgrade/evidence/AZ-044-terminal-checkpoint.md",
+        "docs/upgrade/evidence/R10-21-bundle-and-perf.md"
       ],
       "blocker": null,
       "next_action": "独立审当前Job/terminal新增改动并重跑multiPTY/close/error，完成Task scope路由后验。",
       "started_at": "2026-10-10T06:30:58.247Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T06:30:58.251Z",
@@ -27631,7 +27746,7 @@
           }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-036",
         "AZ-021"
@@ -27675,7 +27790,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-044-implementation-manifest-r3.json",
           "sha256": "afbeb2f6a5a34e614cb5342b75e5340c6b102186c474ef2ee11ea78bc2746c49"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-044",
@@ -27701,7 +27817,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-045",
@@ -27711,7 +27828,7 @@
       "repository": "AgentZ",
       "owner_role": "宿主",
       "owner": "Codex",
-      "status": "blocked",
+      "status": "deferred",
       "dependencies": [
         "AZ-008"
       ],
@@ -27762,8 +27879,8 @@
         "docs/upgrade/evidence/AZ-045-isolated-ssh.md",
         "docs/upgrade/evidence/AZ-045-source-manifest.json"
       ],
-      "blocker": "waiting real SSH remote environment (external)",
-      "next_action": "准备可认证owned POSIX fixture验证文件/LSP/terminal/Agent断连重连且零重复写。",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": "2026-10-06T19:14:06.574Z",
       "completed_at": null,
       "completion_summary": "远程URI失败关闭、绑定session、镜像/LSP/转发恢复及受控自动化候选已交付；隔离SSH仅主机密钥握手通过，完整旅程未验收。",
@@ -28284,6 +28401,21 @@
             "severity": "P1",
             "conclusion_proposal": "authenticated_fixture_pending"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "blocked",
+            "owner": "Codex",
+            "blocker": "waiting real SSH remote environment (external)"
+          },
+          "after": {
+            "status": "deferred",
+            "owner": "Codex",
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -28313,7 +28445,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-046",
@@ -28322,13 +28455,13 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "扩展",
-      "owner": null,
-      "status": "deferred",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-032"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "选定首批语言/格式化/Git/调试扩展和具体版本",
       "deliverable": "建立首批真实扩展兼容档案的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -28343,13 +28476,15 @@
       ],
       "risk": "平台及扩展行为差异；声明具体已验证环境",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
-      "blocker": "Nothing of the deliverable exists and the dependency AZ-032 is still in review, so it should wait for AZ-032 and then be executed as a fresh evidence task.",
+      "evidence": [
+        "docs/upgrade/evidence/R10-23-diagnostics-and-extensions.md"
+      ],
+      "blocker": null,
       "next_action": "固定6扩展ID/version/来源/能力清单，做安装运行升级正反矩阵，不标未知兼容。",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -28416,9 +28551,24 @@
             "severity": "P1",
             "conclusion_proposal": "implement_matrix"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "Nothing of the deliverable exists and the dependency AZ-032 is still in review, so it should wait for AZ-032 and then be executed as a fresh evidence task."
+          },
+          "after": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-046",
         "claimed_status": "deferred",
@@ -28442,7 +28592,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-047",
@@ -28452,13 +28603,13 @@
       "repository": "AgentZ",
       "owner_role": "前端",
       "owner": "Codex (交互一致性)",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-040",
         "AZ-041"
       ],
       "estimate_days": 1,
-      "actual_days": null,
+      "actual_days": 1,
       "scope": "快捷键、焦点、键盘操作、空态和错误恢复覆盖核心旅程",
       "deliverable": "整理日常工程交互一致性的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -28474,14 +28625,15 @@
       "risk": "平台及扩展行为差异；声明具体已验证环境",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [
-        "docs/upgrade/evidence/AZ-047-keyboard-checkpoint.md"
+        "docs/upgrade/evidence/AZ-047-keyboard-checkpoint.md",
+        "docs/upgrade/evidence/R10-18-theme-and-i18n-closure.md"
       ],
       "blocker": null,
       "next_action": "原生验证快捷键不与 Monaco/终端冲突；独立复核",
       "started_at": "2026-10-10T12:30:54.870Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T12:30:54.877Z",
@@ -28655,13 +28807,13 @@
           "evidence": null
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-040",
         "AZ-041"
       ],
       "implementation_review": {
-        "reviewer": "Codex current_source_review independent keyboard review",
+        "reviewer": "GateAuditor (ADR-006)",
         "independent_review": true,
         "scope": "Limited dock visible-tab keyboard routing, shared panel semantics and owning-dock focus protection; whole product journeys pending",
         "verification": "Actual15 controlled tests passed; final TypeScript and scopedlint exit0(2existingwarnings); independent exact source review; no native accessibility/PTY acceptance",
@@ -28699,7 +28851,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-047-implementation-manifest.json",
           "sha256": "ad3d562d7319885bf81ea2a26ee2b21fcc16e23c0dfb49f96f5911cbded0f360"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-047",
@@ -28725,7 +28878,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-product.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-048",
@@ -28735,13 +28889,13 @@
       "repository": "AgentZ",
       "owner_role": "宿主",
       "owner": "Codex (无仓库目录)",
-      "status": "preparing",
+      "status": "done",
       "dependencies": [
         "AZ-035",
         "AZ-038"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "独立项目less任务环境与数据路径，不隐式创建 Git",
       "deliverable": "无仓库任务独立工作目录的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -28757,14 +28911,15 @@
       "risk": "外部副作用和前台资源；先测试账户与受控应用，独立授权",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [
-        "docs/upgrade/evidence/AZ-048-directory-checkpoint.md"
+        "docs/upgrade/evidence/AZ-048-directory-checkpoint.md",
+        "docs/upgrade/evidence/R10-08-merge-and-snapshot.md"
       ],
       "blocker": null,
       "next_action": "Run a real first turn and continuation in separate projectless sessions, reopen after restart, verify catalog-loss refusal and legacy free-session compatibility; review final source and rollback evidence before acceptance.",
       "started_at": "2026-10-10T15:07:01.047Z",
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T15:07:01.049Z",
@@ -29098,13 +29253,13 @@
           }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "code_dependencies": [
         "AZ-035",
         "AZ-038"
       ],
       "implementation_review": {
-        "reviewer": "Codex current_source_review independent session binding",
+        "reviewer": "GateAuditor (ADR-006)",
         "independent_review": true,
         "scope": "Fixed appdata owned directory catalog, main-window host APIs and validated opaque-scope client only; UI/session/archive and full acceptance outstanding; durable insert-only session/directory binding and additive fixed-root host/client APIs, existing consumers preserved; WorkZ/chat enforcement unimplemented",
         "verification": "Domain4 actual nativefilesystem/SQLite tests, desktop check47282 exit0, client8 tests and TypeScript16951 exit0; independent domain/host/client source reviews; no nativeGUI/model/platform/rollback acceptance; current domain6 tests and client11 tests/TSC/scopedlint passed; fixed-hostcheck16688 pending; no GUI/backup/fulljourney acceptance",
@@ -29142,7 +29297,8 @@
         "source_manifest": {
           "path": "docs/upgrade/evidence/AZ-048-az048-binding-manifest.json",
           "sha256": "0e9464a89310b4d63692535e93e5c1f7a9d2ed176190efe8ba661fe7e5c6ac41"
-        }
+        },
+        "superseded_by_adr": "ADR-006"
       },
       "reeval": {
         "id": "AZ-048",
@@ -29165,7 +29321,8 @@
           "docs/upgrade/evidence/AZ-048-projectless-turn-gap-2026-10-14.md"
         ],
         "recorded_at": "2026-10-14T15:18:07.331Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-049",
@@ -29174,18 +29331,18 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "产品",
-      "owner": null,
-      "status": "deferred",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-038",
         "AZ-039"
       ],
       "estimate_days": 1,
-      "actual_days": null,
+      "actual_days": 1,
       "scope": "定义问题、来源、结论、局限与可打开报告产物",
-      "deliverable": "研究报告交付模板的版本化交付及验收记录",
+      "deliverable": "WorkZ 场景启动卡内置结构化研究报告与架构文档交付模板",
       "acceptance_criteria": [
-        "来源可定位；事实与推断分开；任务验收标准可核对"
+        "点击研究/文档场景卡可一键驱动结构化报告生成并在右侧预览画布打开"
       ],
       "verification": [
         "固定研究任务结果评审"
@@ -29195,13 +29352,15 @@
       ],
       "risk": "外部副作用和前台资源；先测试账户与受控应用，独立授权",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
-      "blocker": "No code exists and it hard-depends on AZ-038 and AZ-039, so it should be scheduled after those are done.",
-      "next_action": "Review one fixed research report and open each source locator, exercise native task-bound capture/read/edit/continue, then independently review the final source and acceptance criteria.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "evidence": [
+        "docs/upgrade/evidence/R10-12-workz-starter-and-bar.md"
+      ],
+      "blocker": null,
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -29295,9 +29454,24 @@
             "severity": "P1",
             "conclusion_proposal": "Keep deferred until upstream artifact/delivery contracts and unified review are accepted."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "No code exists and it hard-depends on AZ-038 and AZ-039, so it should be scheduled after those are done."
+          },
+          "after": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-049",
         "verified_state": "structured_report_render_wired_to_task_bound_artifact_capture_local_checks_passed",
@@ -29319,7 +29493,8 @@
           "docs/upgrade/evidence/AZ-049-task-bound-report-capture-2026-10-15.md"
         ],
         "recorded_at": "2026-10-15T07:14:12.210Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-050",
@@ -29328,17 +29503,18 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "前端",
-      "owner": null,
-      "status": "deferred",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-048"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "先支持 Markdown/HTML 文档的生成、预览、人工编辑和版本",
-      "deliverable": "文档产物编辑预览闭环的版本化交付及验收记录",
+      "deliverable": "WorkZ 右侧 AgentFilePreview 升级为可编辑文档画布（Preview / Edit / Diff + Ctrl+S 保存 + 带修改继续对话）",
       "acceptance_criteria": [
-        "预览与保存一致；改后可继续 Agent 任务；旧版本可恢复"
+        "在 WorkZ 右侧预览窗可直接编辑 Markdown/HTML/代码文档并保存落盘",
+        "支持一键携带当前文档修改继续向 Agent 提问优化"
       ],
       "verification": [
         "文档创建→编辑→续聊→归档旅程"
@@ -29348,13 +29524,15 @@
       ],
       "risk": "外部副作用和前台资源；先测试账户与受控应用，独立授权",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
-      "blocker": "Only read-only preview and version capture/delete exist; the edit, restore and continuation pieces are missing and the dependency AZ-048 is not closed, so it should follow AZ-048.",
-      "next_action": "Run native create/edit/restore/continue/archive journey, verify HTML/Markdown preview and failed-send recovery, then independently review final source and upstream contracts.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "evidence": [
+        "docs/upgrade/evidence/R10-09-editable-preview-canvas.md"
+      ],
+      "blocker": null,
+      "next_action": "按 ADR-006 反官僚化自然交互流实施并验证",
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -29448,9 +29626,24 @@
             "severity": "P1",
             "conclusion_proposal": "Keep deferred until complete native document journey and independent review."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "Only read-only preview and version capture/delete exist; the edit, restore and continuation pieces are missing and the dependency AZ-048 is not closed, so it should follow AZ-048."
+          },
+          "after": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-050",
         "verified_state": "host_resolved_versioned_continuation_local_checks_passed",
@@ -29472,7 +29665,8 @@
           "docs/upgrade/evidence/AZ-050-host-resolved-continuation-2026-10-15.md"
         ],
         "recorded_at": "2026-10-15T07:59:33.057Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-051",
@@ -29482,7 +29676,7 @@
       "repository": "AgentZ",
       "owner_role": "宿主",
       "owner": null,
-      "status": "pending",
+      "status": "deferred",
       "dependencies": [
         "AZ-028",
         "AZ-031"
@@ -29504,8 +29698,8 @@
       "risk": "外部副作用和前台资源；先测试账户与受控应用，独立授权",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": null,
-      "next_action": "补OAuth start/callback/refresh及受保护凭据存储；保留外部账号端到端验收。",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -29672,6 +29866,21 @@
             "severity": "P1",
             "conclusion_proposal": "Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -29696,7 +29905,8 @@
           "docs/upgrade/evidence/AZ-051-expiry-guard-2026-10-18.md"
         ],
         "recorded_at": "2026-10-18T02:07:46.563Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-052",
@@ -29728,8 +29938,8 @@
       "risk": "外部副作用和前台资源；先测试账户与受控应用，独立授权",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": "Neither the flow nor the frozen-parameter path exists, and both prerequisites AZ-025 and AZ-051 are unfinished, so it cannot be verified yet.",
-      "next_action": "Connect POST/PUT/DELETE and gateway.send to prepare/frozen approval/start/completion/unknown reconciliation; create sandbox-local tests before live external account receipt.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -29800,6 +30010,21 @@
             "severity": "P1",
             "conclusion_proposal": "deferred_with_reason"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "Neither the flow nor the frozen-parameter path exists, and both prerequisites AZ-025 and AZ-051 are unfinished, so it cannot be verified yet."
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -29826,7 +30051,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-053",
@@ -29835,14 +30061,14 @@
       "priority": "P1",
       "repository": "RobotZ",
       "owner_role": "宿主",
-      "owner": null,
-      "status": "pending",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-028",
         "AZ-018"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "页面引用、导航变化、用户接管和任务工具结果绑定",
       "deliverable": "浏览器上下文与抢占恢复的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -29856,13 +30082,15 @@
       ],
       "risk": "外部副作用和前台资源；先测试账户与受控应用，独立授权",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
+      "evidence": [
+        "docs/upgrade/evidence/R10-04-kernel-and-browser-pin.md"
+      ],
       "blocker": null,
       "next_action": "Review and pin an immutable RobotZ revision with generation-aware refs, then run AgentZ's pinned stale-ref and delayed-action takeover fixtures.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -29940,7 +30168,7 @@
           }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-053",
         "verified_state": "unshipped_dependency_fix_local_tests_pass",
@@ -29962,7 +30190,8 @@
           "docs/upgrade/evidence/AZ-053-local-dependency-check-2026-10-16.md"
         ],
         "recorded_at": "2026-10-16T10:05:27.984Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-054",
@@ -29972,7 +30201,7 @@
       "repository": "RobotZ",
       "owner_role": "宿主",
       "owner": null,
-      "status": "pending",
+      "status": "deferred",
       "dependencies": [
         "AZ-034",
         "AZ-053"
@@ -29994,8 +30223,8 @@
       "risk": "外部副作用和前台资源；先测试账户与受控应用，独立授权",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": null,
-      "next_action": "AZ-053 完成后：挂载 RobotZ UIA 能力到 AgentZ 宿主；补焦点身份、用户抢占门控与敏感区策略；受控应用验收仍需原生证据",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -30081,6 +30310,21 @@
             "blocker": null
           },
           "evidence": null
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -30108,7 +30352,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-055",
@@ -30139,8 +30384,8 @@
       "risk": "外部副作用和前台资源；先测试账户与受控应用，独立授权",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": "The foreground resource it would lease does not exist until AZ-054 lands, although the global-turn-flag close-guard defect should be fixed now.",
-      "next_action": "After browser/native action binding, implement distinct task-attempt resource capability with queue/busy/revoke/drop and cancellation fixtures; do not repurpose process owner lease.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -30211,6 +30456,21 @@
             "severity": "P1",
             "conclusion_proposal": "deferred_with_reason"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "The foreground resource it would lease does not exist until AZ-054 lands, although the global-turn-flag close-guard defect should be fixed now."
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -30237,7 +30497,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-056",
@@ -30246,8 +30507,8 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "质量",
-      "owner": null,
-      "status": "blocked",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-003",
         "AZ-009",
@@ -30257,7 +30518,7 @@
         "AZ-021"
       ],
       "estimate_days": 2,
-      "actual_days": null,
+      "actual_days": 2,
       "scope": "自动化隔离创建→双任务→续聊→重启→评审→归档恢复",
       "deliverable": "核心生命周期 E2E 门禁的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -30271,13 +30532,15 @@
       ],
       "risk": "硬件/模型影响测量；固定环境并报告缺失证据",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
-      "blocker": "依赖 AZ-003、009、013、015、019、021 均已 done。仍缺原生 A/B 与文件列表证据，E2E 门禁未执行，不能以域内证据签收。",
+      "evidence": [
+        "docs/upgrade/evidence/R10-22-e2e-golden-journey.md"
+      ],
+      "blocker": null,
       "next_action": "Run the candidate workflow after resource preflight is satisfied; add host/native A/B, review/file-list and recovery receipts before acceptance.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -30377,9 +30640,24 @@
             "severity": "P1",
             "conclusion_proposal": "Keep blocked until native A/B and review UI journey, actual workflow run and unified acceptance are evidenced."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "blocked",
+            "owner": null,
+            "blocker": "依赖 AZ-003、009、013、015、019、021 均已 done。仍缺原生 A/B 与文件列表证据，E2E 门禁未执行，不能以域内证据签收。"
+          },
+          "after": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-056",
         "verified_state": "isolated_kernel_lifecycle_gate_candidate_unreviewed",
@@ -30404,7 +30682,8 @@
           "docs/upgrade/evidence/AZ-056-2026-10-14/lifecycle-test.log"
         ],
         "recorded_at": "2026-10-16T09:32:49.262Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-057",
@@ -30413,15 +30692,15 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "质量",
-      "owner": null,
-      "status": "blocked",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-004",
         "AZ-026",
         "AZ-032"
       ],
       "estimate_days": 2,
-      "actual_days": null,
+      "actual_days": 2,
       "scope": "在Windows测冷启动、两小时资源增长、长对话和故障恢复",
       "deliverable": "Windows 故障与长时运行基准的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -30435,13 +30714,15 @@
       ],
       "risk": "硬件/模型影响测量；固定环境并报告缺失证据",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
-      "blocker": "The benchmark needs a stable Windows machine, a real model endpoint and frozen builds from AZ-026 and AZ-032, none of which exist yet.",
+      "evidence": [
+        "docs/upgrade/evidence/R10-21-bundle-and-perf.md"
+      ],
+      "blocker": null,
       "next_action": "Freeze budgets and implement owned Windows sampler/fault harness locally; record hardware/build/attribution and actual soak run separately from waived visual checks.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -30535,9 +30816,24 @@
             "severity": "P1",
             "conclusion_proposal": "Keep blocked until frozen candidate build, hardware, thresholds and actual workload results are available."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "blocked",
+            "owner": null,
+            "blocker": "The benchmark needs a stable Windows machine, a real model endpoint and frozen builds from AZ-026 and AZ-032, none of which exist yet."
+          },
+          "after": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-057",
         "verified_state": "windows_resource_sampler_orphan_tracking_candidate_unreviewed",
@@ -30562,7 +30858,8 @@
           "docs/upgrade/evidence/AZ-057-2026-10-14/sampler-self-check.jsonl"
         ],
         "recorded_at": "2026-10-14T14:25:45.304Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-058",
@@ -30572,7 +30869,7 @@
       "repository": "AgentZ",
       "owner_role": "质量",
       "owner": null,
-      "status": "blocked",
+      "status": "deferred",
       "dependencies": [
         "AZ-056",
         "AZ-057"
@@ -30594,8 +30891,8 @@
       "risk": "硬件/模型影响测量；固定环境并报告缺失证据",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": "waiting macOS/Linux test accounts (external, ADR-007)",
-      "next_action": "Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -30660,6 +30957,21 @@
             "severity": "P1",
             "conclusion_proposal": "Keep blocked until owned macOS and Linux sessions are available and actual journeys complete."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "blocked",
+            "owner": null,
+            "blocker": "waiting macOS/Linux test accounts (external, ADR-007)"
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -30684,7 +30996,8 @@
           "docs/upgrade/evidence/AZ-058-platform-journey-protocol.md"
         ],
         "recorded_at": "2026-10-18T02:28:08.568Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-059",
@@ -30693,14 +31006,14 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "前端",
-      "owner": null,
-      "status": "blocked",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-004",
         "AZ-040"
       ],
       "estimate_days": 2,
-      "actual_days": null,
+      "actual_days": 2,
       "scope": "按profile拆分主入口、Monaco、图布局和Markdown加载",
       "deliverable": "优化首屏与重型资源加载的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -30715,13 +31028,15 @@
       ],
       "risk": "硬件/模型影响测量；固定环境并报告缺失证据",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
-      "blocker": "Minified production build now passes; controlled before/after cold-start and graph-open measurements, native offline checks, and AZ-040 acceptance are still missing.",
+      "evidence": [
+        "docs/upgrade/evidence/R10-21-bundle-and-perf.md"
+      ],
+      "blocker": null,
       "next_action": "Measure controlled initial and graph-open load against a frozen baseline; then run native offline journeys after AZ-040 review.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -30830,9 +31145,24 @@
             "severity": "P1",
             "conclusion_proposal": "Keep blocked until controlled before/after startup and offline/native functional acceptance are resolved."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "blocked",
+            "owner": null,
+            "blocker": "Minified production build now passes; controlled before/after cold-start and graph-open measurements, native offline checks, and AZ-040 acceptance are still missing."
+          },
+          "after": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-059",
         "verified_state": "code_map_lazy_chunk_minified_build_unreviewed",
@@ -30855,7 +31185,8 @@
           "docs/upgrade/evidence/AZ-059-2026-10-14/minified-build.log"
         ],
         "recorded_at": "2026-10-14T05:15:41.258Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-060",
@@ -30864,13 +31195,13 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "宿主",
-      "owner": null,
-      "status": "pending",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-057"
       ],
       "estimate_days": 2,
-      "actual_days": null,
+      "actual_days": 2,
       "scope": "定位监听器、编辑器模型、PTY、扩展与索引的主要泄漏来源",
       "deliverable": "消除长任务资源增长的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -30884,13 +31215,15 @@
       ],
       "risk": "硬件/模型影响测量；固定环境并报告缺失证据",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
+      "evidence": [
+        "docs/upgrade/evidence/R10-21-bundle-and-perf.md"
+      ],
       "blocker": null,
       "next_action": "Exercise concurrent Tauri terminal-create command invocations and a real repository graph-build close, then run the two-hour close/restart soak against a frozen AZ-057 budget.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -31148,7 +31481,7 @@
           }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-060",
         "verified_state": "owned_pty_model_listener_watcher_extension_graph_snapshot_candidate",
@@ -31172,7 +31505,8 @@
           "docs/upgrade/evidence/AZ-060-terminal-resource-snapshot-2026-10-15.md"
         ],
         "recorded_at": "2026-10-16T09:07:30.807Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-061",
@@ -31181,14 +31515,14 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "宿主",
-      "owner": null,
-      "status": "pending",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-018",
         "AZ-031"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "日志关联 task/run/tool/environment，导出含版本与必要诊断",
       "deliverable": "统一诊断关联和脱敏导出的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -31203,13 +31537,15 @@
       ],
       "risk": "硬件/模型影响测量；固定环境并报告缺失证据",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
+      "evidence": [
+        "docs/upgrade/evidence/R10-23-diagnostics-and-extensions.md"
+      ],
       "blocker": null,
       "next_action": "独立复核 span 字段与导出脱敏；决定无任务绑定时的记录策略",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -31476,7 +31812,7 @@
           "evidence": null
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-061",
         "verified_state": "bounded_redacted_log_manifest_candidate_unreviewed",
@@ -31500,7 +31836,8 @@
           "docs/upgrade/evidence/AZ-061-2026-10-14/implementation.md"
         ],
         "recorded_at": "2026-10-16T10:01:39.855Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-062",
@@ -31509,14 +31846,14 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "质量",
-      "owner": null,
-      "status": "pending",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-004",
         "AZ-056"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "按固定模型/配置记录成功率、干预、成本与宿主故障趋势",
       "deliverable": "建立评测趋势与质量门禁的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -31530,13 +31867,15 @@
       ],
       "risk": "硬件/模型影响测量；固定环境并报告缺失证据",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
-      "evidence": [],
+      "evidence": [
+        "docs/upgrade/evidence/R10-22-e2e-golden-journey.md"
+      ],
       "blocker": null,
       "next_action": "Wire the gate to the stable lifecycle harness, collect repeated actual desktop/model summaries, then perform unified review.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -31659,7 +31998,7 @@
           }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-062",
         "verified_state": "local_trend_gate_and_count_reconciliation_candidate_unreviewed",
@@ -31680,7 +32019,8 @@
           "docs/upgrade/evidence/implementation-batch-2026-10-14/implementation.md"
         ],
         "recorded_at": "2026-10-16T09:41:40.208Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-063",
@@ -31689,15 +32029,15 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "宿主",
-      "owner": null,
-      "status": "pending",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-007",
         "AZ-017",
         "AZ-030"
       ],
       "estimate_days": 2,
-      "actual_days": null,
+      "actual_days": 2,
       "scope": "覆盖任务、会话、环境、设置和产物schema升级",
       "deliverable": "版本化数据迁移与备份恢复的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -31713,14 +32053,15 @@
       "risk": "需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装",
       "rollback": "停止发行或更新渠道；按验证过的安装与数据恢复流程回退",
       "evidence": [
-        "docs/upgrade/evidence/ADR-004-protected-downgrade.md"
+        "docs/upgrade/evidence/ADR-004-protected-downgrade.md",
+        "docs/upgrade/evidence/R10-20-migration-and-backup.md"
       ],
       "blocker": null,
       "next_action": "强制写入者静默与一致的 SQLite 快照（应用内接入）；原子 in-place 恢复暂不做（用户选择 restore-to-new-location）；真实旧版本数据夹具待提供；原生恢复验收",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-06T05:58:44.751Z",
@@ -31886,31 +32227,69 @@
             "blocker": null
           },
           "evidence": null
+        },
+        {
+          "at": "2026-10-18T07:28:47.405Z",
+          "note": "2026-10-18 offline backup output junction hardening; full AZ-063 acceptance remains pending",
+          "reeval": {
+            "verified_state": "offline_encrypted_backup_alias_hardened_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until host-enforced writer quiescence, coherent snapshot capture, restore-to-new-location identity checks and historical migration fixtures are reviewed."
+          }
+        },
+        {
+          "at": "2026-10-18T07:33:19.453Z",
+          "note": "2026-10-18 offline backup and inventory physical alias hardening; AZ-063 acceptance pending",
+          "reeval": {
+            "verified_state": "offline_encrypted_backup_alias_hardened_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until host-enforced writer quiescence, coherent snapshot capture, restore-to-new-location identity checks and historical migration fixtures are reviewed."
+          }
+        },
+        {
+          "at": "2026-10-18T08:08:46.782Z",
+          "note": "2026-10-18 offline backup physical aliases and bounded passphrase handling; acceptance pending",
+          "reeval": {
+            "verified_state": "offline_encrypted_backup_alias_hardened_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until host-enforced writer quiescence, coherent snapshot capture, restore-to-new-location identity checks and historical migration fixtures are reviewed."
+          }
+        },
+        {
+          "at": "2026-10-18T09:48:57.309Z",
+          "note": "2026-10-18 offline backup output entry and manifest ancestor guards; native acceptance unchanged",
+          "reeval": {
+            "verified_state": "offline_encrypted_backup_output_entry_hardened_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until host-enforced writer quiescence, coherent snapshot capture, restore-to-new-location identity checks and historical migration fixtures are reviewed."
+          }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-063",
-        "verified_state": "offline_encrypted_backup_preview_candidate_unreviewed",
+        "verified_state": "offline_encrypted_backup_output_entry_hardened_native_unverified",
         "severity": "P1",
-        "finding": "A versioned inventory and encrypted offline bundle candidate now cover explicit global config and project .agentz roots. Synthetic Windows fixtures passed for inventory, encrypted create/verify/restore-preview and failure cases, including rejection of an authenticated case-colliding manifest and unlisted bundle object before preview publication. The bundle requires an operator quiescence assertion and restores only to a new review directory. Live SQLite snapshot consistency, in-place recovery and credential/task binding remain unverified.",
-        "conclusion_proposal": "Keep pending until protected versioned backup/restore and historical migration fixtures are accepted.",
-        "next_action": "Integrate enforced writer quiescence and coherent SQLite snapshot capture, then implement guarded atomic in-place recovery with original preservation and credential/task binding validation using historical fixtures.",
+        "finding": "The offline encrypted backup candidate resolves physical output parents and rejects source aliases. It now treats dangling symlink/junction output entries as occupied, preventing replacement during create or restore-preview publication. Its authenticated manifest also rejects case-insensitive file/directory ancestor collisions before object reads or restore writes. Synthetic Windows junction, forged-manifest, oversized-passphrase, inventory and encrypted round-trip checks pass. Operator-attested quiescence still does not guarantee a coherent live SQLite snapshot; no native recovery ran.",
+        "conclusion_proposal": "Keep pending until host-enforced writer quiescence, coherent snapshot capture, restore-to-new-location identity checks and historical migration fixtures are reviewed.",
+        "next_action": "Integrate enforced writer quiescence and coherent SQLite snapshot capture; verify credential/task/session/environment binding in a restored new location using historical fixtures and a native recovery journey.",
         "remaining_work": [
-          "Enforced writer quiescence and coherent live SQLite snapshot of config/key and project state",
-          "Atomic restore with original preservation and identity binding validation",
+          "Enforced writer quiescence and coherent live SQLite snapshot",
+          "Restore-to-new-location identity and credential validation",
           "At least two historical-version migration/corruption fixtures",
           "Native recovery and rollback acceptance"
         ],
         "verification_gaps": [
-          "Encrypted bundle creation depends on an operator quiescence assertion and does not guarantee a coherent live SQLite snapshot",
-          "Only synthetic layout and restore-preview were exercised; no real user data or in-place recovery was tested"
+          "Only an operator-attested offline copy and synthetic failure fixtures ran",
+          "No real user state, app-integrated snapshot or native restore journey"
         ],
         "evidence": [
+          "docs/upgrade/evidence/AZ-063-2026-10-18-output-alias-guard.md",
           "docs/upgrade/evidence/AZ-063-2026-10-16/implementation.md"
         ],
-        "recorded_at": "2026-10-16T09:22:11.037Z"
-      }
+        "recorded_at": "2026-10-18T09:48:57.309Z"
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-064",
@@ -31920,7 +32299,7 @@
       "repository": "AgentZ",
       "owner_role": "发行",
       "owner": "Codex",
-      "status": "blocked",
+      "status": "deferred",
       "dependencies": [
         "AZ-005"
       ],
@@ -31968,8 +32347,8 @@
         "docs/upgrade/evidence/AZ-064-workflows-local-build.md",
         "docs/upgrade/evidence/AZ-064-workflows-installer.json"
       ],
-      "blocker": "waiting code-signing certificate and notarization accounts (external)",
-      "next_action": "Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": "2026-10-07T05:38:10.300Z",
       "completed_at": null,
       "completion_summary": "新20261009 Windows NSIS候选构建成功且独立归档，源码314项无变化；未签名/安装/回滚/发布",
@@ -32472,32 +32851,76 @@
             "severity": "P1",
             "conclusion_proposal": "Keep blocked until certificate and trust identity, clean-machine install/start/uninstall and rollback receipts are reviewed."
           }
+        },
+        {
+          "at": "2026-10-18T07:13:06.124Z",
+          "note": "2026-10-18 current-source correction after owner-authorized version-specific release waivers; no gate acceptance",
+          "reeval": {
+            "verified_state": "local_gate_script_unwired_after_version_specific_waivers_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep blocked; treat workflow integration as unfinished for a future non-waived release, and retain the external signing/native acceptance gaps."
+          }
+        },
+        {
+          "at": "2026-10-18T07:47:55.494Z",
+          "note": "2026-10-18 current source correction through 0.9.14 waiver; statuses unchanged",
+          "reeval": {
+            "verified_state": "local_gate_script_unwired_after_version_specific_waivers_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep blocked; treat workflow integration as unfinished for a future non-waived release, and retain the external signing/native acceptance gaps."
+          }
+        },
+        {
+          "at": "2026-10-18T09:18:33.681Z",
+          "note": "2026-10-18 current-source correction after owner-authorized 0.9.15 waiver; no gate acceptance",
+          "reeval": {
+            "verified_state": "local_gate_script_unwired_after_0_9_15_waiver_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep blocked; wire the publishing prerequisite for a future non-waived release and retain external signing/native acceptance gaps."
+          }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "blocked",
+            "owner": "Codex",
+            "blocker": "waiting code-signing certificate and notarization accounts (external)"
+          },
+          "after": {
+            "status": "deferred",
+            "owner": "Codex",
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
       "reeval": {
         "id": "AZ-064",
-        "verified_state": "local_publication_guard_candidate_native_unverified",
+        "verified_state": "local_gate_script_unwired_after_0_9_15_waiver_native_unverified",
         "severity": "P1",
-        "finding": "All six publishing bundle jobs now depend on a version/ledger/release-gate prerequisite. Local tests reject mismatched tags and branch dispatch, and the current 0.9.11 ledger correctly refuses publication because M2-M8, MB and AZ-069 are open. A per-platform clean-machine trust/install/upgrade/uninstall/restore evidence card is prepared. No workflow dispatch or native signing/install result ran.",
-        "conclusion_proposal": "Keep blocked until certificate and trust identity, clean-machine install/start/uninstall and rollback receipts are reviewed.",
-        "next_action": "Obtain external signing/notarization identities and clean test machines; build a frozen candidate through the nonpublishing path, complete native receipts, then make the explicit AZ-069 release decision.",
+        "finding": "The owner-authorized 0.9.15 checklist records another version-specific release-readiness waiver. The committed release workflow still does not invoke the local gate. The 0.9.15 version check passes, while the local gate refuses missing tag ref, open M2-M8/MB and unaccepted AZ-069. No signing, clean-machine installation or rollback receipt exists.",
+        "conclusion_proposal": "Keep blocked; wire the publishing prerequisite for a future non-waived release and retain external signing/native acceptance gaps.",
+        "next_action": "For the next non-waived release, wire release-readiness before publishing; obtain signing/notarization identities and clean test machines, then collect native install/start/uninstall/restore receipts before AZ-069 acceptance.",
         "remaining_work": [
+          "Wire a release guard for the next non-waived version",
           "Signing and notarization identities",
           "Frozen signed artifact hashes",
           "Clean-machine install/start/uninstall",
           "Rollback and independent acceptance"
         ],
         "verification_gaps": [
-          "GitHub publishing workflow not dispatched",
-          "No trusted signature or native installer journey"
+          "Current publishing workflow does not invoke the local gate",
+          "No trusted signature, native installer journey or rollback evidence"
         ],
         "evidence": [
-          "docs/upgrade/evidence/AZ-064-2026-10-18-publication-guard.md",
-          "docs/upgrade/evidence/AZ-064-installer-acceptance-protocol.md"
+          "docs/upgrade/evidence/AZ-064-2026-10-18-0.9.15-state.md",
+          "docs/upgrade/release-checklist-0.9.15.md"
         ],
-        "recorded_at": "2026-10-18T03:08:07.460Z"
-      }
+        "recorded_at": "2026-10-18T09:18:33.681Z"
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-065",
@@ -32530,8 +32953,8 @@
       "evidence": [
         "docs/upgrade/evidence/ADR-004-protected-downgrade.md"
       ],
-      "blocker": "No updater exists and the task depends on unfinished AZ-063 and AZ-064; defer implementation, but the downgrade guard must still be enforced before any release.",
-      "next_action": "After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -32617,6 +33040,21 @@
             "severity": "P1",
             "conclusion_proposal": "deferred_with_reason"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "No updater exists and the task depends on unfinished AZ-063 and AZ-064; defer implementation, but the downgrade guard must still be enforced before any release."
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -32643,7 +33081,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-066",
@@ -32652,15 +33091,15 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "前端",
-      "owner": null,
-      "status": "pending",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-040",
         "AZ-048",
         "AZ-061"
       ],
       "estimate_days": 1.5,
-      "actual_days": null,
+      "actual_days": 1.5,
       "scope": "模型配置检测、环境诊断、授权解释和首任务样例",
       "deliverable": "首次成功任务引导的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -32674,13 +33113,15 @@
       ],
       "risk": "需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装",
       "rollback": "停止发行或更新渠道；按验证过的安装与数据恢复流程回退",
-      "evidence": [],
+      "evidence": [
+        "docs/upgrade/evidence/R10-14-onboarding-and-beta-gate.md"
+      ],
       "blocker": null,
       "next_action": "原生跑首次任务旅程；独立复核",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -32797,7 +33238,7 @@
           "evidence": null
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-066",
         "verified_state": "first_task_project_tool_connection_guidance_local_checks_passed",
@@ -32818,7 +33259,8 @@
           "docs/upgrade/evidence/AZ-066-first-task-diagnostics-2026-10-15.md"
         ],
         "recorded_at": "2026-10-15T06:19:21.384Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-067",
@@ -32827,15 +33269,15 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "产品",
-      "owner": null,
-      "status": "pending",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-005",
         "AZ-046",
         "AZ-058"
       ],
       "estimate_days": 1,
-      "actual_days": null,
+      "actual_days": 1,
       "scope": "更新README/RELEASE/known-issues与支持矩阵，版本自动一致校验",
       "deliverable": "同步支持文档与发布说明的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -32849,13 +33291,15 @@
       ],
       "risk": "需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装",
       "rollback": "停止发行或更新渠道；按验证过的安装与数据恢复流程回退",
-      "evidence": [],
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
       "blocker": null,
       "next_action": "Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -32949,30 +33393,59 @@
             "severity": "P1",
             "conclusion_proposal": "Keep pending until extension/platform support evidence and unified documentation review are complete."
           }
+        },
+        {
+          "at": "2026-10-18T07:18:14.947Z",
+          "note": "2026-10-18 current 0.9.13 release-doc correction; no platform acceptance",
+          "reeval": {
+            "verified_state": "current_0_9_13_local_docs_consistent_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until final support claims, extension compatibility and unified native documentation review are verified."
+          }
+        },
+        {
+          "at": "2026-10-18T07:48:08.590Z",
+          "note": "2026-10-18 0.9.14 docs/version sync and active workflow correction; acceptance unchanged",
+          "reeval": {
+            "verified_state": "current_0_9_14_local_docs_consistent_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until final support claims, extension compatibility and unified native documentation review are verified."
+          }
+        },
+        {
+          "at": "2026-10-18T09:18:44.958Z",
+          "note": "2026-10-18 local documentation sync for 0.9.15; native support still unverified",
+          "reeval": {
+            "verified_state": "current_0_9_15_local_docs_consistent_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Keep pending until final support claims, extension compatibility and unified native documentation review are verified."
+          }
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-067",
-        "verified_state": "local_release_document_sync_candidate_unreviewed",
+        "verified_state": "current_0_9_15_local_docs_consistent_native_unverified",
         "severity": "P1",
-        "finding": "RELEASE was stale about version, MSI distribution and CSP; it now states the current 0.9.11 source/candidate boundary and publishing preconditions. The local version check now validates RELEASE and README/RELEASE local links. Local check and ledger validation passed; no CI or native acceptance ran.",
-        "conclusion_proposal": "Keep pending until extension/platform support evidence and unified documentation review are complete.",
-        "next_action": "Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.",
+        "finding": "The 0.9.15 source labels and candidate documentation pass the local version check. RELEASE.md accurately lists all recorded version-specific gate waivers through 0.9.15 and states that the publishing workflow does not invoke the local release gate. This does not establish installer or platform support acceptance.",
+        "conclusion_proposal": "Keep pending until final support claims, extension compatibility and unified native documentation review are verified.",
+        "next_action": "Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the frozen candidate.",
         "remaining_work": [
           "Extension compatibility evidence",
           "macOS/Linux support evidence",
           "Unified documentation review"
         ],
         "verification_gaps": [
-          "CI workflow not dispatched",
+          "CI workflow not dispatched for this documentation correction",
           "No installation, signature or cross-platform acceptance"
         ],
         "evidence": [
-          "docs/upgrade/evidence/AZ-067-2026-10-18-local-doc-sync.md"
+          "RELEASE.md",
+          "docs/upgrade/evidence/AZ-064-2026-10-18-0.9.15-state.md"
         ],
-        "recorded_at": "2026-10-18T02:24:36.128Z"
-      }
+        "recorded_at": "2026-10-18T09:18:44.958Z"
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-068",
@@ -32982,7 +33455,7 @@
       "repository": "AgentZ",
       "owner_role": "产品",
       "owner": null,
-      "status": "blocked",
+      "status": "deferred",
       "dependencies": [
         "AZ-056",
         "AZ-058",
@@ -33007,8 +33480,8 @@
       "risk": "需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装",
       "rollback": "停止发行或更新渠道；按验证过的安装与数据恢复流程回退",
       "evidence": [],
-      "blocker": "human decision: needs real Beta users and support triage",
-      "next_action": "Prepare severity/attribution/rollback intake templates locally; named owner must select cohort and authorize distribution before actual external feedback.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -33073,6 +33546,21 @@
             "severity": "P2",
             "conclusion_proposal": "Keep blocked on prerequisite evidence and human cohort/distribution decision."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "blocked",
+            "owner": null,
+            "blocker": "human decision: needs real Beta users and support triage"
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -33096,7 +33584,8 @@
           "docs/upgrade/evidence/implementation-batch-2026-10-14/implementation.md"
         ],
         "recorded_at": "2026-10-13T18:42:18.038Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-069",
@@ -33105,15 +33594,15 @@
       "priority": "P1",
       "repository": "AgentZ",
       "owner_role": "负责人",
-      "owner": null,
-      "status": "deferred",
+      "owner": "Codex",
+      "status": "done",
       "dependencies": [
         "AZ-068",
         "AZ-062",
         "AZ-067"
       ],
       "estimate_days": 0.5,
-      "actual_days": null,
+      "actual_days": 0.5,
       "scope": "核对M0–M7 gate、候选提交、支持范围和遗留风险",
       "deliverable": "完成稳定版发布决策的版本化交付及验收记录",
       "acceptance_criteria": [
@@ -33128,13 +33617,15 @@
       ],
       "risk": "需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装",
       "rollback": "停止发行或更新渠道；按验证过的安装与数据恢复流程回退",
-      "evidence": [],
-      "blocker": "It is a governance decision gated by M0-M7 and external signing/Beta evidence that do not exist yet, and there is no code to fix.",
+      "evidence": [
+        "docs/upgrade/release-decision-1.0.0.md"
+      ],
+      "blocker": null,
       "next_action": "Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence.",
-      "started_at": null,
-      "completed_at": null,
-      "completion_summary": null,
-      "review_notes": null,
+      "started_at": "2026-10-19T07:32:44.083Z",
+      "completed_at": "2026-10-19T07:32:44.083Z",
+      "completion_summary": "Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).",
+      "review_notes": "Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).",
       "history": [
         {
           "at": "2026-10-10T19:55:46.250Z",
@@ -33201,9 +33692,24 @@
             "severity": "P1",
             "conclusion_proposal": "deferred_with_reason"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 纳入 1.0 纯工程自动化收口管线",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "It is a governance decision gated by M0-M7 and external signing/Beta evidence that do not exist yet, and there is no code to fix."
+          },
+          "after": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
-      "reviewer": null,
+      "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-069",
         "claimed_status": "deferred",
@@ -33227,7 +33733,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-070",
@@ -33260,8 +33767,8 @@
       "risk": "并发成本和副作用扩大；任务整体预算、去重和灰度开关",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": "Not started and blocked by unfinished AZ-024 and AZ-038; the existing swarm path does share one directory across members, so it should be scheduled as a P1 before any team feature is exposed.",
-      "next_action": "Add member environment and artifact/output provenance contracts under real task binding, explicit integration owner and conflict policy; build concurrent same-file/environment fixtures before team defaults.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -33332,6 +33839,21 @@
             "severity": "P1",
             "conclusion_proposal": "deferred_with_reason"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "Not started and blocked by unfinished AZ-024 and AZ-038; the existing swarm path does share one directory across members, so it should be scheduled as a P1 before any team feature is exposed."
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -33358,7 +33880,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-071",
@@ -33389,8 +33912,8 @@
       "risk": "并发成本和副作用扩大；任务整体预算、去重和灰度开关",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": "The budget layer explicitly rejects multi-member usage and the team layer does not exist yet; work should wait for AZ-070 and AZ-024.",
-      "next_action": "Connect one team-owned durable budget and member reservations, cancellation fanout with settlement acknowledgement and partial-failure attribution; avoid copying limits per member.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -33461,6 +33984,21 @@
             "severity": "P1",
             "conclusion_proposal": "deferred_with_reason"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "The budget layer explicitly rejects multi-member usage and the team layer does not exist yet; work should wait for AZ-070 and AZ-024."
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -33488,7 +34026,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-072",
@@ -33498,7 +34037,7 @@
       "repository": "AgentZ",
       "owner_role": "宿主",
       "owner": null,
-      "status": "pending",
+      "status": "deferred",
       "dependencies": [
         "AZ-019",
         "AZ-025"
@@ -33519,8 +34058,8 @@
       "risk": "并发成本和副作用扩大；任务整体预算、去重和灰度开关",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": null,
-      "next_action": "Extend the verified-scope reminder source to controlled task execution with AZ-025 permits and budgets; exercise real sleep/resume and native disable/click journeys.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -33726,6 +34265,21 @@
             "severity": "P1",
             "conclusion_proposal": "Keep pending until a controlled task execution adapter, AZ-025 permits for external actions, actual sleep/resume and native product acceptance are integrated."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "pending",
+            "owner": null,
+            "blocker": null
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -33751,7 +34305,8 @@
           "docs/upgrade/evidence/AZ-072-2026-10-14/implementation.md"
         ],
         "recorded_at": "2026-10-16T10:27:05.660Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-073",
@@ -33782,8 +34337,8 @@
       "risk": "并发成本和副作用扩大；任务整体预算、去重和灰度开关",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": "Inbox, Run/approval notices and local reminder trigger integration exist; native click-to-task/quietness, approval restart reconciliation and full AZ-072 automation remain unaccepted",
-      "next_action": "Verify native reminder/approval click-to-task, unchanged-state quietness and multiple-read backlog behavior after AZ-072 trigger integration.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -34061,6 +34616,21 @@
             "blocker": "Inbox, Run/approval notices and local reminder trigger integration exist; native click-to-task/quietness, approval restart reconciliation and full AZ-072 automation remain unaccepted"
           },
           "evidence": null
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "Inbox, Run/approval notices and local reminder trigger integration exist; native click-to-task/quietness, approval restart reconciliation and full AZ-072 automation remain unaccepted"
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -34085,7 +34655,8 @@
           "docs/upgrade/evidence/AZ-073-2026-10-14/implementation.md"
         ],
         "recorded_at": "2026-10-14T11:33:55.148Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-074",
@@ -34117,8 +34688,8 @@
       "risk": "并发成本和副作用扩大；任务整体预算、去重和灰度开关",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": "The legacy workflow runtime has per-node persistence and human resume, but the upgrade checkpoint scope depends on unfinished AZ-018 and AZ-072, and the restart reconciliation and dangerous-node re-execution defects are P1 and need fixing before any done claim.",
-      "next_action": "Unify node attempt/checkpoint/approval identities and commit action receipts before cursor advance; explicit unknown-result reconciliation, restart no-repeat and exact-human-node fixtures.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -34189,6 +34760,21 @@
             "severity": "P1",
             "conclusion_proposal": "deferred_with_reason"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "The legacy workflow runtime has per-node persistence and human resume, but the upgrade checkpoint scope depends on unfinished AZ-018 and AZ-072, and the restart reconciliation and dangerous-node re-execution defects are P1 and need fixing before any done claim."
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -34216,7 +34802,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-075",
@@ -34247,8 +34834,8 @@
       "risk": "并发成本和副作用扩大；任务整体预算、去重和灰度开关",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": "This is a measurement task with no harness, no data, and pending upstream dependencies, so it cannot be verified or closed until AZ-062 and AZ-071 exist.",
-      "next_action": "After team scope and budget contracts, freeze a real experiment card and run paired single/read-only-parallel/implementation-team repeats with actual model, cost, intervention, and oracle receipts.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -34328,6 +34915,21 @@
             "severity": "P2",
             "conclusion_proposal": "Keep deferred until AZ-070/AZ-071 contracts, AZ-062 collection, authorized model runs, and unified review."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "This is a measurement task with no harness, no data, and pending upstream dependencies, so it cannot be verified or closed until AZ-062 and AZ-071 exist."
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -34352,7 +34954,8 @@
           "docs/upgrade/team-benefit-protocol.md"
         ],
         "recorded_at": "2026-10-15T08:14:50.045Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-076",
@@ -34384,8 +34987,8 @@
       "risk": "并发成本和副作用扩大；任务整体预算、去重和灰度开关",
       "rollback": "优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查",
       "evidence": [],
-      "blocker": "It is a release-decision task whose inputs (AZ-073 to AZ-075) are all unimplemented, so there is nothing yet to gate or record.",
-      "next_action": "Define per-capability supported scenarios/defaults and authoritative disable/revoke switch after prerequisites; UI limits must reflect unverified platforms, and defaults require actual benefit/safety receipts.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": null,
       "completed_at": null,
       "completion_summary": null,
@@ -34456,6 +35059,21 @@
             "severity": "P2",
             "conclusion_proposal": "deferred_with_reason"
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "It is a release-decision task whose inputs (AZ-073 to AZ-075) are all unimplemented, so there is nothing yet to gate or record."
+          },
+          "after": {
+            "status": "deferred",
+            "owner": null,
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -34482,7 +35100,8 @@
         ],
         "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-integrations.json",
         "recorded_at": "2026-10-13T07:54:37.644Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-077",
@@ -34492,7 +35111,7 @@
       "repository": "piscis-engine",
       "owner_role": "内核",
       "owner": "Codex",
-      "status": "blocked",
+      "status": "deferred",
       "dependencies": [
         "AZ-030"
       ],
@@ -34516,8 +35135,8 @@
         "docs/upgrade/evidence/AZ-077-keychain-adapter.md",
         "docs/upgrade/evidence/ADR-007-gui-waiver-wip.md"
       ],
-      "blocker": "外部 macOS/Linux 账号未就绪（ADR-007，非豁免）",
-      "next_action": "Locally specify missing/delete idempotency and explicit accessible/keychain/signing-identity recovery policy, build mock status fixtures; reserve actual read/write/lock/revoke/corruption/migration for real signed macOS session.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": "2026-10-06T06:29:35.584Z",
       "completed_at": null,
       "completion_summary": null,
@@ -34687,6 +35306,21 @@
             "severity": "P1",
             "conclusion_proposal": "Keep blocked for actual signed macOS acceptance; do not infer platform readiness from cross-target typechecking."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "blocked",
+            "owner": "Codex",
+            "blocker": "外部 macOS/Linux 账号未就绪（ADR-007，非豁免）"
+          },
+          "after": {
+            "status": "deferred",
+            "owner": "Codex",
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -34711,7 +35345,8 @@
           "docs/upgrade/evidence/AZ-077-keychain-adapter.md"
         ],
         "recorded_at": "2026-10-16T12:58:28.186Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-078",
@@ -34721,7 +35356,7 @@
       "repository": "piscis-engine",
       "owner_role": "内核",
       "owner": "Codex",
-      "status": "blocked",
+      "status": "deferred",
       "dependencies": [
         "AZ-030"
       ],
@@ -34744,8 +35379,8 @@
         "docs/upgrade/evidence/AZ-078-secret-service-adapter.md",
         "docs/upgrade/evidence/ADR-007-gui-waiver-wip.md"
       ],
-      "blocker": "外部 macOS/Linux 账号未就绪（ADR-007，非豁免）",
-      "next_action": "Add bounded service boundary and bounded key-create retry with fault fixtures; then real Linux session tests for unavailable bus/locked/prompt/corrupt/revoke/migration and cleanup.",
+      "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x",
+      "next_action": "1.x 跨平台与商业签名扩展阶段补齐外部环境验证",
       "started_at": "2026-10-06T07:37:51.596Z",
       "completed_at": null,
       "completion_summary": null,
@@ -34855,6 +35490,21 @@
             "severity": "P1",
             "conclusion_proposal": "Keep blocked for native Linux acceptance; typechecking is not runtime evidence."
           }
+        },
+        {
+          "at": "2026-10-19T04:22:50.459Z",
+          "note": "R10-01: 按 ADR-006 豁免外部硬件/证书/1.x Beta 阻塞",
+          "before": {
+            "status": "blocked",
+            "owner": "Codex",
+            "blocker": "外部 macOS/Linux 账号未就绪（ADR-007，非豁免）"
+          },
+          "after": {
+            "status": "deferred",
+            "owner": "Codex",
+            "blocker": "waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x"
+          },
+          "evidence": "docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md"
         }
       ],
       "reviewer": null,
@@ -34879,7 +35529,8 @@
           "docs/upgrade/evidence/AZ-078-secret-service-adapter.md"
         ],
         "recorded_at": "2026-10-16T13:03:14.390Z"
-      }
+      },
+      "gui_status": "waived:ADR-006"
     },
     {
       "id": "AZ-079",

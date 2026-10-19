@@ -331,8 +331,7 @@ fn mcp_to_dto(s: &McpServerConfig) -> McpServerDto {
     }
 }
 
-fn load_settings(app: &AppHandle) -> Result<(Settings, String), String> {
-    let config_dir = resolve_config_dir(app)?;
+fn load_settings_from_dir(config_dir: &std::path::Path) -> Result<(Settings, String), String> {
     let config_path = config_dir.join("config.json");
     let mut settings = Settings::load(&config_path).map_err(|e| e.to_string())?;
     // Settings from before this field was exposed used the kernel's old
@@ -349,6 +348,11 @@ fn load_settings(app: &AppHandle) -> Result<(Settings, String), String> {
     }
     settings.config_path = config_path;
     Ok((settings, config_dir.display().to_string()))
+}
+
+fn load_settings(app: &AppHandle) -> Result<(Settings, String), String> {
+    let config_dir = resolve_config_dir(app)?;
+    load_settings_from_dir(&config_dir)
 }
 
 fn provider_to_dto(p: &LlmProviderConfig) -> LlmProviderDto {
@@ -1034,5 +1038,61 @@ mod secret_response_tests {
         assert_eq!(restored.url, previous.url);
         assert_eq!(restored.env, previous.env);
         assert_eq!(restored.headers, previous.headers);
+    }
+
+    #[test]
+    fn historical_v090_and_v0912_fixtures_migrate_cleanly_to_1_0() {
+        let dir = std::env::temp_dir().join(format!(
+            "agentz-migration-fixtures-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // Fixture 1: v0.9.0 — legacy config with max_iterations=50 + flat skills/{slug}/SKILL.md
+        let v090_dir = dir.join("v0.9.0");
+        std::fs::create_dir_all(v090_dir.join("skills").join("pdf-helper")).unwrap();
+        std::fs::write(
+            v090_dir.join("skills").join("pdf-helper").join("SKILL.md"),
+            "---\nname: PDF Helper\n---\nExtract PDF tables.\n",
+        )
+        .unwrap();
+        std::fs::write(
+            v090_dir.join("config.json"),
+            r#"{"provider":"openai","model":"gpt-4o","max_iterations":50,"language":"zh"}"#,
+        )
+        .unwrap();
+
+        let (migrated_090, _) = load_settings_from_dir(&v090_dir).unwrap();
+        assert_eq!(migrated_090.max_iterations, 200);
+        assert_eq!(migrated_090.model, "gpt-4o");
+        let moved = crate::skills::provenance::migrate_flat_skills_to_installed(&v090_dir.join("skills")).unwrap();
+        assert_eq!(moved, 1);
+        assert!(v090_dir
+            .join("skills")
+            .join("installed")
+            .join("pdf-helper")
+            .join("SKILL.md")
+            .exists());
+        // Idempotent second run
+        assert_eq!(
+            crate::skills::provenance::migrate_flat_skills_to_installed(&v090_dir.join("skills")).unwrap(),
+            0
+        );
+
+        // Fixture 2: v0.9.12 — config omitting max_iterations + multi-provider list + custom iteration preservation
+        let v0912_dir = dir.join("v0.9.12");
+        std::fs::create_dir_all(&v0912_dir).unwrap();
+        std::fs::write(
+            v0912_dir.join("config.json"),
+            r#"{"provider":"anthropic","model":"claude-sonnet-4-20250514","language":"en","llm_providers":[{"id":"p1","label":"Claude","provider":"anthropic","model":"claude-sonnet-4-20250514","api_key":"","base_url":"","max_tokens":8192}]}"#,
+        )
+        .unwrap();
+        let (migrated_0912, _) = load_settings_from_dir(&v0912_dir).unwrap();
+        assert_eq!(migrated_0912.max_iterations, 200);
+        assert_eq!(migrated_0912.llm_providers.len(), 1);
+        assert_eq!(migrated_0912.llm_providers[0].id, "p1");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

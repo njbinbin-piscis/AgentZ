@@ -1,11 +1,8 @@
 # Known Issues — Agent Loop Robustness & Tooling
 
-Status: **partially fixed** — the host-side work landed in *Fix batch 1–3*
-(see the end of this file). Kernel-bound items have a concrete *Upstream patch
-spec* instead of an in-repo fix. Collected during the CodeZ chat-rendering
-refactor. Fix these after the current task queue drains.
+Status: **1.0.0 Engineering Baseline Closed (2026-10-19)** — All host-side engineering, WorkZ ↔ CodeZ handoff, dirty buffer conflict protection, per-turn undo, side-channel token accounting, secret scrubbing, and bundle/E2E gates are resolved and verified in `1.0.0` (see `docs/upgrade/release-decision-1.0.0.md` and `docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md`). External hardware/certificate items are tracked under `ADR-006`. Historical notes below are retained for engineering provenance.
 
-Owner: Piscis. Created: 2026-09-29.
+Owner: Piscis. Created: 2026-09-29. Updated: 2026-10-19.
 
 ## Status index (2026-10-13)
 

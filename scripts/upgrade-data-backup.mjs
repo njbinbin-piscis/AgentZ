@@ -35,6 +35,23 @@ const isWithin = (root, candidate) => {
   const relative = path.relative(path.resolve(root).toLowerCase(), path.resolve(candidate).toLowerCase());
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 };
+// Resolve the existing parent before checking an output path. A junction/symlink
+// alias must not let a new bundle or restore preview land inside protected data.
+const newTarget = value => {
+  const target = absolute(value);
+  const parent = fs.realpathSync(path.dirname(target));
+  if (!fs.statSync(parent).isDirectory()) throw new Error('Output parent is not a directory');
+  return path.join(parent, path.basename(target));
+};
+const existingRoot = value => fs.existsSync(value) ? fs.realpathSync(value) : path.resolve(value);
+const overlapsSource = (target, sources) => sources.some(source =>
+  isWithin(source, target) || isWithin(existingRoot(source), target));
+// existsSync follows links and reports false for a dangling symlink. Treat it
+// as occupied so publication never replaces an existing directory entry.
+const pathOccupied = target => {
+  try { fs.lstatSync(target); return true; }
+  catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+};
 const validRelative = value => typeof value === 'string' && value.length > 0 && !value.includes('\\')
   && !value.includes('\0') && !path.posix.isAbsolute(value)
   && value.split('/').every(part => part && part !== '.' && part !== '..'
@@ -44,25 +61,38 @@ const validRelative = value => typeof value === 'string' && value.length > 0 && 
 async function passphraseKey(salt) {
   if (process.stdin.isTTY) throw new Error('Pipe the backup passphrase on stdin; no command-line secret argument is accepted');
   const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
-  const secret = Buffer.concat(chunks);
-  if (secret.length < 12 || secret.length > 4096) throw new Error('Passphrase must be 12..4096 bytes on stdin');
   try {
-    return crypto.scryptSync(secret, salt, 32, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+    let bytes = 0;
+    for await (const input of process.stdin) {
+      const chunk = Buffer.isBuffer(input) ? input : Buffer.from(input);
+      bytes += chunk.length;
+      if (bytes > 4096) {
+        chunk.fill(0);
+        throw new Error('Passphrase must be 12..4096 bytes on stdin');
+      }
+      chunks.push(chunk);
+    }
+    if (bytes < 12) throw new Error('Passphrase must be 12..4096 bytes on stdin');
+    const secret = Buffer.concat(chunks);
+    try {
+      return crypto.scryptSync(secret, salt, 32, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+    } finally {
+      secret.fill(0);
+    }
   } finally {
-    secret.fill(0);
+    for (const chunk of chunks) chunk.fill(0);
   }
 }
 
 function newOutputDirectory(target) {
-  if (fs.existsSync(target)) throw new Error('Output already exists');
+  if (pathOccupied(target)) throw new Error('Output already exists');
   const parent = path.dirname(target);
   if (!fs.statSync(parent).isDirectory()) throw new Error('Output parent is not a directory');
   return fs.mkdtempSync(path.join(parent, '.agentz-backup-stage-'));
 }
 
 function publishDirectory(stage, target) {
-  if (fs.existsSync(target)) throw new Error('Output appeared during operation');
+  if (pathOccupied(target)) throw new Error('Output appeared during operation');
   fs.renameSync(stage, target);
 }
 
@@ -111,16 +141,21 @@ function decryptManifest(bundle, key, header) {
     roles.add(root.role);
     // A bundle must also be safe to preview on case-insensitive filesystems.
     const names = new Set();
+    const directories = new Set();
     for (const file of root.files) {
       count++;
       totalBytes += file.bytes;
       const portableName = typeof file.path === 'string' ? file.path.toLowerCase() : '';
+      const parts = portableName.split('/');
+      const ancestors = parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'));
       if (count > 50000 || !validRelative(file.path) || names.has(portableName)
+        || directories.has(portableName) || ancestors.some(parent => names.has(parent))
         || !Number.isSafeInteger(file.bytes) || file.bytes < 0
         || totalBytes > 4 * 1024 * 1024 * 1024
         || !/^[a-f0-9]{64}$/.test(file.sha256)
         || !/^\d{6}\.bin$/.test(file.object) || objects.has(file.object)) throw new Error('Invalid manifest file');
       names.add(portableName);
+      for (const parent of ancestors) directories.add(parent);
       objects.add(file.object);
       fromHex(file.iv, 12);
       fromHex(file.tag, 16);
@@ -154,14 +189,17 @@ async function decryptFile(source, output, key, role, file) {
 async function create() {
   const config = absolute(options.config);
   const projects = options.projects.map(absolute);
-  const target = absolute(options.output);
-  if ([config, ...projects.map(project => path.join(project, '.agentz'))].some(source => isWithin(source, target))) {
+  const target = newTarget(options.output);
+  if (overlapsSource(target, [config, ...projects.map(project => path.join(project, '.agentz'))])) {
     throw new Error('Backup output must be outside source roots');
   }
   if (options.quiesced !== 'true') throw new Error('Offline writer quiescence must be explicitly confirmed');
   const inventoryArgs = ['--config-dir', config, ...projects.flatMap(project => ['--project-dir', project])];
   const inventory = JSON.parse(execFileSync(process.execPath, [inventoryScript, ...inventoryArgs], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
   if (!inventory.config_key_pair_present) throw new Error('Matching config.json and .secret_key presence is required');
+  if (Array.isArray(inventory.sqlite_sidecars) && inventory.sqlite_sidecars.length > 0) {
+    throw new Error(`Active SQLite sidecar files detected (${inventory.sqlite_sidecars.map(s => `${s.role}:${s.path}`).join(', ')}); checkpoint and quiesce writers before creating a backup`);
+  }
   const sources = [config, ...projects.map(project => path.join(project, '.agentz'))];
   const salt = crypto.randomBytes(32);
   const key = await passphraseKey(salt);
@@ -169,7 +207,7 @@ async function create() {
   try {
     stage = newOutputDirectory(target);
     fs.mkdirSync(path.join(stage, 'objects'));
-    const manifest = { schema_version: 1, app_version: inventory.app_version, captured_at: new Date().toISOString(), roots: [] };
+    const manifest = { schema_version: 1, app_version: inventory.app_version, captured_at: new Date().toISOString(), snapshot_consistent: true, roots: [] };
     let objectNumber = 0;
     for (const [index, root] of inventory.roots.entries()) {
       const files = [];
@@ -183,7 +221,8 @@ async function create() {
     }
     const afterInventory = JSON.parse(execFileSync(process.execPath, [inventoryScript, ...inventoryArgs], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
     if (JSON.stringify(afterInventory.roots) !== JSON.stringify(inventory.roots)
-      || !afterInventory.config_key_pair_present) {
+      || !afterInventory.config_key_pair_present
+      || (Array.isArray(afterInventory.sqlite_sidecars) && afterInventory.sqlite_sidecars.length > 0)) {
       throw new Error('Backup source tree changed during capture');
     }
     const iv = crypto.randomBytes(12);
@@ -194,7 +233,7 @@ async function create() {
     fs.writeFileSync(path.join(stage, 'header.json'), JSON.stringify({ schema_version: 1, kdf: 'scrypt-N32768-r8-p1', salt: hex(salt), manifest_iv: hex(iv), manifest_tag: hex(cipher.getAuthTag()) }), { flag: 'wx' });
     publishDirectory(stage, target);
     stage = undefined;
-    process.stdout.write(`${JSON.stringify({ schema_version: 1, protected_backup: true, bundle: target, files: objectNumber, snapshot_consistent: false })}\n`);
+    process.stdout.write(`${JSON.stringify({ schema_version: 1, protected_backup: true, bundle: target, files: objectNumber, snapshot_consistent: true })}\n`);
   } finally {
     key.fill(0);
     removeOwnedStage(stage);
@@ -203,10 +242,11 @@ async function create() {
 
 async function inspectOrRestore(restore) {
   const bundle = absolute(options.bundle);
+  let target;
   if (restore) {
-    const target = absolute(options.output);
+    target = newTarget(options.output);
     const sources = [absolute(options.config), ...options.projects.map(project => path.join(absolute(project), '.agentz'))];
-    if ([bundle, ...sources].some(source => isWithin(source, target))) throw new Error('Restore preview output must be outside bundle and source roots');
+    if (overlapsSource(target, [bundle, ...sources])) throw new Error('Restore preview output must be outside bundle and source roots');
   }
   const headerInfo = fs.lstatSync(path.join(bundle, 'header.json'));
   if (!headerInfo.isFile() || headerInfo.isSymbolicLink() || headerInfo.size > 4096) throw new Error('Invalid bundle header');
@@ -229,7 +269,7 @@ async function inspectOrRestore(restore) {
       if (expected.length !== manifest.roots.length || manifest.roots.some((root, index) => root.source_fingerprint !== pathFingerprint(expected[index]))) {
         throw new Error('Restore source binding does not match');
       }
-      stage = newOutputDirectory(absolute(options.output));
+      stage = newOutputDirectory(target);
     }
     for (const root of manifest.roots) {
       const rootOutput = stage && path.join(stage, root.role);
@@ -241,7 +281,7 @@ async function inspectOrRestore(restore) {
       }
     }
     if (stage) {
-      publishDirectory(stage, absolute(options.output));
+      publishDirectory(stage, target);
       stage = undefined;
     }
     process.stdout.write(`${JSON.stringify({ schema_version: 1, authenticated: true, files: manifest.roots.reduce((n, root) => n + root.files.length, 0), restored_to_new_directory: restore })}\n`);

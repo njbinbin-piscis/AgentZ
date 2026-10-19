@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-064",
+    "verified_state": "local_gate_script_unwired_after_0_9_15_waiver_native_unverified",
+    "severity": "P1",
+    "finding": "The owner-authorized 0.9.15 checklist records another version-specific release-readiness waiver. The committed release workflow still does not invoke the local gate. The 0.9.15 version check passes, while the local gate refuses missing tag ref, open M2-M8/MB and unaccepted AZ-069. No signing, clean-machine installation or rollback receipt exists.",
+    "conclusion_proposal": "Keep blocked; wire the publishing prerequisite for a future non-waived release and retain external signing/native acceptance gaps.",
+    "next_action": "For the next non-waived release, wire release-readiness before publishing; obtain signing/notarization identities and clean test machines, then collect native install/start/uninstall/restore receipts before AZ-069 acceptance.",
+    "remaining_work": ["Wire a release guard for the next non-waived version", "Signing and notarization identities", "Frozen signed artifact hashes", "Clean-machine install/start/uninstall", "Rollback and independent acceptance"],
+    "verification_gaps": ["Current publishing workflow does not invoke the local gate", "No trusted signature, native installer journey or rollback evidence"],
+    "evidence": ["docs/upgrade/evidence/AZ-064-2026-10-18-0.9.15-state.md", "docs/upgrade/release-checklist-0.9.15.md"]
+  }
+]

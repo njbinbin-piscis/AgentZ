@@ -19,18 +19,40 @@
   margin: 0 16px 10px;
 }
 
+.agentz-task-panel-header-row {
+  display: flex;
+  align-items: center;
+  background: var(--bg, #0e0e14);
+}
+
 .agentz-task-panel-header {
-  width: 100%;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
   border: 0;
-  background: var(--bg, #0e0e14);
+  background: transparent;
   color: var(--text, #e8e8f0);
   cursor: pointer;
   text-align: left;
+}
+
+.agentz-task-panel-clear {
+  margin-right: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #2a2a38);
+  background: transparent;
+  color: var(--text-dim, #9a9ab0);
+  cursor: pointer;
+}
+
+.agentz-task-panel-clear:hover {
+  color: var(--text, #e8e8f0);
+  border-color: var(--accent, #7c6ef8);
 }
 
 .agentz-task-panel-title {

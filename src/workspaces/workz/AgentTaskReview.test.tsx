@@ -256,16 +256,35 @@ describe("complete task review", () => {
     expect(button("agent.merge").props.disabled).toBe(true);
     expect(button("agent.discard").props.disabled).toBe(true);
   });
-  it("renders working files and blocks operations that would omit uncommitted content", async () => {
-    api.changeSet.mockResolvedValue({ changes: [change("new file.txt", "untracked")] });
+  it("renders working files and enables auto-commit merge when uncommitted content is present", async () => {
+    api.changeSet.mockResolvedValue({
+      head_sha: "review-head",
+      changes: [change("new file.txt", "untracked")],
+    });
+    api.mergePreview.mockResolvedValue({
+      task_head: "auto-committed-head",
+      target_head: "target-head",
+      target_branch: "main",
+    });
     await mount();
     expect(text()).toContain("new file.txt");
     expect(text()).toContain("agent.reviewSource.untracked");
     expect(text()).toContain("after");
     expect(api.fileView).toHaveBeenCalledWith("/project", "task-a", "new file.txt");
-    for (const label of ["agent.merge", "agent.openPr"])
-      expect(button(label).props.disabled).toBe(true);
+    expect(button("agent.openPr").props.disabled).toBe(true);
+    expect(button("agent.mergeAutoCommit").props.disabled).toBe(false);
     expect(button("agent.discard").props.disabled).toBe(false);
+    await act(async () => {
+      await button("agent.mergeAutoCommit").props.onClick();
+    });
+    expect(api.mergePreview).toHaveBeenCalledWith("/project", "task-a", "main", "review-head", true);
+    expect(api.merge).toHaveBeenCalledWith(
+      "/project",
+      "task-a",
+      "main",
+      "auto-committed-head",
+      "target-head",
+    );
   });
   it("shows binary content explicitly and identifies the captured review version", async () => {
     api.changeSet.mockResolvedValue({ changes: [change("image.bin", "committed", true)] });
@@ -275,13 +294,14 @@ describe("complete task review", () => {
     expect(text()).toContain("agent.reviewVersion");
     expect(text()).not.toContain("agentz-task-review-diff-pre");
   });
-  it("blocks branch operations when a dirty file has canceled its net base diff", async () => {
+  it("blocks openPr and switches merge to auto-commit when a dirty file has canceled its net base diff", async () => {
     api.changeSet.mockResolvedValue({
+      head_sha: "review-head",
       changes: [change("other-committed.txt")],
       has_uncommitted: true,
     });
     await mount();
-    expect(button("agent.merge").props.disabled).toBe(true);
+    expect(button("agent.mergeAutoCommit").props.disabled).toBe(false);
     expect(button("agent.openPr").props.disabled).toBe(true);
   });
   it("keeps file read failure distinct from no change", async () => {
@@ -322,7 +342,13 @@ describe("complete task review", () => {
     await act(async () => {
       await button("agent.merge").props.onClick();
     });
-    expect(api.mergePreview).toHaveBeenCalledWith("/project", "task-a", "main", "review-head");
+    expect(api.mergePreview).toHaveBeenCalledWith(
+      "/project",
+      "task-a",
+      "main",
+      "review-head",
+      false,
+    );
     expect(api.merge).toHaveBeenCalledWith(
       "/project",
       "task-a",
@@ -331,5 +357,23 @@ describe("complete task review", () => {
       "target-head",
     );
     expect(props.onResolved).toHaveBeenCalled();
+  });
+  it("invokes onOpenInCodeZ with the task worktree and selected file", async () => {
+    const onOpenInCodeZ = vi.fn();
+    api.changeSet.mockResolvedValue({
+      head_sha: "review-head",
+      changes: [change("src/main.ts")],
+    });
+    await act(async () => {
+      renderer = create(<AgentTaskReview {...props} onOpenInCodeZ={onOpenInCodeZ} />);
+    });
+    await act(async () => {
+      button("agent.openInCodeZ").props.onClick();
+    });
+    expect(onOpenInCodeZ).toHaveBeenCalledWith({
+      taskId: "task-a",
+      worktreePath: "/task-a",
+      filePath: "src/main.ts",
+    });
   });
 });

@@ -23,6 +23,12 @@ interface AgentTaskReviewProps {
   onClose: () => void;
   /** Called after a merge / discard so the parent can refresh its task list. */
   onResolved: () => void;
+  /** Handoff the isolated worktree (and currently selected file) into CodeZ. */
+  onOpenInCodeZ?: (opts: {
+    taskId: string;
+    worktreePath: string;
+    filePath?: string | null;
+  }) => void;
 }
 
 /**
@@ -43,7 +49,13 @@ export default function AgentTaskReview(props: AgentTaskReviewProps) {
   return <TaskReviewContent key={identity} {...props} />;
 }
 
-function TaskReviewContent({ projectDir, task, onClose, onResolved }: AgentTaskReviewProps) {
+function TaskReviewContent({
+  projectDir,
+  task,
+  onClose,
+  onResolved,
+  onOpenInCodeZ,
+}: AgentTaskReviewProps) {
   const { t } = useTranslation();
   const active = useRef(true);
   useEffect(() => {
@@ -174,18 +186,22 @@ function TaskReviewContent({ projectDir, task, onClose, onResolved }: AgentTaskR
         task.id,
         targetBranch,
         reviewHead,
+        uncommitted,
       );
       // A completed preview is not permission to merge a review that has
       // since closed or switched to another task/environment.
       if (!active.current) return;
+      const effectiveHead = preview.task_head || reviewHead;
       const receipt = await agentTaskApi.merge(
         projectDir,
         task.id,
         targetBranch,
-        reviewHead,
+        effectiveHead,
         preview.target_head,
       );
       if (!active.current) return;
+      setReviewHead(effectiveHead);
+      setUncommitted(false);
       setMergeRecoveryRef(receipt.recovery_ref);
       setMergeBlocked(true);
       setStatus(t("agent.mergeOk", { base: targetBranch }));
@@ -201,7 +217,7 @@ function TaskReviewContent({ projectDir, task, onClose, onResolved }: AgentTaskR
     } finally {
       if (active.current) setBusy(false);
     }
-  }, [projectDir, task.id, targetBranch, reviewHead, t, onResolved]);
+  }, [projectDir, task.id, targetBranch, reviewHead, uncommitted, t, onResolved]);
 
   const discard = useCallback(async () => {
     if (!window.confirm(t("agent.discardConfirm"))) return;
@@ -282,6 +298,23 @@ function TaskReviewContent({ projectDir, task, onClose, onResolved }: AgentTaskR
               <code>{base}</code>
             </span>
           </div>
+          {onOpenInCodeZ && (
+            <button
+              type="button"
+              className="agentz-task-review-open-codez"
+              data-testid="review-open-in-codez"
+              disabled={archived || busy}
+              onClick={() =>
+                onOpenInCodeZ({
+                  taskId: task.id,
+                  worktreePath: task.worktree_path || projectDir,
+                  filePath: selected,
+                })
+              }
+            >
+              {t("agent.openInCodeZ")}
+            </button>
+          )}
           <button
             type="button"
             disabled={archived || busy || loading}
@@ -414,10 +447,14 @@ function TaskReviewContent({ projectDir, task, onClose, onResolved }: AgentTaskR
             <button
               type="button"
               onClick={merge}
-              disabled={actionsDisabled || uncommitted || mergeBlocked || !reviewHead}
+              disabled={actionsDisabled || mergeBlocked || !reviewHead}
               className="primary"
             >
-              {busy ? t("agent.merging") : t("agent.merge")}
+              {busy
+                ? t("agent.merging")
+                : uncommitted
+                  ? t("agent.mergeAutoCommit")
+                  : t("agent.merge")}
             </button>
           </div>
         </div>

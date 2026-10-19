@@ -5,6 +5,28 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-10-19
+
+### Added
+
+- **Cross-View WorkZ ↔ CodeZ Collaboration Loop (`R10-05`–`R10-09`)**:
+  - Dirty buffer conflict guard in `CodeZ` (`EditorConflictTracker` + `[data-testid="editor-conflict-banner"]`) with one-click Diff view, Keep Mine, or Accept Disk resolution.
+  - One-click worktree handoff (`在 CodeZ 中打开`) from `AgentTaskReview` and `AgentFilePreview`, binding `CodeZ` file tree, editor, terminal, and search to the isolated worktree with a top return pill (`worktree-handoff-bar`).
+  - Human edit feedback ledger (`recordUserRecentEdit`, `consumeUserRecentEdits`) that injects `<user_recent_edits>` into the next Agent turn after saving in `CodeZ` or `WorkZ`.
+  - Automatic staging/committing of uncommitted worktree changes during `AgentTaskReview` merge (`commit_uncommitted_task_changes`) and non-Git folder task snapshot rollback (`agent_task_rollback_snapshot`).
+  - Editable preview canvas in `WorkZ` (`AgentFilePreview.tsx`) with `Preview / Edit / Diff` modes, `Ctrl+S` save, and `[基于最新修改继续对话]`.
+- **Vibe Coding & Office Starter Experience (`R10-10`–`R10-14`)**:
+  - Global Command Palette (`Ctrl+Shift+P`) and Quick Open (`Ctrl+P`) in `CodeZ` (`CommandPalette.tsx`).
+  - Per-turn file modification rollback (`[撤销本轮文件修改]`, `journalUndoTurn`) on assistant bubbles in both `CodeZ` and `WorkZ`.
+  - 4 high-frequency starter scenario cards in `WorkzEmptyState.tsx` and streamlined sandbox controls (isolated by default, advanced SHA controls collapsed).
+  - Unified side-channel LLM token/cost accounting (`background`, `inline_edit`) and status bar model switcher + Token/USD cost pill (`IdeStatusBar.tsx`).
+  - 3-step first-run onboarding wizard (`OnboardingModal.tsx`) and `Beta` gating for Swarm / Workflow / Gateway surfaces.
+- **Architecture Modularity, Security & Release Gates (`R10-01`–`R10-04`, `R10-15`–`R10-24`)**:
+  - Decomposed monolithic frontend components (`workz/index.tsx`, `codez/index.tsx`, `AssistantPanel.tsx`) and Rust `commands/chat_turn/` (`mod.rs`, `prompt_assembly.rs`, `tool_approval.rs`, `post_turn.rs`).
+  - Removed 18 isolated bureaucratic compliance UI files (`R10-03`) in favor of natural main-flow UX (`ADR-006`).
+  -Pinned 5-phase kernel contract tests and `BrowserGenerationTracker` (`snapshot_generation` stale-ref guard).
+  - Complete theme CSS token convergence, zero hardcoded Chinese in production `.tsx` (`i18n.test.ts`), full-outlet secret scrubbing, historical `v0.9.0`/`v0.9.12` migration fixtures, writer-quiescent encrypted backups, manual chunk splitting (`index-*.js < 1.2 MB`), cross-view E2E suite (`e2e/agentz.spec.tsx`), and Top 8 VS Code extension compatibility archive (`docs/extension-compatibility-1.0.md`).
+
 ## [0.9.19] - 2026-10-19
 
 ### Added

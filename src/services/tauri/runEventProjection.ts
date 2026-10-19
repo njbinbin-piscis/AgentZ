@@ -277,3 +277,35 @@ export function projectRunAgentEvents(
   result.text = redacted(rawText);
   return result;
 }
+
+export interface StreamContextUsageSnapshot {
+  estimatedInputTokens: number;
+  totalInputBudget: number;
+  triggerThreshold: number;
+  cumulativeInputTokens: number;
+  cumulativeOutputTokens: number;
+  rollingSummaryVersion: number;
+  autoCompactThreshold: number;
+}
+
+/** Normalize a raw `context_usage` agent event into the shared UI snapshot used by CodeZ & WorkZ. */
+export function normalizeStreamContextUsage(evt: {
+  estimated_input_tokens: number;
+  total_input_budget: number;
+  trigger_threshold: number;
+  cumulative_input_tokens: number;
+  cumulative_output_tokens: number;
+  rolling_summary_version: number;
+  auto_compact_threshold: number;
+}): StreamContextUsageSnapshot {
+  return {
+    estimatedInputTokens: evt.estimated_input_tokens,
+    totalInputBudget: evt.total_input_budget,
+    triggerThreshold: evt.trigger_threshold,
+    cumulativeInputTokens: evt.cumulative_input_tokens,
+    cumulativeOutputTokens: evt.cumulative_output_tokens,
+    rollingSummaryVersion: evt.rolling_summary_version,
+    autoCompactThreshold: evt.auto_compact_threshold,
+  };
+}
+

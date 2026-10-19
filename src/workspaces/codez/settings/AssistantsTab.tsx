@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import DropdownSelect from "../../../components/DropdownSelect";
 import {
   connectGatewayChannels,
@@ -46,12 +47,15 @@ const EMPTY: ImSettings = {
   im_message_mode: "queue",
 };
 
-function statusLabel(s: ChannelStatus): { text: string; color: string } {
-  if (s === "Connected") return { text: "已连接", color: "#3fb950" };
-  if (s === "Connecting") return { text: "连接中", color: "#d29922" };
-  if (s === "Disconnected") return { text: "未连接", color: "#8b949e" };
+function statusLabel(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  s: ChannelStatus,
+): { text: string; color: string } {
+  if (s === "Connected") return { text: t("assistantPanel.statusConnected"), color: "#3fb950" };
+  if (s === "Connecting") return { text: t("assistantPanel.statusConnecting"), color: "#d29922" };
+  if (s === "Disconnected") return { text: t("assistantPanel.statusDisconnected"), color: "#8b949e" };
   if (typeof s === "object" && "Error" in s)
-    return { text: `错误: ${s.Error}`, color: "#f85149" };
+    return { text: t("assistantPanel.imErrorPrefix", { msg: s.Error }), color: "#f85149" };
   return { text: String(s), color: "#8b949e" };
 }
 
@@ -60,6 +64,7 @@ function statusLabel(s: ChannelStatus): { text: string; color: string } {
  * so inbound chat messages drive a headless agent turn and the reply is sent back.
  */
 export default function AssistantsTab() {
+  const { t } = useTranslation();
   const [form, setForm] = useState<ImSettings>(EMPTY);
   const [channels, setChannels] = useState<ChannelInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,13 +108,13 @@ export default function AssistantsTab() {
     try {
       const saved = await saveImSettings(form);
       setForm(saved);
-      setNotice("已保存");
+      setNotice(t("assistantPanel.imSaved"));
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
-  }, [form]);
+  }, [form, t]);
 
   const connect = useCallback(async () => {
     setBusy(true);
@@ -119,13 +124,13 @@ export default function AssistantsTab() {
       await saveImSettings(form);
       const st = await connectGatewayChannels();
       setChannels(st.channels);
-      setNotice("已连接启用的渠道");
+      setNotice(t("assistantPanel.imConnectedNotice"));
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
-  }, [form]);
+  }, [form, t]);
 
   const disconnect = useCallback(async () => {
     setBusy(true);
@@ -133,41 +138,41 @@ export default function AssistantsTab() {
     try {
       await disconnectGatewayChannels();
       setChannels([]);
-      setNotice("已断开所有渠道");
+      setNotice(t("assistantPanel.imDisconnectedNotice"));
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [t]);
 
   const beginWechat = useCallback(async () => {
     setError(null);
     setQr(null);
-    setQrMsg("正在获取二维码…");
+    setQrMsg(t("assistantPanel.wechatQrFetching"));
     try {
       const res = await startWechatLogin();
       setQr(res.qr_data_url);
-      setQrMsg("请使用微信扫码登录");
+      setQrMsg(t("assistantPanel.wechatQrPrompt"));
       const token = res.qrcode_token;
       if (!token) return;
       if (pollTimer.current) window.clearInterval(pollTimer.current);
       pollTimer.current = window.setInterval(async () => {
         try {
           const st = await pollWechatLogin(token);
-          if (st.message === "scaned") setQrMsg("已扫码，请在手机上确认");
+          if (st.message === "scaned") setQrMsg(t("assistantPanel.wechatQrScanned"));
           if (st.connected) {
-            setQrMsg("微信已连接");
+            setQrMsg(t("assistantPanel.wechatQrConnected"));
             setQr(null);
             if (pollTimer.current) window.clearInterval(pollTimer.current);
             await refresh();
           } else if (st.message === "expired") {
-            setQrMsg("二维码已过期，请重试");
+            setQrMsg(t("assistantPanel.wechatQrExpired"));
             setQr(null);
             if (pollTimer.current) window.clearInterval(pollTimer.current);
           }
         } catch (e) {
-          setQrMsg(`轮询失败: ${e}`);
+          setQrMsg(t("assistantPanel.wechatQrPollError", { msg: String(e) }));
           if (pollTimer.current) window.clearInterval(pollTimer.current);
         }
       }, 2500);
@@ -175,10 +180,10 @@ export default function AssistantsTab() {
       setQrMsg(null);
       setError(String(e));
     }
-  }, [refresh]);
+  }, [refresh, t]);
 
   if (loading) {
-    return <div className="agentz-settings-loading">加载中…</div>;
+    return <div className="agentz-settings-loading">{t("assistantPanel.imLoading")}</div>;
   }
 
   const statusOf = (name: string) => channels.find((c) => c.name === name)?.status;
@@ -186,7 +191,7 @@ export default function AssistantsTab() {
   const renderStatus = (name: string) => {
     const s = statusOf(name);
     if (!s) return null;
-    const { text, color } = statusLabel(s);
+    const { text, color } = statusLabel(t, s);
     return (
       <span className="agentz-wb-meta" style={{ color }}>
         ● {text}
@@ -197,15 +202,14 @@ export default function AssistantsTab() {
   return (
     <div className="agentz-settings-tabpanel">
       <section className="agentz-settings-section">
-        <h3>助理（IM 渠道）</h3>
+        <h3>{t("assistantPanel.imTitle")}</h3>
         <p className="agentz-settings-hint">
-          连接飞书 / 企业微信 / 钉钉 / 微信等即时通讯平台，收到的消息会驱动一次无界面 Agent
-          回合，并把回复发回原渠道。凭证保存在本地 config.json（密钥加密存储）。
+          {t("assistantPanel.imHint")}
         </p>
         {error && <div className="agentz-settings-error">{error}</div>}
         {notice && <div className="agentz-settings-hint">{notice}</div>}
 
-        {/* 飞书 */}
+        {/* Feishu / Lark */}
         <div className="agentz-wb-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
           <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
@@ -213,7 +217,7 @@ export default function AssistantsTab() {
               checked={form.feishu_enabled}
               onChange={(e) => set("feishu_enabled", e.target.checked)}
             />
-            <strong>飞书 / Lark</strong>
+            <strong>{t("assistantPanel.feishuTitle")}</strong>
             {renderStatus("feishu")}
           </label>
           <input
@@ -231,14 +235,14 @@ export default function AssistantsTab() {
             variant="field"
             value={form.feishu_domain}
             options={[
-              { id: "feishu", label: "feishu（飞书，国内）" },
-              { id: "lark", label: "lark（海外）" },
+              { id: "feishu", label: t("assistantPanel.feishuDomainDomestic") },
+              { id: "lark", label: t("assistantPanel.feishuDomainGlobal") },
             ]}
             onChange={(v) => set("feishu_domain", v)}
           />
         </div>
 
-        {/* 企业微信 */}
+        {/* WeCom */}
         <div className="agentz-wb-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
           <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
@@ -246,7 +250,7 @@ export default function AssistantsTab() {
               checked={form.wecom_enabled}
               onChange={(e) => set("wecom_enabled", e.target.checked)}
             />
-            <strong>企业微信（智能机器人）</strong>
+            <strong>{t("assistantPanel.wecomTitle")}</strong>
             {renderStatus("wecom")}
           </label>
           <input
@@ -262,7 +266,7 @@ export default function AssistantsTab() {
           />
         </div>
 
-        {/* 钉钉 */}
+        {/* DingTalk */}
         <div className="agentz-wb-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
           <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
@@ -270,7 +274,7 @@ export default function AssistantsTab() {
               checked={form.dingtalk_enabled}
               onChange={(e) => set("dingtalk_enabled", e.target.checked)}
             />
-            <strong>钉钉</strong>
+            <strong>{t("assistantPanel.dingtalkTitle")}</strong>
             {renderStatus("dingtalk")}
           </label>
           <input
@@ -285,13 +289,13 @@ export default function AssistantsTab() {
             onChange={(e) => set("dingtalk_app_secret", e.target.value)}
           />
           <input
-            placeholder="Robot Code（可选，启用主动发送）"
+            placeholder={t("assistantPanel.dingtalkRobotCodePlaceholder")}
             value={form.dingtalk_robot_code}
             onChange={(e) => set("dingtalk_robot_code", e.target.value)}
           />
         </div>
 
-        {/* 微信 */}
+        {/* WeChat */}
         <div className="agentz-wb-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
           <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
@@ -299,38 +303,40 @@ export default function AssistantsTab() {
               checked={form.wechat_enabled}
               onChange={(e) => set("wechat_enabled", e.target.checked)}
             />
-            <strong>微信（iLink 扫码）</strong>
+            <strong>{t("assistantPanel.wechatTitle")}</strong>
             {renderStatus("wechat")}
           </label>
           <div style={{ fontSize: 12, color: "#8b949e" }}>
-            {form.wechat_bot_id ? `已绑定 bot_id: ${form.wechat_bot_id}` : "未绑定，请扫码登录"}
+            {form.wechat_bot_id
+              ? t("assistantPanel.wechatBound", { id: form.wechat_bot_id })
+              : t("assistantPanel.wechatUnbound")}
           </div>
           <div className="agentz-wb-actions">
             <button type="button" onClick={() => void beginWechat()}>
-              扫码登录
+              {t("assistantPanel.wechatScanLogin")}
             </button>
           </div>
           {qrMsg && <div className="agentz-settings-hint">{qrMsg}</div>}
           {qr && (
             <img
               src={qr}
-              alt="微信登录二维码"
+              alt={t("assistantPanel.wechatQrAlt")}
               style={{ width: 200, height: 200, background: "#fff", padding: 8, borderRadius: 6 }}
             />
           )}
         </div>
 
-        {/* 消息处理模式 */}
+        {/* Message handling mode */}
         <div className="agentz-wb-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
           <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <strong>消息处理模式</strong>
+            <strong>{t("assistantPanel.imModeTitle")}</strong>
           </label>
           <DropdownSelect
             variant="field"
             value={form.im_message_mode || "queue"}
             options={[
-              { id: "queue", label: "queue（排队：先完成当前任务）" },
-              { id: "cancel", label: "cancel（取消：新消息打断旧任务）" },
+              { id: "queue", label: t("assistantPanel.imModeQueue") },
+              { id: "cancel", label: t("assistantPanel.imModeCancel") },
             ]}
             onChange={(v) => set("im_message_mode", v)}
           />
@@ -338,13 +344,13 @@ export default function AssistantsTab() {
 
         <div className="agentz-wb-actions" style={{ marginTop: 12 }}>
           <button type="button" onClick={() => void save()} disabled={busy}>
-            {busy ? "保存中…" : "保存"}
+            {busy ? t("assistantPanel.imSaving") : t("assistantPanel.imSave")}
           </button>
           <button type="button" onClick={() => void connect()} disabled={busy}>
-            保存并连接
+            {t("assistantPanel.imSaveAndConnect")}
           </button>
           <button type="button" className="danger" onClick={() => void disconnect()} disabled={busy}>
-            全部断开
+            {t("assistantPanel.imDisconnectAll")}
           </button>
         </div>
       </section>

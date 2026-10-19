@@ -35,6 +35,7 @@ interface AssistantMessageListProps {
   onSelectPath?: (path: string) => void;
   onForkCheckpoint: (messageId: string) => void | Promise<void>;
   onRestoreCheckpoint: (messageId: string) => void | Promise<void>;
+  onUndoTurn?: (turnId: string) => void | Promise<void>;
   onCardSubmitted: (requestId: string) => void;
   onCardActionSent: (requestId: string) => void;
   onPlanModeChange?: (mode: "plan" | "agent") => void;
@@ -65,6 +66,7 @@ function AssistantMessageList({
   onSelectPath,
   onForkCheckpoint,
   onRestoreCheckpoint,
+  onUndoTurn,
   onCardSubmitted,
   onCardActionSent,
   onPlanModeChange,
@@ -191,6 +193,18 @@ function AssistantMessageList({
                 {diffs.map((d) => (
                   <FileDiffCard key={d.id} diff={d} onOpen={onSelectPath} />
                 ))}
+                {m.turnId && onUndoTurn && !isStreamingLast && (
+                  <div className="agentz-turn-undo-bar">
+                    <button
+                      type="button"
+                      data-testid={`undo-turn-${m.turnId}`}
+                      className="agentz-checkpoint-btn"
+                      onClick={() => void onUndoTurn(m.turnId!)}
+                    >
+                      {t("agent.rollbackTurn")}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             {showCheckpoint && (

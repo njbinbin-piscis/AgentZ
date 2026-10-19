@@ -30,6 +30,38 @@ pub struct FrontendAttachment {
     pub filename: Option<String>,
 }
 
+/// Human file edit saved in the editor or WorkZ preview before a chat turn (R10-07).
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct UserRecentEdit {
+    pub path: String,
+    pub timestamp: String,
+    pub diff_summary: String,
+}
+
+/// Format collected human edits into an XML-fenced `<user_recent_edits>` context block.
+pub fn format_user_recent_edits_block(edits: &[UserRecentEdit]) -> Option<String> {
+    if edits.is_empty() {
+        return None;
+    }
+    let mut out = String::from(
+        "<user_recent_edits>\nThe user manually edited and saved these files before this turn. Respect and preserve their changes:\n",
+    );
+    for edit in edits {
+        out.push_str(&format!(
+            "  <edit path=\"{}\" timestamp=\"{}\">\n",
+            edit.path, edit.timestamp
+        ));
+        for line in edit.diff_summary.lines() {
+            out.push_str("    ");
+            out.push_str(line);
+            out.push('\n');
+        }
+        out.push_str("  </edit>\n");
+    }
+    out.push_str("</user_recent_edits>");
+    Some(out)
+}
+
 /// Bridges the kernel's [`EventSink`] to Tauri events.
 struct TauriEventSink {
     app: AppHandle,
@@ -193,6 +225,21 @@ mod continuation_intent_tests {
         assert!(error.contains("deprecated"));
         assert!(error.contains("explicit plan replacement"));
     }
+
+    #[test]
+    fn formats_user_recent_edits_xml_block_for_next_turn() {
+        assert!(format_user_recent_edits_block(&[]).is_none());
+        let edits = vec![UserRecentEdit {
+            path: "src/config.ts".to_string(),
+            timestamp: "2026-10-19T12:00:00Z".to_string(),
+            diff_summary: "+1 / -1 lines\n- const PORT = 3000;\n+ const PORT = 8080;".to_string(),
+        }];
+        let block = format_user_recent_edits_block(&edits).expect("block generated");
+        assert!(block.starts_with("<user_recent_edits>"));
+        assert!(block.contains("<edit path=\"src/config.ts\" timestamp=\"2026-10-19T12:00:00Z\">"));
+        assert!(block.contains("+ const PORT = 8080;"));
+        assert!(block.ends_with("</user_recent_edits>"));
+    }
 }
 
 /// Run one agent turn. Streams `AgentEvent`s via `agentz:chat-event`.
@@ -222,6 +269,7 @@ pub async fn chat_send(
     prefer_zh: Option<bool>,
     artifact_scope_handle: Option<String>,
     artifact_ref: Option<super::task_artifacts::ArtifactContinuationRef>,
+    user_recent_edits: Option<Vec<UserRecentEdit>>,
 ) -> Result<ChatResult, String> {
     let clear_plan = continuation_plan_intent(clear_plan)?;
     // Held before queueing and through the entire turn; RAII also releases on errors.
@@ -349,6 +397,20 @@ pub async fn chat_send(
         "workz" => Some("WorkZ task".to_string()),
         _ => None,
     };
+
+    let display_prompt = display_prompt.or_else(|| {
+        if user_recent_edits.as_ref().is_some_and(|e| !e.is_empty()) {
+            Some(prompt.clone())
+        } else {
+            None
+        }
+    });
+    if let Some(edits) = user_recent_edits.as_deref() {
+        if let Some(block) = format_user_recent_edits_block(edits) {
+            prompt.push_str("\n\n");
+            prompt.push_str(&block);
+        }
+    }
 
     let request = HeadlessCliRequest {
         prompt,

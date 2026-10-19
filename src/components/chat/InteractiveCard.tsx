@@ -506,7 +506,7 @@ export default function InteractiveCard({
       {cardKind === "plan_mode_suggest" && suggestCountdown != null && !submitted && (
         <p className="ic-plan-countdown">
           {t("chat.planSuggestCountdown", {
-            defaultValue: "{{seconds}}s 后自动按 Agent 模式继续",
+            defaultValue: "Continuing in Agent mode in {{seconds}}s",
             seconds: suggestCountdown,
           })}
         </p>

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import CodeEditor from "./CodeEditor";
+import CodeEditor, { type EditorConflictBannerProps } from "./CodeEditor";
 import ImagePreview from "./ImagePreview";
 import MarkdownPreview from "./MarkdownPreview";
 import NotebookEditor from "../../extensions/notebook/NotebookEditor";
@@ -14,6 +14,7 @@ interface FileViewerProps {
   onChange: (value: string) => void;
   onSave?: () => void;
   onViewModeChange: (mode: TabViewMode) => void;
+  conflict?: EditorConflictBannerProps | null;
 }
 
 function HtmlPreview({ content }: { content: string }) {
@@ -35,6 +36,7 @@ export default function FileViewer({
   onChange,
   onSave,
   onViewModeChange,
+  conflict,
 }: FileViewerProps) {
   const { t } = useTranslation();
 
@@ -47,6 +49,7 @@ export default function FileViewer({
         reveal={reveal}
         onChange={onChange}
         onSave={onSave}
+        conflict={conflict}
       />
     );
   }
@@ -103,6 +106,7 @@ export default function FileViewer({
           reveal={reveal}
           onChange={onChange}
           onSave={onSave}
+          conflict={conflict}
         />
       )}
     </div>

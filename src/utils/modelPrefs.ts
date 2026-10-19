@@ -10,11 +10,21 @@ const STORAGE_KEYS: Record<ModelScope, string> = {
 const LEGACY_KEY = "agentz-model-id";
 
 export function loadScopedModelId(scope: ModelScope): string {
-  const saved = localStorage.getItem(STORAGE_KEYS[scope]);
-  if (saved != null && saved !== "") return saved;
-  return localStorage.getItem(LEGACY_KEY) ?? "";
+  try {
+    if (typeof localStorage === "undefined") return "";
+    const saved = localStorage.getItem(STORAGE_KEYS[scope]);
+    if (saved != null && saved !== "") return saved;
+    return localStorage.getItem(LEGACY_KEY) ?? "";
+  } catch {
+    return "";
+  }
 }
 
 export function saveScopedModelId(scope: ModelScope, modelId: string): void {
-  localStorage.setItem(STORAGE_KEYS[scope], modelId);
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS[scope], modelId);
+  } catch {
+    /* ignore in headless test environments */
+  }
 }

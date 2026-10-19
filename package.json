@@ -1,6 +1,6 @@
 {
   "name": "agentz",
-  "version": "0.9.19",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "build:exthost": "npm --prefix extension-host install && npm --prefix extension-host run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "vitest run e2e/agentz.spec.tsx",
     "test:scripts": "node --test scripts/upgrade-release-gate.test.mjs",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",

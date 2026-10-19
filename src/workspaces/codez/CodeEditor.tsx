@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import { themeStore, ACTIVE_EDITOR_THEME_KEY, syncEditorThemeWithAppearance } from "./themeStore";
@@ -57,6 +58,13 @@ interface InlineEditState {
   } | null;
 }
 
+export interface EditorConflictBannerProps {
+  fileName: string;
+  onViewDiff: () => void;
+  onAcceptDisk: () => void;
+  onKeepMine: () => void;
+}
+
 interface CodeEditorProps {
   tab: OpenTab;
   theme: string;
@@ -66,9 +74,11 @@ interface CodeEditorProps {
   /// When set (and matching this tab), move the cursor to line/column and
   /// reveal it. `nonce` forces re-reveal even for the same line.
   reveal?: { line: number; column: number; nonce: number } | null;
+  conflict?: EditorConflictBannerProps | null;
 }
 
-export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }: CodeEditorProps) {
+export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, conflict }: CodeEditorProps) {
+  const { t } = useTranslation();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
   const lspRef = useRef<LspProvidersRegistration | null>(null);
@@ -684,9 +694,42 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal }
 
   return (
     <div className="agentz-editor-wrap">
+      {conflict && (
+        <div className="ide-conflict-banner" role="alert" data-testid="editor-conflict-banner">
+          <span className="ide-conflict-banner-msg">
+            {t("ide.conflictBanner.message", { name: conflict.fileName })}
+          </span>
+          <div className="ide-conflict-banner-actions">
+            <button
+              type="button"
+              className="ide-conflict-btn"
+              onClick={conflict.onViewDiff}
+              data-testid="conflict-view-diff"
+            >
+              {t("ide.conflictBanner.viewDiff")}
+            </button>
+            <button
+              type="button"
+              className="ide-conflict-btn ide-conflict-btn-accept"
+              onClick={conflict.onAcceptDisk}
+              data-testid="conflict-accept-disk"
+            >
+              {t("ide.conflictBanner.acceptDisk")}
+            </button>
+            <button
+              type="button"
+              className="ide-conflict-btn ide-conflict-btn-keep"
+              onClick={conflict.onKeepMine}
+              data-testid="conflict-keep-mine"
+            >
+              {t("ide.conflictBanner.keepMine")}
+            </button>
+          </div>
+        </div>
+      )}
       {lspHealth !== "idle" && lspHealth !== "ready" && (
         <span className="agentz-lsp-health" role="status">
-          {lspHealth === "recovering" ? "语言服务恢复中…" : lspHealth === "connecting" ? "语言服务连接中…" : "语言服务不可用"}
+          {lspHealth === "recovering" ? t("ide.lspRecovering") : lspHealth === "connecting" ? t("ide.lspConnecting") : t("ide.lspUnavailable")}
         </span>
       )}
       <Editor

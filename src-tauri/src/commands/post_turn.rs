@@ -23,12 +23,15 @@ pub async fn run_post_turn_hooks(
     let Ok(global_ctx) = crate::commands::skill_evolution_ctx::SkillEvolutionCtx::open(app) else {
         return;
     };
-    let mem_client = budget.guard(llm::build_client_with_timeout(
-        &provider,
-        &api_key,
-        base_url.as_deref(),
-        90,
-    ));
+    let mem_client = budget.guard_with_source(
+        llm::build_client_with_timeout(
+            &provider,
+            &api_key,
+            base_url.as_deref(),
+            90,
+        ),
+        "background",
+    );
     crate::commands::memory_extract::auto_extract_memories(
         project_db.clone(),
         session_id.clone(),
@@ -125,12 +128,15 @@ pub async fn auto_extract_repo_notes(
          Conversation:\n{conv_excerpt}\n\nJSON output:"
     );
 
-    let client = budget.guard(llm::build_client_with_timeout(
-        &provider,
-        &api_key,
-        base_url.as_deref(),
-        60,
-    ));
+    let client = budget.guard_with_source(
+        llm::build_client_with_timeout(
+            &provider,
+            &api_key,
+            base_url.as_deref(),
+            60,
+        ),
+        "background",
+    );
     let req = llm::LlmRequest {
         messages: vec![LlmMessage {
             role: "user".into(),

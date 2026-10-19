@@ -368,6 +368,11 @@ Skills:
         warn!("curator LLM merge: completion failed");
         return Ok((0, 0));
     };
+    crate::runtime::task_budget::record_side_channel_usage(
+        "background",
+        resp.input_tokens,
+        resp.output_tokens,
+    );
     let text = resp.content;
     let json_start = text.find('{').unwrap_or(0);
     let json_end = text.rfind('}').map(|i| i + 1).unwrap_or(text.len());

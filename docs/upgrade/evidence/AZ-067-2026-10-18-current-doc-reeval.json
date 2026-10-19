@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-067",
+    "verified_state": "current_0_9_14_local_docs_consistent_native_unverified",
+    "severity": "P1",
+    "finding": "The 0.9.14 source labels and candidate documents pass the local version check. RELEASE.md now states accurately that the current publishing workflow does not invoke the local gate script after the owner-authorized version-specific waivers through 0.9.14; the prior text incorrectly described that candidate guard as active. This corrects release documentation but does not establish platform support or installer acceptance.",
+    "conclusion_proposal": "Keep pending until final support claims, extension compatibility and unified native documentation review are verified.",
+    "next_action": "Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the frozen candidate.",
+    "remaining_work": ["Extension compatibility evidence", "macOS/Linux support evidence", "Unified documentation review"],
+    "verification_gaps": ["CI workflow not dispatched for this documentation correction", "No installation, signature or cross-platform acceptance"],
+    "evidence": ["RELEASE.md", "docs/upgrade/evidence/AZ-064-2026-10-18-post-release-state.md"]
+  }
+]

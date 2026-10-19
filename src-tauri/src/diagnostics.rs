@@ -22,6 +22,14 @@ pub const REDACTED: &str = "***";
 const MAX_LOG_FILES: usize = 32;
 const MAX_LOG_BYTES: u64 = 8 * 1024 * 1024;
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct DiagnosticContextSummary {
+    pub latest_run_id: Option<String>,
+    pub latest_task_id: Option<String>,
+    pub latest_environment_id: Option<String>,
+    pub failure_count: usize,
+}
+
 #[derive(Debug, Serialize)]
 pub struct DiagnosticExportPreview {
     pub schema_version: u32,
@@ -29,6 +37,7 @@ pub struct DiagnosticExportPreview {
     pub files: Vec<DiagnosticLogFile>,
     pub total_bytes: u64,
     pub redaction_ready: bool,
+    pub context_summary: DiagnosticContextSummary,
 }
 
 #[derive(Debug, Serialize)]
@@ -55,6 +64,7 @@ struct DiagnosticManifest {
     files: Vec<DiagnosticLogFile>,
     failure_locators: Vec<DiagnosticFailureLocator>,
     locators_truncated: bool,
+    context_summary: DiagnosticContextSummary,
 }
 
 fn span_field(line: &str, key: &str) -> Option<String> {
@@ -343,12 +353,39 @@ pub fn preview_redacted_logs(
     let files = bounded_log_files(config_dir)?;
     export_secret_values(config_dir, settings)?;
     let total_bytes = files.iter().map(|(_, file)| file.bytes).sum();
+    let mut latest_run_id = None;
+    let mut latest_task_id = None;
+    let mut latest_environment_id = None;
+    let mut failure_count = 0usize;
+    for (file, info) in &files {
+        let text = read_bounded_log(file, info.bytes)?;
+        for line in text.lines() {
+            if let Some(v) = span_field(line, "run_id") {
+                latest_run_id = Some(v);
+            }
+            if let Some(v) = span_field(line, "task_id") {
+                latest_task_id = Some(v);
+            }
+            if let Some(v) = span_field(line, "environment_id") {
+                latest_environment_id = Some(v);
+            }
+            if failure_level(line).is_some() {
+                failure_count += 1;
+            }
+        }
+    }
     Ok(DiagnosticExportPreview {
         schema_version: 1,
         app_version: APP_VERSION,
         files: files.into_iter().map(|(_, file)| file).collect(),
         total_bytes,
         redaction_ready: true,
+        context_summary: DiagnosticContextSummary {
+            latest_run_id,
+            latest_task_id,
+            latest_environment_id,
+            failure_count,
+        },
     })
 }
 
@@ -359,14 +396,28 @@ pub fn export_redacted_logs(config_dir: &Path, settings: &Value) -> Result<PathB
     let mut body = String::new();
     let mut locators = Vec::new();
     let mut locators_truncated = false;
+    let mut latest_run_id = None;
+    let mut latest_task_id = None;
+    let mut latest_environment_id = None;
+    let mut failure_count = 0usize;
     for (file, info) in &files {
         let text = read_bounded_log(file, info.bytes)?;
         let redacted = redact_known_secrets(&text, &secrets);
         for (index, line) in redacted.lines().enumerate() {
+            if let Some(v) = span_field(line, "run_id") {
+                latest_run_id = Some(v);
+            }
+            if let Some(v) = span_field(line, "task_id") {
+                latest_task_id = Some(v);
+            }
+            if let Some(v) = span_field(line, "environment_id") {
+                latest_environment_id = Some(v);
+            }
             if let Some(level) = failure_level(line) {
+                failure_count += 1;
                 if locators.len() == 100 {
                     locators_truncated = true;
-                    break;
+                    continue;
                 }
                 locators.push(DiagnosticFailureLocator {
                     file: info.name.clone(),
@@ -395,6 +446,12 @@ pub fn export_redacted_logs(config_dir: &Path, settings: &Value) -> Result<PathB
             .collect(),
         failure_locators: locators,
         locators_truncated,
+        context_summary: DiagnosticContextSummary {
+            latest_run_id,
+            latest_task_id,
+            latest_environment_id,
+            failure_count,
+        },
     };
     let manifest_json =
         serde_json::to_string(&manifest).map_err(|e| format!("serialize manifest: {e}"))?;

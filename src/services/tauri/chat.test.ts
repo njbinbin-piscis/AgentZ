@@ -2,11 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
-import { chatSend } from "./chat";
+import {
+  chatSend,
+  consumeUserRecentEdits,
+  formatUserRecentEditsBlock,
+  peekUserRecentEdits,
+  recordUserRecentEdit,
+} from "./chat";
 
 beforeEach(() => {
   invoke.mockReset();
   invoke.mockResolvedValue({ ok: true, session_id: "task", response_text: "continued" });
+  consumeUserRecentEdits("fixture-project");
 });
 describe("ordinary task continuation", () => {
   it("sends continuation by default without inferring replacement", async () => {
@@ -29,5 +36,38 @@ describe("ordinary task continuation", () => {
     expect(invoke).toHaveBeenCalledWith("chat_send", expect.objectContaining({
       prompt: "continue", displayPrompt: "continue", artifactRef, artifactScopeHandle: "host-scope",
     }));
+  });
+  it("records human file saves and injects userRecentEdits into the next chatSend call", async () => {
+    const edit = recordUserRecentEdit({
+      projectDir: "fixture-project",
+      path: "src/config.ts",
+      beforeContent: "export const PORT = 3000;\n",
+      afterContent: "export const PORT = 8080;\n",
+      timestamp: "2026-10-19T12:00:00.000Z",
+    });
+    expect(edit).not.toBeNull();
+    expect(peekUserRecentEdits("fixture-project")).toHaveLength(1);
+    const block = formatUserRecentEditsBlock(peekUserRecentEdits("fixture-project"));
+    expect(block).toContain("<user_recent_edits>");
+    expect(block).toContain('path="src/config.ts"');
+    expect(block).toContain("export const PORT = 8080;");
+
+    await chatSend({
+      prompt: "start the server",
+      sessionId: "task",
+      projectDir: "fixture-project",
+    });
+    expect(invoke).toHaveBeenCalledWith(
+      "chat_send",
+      expect.objectContaining({
+        userRecentEdits: [
+          expect.objectContaining({
+            path: "src/config.ts",
+            timestamp: "2026-10-19T12:00:00.000Z",
+          }),
+        ],
+      }),
+    );
+    expect(peekUserRecentEdits("fixture-project")).toHaveLength(0);
   });
 });

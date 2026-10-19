@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import en from "./en";
 import zh from "./zh";
 
+const tsxModules = import.meta.glob("../**/*.tsx", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
 function flatten(obj: Record<string, unknown>, prefix = ""): string[] {
   return Object.entries(obj).flatMap(([key, value]) => {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -24,5 +30,20 @@ describe("i18n parity", () => {
     expect(zh.ide.expandAll).toBeTruthy();
     expect(en.ide.collapseAll).toBeTruthy();
     expect(zh.ide.collapseAll).toBeTruthy();
+  });
+
+  it("has zero hardcoded Chinese characters in production TSX files (R10-18)", () => {
+    const cjkRe = /[\u4e00-\u9fff]/;
+    const violations: string[] = [];
+    for (const [file, content] of Object.entries(tsxModules)) {
+      if (file.endsWith(".test.tsx")) continue;
+      const lines = content.split(/\r?\n/);
+      lines.forEach((line, idx) => {
+        if (cjkRe.test(line)) {
+          violations.push(`${file.replace(/^\.\.\//, "")}:${idx + 1}: ${line.trim()}`);
+        }
+      });
+    }
+    expect(violations).toEqual([]);
   });
 });

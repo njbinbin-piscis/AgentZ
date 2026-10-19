@@ -15,6 +15,7 @@ export interface AgentStep {
   text: string;
   tools: AgentToolEvent[];
   id?: string;
+  turnId?: string;
 }
 
 function pathFromToolInput(input: unknown): string | undefined {

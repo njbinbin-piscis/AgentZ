@@ -72,3 +72,39 @@ it("old save failure and read failure cannot clear a newer dirty edit", () => {
   expect(tracker.settleRead(tracker.beginRead("file")!,{kind:"error"})).toEqual({status:"unavailable",localContent:"new draft",isDirty:true});
   expect(tracker.snapshot("file")).toEqual(draft);
 });
+
+it("records conflict details on external modification and supports Keep Mine or Accept Disk resolution", () => {
+  const tracker = fixture(false);
+  tracker.edit("file", "my unsaved edit");
+  const readOp = tracker.beginRead("file", { allowDiscard: false })!;
+  const settled = tracker.settleRead(readOp, { kind: "content", content: "agent disk edit" });
+  expect(settled).toEqual({
+    status: "conflict",
+    localContent: "my unsaved edit",
+    diskContent: "agent disk edit",
+  });
+  // Buffer must NOT be overwritten when conflict is detected
+  expect(tracker.snapshot("file")?.content).toBe("my unsaved edit");
+  expect(tracker.snapshot("file")?.isDirty).toBe(true);
+  expect(tracker.getConflict("file")).toEqual({
+    path: "file",
+    localContent: "my unsaved edit",
+    diskContent: "agent disk edit",
+  });
+
+  // Resolve with Keep Mine -> clears conflict banner while keeping dirty buffer intact
+  expect(tracker.resolveConflictKeepMine("file")).toBe(true);
+  expect(tracker.getConflict("file")).toBeNull();
+  expect(tracker.snapshot("file")?.content).toBe("my unsaved edit");
+  expect(tracker.snapshot("file")?.isDirty).toBe(true);
+
+  // Trigger another external disk conflict and resolve with Accept Disk
+  tracker.recordConflict("file", "newer disk version", "sha256-abc");
+  expect(tracker.getConflict("file")?.diskContent).toBe("newer disk version");
+  const accepted = tracker.resolveConflictAcceptDisk("file");
+  expect(accepted).toEqual({ status: "applied", content: "newer disk version" });
+  expect(tracker.getConflict("file")).toBeNull();
+  expect(tracker.snapshot("file")?.content).toBe("newer disk version");
+  expect(tracker.snapshot("file")?.isDirty).toBe(false);
+});
+

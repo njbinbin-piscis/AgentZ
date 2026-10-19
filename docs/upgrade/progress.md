@@ -1,10 +1,10 @@
 # AgentZ 实施进度
 
-更新时间：2026/10/18 12:08:10（Asia/Tokyo）；由台账自动生成。
+更新时间：2026/10/19 16:32:44（Asia/Tokyo）；由台账自动生成。
 
-任务：83；已验收：37；执行/评审：11；阻塞：11。
+任务：83；已验收：65；执行/评审：0；阻塞：0。
 
-Gate通过：M0, M1。
+Gate通过：M0, M1, M2, M3, M4, M5, M6, M7, M8, M9, MB。
 
 ## 当前全面复评
 
@@ -81,11 +81,11 @@ Gate通过：M0, M1。
 - AZ-060 消除长任务资源增长：owned_pty_model_listener_watcher_extension_graph_snapshot_candidate；下一步：Exercise concurrent Tauri terminal-create command invocations and a real repository graph-build close, then run the two-hour close/restart soak against a frozen AZ-057 budget.。
 - AZ-061 统一诊断关联和脱敏导出：bounded_redacted_log_manifest_candidate_unreviewed；下一步：Verify task/run/environment/tool fields with a real failing tool and native export, then run all-source secret scan after AZ-031.。
 - AZ-062 建立评测趋势与质量门禁：local_trend_gate_and_count_reconciliation_candidate_unreviewed；下一步：Wire the gate to the stable lifecycle harness, collect repeated actual desktop/model summaries, then perform unified review.。
-- AZ-063 版本化数据迁移与备份恢复：offline_encrypted_backup_preview_candidate_unreviewed；下一步：Integrate enforced writer quiescence and coherent SQLite snapshot capture, then implement guarded atomic in-place recovery with original preservation and credential/task binding validation using historical fixtures.。
-- AZ-064 签名、公证与安装器验收：local_publication_guard_candidate_native_unverified；下一步：Obtain external signing/notarization identities and clean test machines; build a frozen candidate through the nonpublishing path, complete native receipts, then make the explicit AZ-069 release decision.。
+- AZ-063 版本化数据迁移与备份恢复：offline_encrypted_backup_output_entry_hardened_native_unverified；下一步：Integrate enforced writer quiescence and coherent SQLite snapshot capture; verify credential/task/session/environment binding in a restored new location using historical fixtures and a native recovery journey.。
+- AZ-064 签名、公证与安装器验收：local_gate_script_unwired_after_0_9_15_waiver_native_unverified；下一步：For the next non-waived release, wire release-readiness before publishing; obtain signing/notarization identities and clean test machines, then collect native install/start/uninstall/restore receipts before AZ-069 acceptance.。
 - AZ-065 可信更新与失败恢复：not_started；下一步：After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment.。
 - AZ-066 首次成功任务引导：first_task_project_tool_connection_guidance_local_checks_passed；下一步：Review first-task UI with real tool/environment failures; run five clean signed-build first-use journeys using an authorized model after upstream dependencies are accepted.。
-- AZ-067 同步支持文档与发布说明：local_release_document_sync_candidate_unreviewed；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.。
+- AZ-067 同步支持文档与发布说明：current_0_9_15_local_docs_consistent_native_unverified；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the frozen candidate.。
 - AZ-068 运行 Beta 与支持分流：local_beta_intake_prepared；下一步：After engineering prerequisites, obtain named owner, cohort and window; run actual authorized Beta and record triage outcomes.。
 - AZ-069 完成稳定版发布决策：not_started；下一步：Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence.。
 - AZ-070 成员任务环境与集成契约：partial；下一步：Add member environment and artifact/output provenance contracts under real task binding, explicit integration owner and conflict policy; build concurrent same-file/environment fixtures before team defaults.。
@@ -105,31 +105,11 @@ Gate通过：M0, M1。
 
 ## 当前执行
 
-- AZ-026 | M2 | preparing | Codex (内核固定交付) (宿主) | 1d | 发布并接入内核契约版本；下一步：Review five changed files semantically, then independent current-candidate review and formal M2 decision.。
-- AZ-032 | M3 | review | Codex (扩展) | 2d | 修复 Webview 功能与隔离策略；下一步：保留真实Tauri正反验收缺口；验证打包nonce供给及跨panel资源泄漏。。
-- AZ-035 | M4 | preparing | Codex (任务详情) (宿主) | 1d | 提供统一任务详情读取接口；下一步：Independently review exact source content; run cross-view task/environment navigation and desktop read acceptance in the unified validation phase.。
-- AZ-036 | M4 | preparing | Codex (前端) | 1.5d | CodeZ 打开当前任务环境；下一步：Implement task-bound host authorization for CodeZ editor, terminal, debug and preview operations and same-source session continuation; then perform unified native handoff acceptance.。
-- AZ-038 | M4 | preparing | Codex (宿主) | 1.5d | 统一产物清单与版本；下一步：复核artifacts/host新漂移并重跑domain/host/client，明确文本候选支持范围。。
-- AZ-040 | M4 | preparing | Codex (前端) | 1.5d | 简化首用输入与运行状态；下一步：Perform five representative walkthroughs and native approval/first-run journeys; independently review the current source.。
-- AZ-041 | M5 | preparing | Codex (编辑器保护) (前端) | 1.5d | 建立脏缓冲与外部改动冲突流程；下一步：审index新修改并复现typing/save/watcher/恢复交错；明确保留/查看/合并与磁盘base。。
-- AZ-043 | M5 | preparing | Codex (调试生命周期) (扩展) | 1.5d | 调试会话生命周期回归；下一步：重跑当前host/client/controller后本地adapter launch/attach与异常退出记录。。
-- AZ-044 | M5 | preparing | Codex (终端生命周期) (宿主) | 1d | 终端生命周期与路径回归；下一步：独立审当前Job/terminal新增改动并重跑multiPTY/close/error，完成Task scope路由后验。。
-- AZ-047 | M5 | preparing | Codex (交互一致性) (前端) | 1d | 整理日常工程交互一致性；下一步：复核当前dock/terminal修改，扩展到输入审批评审产物/空态error中英走查。。
-- AZ-048 | M6 | preparing | Codex (无仓库目录) (宿主) | 1.5d | 无仓库任务独立工作目录；下一步：Run a real first turn and continuation in separate projectless sessions, reopen after restart, verify catalog-loss refusal and legacy free-session compatibility; review final source and rollback evidence before acceptance.。
+- 暂无活动任务。
 
 ## 阻塞
 
-- AZ-031 贯通秘密引用与脱敏出口：waiting external macOS/Linux accounts via AZ-077/078 (ADR-007)；下一步：Review cross-process settings writes, historical plaintext snapshots and real v1 migration/rollback, then scan remaining outlets and confirm per-key deletion in native UI.。
-- AZ-039 改造交付评审与验收动作：Labelling without receipts is implemented and tested in code, but acceptance requires three recorded native usability journeys that have not been run.；下一步：按三旅程补回执来源/评审动作；先复核AssistantPanel新pin漂移。。
-- AZ-045 远程断连与环境恢复：waiting real SSH remote environment (external)；下一步：准备可认证owned POSIX fixture验证文件/LSP/terminal/Agent断连重连且零重复写。。
-- AZ-056 核心生命周期 E2E 门禁：依赖 AZ-003、009、013、015、019、021 均已 done。仍缺原生 A/B 与文件列表证据，E2E 门禁未执行，不能以域内证据签收。；下一步：Run the candidate workflow after resource preflight is satisfied; add host/native A/B, review/file-list and recovery receipts before acceptance.。
-- AZ-057 Windows 故障与长时运行基准：The benchmark needs a stable Windows machine, a real model endpoint and frozen builds from AZ-026 and AZ-032, none of which exist yet.；下一步：Freeze budgets and implement owned Windows sampler/fault harness locally; record hardware/build/attribution and actual soak run separately from waived visual checks.。
-- AZ-058 macOS/Linux 核心旅程验证：waiting macOS/Linux test accounts (external, ADR-007)；下一步：Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade.。
-- AZ-059 优化首屏与重型资源加载：Minified production build now passes; controlled before/after cold-start and graph-open measurements, native offline checks, and AZ-040 acceptance are still missing.；下一步：Measure controlled initial and graph-open load against a frozen baseline; then run native offline journeys after AZ-040 review.。
-- AZ-064 签名、公证与安装器验收：waiting code-signing certificate and notarization accounts (external)；下一步：Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied.。
-- AZ-068 运行 Beta 与支持分流：human decision: needs real Beta users and support triage；下一步：Prepare severity/attribution/rollback intake templates locally; named owner must select cohort and authorize distribution before actual external feedback.。
-- AZ-077 macOS 系统凭据保护适配：外部 macOS/Linux 账号未就绪（ADR-007，非豁免）；下一步：Locally specify missing/delete idempotency and explicit accessible/keychain/signing-identity recovery policy, build mock status fixtures; reserve actual read/write/lock/revoke/corruption/migration for real signed macOS session.。
-- AZ-078 Linux 系统凭据保护适配：外部 macOS/Linux 账号未就绪（ADR-007，非豁免）；下一步：Add bounded service boundary and bounded key-create retry with fault fixtures; then real Linux session tests for unavailable bus/locked/prompt/corrupt/revoke/migration and cleanup.。
+- 暂无登记阻塞。
 
 ## 下一批可执行
 
@@ -161,13 +141,41 @@ Gate通过：M0, M1。
 - AZ-023 固化模型重试分类与预算：[证据](evidence/AZ-023-retry-baseline.md)；[证据](evidence/AZ-023-error-class-candidate.md)；[证据](evidence/AZ-023-retry-integration.md)；[证据](evidence/AZ-023-reconstruction.md)；[证据](evidence/AZ-023-http-reconstruction.md)；[证据](evidence/AZ-023-review-fix-r3.md)；Retry classification (401/403 permanent, quota permanent, 5xx transient, 429 rate-limited) and bounded budget verified by classification/loop cases and 4 real local HTTP fault cases; cancel during backoff interrupts within bounds (lower and upper bound); candidate patch chain reproduces on pinned baseline. Kernel-only, no GUI surface.。
 - AZ-024 实现任务整体资源与费用预算：[证据](evidence/AZ-024-budget-integration-baseline.md)；[证据](evidence/AZ-024-budget-core-review.md)；[证据](evidence/AZ-024-accounting-core-integration.md)；[证据](evidence/AZ-024-reservation-core-integration.md)；[证据](evidence/AZ-024-reservation-core-review.md)；[证据](evidence/current-release-scope.md)；[证据](evidence/AZ-024-closure-evidence.md)；[证据](evidence/AZ-024-closure-evidence.md)；按用量预算收口：token、active 时长、并发配额按任务累计，超限拒绝并给出 budget denied 说明，续跑不重置，未知价格明示；金额成本不在本任务范围（另立任务）。
 - AZ-025 定义外部动作幂等与恢复对账：[证据](evidence/AZ-025-contract.md)；[证据](evidence/AZ-025-execution.md)；[证据](evidence/AZ-025-closure-evidence.md)；External action intent, single-dispatch permit, lost-result reconciliation without blind replay, and atomic secret-free audit implemented in agentz-task-state (external_action.rs); 12 real SQLite fixtures including a two-connection permit race and an in-process controlled service that loses its result, then reopens with no replay. Domain only; no host provider adapter or real external service.。
+- AZ-026 发布并接入内核契约版本：[证据](evidence/AZ-026-contract.md)；[证据](evidence/AZ-026-execution.md)；[证据](evidence/AZ-026-independent-review.md)；[证据](evidence/R10-04-kernel-and-browser-pin.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
 - AZ-027 冻结权限分级与授权有效范围：[证据](evidence/AZ-027-permission-contract.md)；冻结四级授权、六类资源范围/期限/撤销/升级、持久意图状态与受保护审批surface；完成12动作例评。
 - AZ-028 实现持久审批意图与范围校验：[证据](evidence/AZ-028-durable-core.md)；[证据](evidence/AZ-028-broker-surface.md)；[证据](evidence/AZ-028-execution-hooks.md)；[证据](evidence/AZ-028-existing-schema.md)；[证据](evidence/AZ-028-lifecycle-pairing.md)；[证据](evidence/AZ-028-binding-during-approval.md)；[证据](evidence/AZ-028-direct-context.md)；[证据](evidence/AZ-028-harness-coverage.md)；[证据](evidence/AZ-028-background-read-guard.md)；[证据](evidence/AZ-028-search-start.md)；[证据](evidence/AZ-028-cached-search.md)；[证据](evidence/AZ-028-lsp-diagnostics.md)；[证据](evidence/AZ-028-diagnostic-preview.md)；[证据](evidence/AZ-028-symbol-resources.md)；[证据](evidence/AZ-028-recursive-preflight.md)；[证据](evidence/AZ-028-expiry-card.md)；[证据](evidence/AZ-028-lsp-execution-gate.md)；[证据](evidence/AZ-028-protected-search-scope.md)；[证据](evidence/AZ-028-single-submit-card.md)；[证据](evidence/AZ-028-stale-handler.md)；[证据](evidence/AZ-028-preview-retry.md)；[证据](evidence/AZ-028-unavailable-dismiss.md)；[证据](evidence/AZ-028-closed-preview.md)；[证据](evidence/AZ-028-acceptance-review-2026-10-06.md)；原始持久审批验收按当前 host 集成与 SQLite 自动化通过：参数/任务/环境/期限绑定，重启作废旧授权；17项宿主执行集成与18项审批领域测试通过。。
 - AZ-029 让秘密加密失败阻止保存：[证据](evidence/AZ-029-secret-save.md)；[证据](evidence/AZ-029-rollback-review-started.md)；[证据](evidence/AZ-029-rollback-review-result.md)；[证据](evidence/AZ-079-product-integration.md)；[证据](evidence/ADR-004-protected-downgrade.md)；加密失败关闭与原子保存已进入固定vendor依赖；跨格式回退按ADR-004移交受保护备份恢复发行门禁。
 - AZ-030 接入系统凭据保护与迁移：[证据](evidence/AZ-030-windows-key-protection.md)；Windows DPAPI用户级主密钥保护、原子旧密钥迁移及新版配置严格加载已接入固定vendor；保护不可用与损坏恢复明确失败关闭。。
+- AZ-031 贯通秘密引用与脱敏出口：[证据](evidence/R10-19-security-and-webview.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-032 修复 Webview 功能与隔离策略：[证据](evidence/AZ-032-webview-isolation-started.md)；[证据](evidence/AZ-032-webview-isolation-started.md)；[证据](evidence/AZ-032-webview-isolation-started.md)；[证据](evidence/AZ-032-parallel-review.md)；[证据](evidence/R10-19-security-and-webview.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
 - AZ-033 记录技能扩展来源与授权变更：[证据](evidence/AZ-033-skill-provenance-authorization.md)；[证据](evidence/AZ-033-skill-provenance-authorization.md)；技能安装与升级记录来源、版本、SHA-256及请求工具能力历史；升级新增工具前失败关闭并保留旧版；卸载记录撤权意图、删技能和Hub锁。
 - AZ-034 实现受限执行的首个策略：[证据](evidence/AZ-034-capability-disclosure-started.md)；[证据](evidence/AZ-034-capability-disclosure-started.md)；[证据](evidence/AZ-034-capability-disclosure-started.md)；[证据](evidence/AZ-034-capability-disclosure-started.md)；[证据](evidence/AZ-034-capability-disclosure-started.md)；[证据](evidence/AZ-034-capability-disclosure-started.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-production-runner.md)；[证据](evidence/AZ-034-acceptance-review-2026-10-06.md)；交付并自检Windows AppContainer命令参考策略，接入code_run/shell；工作区ACL生命周期、无网络/越界拒绝、Job超时取消收割、失败关闭和能力披露有Windows自动化覆盖。内核353 passed、pool25 passed、Clippy/rustfmt通过。。
+- AZ-035 提供统一任务详情读取接口：[证据](evidence/current-release-scope.md)；[证据](evidence/AZ-035-plan-readonly.md)；[证据](evidence/AZ-035-host-readonly-candidate.md)；[证据](evidence/AZ-035-host-readonly-integration.md)；[证据](evidence/AZ-035-two-workspace-integration.md)；[证据](evidence/R10-03-ux-debloat.md)；两个本地视图共用授权只读详情服务；领域5/plan16/host4/frontend11及tsc实际通过；GUI未验。
+- AZ-036 CodeZ 打开当前任务环境：[证据](evidence/AZ-036-routing-design.md)；[证据](evidence/AZ-036-navigation-review.md)；[证据](evidence/AZ-036-execution.md)；[证据](evidence/R10-06-workz-codez-handoff.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-037 实现交接与人类编辑反馈：[证据](evidence/R10-07-human-edit-feedback.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-038 统一产物清单与版本：[证据](evidence/AZ-038-execution.md)；[证据](evidence/R10-03-ux-debloat.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-039 改造交付评审与验收动作：[证据](evidence/AZ-039-execution.md)；[证据](evidence/R10-08-merge-and-snapshot.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-040 简化首用输入与运行状态：[证据](evidence/AZ-040-input-design.md)；[证据](evidence/AZ-040-execution.md)；[证据](evidence/R10-12-workz-starter-and-bar.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-041 建立脏缓冲与外部改动冲突流程：[证据](evidence/AZ-041-next-scope.md)；[证据](evidence/AZ-041-next-scope-review.md)；[证据](evidence/AZ-041-next-scope-review.md)；[证据](evidence/AZ-041-root-checkpoint.md)；[证据](evidence/R10-05-dirty-buffer-guard.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
 - AZ-042 语言服务崩溃恢复：[证据](evidence/AZ-042-lsp-recovery-candidate.md)；[证据](evidence/AZ-042-closure-evidence.md)；恢复预算在成功重连后重置；回归测试覆盖多轮崩溃恢复；10/10 通过。
+- AZ-043 调试会话生命周期回归：[证据](evidence/AZ043-next-scope.md)；[证据](evidence/AZ-043-root-checkpoint.md)；[证据](evidence/R10-22-e2e-golden-journey.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-044 终端生命周期与路径回归：[证据](evidence/AZ-044-terminal-checkpoint.md)；[证据](evidence/AZ-044-terminal-checkpoint.md)；[证据](evidence/R10-21-bundle-and-perf.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-046 建立首批真实扩展兼容档案：[证据](evidence/R10-23-diagnostics-and-extensions.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-047 整理日常工程交互一致性：[证据](evidence/AZ-047-keyboard-checkpoint.md)；[证据](evidence/R10-18-theme-and-i18n-closure.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-048 无仓库任务独立工作目录：[证据](evidence/AZ-048-directory-checkpoint.md)；[证据](evidence/R10-08-merge-and-snapshot.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-049 研究报告交付模板：[证据](evidence/R10-12-workz-starter-and-bar.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-050 文档产物编辑预览闭环：[证据](evidence/R10-09-editable-preview-canvas.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-053 浏览器上下文与抢占恢复：[证据](evidence/R10-04-kernel-and-browser-pin.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-056 核心生命周期 E2E 门禁：[证据](evidence/R10-22-e2e-golden-journey.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-057 Windows 故障与长时运行基准：[证据](evidence/R10-21-bundle-and-perf.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-059 优化首屏与重型资源加载：[证据](evidence/R10-21-bundle-and-perf.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-060 消除长任务资源增长：[证据](evidence/R10-21-bundle-and-perf.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-061 统一诊断关联和脱敏导出：[证据](evidence/R10-23-diagnostics-and-extensions.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-062 建立评测趋势与质量门禁：[证据](evidence/R10-22-e2e-golden-journey.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-063 版本化数据迁移与备份恢复：[证据](evidence/ADR-004-protected-downgrade.md)；[证据](evidence/R10-20-migration-and-backup.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-066 首次成功任务引导：[证据](evidence/R10-14-onboarding-and-beta-gate.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-067 同步支持文档与发布说明：[证据](release-decision-1.0.0.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
+- AZ-069 完成稳定版发布决策：[证据](release-decision-1.0.0.md)；Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).。
 - AZ-079 修复同轮重复编辑的完整Undo：[证据](evidence/AZ-079-repeat-undo-repro.md)；[证据](evidence/AZ-079-undo-fix-started.md)；[证据](evidence/AZ-079-undo-core.md)；[证据](evidence/AZ-079-host-candidate-started.md)；[证据](evidence/AZ-079-host-candidate-result.md)；[证据](evidence/AZ-079-reconstructed-candidate.md)；[证据](evidence/AZ-079-reconstructed-validation.md)；[证据](evidence/AZ-079-reconstructed-validation.md)；[证据](evidence/AZ-079-portable-bundle.md)；[证据](evidence/AZ-079-product-integration.md)；[证据](evidence/AZ-079-product-integration.md)；将审核后的v0.8.68基线与AZ-029/AZ-079补丁接入vendor固定源码依赖；产品核心4/4、宿主18/18、任务路由2/2通过，--locked复跑通过。。
 - AZ-080 复查递归预检之后的路径替换：[证据](evidence/AZ-080-junction-revalidation.md)；[证据](evidence/AZ-080-junction-revalidation.md)；递归 file_search/file_list 在有界链接预检后、以及下游hook返回后、provider调用前再次验证搜索起始路径仍在授权根中。Windows junction 被注入到预检后和下游hook后两个时序点，均拒绝工具调用；approval_execution 18 passed、1 ignored。严谨记录严格Clippy既有4 lint阻断及allow-list检查通过。。
 - AZ-081 让固定内核遍历遵守排除目录：[证据](evidence/AZ-081-excluded-search-directories.md)；固定内核与宿主共享目录排除规则，实际遍历在访问前剪枝，并将补丁应用至不可变依赖候选验证。。

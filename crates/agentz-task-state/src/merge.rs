@@ -94,6 +94,55 @@ fn clean(root: &Path, stage: &'static str) -> Result<(), MergeError> {
     Ok(())
 }
 
+/// Auto-stage and commit any uncommitted non-runtime changes in the isolated task worktree
+/// before running merge preflight, returning the resulting task `HEAD` SHA (R10-08).
+pub fn commit_uncommitted_task_changes(
+    project: &Path,
+    task_id: &str,
+) -> Result<String, MergeError> {
+    let record = load(project, task_id)
+        .map_err(|e| error("identity", e))?
+        .ok_or_else(|| error("identity", "registered task identity is required"))?;
+    check_record(project, &record).map_err(|e| error("identity", e))?;
+    let root = Path::new(&record.workspace_root);
+    let has_dirty_tracked = !git(root, None, &["diff", "--name-only", "-z"], None)
+        .map_err(|e| error("source_commit", e))?
+        .is_empty()
+        || !git(root, None, &["diff", "--cached", "--name-only", "-z"], None)
+            .map_err(|e| error("source_commit", e))?
+            .is_empty();
+    let untracked = git(
+        root,
+        None,
+        &["ls-files", "--others", "--exclude-standard", "-z"],
+        None,
+    )
+    .map_err(|e| error("source_commit", e))?;
+    let mut untracked_sources = Vec::new();
+    for bytes in untracked.split(|b| *b == 0).filter(|b| !b.is_empty()) {
+        let path = std::str::from_utf8(bytes)
+            .map_err(|_| error("source_commit", "unsupported non-UTF8 source path"))?;
+        if ![".agentz", ".codez", ".piscis"].contains(&path.split('/').next().unwrap_or("")) {
+            untracked_sources.push(path.to_owned());
+        }
+    }
+    if has_dirty_tracked || !untracked_sources.is_empty() {
+        git(root, None, &["add", "-u"], None).map_err(|e| error("source_commit", e))?;
+        for rel in &untracked_sources {
+            git(root, None, &["add", "--", rel], None).map_err(|e| error("source_commit", e))?;
+        }
+        if !git(root, None, &["diff", "--cached", "--name-only", "-z"], None)
+            .map_err(|e| error("source_commit", e))?
+            .is_empty()
+        {
+            let msg = format!("chore(workz): finalize uncommitted changes for task {task_id}");
+            git(root, None, &["commit", "-m", &msg], None)
+                .map_err(|e| error("source_commit", e))?;
+        }
+    }
+    output(root, &["rev-parse", "--verify", "HEAD^{commit}"], "source")
+}
+
 /// expected_task_head is the commit captured with the user's reviewed change set.
 /// A commit SHA is never accepted as the destination branch. No checkout is performed.
 pub fn preview(
@@ -832,5 +881,8 @@ mod tests {
             "source_dirty"
         );
         assert_eq!(fs::read(task.join("new.txt")).unwrap(), b"uncommitted");
+        let auto_committed_head = commit_uncommitted_task_changes(&project, "a").unwrap();
+        assert_ne!(auto_committed_head, head);
+        clean(&task, "source_dirty").unwrap();
     }
 }

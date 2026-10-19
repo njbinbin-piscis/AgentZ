@@ -35,9 +35,18 @@ try {
   fs.writeFileSync(path.join(project, '.agentz', 'runs.db'), 'changed-run-marker');
   const changed = JSON.parse(execFileSync(process.execPath, [script, '--config-dir', config, '--project-dir', project], { encoding: 'utf8' }));
   assert.notEqual(changed.roots[1].files[0].sha256, report.roots[1].files[0].sha256);
+  fs.rmSync(path.join(project, '.agentz', 'runs.db-wal'));
+  const quiesced = JSON.parse(execFileSync(process.execPath, [script, '--config-dir', config, '--project-dir', project], { encoding: 'utf8' }));
+  assert.equal(quiesced.snapshot_consistent, true);
+  assert.deepEqual(quiesced.sqlite_sidecars, []);
   const overlapping = spawnSync(process.execPath, [script, '--config-dir', project, '--project-dir', project], { encoding: 'utf8' });
   assert.notEqual(overlapping.status, 0);
   assert.match(overlapping.stderr, /Overlapping inventory roots/);
+  const projectAlias = path.join(fixture, 'project-alias');
+  fs.symlinkSync(project, projectAlias, process.platform === 'win32' ? 'junction' : 'dir');
+  const aliasedOverlap = spawnSync(process.execPath, [script, '--config-dir', project, '--project-dir', projectAlias], { encoding: 'utf8' });
+  assert.notEqual(aliasedOverlap.status, 0);
+  assert.match(aliasedOverlap.stderr, /Overlapping inventory roots/);
   console.log('upgrade-data-inventory: synthetic config/key/project inventory passed');
 } finally {
   fs.rmSync(fixture, { recursive: true, force: true });

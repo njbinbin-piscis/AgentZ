@@ -101,6 +101,98 @@ export function isReadOnlyInCodeZ(source: string | null | undefined): boolean {
   return source === SESSION_SOURCE_WORKZ_TEAM;
 }
 
+// ── Human Edit Tracking (<user_recent_edits>, R10-07) ────────────────────
+
+export interface UserRecentEdit {
+  path: string;
+  timestamp: string;
+  diff_summary: string;
+}
+
+const recentEditsByScope = new Map<string, UserRecentEdit[]>();
+const MAX_RECENT_EDITS_PER_SCOPE = 10;
+
+function normalizeScopeKey(dir: string | null | undefined): string {
+  return (dir ?? "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+export function summarizeEditDiff(beforeContent: string, afterContent: string): string {
+  const beforeLines = beforeContent.split("\n");
+  const afterLines = afterContent.split("\n");
+  const beforeSet = new Set(beforeLines);
+  const afterSet = new Set(afterLines);
+  const added = afterLines.filter((l) => l.trim() && !beforeSet.has(l));
+  const removed = beforeLines.filter((l) => l.trim() && !afterSet.has(l));
+  const sample = [
+    ...removed.slice(0, 3).map((l) => `- ${l.slice(0, 120)}`),
+    ...added.slice(0, 3).map((l) => `+ ${l.slice(0, 120)}`),
+  ];
+  const header = `+${added.length} / -${removed.length} lines`;
+  return sample.length > 0 ? `${header}\n${sample.join("\n")}` : header;
+}
+
+export function recordUserRecentEdit(opts: {
+  projectDir: string | null | undefined;
+  path: string;
+  beforeContent?: string;
+  afterContent: string;
+  timestamp?: string;
+}): UserRecentEdit | null {
+  const key = normalizeScopeKey(opts.projectDir);
+  if (!key || !opts.path) return null;
+  const before = opts.beforeContent ?? "";
+  if (before === opts.afterContent && opts.beforeContent !== undefined) return null;
+  const entry: UserRecentEdit = {
+    path: opts.path.replace(/\\/g, "/"),
+    timestamp: opts.timestamp ?? new Date().toISOString(),
+    diff_summary: summarizeEditDiff(before, opts.afterContent),
+  };
+  const existing = (recentEditsByScope.get(key) ?? []).filter((e) => e.path !== entry.path);
+  existing.push(entry);
+  if (existing.length > MAX_RECENT_EDITS_PER_SCOPE) {
+    existing.splice(0, existing.length - MAX_RECENT_EDITS_PER_SCOPE);
+  }
+  recentEditsByScope.set(key, existing);
+  return entry;
+}
+
+export function peekUserRecentEdits(projectDir: string | null | undefined): UserRecentEdit[] {
+  const key = normalizeScopeKey(projectDir);
+  return key ? [...(recentEditsByScope.get(key) ?? [])] : [];
+}
+
+export function consumeUserRecentEdits(
+  projectDir: string | null | undefined,
+  workspaceDir?: string | null,
+): UserRecentEdit[] {
+  const keys = Array.from(
+    new Set([normalizeScopeKey(workspaceDir), normalizeScopeKey(projectDir)].filter(Boolean)),
+  );
+  const merged = new Map<string, UserRecentEdit>();
+  for (const k of keys) {
+    const list = recentEditsByScope.get(k) ?? [];
+    recentEditsByScope.delete(k);
+    for (const item of list) {
+      merged.set(item.path, item);
+    }
+  }
+  return [...merged.values()];
+}
+
+export function formatUserRecentEditsBlock(edits: UserRecentEdit[]): string {
+  if (!edits || edits.length === 0) return "";
+  const items = edits
+    .map(
+      (e) =>
+        `  <edit path="${e.path}" timestamp="${e.timestamp}">\n${e.diff_summary
+          .split("\n")
+          .map((l) => `    ${l}`)
+          .join("\n")}\n  </edit>`,
+    )
+    .join("\n");
+  return `<user_recent_edits>\nThe user manually edited and saved these files before this turn. Respect and preserve their changes:\n${items}\n</user_recent_edits>`;
+}
+
 /** Start one agent turn. Resolves with the final assistant text. */
 export function chatSend(args: {
   prompt: string;
@@ -136,10 +228,14 @@ export function chatSend(args: {
   poolId?: string | null;
   /** Prefer Chinese prompt/description when available. */
   preferZh?: boolean | null;
+  /** Optional explicit human edits since the last turn (auto-collected when omitted). */
+  userRecentEdits?: UserRecentEdit[] | null;
 }): Promise<ChatResult> {
   if (args.clearPlan === true) {
     return Promise.reject(new Error("clearPlan=true is deprecated; ordinary continuation preserves the plan. Explicit goal replacement is not supported by this field."));
   }
+  const recentEdits =
+    args.userRecentEdits ?? consumeUserRecentEdits(args.projectDir, args.workspaceDir);
   return invoke<ChatResult>("chat_send", {
     prompt: args.prompt,
     displayPrompt: args.displayPrompt ?? null,
@@ -162,6 +258,7 @@ export function chatSend(args: {
     teamId: args.teamId ?? null,
     poolId: args.poolId ?? null,
     preferZh: args.preferZh ?? null,
+    userRecentEdits: recentEdits.length > 0 ? recentEdits : null,
   });
 }
 

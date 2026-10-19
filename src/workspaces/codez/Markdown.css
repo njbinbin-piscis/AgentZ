@@ -181,7 +181,7 @@
 .agentz-markdown-fallback {
   margin: 0;
   padding: 8px;
-  background: #0c0c12;
+  background: var(--code-bg, #0d1117);
   border: 1px solid var(--border, #2a2a38);
   border-radius: 8px;
   overflow-x: auto;

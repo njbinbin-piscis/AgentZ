@@ -1,122 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import {
-  chatSend,
-  chatCancel,
-  onChatEvent,
-  listSessions,
-  SESSION_SOURCE_CODEZ,
-  SESSION_SOURCES_PROJECT_SHARED,
-  isReadOnlyInCodeZ,
-  getMessagesPage,
-  forkSession,
-  deleteSession,
-  restoreCheckpoint,
-  journalListChanges,
-  journalGetTurnDiffs,
-  type AgentEvent,
-  type JournalFileDiff,
-  type ChatAttachment,
-  type ChatEventEnvelope,
-  type ChatMode,
-  type MessageDto,
-  type PlanTodoItem,
-  type SessionMeta,
-} from "../../services/tauri/chat";
-import { useAppSettings, pruneModelId } from "../../hooks/useAppSettings";
-import { useStickToBottom } from "../../hooks/useStickToBottom";
-import { loadScopedModelId, saveScopedModelId } from "../../utils/modelPrefs";
-import { useInputHistory } from "../../components/useInputHistory";
-import { listInstalledSkills, type InstalledSkill } from "../../services/tauri/workbench";
-import { listAgents, type AgentInfo } from "../../services/tauri/agents";
-import { ideApi } from "../../services/tauri/ide";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
-import ChatComposer, { type ComposerMenuOption } from "../../components/ChatComposer";
-import {
-  composePromptWithChips,
-  createBrowserElementChip,
-  createFileRefChip,
-  createImageAttachmentChip,
-  createTerminalSnippetChip,
-  extractImageAttachment,
-  type ComposerChip,
-} from "../../components/composerChips";
+import { chatCancel } from "../../services/tauri/chat";
 import type { PickedElement } from "../../services/tauri/browser";
-import {
-  absPathToProjectRel,
-  blobToDataUrl,
-  dataUrlToBase64,
-  modelLabel,
-  modelDisplayLabel,
-  pickChatAttachment,
-} from "../../components/chatComposerUtils";
-import { visionCapable } from "../../components/visionUtils";
-import ContextUsageRing, { type ContextUsageSnapshot } from "../../components/ContextUsageRing";
-import { formatUserMessageDisplay } from "../../components/chatFileRefs";
-import { useSlashCompletion } from "../../hooks/useSlashCompletion";
-import AssistantMessageList from "./AssistantMessageList";
+import type { ChatAttachment } from "../../services/tauri/chat";
+import ChatComposer from "../../components/ChatComposer";
 import TaskPanel from "../../components/TaskPanel";
-import { queryTaskPlan, type DurablePlan } from "../../services/tauri/chatPlan";
-import {
-  truncateToolResultForUi,
-  upsertToolStep,
-  type ToolTraceItem,
-} from "../../components/ToolTrace";
-import type { FileNode } from "./types";
-import { useInteractiveCards } from "../../hooks/useInteractiveCards";
-import type { PermissionRequestCard } from "../../components/chat/PermissionCard";
-import {
-  chipsSnapshot,
-  composerDbg,
-  composerDbgMark,
-  promptPreview,
-} from "../../utils/composerDebug";
-import { useProjectEdgeActions } from "../../contexts/ProjectEdgeContext";
-import { useProjectScope } from "../../services/tauri/projectScope";
-import { collectArtifactsFromToolSteps, pathFromToolEvent } from "../workz/agentArtifacts";
+import ContextUsageRing from "../../components/ContextUsageRing";
+import AssistantMessageList from "./AssistantMessageList";
+import { useAssistantSession } from "./useAssistantSession";
 import "./AssistantPanel.css";
-import { isConfigured } from "../../services/tauri/settings";
-import {
-  SETTINGS_CLOSED_EVENT,
-  hasFirstTaskDone,
-  firstTaskFailureHint,
-  isLlmSetupFailure,
-  markFirstTaskDone,
-  requestOpenSettings,
-} from "./firstRun";
-import { OPEN_CODEZ_SESSION_EVENT, sameProjectPath, type OpenCodezSessionDetail } from "./sessionRoute";
-interface ChatMessage {
-  id?: string;
-  role: "user" | "assistant";
-  text: string;
-  /** Journal turn id — used to attach inline diff cards (current session only). */
-  turnId?: string;
-  /** Persisted tool calls, so history / interrupted turns keep their tool trace. */
-  tools?: ToolTraceItem[];
-}
 
-function messageFromDto(m: MessageDto): ChatMessage {
-  return {
-    id: m.id,
-    role: m.role,
-    text: m.role === "user" ? formatUserMessageDisplay(m.content) : m.content,
-    tools:
-      m.tools && m.tools.length > 0
-        ? m.tools.map(
-            (t): ToolTraceItem => ({
-              id: t.id,
-              name: t.name,
-              input: t.input,
-              result: t.result ?? undefined,
-              status: t.is_error || t.result == null ? "error" : "done",
-              textOffset: t.text_offset,
-            }),
-          )
-        : undefined,
-  };
-}
-
-interface AssistantPanelProps {
+export interface AssistantPanelProps {
   projectDir: string | null;
   onOpenFolder: () => void;
   /** External request to insert @file references into the composer. */
@@ -131,1341 +23,65 @@ interface AssistantPanelProps {
   onAttachRequestHandled?: () => void;
 }
 
-interface QueuedTurn {
-  text: string;
-  attachment: ChatAttachment | null;
-  clearPlan: false;
-  /** Bubble label when it differs from the model-facing prompt (auto-resume). */
-  displayText?: string;
-}
-
-/**
- * How many times a single user request may auto-restart after a turn timeout.
- * Bounds no-click continuation so a failing turn can never loop forever.
- */
-const MAX_AUTO_RESUMES = 6;
-
-const LAST_SESSION_KEY_PREFIX = "agentz-codez-last-session:";
-
-/** Remember which session was open so a restart can reopen it (per project). */
-function rememberLastSession(projectDir: string | null | undefined, id: string | null): void {
-  if (!projectDir) return;
-  try {
-    const key = LAST_SESSION_KEY_PREFIX + projectDir;
-    if (id) localStorage.setItem(key, id);
-    else localStorage.removeItem(key);
-  } catch {
-    // storage unavailable — restore is best-effort
-  }
-}
-
-function readLastSession(projectDir: string): string | null {
-  try {
-    return localStorage.getItem(LAST_SESSION_KEY_PREFIX + projectDir);
-  } catch {
-    return null;
-  }
-}
-/** Raw DB rows fetched per history page (newest first). */
-const HISTORY_PAGE = 120;
-
-function queuedLabels(queue: QueuedTurn[]): string[] {
-  return queue.map((q) => q.displayText ?? q.text);
-}
-
-function revokeImageChipPreviews(chips: ComposerChip[]) {
-  for (const chip of chips) {
-    if (chip.kind === "image-attachment" && chip.preview.startsWith("blob:")) {
-      URL.revokeObjectURL(chip.preview);
-    }
-  }
-}
-
-function flattenFiles(nodes: FileNode[], acc: string[] = []): string[] {
-  for (const n of nodes) {
-    if (n.is_dir) {
-      // Include the directory itself so `@folder` is selectable, then recurse.
-      acc.push(n.path.endsWith("/") ? n.path : `${n.path}/`);
-      if (n.children) flattenFiles(n.children, acc);
-    } else {
-      acc.push(n.path);
-    }
-  }
-  return acc;
-}
-
-/** Special whole-repo mention surfaced at the top of the @ menu. */
-const CODEBASE_MENTION = "codebase";
-const GRAPH_MENTION = "graph";
-
-interface MentionState {
-  query: string;
-  start: number;
-  caret: number;
-  active: number;
-}
-
-export default function AssistantPanel({
-  projectDir,
-  onOpenFolder,
-  insertRequest,
-  insertElementRequest,
-  insertTerminalRequest,
-  attachRequest,
-  onAttachRequestHandled,
-}: AssistantPanelProps) {
-  const { t, i18n } = useTranslation();
-  const artifactScope = useProjectScope(projectDir);
-  const {
-    setPendingReview,
-    setArtifacts,
-    onSelectPath,
-    setAgentTurnBusy,
-    scheduleWorkspaceRefresh,
-  } = useProjectEdgeActions();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [turnDiffsByTurnId, setTurnDiffsByTurnId] = useState<Record<string, JournalFileDiff[]>>({});
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // True when the current error is a model-setup problem (key missing/rejected); shows a Settings action.
-  const [setupError, setSetupError] = useState(false);
-  const [firstTaskDone, setFirstTaskDone] = useState(() => hasFirstTaskDone());
-  // Shown only before the first message, and only when no model key is configured.
-  // A failed check shows nothing rather than a false warning.
-  const [needsSetup, setNeedsSetup] = useState(false);
-  useEffect(() => {
-    const check = () => {
-      isConfigured()
-        .then((ok) => setNeedsSetup(!ok))
-        .catch(() => setNeedsSetup(false));
-    };
-    check();
-    window.addEventListener(SETTINGS_CLOSED_EVENT, check);
-    return () => window.removeEventListener(SETTINGS_CLOSED_EVENT, check);
-  }, []);
-  const [queuedView, setQueuedView] = useState<string[]>([]);
-  const [files, setFiles] = useState<string[]>([]);
-  const [mention, setMention] = useState<MentionState | null>(null);
-  const [sessions, setSessions] = useState<SessionMeta[]>([]);
-  // WorkZ team sessions are visible here but cannot be continued from CodeZ.
-  const [sessionReadOnly, setSessionReadOnly] = useState(false);
-  const [showSessions, setShowSessions] = useState(false);
-  const [chatMode, setChatMode] = useState<ChatMode>(() => {
-    const saved = localStorage.getItem("agentz-chat-mode");
-    return saved === "plan" ? "plan" : "agent";
-  });
-  const [modelId, setModelId] = useState(() => loadScopedModelId("codez"));
-  const { appSettings, llmProviders, defaultModelLabel, defaultModelHint } = useAppSettings();
-  const inputHistory = useInputHistory("agentz-input-history-codez");
-  const [toast, setToast] = useState<string | null>(null);
-  const [planItems, setPlanItems] = useState<PlanTodoItem[]>([]);
-  const applyPersistedPlan = useCallback((plan: DurablePlan) => {
-    setPlanItems(plan.status === "cancelled" || plan.status === "replaced" ? [] : plan.items.map((item) => ({
-      id: item.id,
-      content: item.description,
-      status: item.state === "done" ? "completed" : item.state,
-    })));
-  }, []);
-  const [toolSteps, setToolSteps] = useState<ToolTraceItem[]>([]);
-  const [taskPanelOpen, setTaskPanelOpen] = useState(false);
-  const [modeNotice, setModeNotice] = useState<string | null>(null);
-  const [contextUsage, setContextUsage] = useState<ContextUsageSnapshot | null>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [composerChips, setComposerChips] = useState<ComposerChip[]>([]);
-  const [installedSkills, setInstalledSkills] = useState<InstalledSkill[]>([]);
-  const [enabledSkills, setEnabledSkills] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem("agentz-enabled-skills");
-      return raw ? (JSON.parse(raw) as string[]) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const [activeAgent, setActiveAgent] = useState<string>(
-    () => localStorage.getItem("agentz-active-agent") ?? "",
-  );
-  const [permissionRequest, setPermissionRequest] = useState<PermissionRequestCard | null>(null);
-
-  const { pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards } =
-    useInteractiveCards();
-
-  const sessionRef = useRef<string | null>(null);
-  const busyRef = useRef(false);
-  busyRef.current = busy;
-  const streamPendingRef = useRef("");
-  /** Total chars streamed into the in-flight assistant message (incl. unflushed). */
-  const streamLenRef = useRef(0);
-  const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const flushStreamDelta = useCallback(() => {
-    const chunk = streamPendingRef.current;
-    streamPendingRef.current = "";
-    streamTimerRef.current = null;
-    if (!chunk) return;
-    setMessages((prev) => {
-      if (prev.length === 0) return prev;
-      const copy = prev.slice();
-      const last = copy[copy.length - 1];
-      if (last.role !== "assistant") return prev;
-      copy[copy.length - 1] = { ...last, text: last.text + chunk };
-      return copy;
-    });
-  }, []);
-
-  useEffect(() => {
-    setAgentTurnBusy(busy);
-    if (!busy) flushStreamDelta();
-  }, [busy, setAgentTurnBusy, flushStreamDelta]);
-
-  useEffect(
-    () => () => {
-      if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
-    },
-    [],
-  );
-  const queueRef = useRef<QueuedTurn[]>([]);
-  // Auto-resume (no-click continuation after a timeout): a bounded counter plus
-  // the localized prompt/label, kept in refs so `applyEvent` needs no new dep.
-  const autoResumeRef = useRef(0);
-  const autoResumeTextRef = useRef({ prompt: "", label: "" });
-  autoResumeTextRef.current = {
-    prompt: t("chat.autoContinuePrompt"),
-    label: t("chat.autoContinueLabel"),
-  };
-  const scrollRef = useRef<HTMLDivElement>(null);
-  /** Newest-first history cursor: raw DB rows loaded so far + whether older ones exist. */
-  const historyCursorRef = useRef({ sessionId: "", offset: 0 });
-  const [hasMoreOlder, setHasMoreOlder] = useState(false);
-  const { stickRef: stickToBottomRef } = useStickToBottom(scrollRef);
-  const taRef = useRef<HTMLTextAreaElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const { slash, slashMatches, pickSlash, slashLabel, detectSlash, handleSlashKeyDown } =
-    useSlashCompletion(setInput, taRef);
-  const runTurnRef = useRef<(turn: QueuedTurn) => Promise<void>>(async () => {});
-  /** Bumped on send/clear so in-flight paste/attach callbacks cannot re-add chips. */
-  const composerGenRef = useRef(0);
-  const handledAttachNonceRef = useRef<number | null>(null);
-  /** Session-scoped agent tool outputs (not git status). */
-  const sessionArtifactsRef = useRef<Set<string>>(new Set());
-
-  const clearSessionArtifacts = useCallback(() => {
-    sessionArtifactsRef.current = new Set();
-    setArtifacts([]);
-  }, [setArtifacts]);
-
-  useEffect(() => {
-    const paths = new Set(sessionArtifactsRef.current);
-    for (const p of collectArtifactsFromToolSteps(toolSteps)) paths.add(p);
-    setArtifacts([...paths].sort((a, b) => a.localeCompare(b)));
-  }, [toolSteps, setArtifacts]);
-
-  useEffect(() => {
-    sessionRef.current = null;
-    setSessionReadOnly(false);
-    setPermissionRequest(null);
-    historyCursorRef.current = { sessionId: "", offset: 0 };
-    setHasMoreOlder(false);
-    queueRef.current = [];
-    setQueuedView([]);
-    setMessages([]);
-    setTurnDiffsByTurnId({});
-    setSessions([]);
-    setPlanItems([]);
-    setToolSteps([]);
-    setError(null);
-    setShowSessions(false);
-    setContextUsage(null);
-    clearSessionArtifacts();
-    clearCards();
-    composerGenRef.current += 1;
-    handledAttachNonceRef.current = null;
-    setComposerChips((cur) => {
-      revokeImageChipPreviews(cur);
-      return [];
-    });
-  }, [projectDir, clearCards, clearSessionArtifacts]);
-
-  useEffect(() => {
-    setModelId((id) => pruneModelId(id, llmProviders));
-  }, [llmProviders]);
-
-  useEffect(() => {
-    listInstalledSkills()
-      .then((skills) => {
-        setInstalledSkills(skills);
-        const slugs = new Set(skills.map((s) => s.slug));
-        setEnabledSkills((cur) => cur.filter((s) => slugs.has(s)));
-      })
-      .catch(() => setInstalledSkills([]));
-    listAgents()
-      .then((list) => {
-        setAgents(list);
-        const ids = new Set(list.map((a) => a.id));
-        setActiveAgent((cur) => (cur && !ids.has(cur) ? "" : cur));
-      })
-      .catch(() => setAgents([]));
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 4500);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
-  const showToast = useCallback((msg: string) => setToast(msg), []);
-
-  useEffect(() => {
-    localStorage.setItem("agentz-chat-mode", chatMode);
-  }, [chatMode]);
-
-  useEffect(() => {
-    saveScopedModelId("codez", modelId);
-  }, [modelId]);
-
-  useEffect(() => {
-    localStorage.setItem("agentz-enabled-skills", JSON.stringify(enabledSkills));
-  }, [enabledSkills]);
-
-  useEffect(() => {
-    localStorage.setItem("agentz-active-agent", activeAgent);
-  }, [activeAgent]);
-
-  useEffect(() => {
-    if (!insertRequest?.paths.length) return;
-    composerDbg("insertRequest from explorer", {
-      nonce: insertRequest.nonce,
-      rawPaths: insertRequest.paths,
-    });
-    const newChips = insertRequest.paths.map((p) => {
-      const isDir = /[/\\]$/.test(p);
-      const rel = p.replace(/^[/\\]+/, "");
-      const path = isDir ? `${rel.replace(/[/\\]+$/, "")}/` : rel;
-      const chip = createFileRefChip(path, isDir);
-      composerDbg("insertRequest → file-ref chip", { raw: p, rel, path, isDir, chipId: chip.id });
-      return chip;
-    });
-    setComposerChips((cur) => {
-      const next = [...cur, ...newChips];
-      composerDbg("composerChips after insert", chipsSnapshot(next));
-      return next;
-    });
-    requestAnimationFrame(() => taRef.current?.focus());
-  }, [insertRequest?.nonce, insertRequest?.paths]);
-
-  useEffect(() => {
-    if (!insertElementRequest?.element) return;
-    setComposerChips((cur) => [...cur, createBrowserElementChip(insertElementRequest.element)]);
-    requestAnimationFrame(() => taRef.current?.focus());
-  }, [insertElementRequest?.nonce, insertElementRequest?.element]);
-
-  useEffect(() => {
-    if (!insertTerminalRequest?.snippetId) return;
-    const lineCount = insertTerminalRequest.text.split(/\r?\n/).length;
-    const preview = insertTerminalRequest.text.replace(/\s+/g, " ").trim().slice(0, 80);
-    setComposerChips((cur) => [
-      ...cur,
-      createTerminalSnippetChip(insertTerminalRequest.snippetId, preview, lineCount),
-    ]);
-    requestAnimationFrame(() => taRef.current?.focus());
-  }, [insertTerminalRequest?.nonce, insertTerminalRequest?.snippetId, insertTerminalRequest?.text]);
-
-  useEffect(() => {
-    if (!attachRequest?.attachment) return;
-    if (handledAttachNonceRef.current === attachRequest.nonce) return;
-    if (attachRequest.attachment.media_type.startsWith("image/")) {
-      if (!appSettings || !visionCapable(appSettings, modelId, llmProviders)) {
-        setToast(t("chat.visionRequired"));
-        return;
-      }
-    }
-    const preview =
-      attachRequest.preview ??
-      (attachRequest.attachment.data
-        ? `data:${attachRequest.attachment.media_type};base64,${attachRequest.attachment.data}`
-        : "");
-    if (!preview) return;
-    handledAttachNonceRef.current = attachRequest.nonce;
-    const gen = composerGenRef.current;
-    setComposerChips((cur) => {
-      if (gen !== composerGenRef.current) return cur;
-      revokeImageChipPreviews(cur.filter((c) => c.kind === "image-attachment"));
-      return [
-        ...cur.filter((c) => c.kind !== "image-attachment"),
-        createImageAttachmentChip(attachRequest.attachment, preview),
-      ];
-    });
-    onAttachRequestHandled?.();
-    requestAnimationFrame(() => taRef.current?.focus());
-  }, [
-    attachRequest?.nonce,
-    attachRequest,
-    appSettings,
-    modelId,
-    llmProviders,
-    onAttachRequestHandled,
-    t,
-  ]);
-
-  const clearComposer = useCallback(() => {
-    composerGenRef.current += 1;
-    setInput("");
-    setMention(null);
-    setComposerChips((cur) => {
-      revokeImageChipPreviews(cur);
-      return [];
-    });
-  }, []);
-
-  const addImageChip = useCallback((attachment: ChatAttachment, preview: string, gen?: number) => {
-    setComposerChips((cur) => {
-      if (gen !== undefined && gen !== composerGenRef.current) return cur;
-      revokeImageChipPreviews(cur.filter((c) => c.kind === "image-attachment"));
-      return [
-        ...cur.filter((c) => c.kind !== "image-attachment"),
-        createImageAttachmentChip(attachment, preview),
-      ];
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!projectDir) {
-      setFiles([]);
-      return;
-    }
-    ideApi
-      .listFiles(projectDir)
-      .then((nodes) => setFiles(flattenFiles(nodes).sort()))
-      .catch(() => setFiles([]));
-  }, [projectDir]);
-
-  const applyEvent = useCallback(
-    (env: ChatEventEnvelope) => {
-      if (env.channel === "session_title" && env.sessionId) {
-        const title = (env.payload as { title?: string }).title;
-        if (title) {
-          setSessions((prev) => {
-            const idx = prev.findIndex((s) => s.id === env.sessionId);
-            if (idx < 0) return prev;
-            const next = prev.slice();
-            next[idx] = { ...next[idx], title };
-            return next;
-          });
-        }
-        return;
-      }
-      // Terminal events must be handled even if `busy` state hasn't committed yet
-      // (React batches setState; the backend can finish before re-render).
-      if (env.channel === "agent_final") {
-        // Another conversation's turn ending must not resume or error this one.
-        if (env.sessionId && env.sessionId !== sessionRef.current) return;
-        const fin = env.payload as {
-          ok: boolean;
-          error?: string;
-          timed_out?: boolean;
-          open_todos?: number;
-        };
-        // Auto-resume: a turn-level wall-clock timeout is not a failure. Whatever
-        // was streamed is already persisted, so the turn is restarted on its own
-        // (no click). A user Stop ends the turn without `timed_out`, so this never
-        // fights an explicit cancellation.
-        const willResume = !!fin.timed_out && autoResumeRef.current < MAX_AUTO_RESUMES;
-        if (fin.ok) autoResumeRef.current = 0;
-        if (willResume) {
-          setToast(t("chat.turnTimeoutResuming"));
-        } else if (!fin.ok && fin.error) {
-          setError(
-            fin.timed_out
-              ? `${fin.error} (stopped after ${MAX_AUTO_RESUMES} automatic continuations — send a message to continue.)`
-              : fin.error,
-          );
-        }
-        if (willResume) {
-          autoResumeRef.current += 1;
-          const { prompt, label } = autoResumeTextRef.current;
-          queueRef.current.push({
-            text: prompt,
-            displayText: label,
-            attachment: null,
-            clearPlan: false,
-          });
-          setQueuedView(queuedLabels(queueRef.current));
-          composerDbg("auto-resume queued", {
-            attempt: autoResumeRef.current,
-            openTodos: fin.open_todos,
-          });
-        }
-        return;
-      }
-      if (env.channel !== "agent_event") return;
-      // The channel carries every session (WordZ, Koi members, background runs).
-      // Only this panel's conversation may touch its cards and transcript.
-      if (!env.sessionId || env.sessionId !== sessionRef.current) return;
-      const evt = env.payload as AgentEvent;
-
-      if (evt.type === "error") {
-        setError(evt.message);
-        return;
-      }
-      if (evt.type === "permission_request") {
-        setPermissionRequest({
-          requestId: evt.request_id,
-          toolName: evt.tool_name,
-          toolInput: evt.tool_input,
-          description: evt.description,
-          approval: evt.approval,
-        });
-        return;
-      }
-      // Interactive cards and terminal lifecycle events are stateful, not just
-      // visual stream deltas. They may arrive before React commits `busy=true`
-      // or after the turn has already resolved; dropping them leaves stale forms
-      // whose backend response channel no longer exists.
-      if (
-        evt.type === "interactive_ui" ||
-        evt.type === "interactive_ui_patch" ||
-        evt.type === "interactive_ui_listen" ||
-        evt.type === "done" ||
-        evt.type === "cancelled"
-      ) {
-        if (evt.type === "done" || evt.type === "cancelled") setPermissionRequest(null);
-        handleAgentEvent(evt);
-        return;
-      }
-      if (!busyRef.current) return;
-
-      switch (evt.type) {
-        case "text_delta":
-          streamPendingRef.current += evt.delta;
-          streamLenRef.current += evt.delta.length;
-          if (!streamTimerRef.current) {
-            streamTimerRef.current = setTimeout(flushStreamDelta, 80);
-          }
-          break;
-        case "tool_start":
-          setToolSteps((prev) => upsertToolStep(prev, evt, streamLenRef.current));
-          break;
-        case "tool_end": {
-          setToolSteps((prev) => {
-            const next = prev.map(
-              (step): ToolTraceItem =>
-                step.id === evt.id
-                  ? {
-                      ...step,
-                      status: evt.is_error ? "error" : "done",
-                      result: truncateToolResultForUi(evt.result),
-                    }
-                  : step,
-            );
-            const ended = next.find((step) => step.id === evt.id);
-            if (ended) {
-              const p = pathFromToolEvent(ended.name, ended.input, evt.result);
-              if (p) sessionArtifactsRef.current.add(p);
-            }
-            return next;
-          });
-          break;
-        }
-        case "plan_update":
-          setPlanItems(evt.items);
-          break;
-        case "context_usage":
-          setContextUsage({
-            estimatedInputTokens: evt.estimated_input_tokens,
-            totalInputBudget: evt.total_input_budget,
-            triggerThreshold: evt.trigger_threshold,
-            cumulativeInputTokens: evt.cumulative_input_tokens,
-            cumulativeOutputTokens: evt.cumulative_output_tokens,
-            rollingSummaryVersion: evt.rolling_summary_version,
-            autoCompactThreshold: evt.auto_compact_threshold,
-          });
-          break;
-        default:
-          handleAgentEvent(evt);
-          break;
-      }
-    },
-    [handleAgentEvent],
-  );
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let disposed = false;
-    onChatEvent(applyEvent).then((fn) => {
-      if (disposed) fn();
-      else unlisten = fn;
-    });
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, [applyEvent]);
-
-  const applyDroppedPaths = useCallback(
-    (paths: string[]) => {
-      if (!projectDir) return;
-      const chips = paths.map((abs) =>
-        createFileRefChip(absPathToProjectRel(abs, projectDir), false),
-      );
-      setComposerChips((cur) => [...cur, ...chips]);
-      taRef.current?.focus();
-    },
-    [projectDir],
-  );
-
-  // OS file drag-and-drop → file-ref chips. Tauri captures native file drops at the
-  // webview level (HTML5 ondrop never fires for files), so we subscribe to the
-  // webview drag-drop stream and only react when the pointer is over this panel.
-  useEffect(() => {
-    const pointInPanel = (x: number, y: number) => {
-      const el = panelRef.current;
-      if (!el) return false;
-      const rect = el.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      const cx = x / dpr;
-      const cy = y / dpr;
-      return cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom;
-    };
-
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    getCurrentWebview()
-      .onDragDropEvent((event) => {
-        const p = event.payload;
-        if (p.type === "over") {
-          setDragOver(pointInPanel(p.position.x, p.position.y));
-        } else if (p.type === "drop") {
-          const over = pointInPanel(p.position.x, p.position.y);
-          setDragOver(false);
-          if (over && p.paths.length > 0) {
-            applyDroppedPaths(p.paths);
-          }
-        } else {
-          setDragOver(false);
-        }
-      })
-      .then((fn) => {
-        if (cancelled) fn();
-        else unlisten = fn;
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [applyDroppedPaths]);
-
-  const removeQueued = useCallback((index: number) => {
-    queueRef.current.splice(index, 1);
-    setQueuedView(queuedLabels(queueRef.current));
-  }, []);
-
-  runTurnRef.current = async (turn: QueuedTurn) => {
-    const done = composerDbgMark("runTurn");
-    composerDbg("runTurn start", {
-      promptLen: turn.text.length,
-      promptPreview: promptPreview(turn.text),
-      hasAttachment: Boolean(turn.attachment),
-      clearPlan: turn.clearPlan,
-      sessionId: sessionRef.current,
-    });
-    setError(null);
-    setSetupError(false);
-    const displayText =
-      turn.displayText ??
-      (turn.attachment && !turn.text.trim()
-        ? `📎 ${turn.attachment.filename ?? turn.attachment.path ?? t("chat.attachment")}`
-        : turn.attachment
-          ? `${turn.text}${turn.text.trim() ? "\n" : ""}📎 ${turn.attachment.filename ?? turn.attachment.path ?? t("chat.attachment")}`
-          : turn.text);
-    composerDbg("runTurn → setMessages (user bubble)");
-    setMessages((m) => [
-      ...m,
-      { role: "user", text: displayText },
-      { role: "assistant", text: "" },
-    ]);
-    streamLenRef.current = 0;
-    setToolSteps([]);
-    // Fix the session id before the turn starts (the backend honours a
-    // client-provided id). The kernel event channel is shared by every panel
-    // and background run, so events are matched against this id from the very
-    // first event; adopting whichever session's event arrived first let other
-    // conversations' interactive cards and text leak into this one.
-    const turnSessionId = sessionRef.current ?? crypto.randomUUID();
-    sessionRef.current = turnSessionId;
-    busyRef.current = true;
-    setBusy(true);
-    try {
-      composerDbg("runTurn → chatSend invoke");
-      const res = await chatSend({
-        prompt: turn.text,
-        displayPrompt: displayText,
-        sessionId: turnSessionId,
-        projectDir: projectDir!,
-        attachment: turn.attachment,
-        chatMode,
-        modelId: modelId || null,
-        clearPlan: false,
-        enabledSkills: enabledSkills.length > 0 ? enabledSkills : null,
-        agentId: activeAgent || null,
-        sessionSource: SESSION_SOURCE_CODEZ,
-        preferZh: i18n.language.startsWith("zh"),
-      });
-      composerDbg("runTurn ← chatSend ok", {
-        sessionId: res.session_id,
-        turnId: res.turn_id,
-        responseLen: res.response_text.length,
-      });
-      sessionRef.current = res.session_id;
-      rememberLastSession(projectDir, res.session_id);
-      // A turn that completed without error is the first successful task.
-      markFirstTaskDone();
-      setFirstTaskDone(true);
-      const turnId = res.turn_id ?? undefined;
-      setMessages((m) => {
-        const copy = m.slice();
-        const last = copy[copy.length - 1];
-        if (last?.role === "assistant" && !last.text.trim()) {
-          copy[copy.length - 1] = { ...last, text: res.response_text, turnId };
-        }
-        return copy;
-      });
-      // Surface this turn's file edits in the global edge drawer + inline diff cards.
-      if (turnId && projectDir) {
-        try {
-          const [changes, diffs] = await Promise.all([
-            journalListChanges(projectDir, res.session_id, turnId),
-            journalGetTurnDiffs(projectDir, res.session_id, turnId),
-          ]);
-          setPendingReview(
-            changes.length > 0 ? { sessionId: res.session_id, turnId, changes } : null,
-          );
-          if (diffs.length > 0) {
-            setTurnDiffsByTurnId((prev) => ({ ...prev, [turnId]: diffs }));
-          }
-        } catch {
-          // journal is best-effort; ignore listing failures
-        }
-      }
-    } catch (e) {
-      const msg = String(e);
-      composerDbg("runTurn ← chatSend error", { error: promptPreview(msg, 500) });
-      if (msg.includes("402") || msg.toLowerCase().includes("insufficient_balance")) {
-        setError(t("chat.llmBalanceError"));
-        setSetupError(true);
-      } else {
-        setError(msg);
-        setSetupError(isLlmSetupFailure(msg));
-      }
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-      if (sessionRef.current && queueRef.current.length === 0) {
-        try {
-          composerDbg("runTurn → syncMessagesFromDb");
-          await syncMessagesFromDb(sessionRef.current);
-          composerDbg("runTurn ← syncMessagesFromDb ok");
-        } catch (syncErr) {
-          composerDbg("runTurn ← syncMessagesFromDb failed", String(syncErr));
-          // keep in-memory messages if reload fails
-        }
-        if (projectDir) {
-          listSessions(projectDir, SESSION_SOURCES_PROJECT_SHARED)
-            .then(setSessions)
-            .catch(() => setSessions([]));
-          scheduleWorkspaceRefresh({ git: true, fileTree: true, force: true, delayMs: 0 });
-        }
-      }
-      const next = queueRef.current.shift();
-      if (next) {
-        setQueuedView(queuedLabels(queueRef.current));
-        void runTurnRef.current(next);
-      }
-      done();
-    }
-  };
-
-  const doSend = useCallback(
-    (text: string, att: ChatAttachment | null) => {
-      if (busy) {
-        queueRef.current.push({ text, attachment: att, clearPlan: false });
-        setQueuedView(queuedLabels(queueRef.current));
-      } else {
-        void runTurnRef.current({ text, attachment: att, clearPlan: false });
-      }
-    },
-    [busy],
-  );
-
-  const submit = useCallback(() => {
-    if (sessionReadOnly) {
-      setToast(t("chat.teamSessionReadOnly"));
-      return;
-    }
-    const done = composerDbgMark("submit");
-    composerDbg("submit click", {
-      chips: chipsSnapshot(composerChips),
-      inputLen: input.length,
-      inputPreview: promptPreview(input, 120),
-      busy,
-      mentionActive: Boolean(mention),
-    });
-    const text = composePromptWithChips(composerChips, input);
-    const pendingAttachment = extractImageAttachment(composerChips);
-    composerDbg("submit composed", {
-      textLen: text.length,
-      textPreview: promptPreview(text),
-      hasImageAttachment: Boolean(pendingAttachment),
-    });
-    if (!text && !pendingAttachment) {
-      composerDbg("submit aborted: empty");
-      done();
-      return;
-    }
-    if (!projectDir) {
-      setError(t("chat.noProject"));
-      done();
-      return;
-    }
-    composerDbg("submit → clear input & chips");
-    clearComposer();
-    // A fresh user request restarts the auto-resume budget.
-    autoResumeRef.current = 0;
-
-    inputHistory.push(text);
-    composerDbg("submit → doSend");
-    // Ordinary Send always continues the task; local projection cannot authorize replacement.
-    doSend(text, pendingAttachment);
-    done();
-  }, [
-    sessionReadOnly,
-    t,
-    input,
-    composerChips,
-    projectDir,
-    doSend,
-    inputHistory,
-    busy,
-    mention,
-    clearComposer,
-  ]);
-
-  const onModeChange = useCallback(
-    (mode: ChatMode) => {
-      setChatMode(mode);
-      setModeNotice(mode === "plan" ? t("chat.modePlanHint") : t("chat.modeAgentHint"));
-      window.setTimeout(() => setModeNotice(null), 4000);
-    },
-    [t],
-  );
-
-  const onPlanBuild = useCallback(
-    (planPath: string) => {
-      onModeChange("agent");
-      const prompt = t("chat.planBuildPrompt", {
-        defaultValue: "请按照计划文件 {{path}} 逐步执行，更新计划进度并产出验收证据。",
-        path: planPath,
-      });
-      if (!busy) {
-        void runTurnRef.current({ text: prompt, attachment: null, clearPlan: false });
-      } else {
-        queueRef.current.push({ text: prompt, attachment: null, clearPlan: false });
-        setQueuedView(queuedLabels(queueRef.current));
-      }
-    },
-    [busy, t],
-  );
-
-  const refreshSessions = useCallback(() => {
-    if (!projectDir) {
-      setSessions([]);
-      return;
-    }
-    listSessions(projectDir, SESSION_SOURCES_PROJECT_SHARED)
-      .then(setSessions)
-      .catch(() => setSessions([]));
-  }, [projectDir]);
-
-  const syncMessagesFromDb = useCallback(
-    async (sessionId: string) => {
-      if (!projectDir) return;
-      // Reload at least what is already on screen (plus headroom for the rows the
-      // finished turn added) so older pages the user loaded are not thrown away.
-      const cur = historyCursorRef.current;
-      const already = cur.sessionId === sessionId ? cur.offset : 0;
-      const page = await getMessagesPage(
-        sessionId,
-        projectDir,
-        0,
-        Math.max(HISTORY_PAGE, already + 20),
-      );
-      if (sessionRef.current !== sessionId) return;
-      historyCursorRef.current = { sessionId, offset: page.next_offset };
-      setHasMoreOlder(page.has_more);
-      setMessages((prev) => {
-        const turnById = new Map<string, string>();
-        for (const m of prev) {
-          if (m.id && m.turnId) turnById.set(m.id, m.turnId);
-        }
-        return page.messages.map((dto) => {
-          const msg = messageFromDto(dto);
-          const turnId = msg.id ? turnById.get(msg.id) : undefined;
-          return turnId ? { ...msg, turnId } : msg;
-        });
-      });
-    },
-    [projectDir],
-  );
-
-  /** Prepend the next-older page. Resolves with how many messages were added. */
-  const loadOlderHistory = useCallback(async (): Promise<number> => {
-    const sessionId = sessionRef.current;
-    if (!sessionId || !projectDir) return 0;
-    const cur = historyCursorRef.current;
-    if (cur.sessionId !== sessionId) return 0;
-    const page = await getMessagesPage(sessionId, projectDir, cur.offset);
-    if (sessionRef.current !== sessionId) return 0;
-    historyCursorRef.current = { sessionId, offset: page.next_offset };
-    setHasMoreOlder(page.has_more);
-    const older = page.messages.map(messageFromDto);
-    if (older.length === 0) return 0;
-    setMessages((prev) => {
-      const have = new Set(prev.map((m) => m.id).filter(Boolean));
-      return [...older.filter((m) => !m.id || !have.has(m.id)), ...prev];
-    });
-    return older.length;
-  }, [projectDir]);
-
-  useEffect(() => {
-    if (showSessions) refreshSessions();
-  }, [showSessions, refreshSessions]);
-
-  const newSession = useCallback(() => {
-    setPermissionRequest(null);
-    sessionRef.current = null;
-    setSessionReadOnly(false);
-    rememberLastSession(projectDir, null);
-    historyCursorRef.current = { sessionId: "", offset: 0 };
-    setHasMoreOlder(false);
-    queueRef.current = [];
-    setQueuedView([]);
-    setMessages([]);
-    setTurnDiffsByTurnId({});
-    setPlanItems([]);
-    setToolSteps([]);
-    setError(null);
-    setShowSessions(false);
-    setContextUsage(null);
-    clearSessionArtifacts();
-    // A pending `chat_ui` card belongs to the turn that produced it, so a fresh
-    // session must start empty — otherwise the stale form reappears here.
-    clearCards();
-  }, [projectDir, clearSessionArtifacts, clearCards]);
-
-  const switchSession = useCallback(
-    async (id: string, source?: string) => {
-      setPermissionRequest(null);
-      try {
-        sessionRef.current = id;
-        setSessionReadOnly(isReadOnlyInCodeZ(source));
-        rememberLastSession(projectDir, id);
-        historyCursorRef.current = { sessionId: id, offset: 0 };
-        setPlanItems([]);
-        setHasMoreOlder(false);
-        setTurnDiffsByTurnId({});
-        // A restored session opens on the newest message; older ones lazy-load
-        // when the user scrolls up.
-        stickToBottomRef.current = true;
-        await syncMessagesFromDb(id);
-        if (artifactScope?.handle) {
-          void queryTaskPlan(artifactScope.handle, id)
-            .then((r) => {
-              if (sessionRef.current === id && r.current) applyPersistedPlan(r.current);
-            })
-            .catch(() => {});
-        }
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            const el = scrollRef.current;
-            if (el) el.scrollTop = el.scrollHeight;
-          }),
-        );
-        setToolSteps([]);
-        setError(null);
-        setShowSessions(false);
-        setContextUsage(null);
-        clearSessionArtifacts();
-        clearCards();
-      } catch (e) {
-        setError(String(e));
-      }
-    },
-    [projectDir, syncMessagesFromDb, clearSessionArtifacts, clearCards, artifactScope, applyPersistedPlan],
-  );
-
-  // After a restart, reopen the session that was active when the app closed.
-  const switchSessionRef = useRef(switchSession);
-  switchSessionRef.current = switchSession;
-  // WorkZ asks CodeZ to open one of the project's sessions. If the project is not current yet,
-  // hold the request and apply it when projectDir changes to the requested project.
-  const projectDirForRouteRef = useRef(projectDir);
-  projectDirForRouteRef.current = projectDir;
-  const pendingCodezOpenRef = useRef<OpenCodezSessionDetail | null>(null);
-  useEffect(() => {
-    const onOpen = (event: Event) => {
-      const detail = (event as CustomEvent<OpenCodezSessionDetail>).detail;
-      if (!detail) return;
-      if (sameProjectPath(detail.projectDir, projectDirForRouteRef.current)) {
-        void switchSessionRef.current(detail.sessionId, detail.source ?? undefined);
-      } else {
-        pendingCodezOpenRef.current = detail;
-      }
-    };
-    window.addEventListener(OPEN_CODEZ_SESSION_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_CODEZ_SESSION_EVENT, onOpen);
-  }, []);
-  useEffect(() => {
-    const pending = pendingCodezOpenRef.current;
-    if (!pending || !sameProjectPath(pending.projectDir, projectDir)) return;
-    pendingCodezOpenRef.current = null;
-    void switchSessionRef.current(pending.sessionId, pending.source ?? undefined);
-  }, [projectDir]);
-  useEffect(() => {
-    if (!projectDir || sessionRef.current || busyRef.current) return;
-    const lastId = readLastSession(projectDir);
-    if (!lastId) return;
-    let cancelled = false;
-    listSessions(projectDir, SESSION_SOURCES_PROJECT_SHARED)
-      .then((list) => {
-        if (cancelled || sessionRef.current || busyRef.current) return;
-        const restored = list.find((s) => s.id === lastId);
-        if (restored) {
-          void switchSessionRef.current(lastId, restored.source);
-        } else {
-          rememberLastSession(projectDir, null);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [projectDir]);
-
-  const forkFromCheckpoint = useCallback(
-    async (messageId: string) => {
-      if (!sessionRef.current || !projectDir || busy) return;
-      try {
-        const forked = await forkSession(sessionRef.current, projectDir!, undefined, messageId);
-        refreshSessions();
-        await switchSession(forked.id, forked.source);
-      } catch (e) {
-        setError(String(e));
-      }
-    },
-    [busy, projectDir, refreshSessions, switchSession],
-  );
-
-  const restoreToCheckpoint = useCallback(
-    async (messageId: string) => {
-      if (!sessionRef.current || !projectDir || busy) return;
-      if (!window.confirm(t("chat.checkpointRestoreConfirm"))) return;
-      // Offer to also roll back the file edits the agent applied afterwards.
-      // The file watcher reloads affected tabs + refreshes git status.
-      const restoreFiles = window.confirm(t("chat.checkpointRestoreFiles"));
-      try {
-        await restoreCheckpoint(sessionRef.current, messageId, projectDir!, restoreFiles);
-        await syncMessagesFromDb(sessionRef.current);
-        setPlanItems([]);
-        setToolSteps([]);
-        setError(null);
-      } catch (e) {
-        setError(String(e));
-      }
-    },
-    [busy, projectDir, syncMessagesFromDb, t],
-  );
-
-  const fork = useCallback(async () => {
-    if (!sessionRef.current || !projectDir) return;
-    try {
-      const forked = await forkSession(sessionRef.current, projectDir!);
-      refreshSessions();
-      await switchSession(forked.id, forked.source);
-    } catch (e) {
-      setError(String(e));
-    }
-  }, [projectDir, refreshSessions, switchSession]);
-
-  const removeSession = useCallback(
-    async (id: string) => {
-      if (!projectDir) return;
-      try {
-        await deleteSession(id, projectDir!);
-        if (sessionRef.current === id) newSession();
-        refreshSessions();
-      } catch (e) {
-        setError(String(e));
-      }
-    },
-    [projectDir, newSession, refreshSessions],
-  );
-
-  const handleAttach = useCallback(async () => {
-    if (!projectDir) return;
-    try {
-      const picked = await pickChatAttachment();
-      if (!picked) return;
-      if (picked.attachment.media_type.startsWith("image/")) {
-        if (!appSettings || !visionCapable(appSettings, modelId, llmProviders)) {
-          setToast(t("chat.visionRequired"));
-          return;
-        }
-        const preview =
-          picked.preview ??
-          (picked.attachment.data
-            ? `data:${picked.attachment.media_type};base64,${picked.attachment.data}`
-            : "");
-        if (!preview) return;
-        addImageChip(picked.attachment, preview);
-      } else if (picked.attachment.path) {
-        const rel = absPathToProjectRel(picked.attachment.path, projectDir);
-        setComposerChips((cur) => [...cur, createFileRefChip(rel, false)]);
-      }
-      taRef.current?.focus();
-    } catch (e) {
-      setError(String(e));
-    }
-  }, [projectDir, appSettings, modelId, llmProviders, addImageChip, t]);
-
-  const handlePaste = useCallback(
-    async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (const item of items) {
-        if (!item.type.startsWith("image/")) continue;
-        e.preventDefault();
-        if (!appSettings || !visionCapable(appSettings, modelId, llmProviders)) {
-          setToast(t("chat.visionRequired"));
-          return;
-        }
-        const file = item.getAsFile();
-        if (!file) return;
-        const gen = composerGenRef.current;
-        try {
-          const dataUrl = await blobToDataUrl(file);
-          if (gen !== composerGenRef.current) return;
-          const data = dataUrlToBase64(dataUrl);
-          addImageChip(
-            {
-              media_type: file.type || "image/png",
-              data,
-              filename: file.name || "paste.png",
-              path: null,
-            },
-            dataUrl,
-            gen,
-          );
-        } catch (err) {
-          setError(String(err));
-        }
-        return;
-      }
-    },
-    [appSettings, modelId, llmProviders, addImageChip, t],
-  );
-
-  const modelOptions = useMemo(() => {
-    const opts: ComposerMenuOption[] = [
-      {
-        id: "",
-        label: defaultModelLabel || t("chat.modelDefault"),
-        hint: defaultModelHint || t("chat.modelDefault"),
-      },
-    ];
-    for (const p of llmProviders) {
-      opts.push({
-        id: p.id,
-        label: modelDisplayLabel(p),
-        hint: modelLabel(p),
-      });
-    }
-    return opts;
-  }, [llmProviders, defaultModelLabel, defaultModelHint, t]);
-
-  const modeOptions = useMemo(
-    (): ComposerMenuOption[] => [
-      { id: "agent", label: t("chat.modeAgent"), hint: t("chat.modeAgentHint") },
-      { id: "plan", label: t("chat.modePlan"), hint: t("chat.modePlanHint") },
-    ],
-    [t],
-  );
-
-  const canSend = Boolean(projectDir && !sessionReadOnly && (input.trim() || composerChips.length > 0));
-
-  const onInputChange = useCallback(
-    (value: string, caret?: number) => {
-      setInput(value);
-      const pos = caret ?? value.length;
-      const before = value.slice(0, pos);
-      const m = before.match(/(?:^|\s)@([^\s]*)$/);
-      if (m) {
-        setMention({ query: m[1], start: pos - m[1].length - 1, caret: pos, active: 0 });
-      } else {
-        setMention(null);
-        detectSlash(value, caret);
-      }
-    },
-    [detectSlash],
-  );
-
-  const matches = useMemo(() => {
-    if (!mention) return [];
-    const q = mention.query.toLowerCase();
-    const out: string[] = [];
-    // Surface the whole-repo `@codebase` recall mention first.
-    if (CODEBASE_MENTION.startsWith(q)) out.push(CODEBASE_MENTION);
-    if (GRAPH_MENTION.startsWith(q)) out.push(GRAPH_MENTION);
-    for (const f of files) {
-      if (out.length >= 9) break;
-      if (f.toLowerCase().includes(q)) out.push(f);
-    }
-    return out;
-  }, [mention, files]);
-
-  const pickMention = useCallback(
-    (path: string) => {
-      if (!mention) return;
-      setInput((cur) => {
-        const next = cur.slice(0, mention.start) + "@" + path + " " + cur.slice(mention.caret);
-        const pos = mention.start + path.length + 2;
-        requestAnimationFrame(() => {
-          taRef.current?.focus();
-          taRef.current?.setSelectionRange(pos, pos);
-        });
-        return next;
-      });
-      setMention(null);
-    },
-    [mention],
-  );
-
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const ta = e.currentTarget;
-    if (handleSlashKeyDown(e)) return;
-    const mentionActive = mention && matches.length > 1 && mention.query.length > 0;
-    if (mentionActive) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setMention({ ...mention, active: (mention.active + 1) % matches.length });
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setMention({ ...mention, active: (mention.active - 1 + matches.length) % matches.length });
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        e.preventDefault();
-        pickMention(matches[mention.active]);
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setMention(null);
-        return;
-      }
-    }
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      const atStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
-      const atEnd = ta.selectionStart === input.length && ta.selectionEnd === input.length;
-      if (e.key === "ArrowUp" && !atStart) return;
-      if (e.key === "ArrowDown" && !atEnd) return;
-      const next = inputHistory.navigate(e.key === "ArrowUp" ? "up" : "down", input);
-      if (next !== null) {
-        e.preventDefault();
-        setInput(next);
-        setMention(null);
-        requestAnimationFrame(() => {
-          const el = taRef.current;
-          if (!el) return;
-          const pos = next.length;
-          el.setSelectionRange(pos, pos);
-        });
-        return;
-      }
-    }
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      submit();
-    }
-  };
-
-  // AssistantMessageList is memoized so typing does not reparse historical
-  // Markdown. Keep this prop stable; an inline callback defeats that boundary.
-  const handlePermissionResolved = useCallback(() => {
-    setPermissionRequest(null);
-  }, []);
-
-  const inputPlaceholder = !projectDir
-    ? t("chat.noProject")
-    : busy
-      ? t("chat.placeholderBusyQueue")
-      : chatMode === "plan"
-        ? t("chat.placeholderPlan")
-        : messages.length === 0
-          ? t("chat.placeholder")
-          : t("chat.placeholderFollowUp");
+export default function AssistantPanel(props: AssistantPanelProps) {
+  const { projectDir, onOpenFolder } = props;
+  const s = useAssistantSession(props);
 
   return (
-    <div className="agentz-assistant" ref={panelRef}>
+    <div className="agentz-assistant" ref={s.panelRef}>
       <div className="agentz-assistant-header">
-        <span>{t("chat.title")}</span>
+        <span>{s.t("chat.title")}</span>
         <div className="agentz-assistant-actions">
-          <ContextUsageRing usage={contextUsage} />
+          <ContextUsageRing usage={s.contextUsage} />
           <button
-            className={showSessions ? "active" : ""}
-            onClick={() => setShowSessions((v) => !v)}
-            title={t("chat.sessions")}
+            className={s.showSessions ? "active" : ""}
+            onClick={() => s.setShowSessions((v) => !v)}
+            title={s.t("chat.sessions")}
           >
             ☰
           </button>
-          <button onClick={newSession} title={t("chat.newChat")}>
+          <button onClick={s.newSession} title={s.t("chat.newChat")}>
             ＋
           </button>
-          <button onClick={() => void fork()} disabled={!sessionRef.current} title={t("chat.fork")}>
+          <button
+            onClick={() => void s.fork()}
+            disabled={!s.sessionRef.current}
+            title={s.t("chat.fork")}
+          >
             ⑂
           </button>
         </div>
       </div>
 
-      {toast && <div className="agentz-assistant-toast">{toast}</div>}
+      {s.toast && <div className="agentz-assistant-toast">{s.toast}</div>}
 
-      {dragOver && (
+      {s.dragOver && (
         <div className="agentz-assistant-dropzone">
-          <span>{t("chat.dropToAddRefs")}</span>
+          <span>{s.t("chat.dropToAddRefs")}</span>
         </div>
       )}
 
-      {showSessions && (
+      {s.showSessions && (
         <div className="agentz-session-list">
-          {sessions.length === 0 && (
-            <div className="agentz-session-empty">{t("chat.noSessions")}</div>
+          {s.sessions.length === 0 && (
+            <div className="agentz-session-empty">{s.t("chat.noSessions")}</div>
           )}
-          {sessions.map((s) => (
+          {s.sessions.map((sess) => (
             <div
-              key={s.id}
-              className={`agentz-session-row ${s.id === sessionRef.current ? "active" : ""}`}
-              onClick={() => void switchSession(s.id, s.source)}
+              key={sess.id}
+              className={`agentz-session-row ${sess.id === s.sessionRef.current ? "active" : ""}`}
+              onClick={() => void s.switchSession(sess.id, sess.source)}
             >
-              <span className="agentz-session-title">{s.title || t("chat.untitled")}</span>
-              <span className="agentz-session-count">{s.message_count}</span>
+              <span className="agentz-session-title">
+                {sess.title || s.t("chat.untitled")}
+              </span>
+              <span className="agentz-session-count">{sess.message_count}</span>
               <button
                 className="agentz-session-del"
-                title={t("chat.delete")}
+                title={s.t("chat.delete")}
                 onClick={(e) => {
                   e.stopPropagation();
-                  void removeSession(s.id);
+                  void s.removeSession(sess.id);
                 }}
               >
                 ×
@@ -1476,62 +92,84 @@ export default function AssistantPanel({
       )}
 
       <TaskPanel
-        planItems={planItems}
-        busy={busy}
-        open={taskPanelOpen}
-        onOpenChange={setTaskPanelOpen}
+        planItems={s.planItems}
+        busy={s.busy}
+        open={s.taskPanelOpen}
+        onOpenChange={s.setTaskPanelOpen}
+        onClearPlan={() => s.setPlanItems([])}
       />
 
       <AssistantMessageList
-        messages={messages}
-        toolSteps={toolSteps}
-        turnDiffsByTurnId={turnDiffsByTurnId}
-        busy={busy}
-        queuedView={queuedView}
-        onRemoveQueued={removeQueued}
-        pendingCards={pendingCards}
-        scrollRef={scrollRef}
-        hasMoreOlder={hasMoreOlder}
-        onLoadOlder={loadOlderHistory}
-        onSelectPath={onSelectPath}
-        onForkCheckpoint={forkFromCheckpoint}
-        onRestoreCheckpoint={restoreToCheckpoint}
-        onCardSubmitted={markSubmitted}
-        onCardActionSent={markActionSent}
-        onPlanModeChange={onModeChange}
-        onPlanBuild={onPlanBuild}
-        permissionRequest={permissionRequest}
-        onPermissionResolved={handlePermissionResolved}
+        messages={s.messages}
+        toolSteps={s.toolSteps}
+        turnDiffsByTurnId={s.turnDiffsByTurnId}
+        busy={s.busy}
+        queuedView={s.queuedView}
+        onRemoveQueued={s.removeQueued}
+        pendingCards={s.pendingCards}
+        scrollRef={s.scrollRef}
+        hasMoreOlder={s.hasMoreOlder}
+        onLoadOlder={s.loadOlderHistory}
+        onSelectPath={s.onSelectPath}
+        onForkCheckpoint={s.forkFromCheckpoint}
+        onRestoreCheckpoint={s.restoreToCheckpoint}
+        onUndoTurn={s.undoTurnChanges}
+        onCardSubmitted={s.markSubmitted}
+        onCardActionSent={s.markActionSent}
+        onPlanModeChange={s.onModeChange}
+        onPlanBuild={s.onPlanBuild}
+        permissionRequest={s.permissionRequest}
+        onPermissionResolved={s.handlePermissionResolved}
       />
 
-      {messages.length === 0 && needsSetup && (
+      {s.messages.length === 0 && s.needsSetup && (
         <div className="agentz-assistant-setup-hint" role="note">
-          <span>{t("chat.setupNeeded")}</span>
-          <button type="button" className="agentz-assistant-error-action" onClick={requestOpenSettings}>
-            {t("chat.firstRunOpenSettings")}
+          <span>{s.t("chat.setupNeeded")}</span>
+          <button
+            type="button"
+            className="agentz-assistant-error-action"
+            onClick={s.requestOpenSettings}
+          >
+            {s.t("chat.firstRunOpenSettings")}
           </button>
         </div>
       )}
 
-      {error && (
+      {s.error && (
         <div className="agentz-assistant-error">
-          {error}
-          {setupError && (
+          {s.error}
+          {s.setupError && (
             <>
-              <div>{t("chat.setupErrorHint")}</div>
-              <button type="button" className="agentz-assistant-error-action" onClick={requestOpenSettings}>
-                {t("chat.firstRunOpenSettings")}
+              <div>{s.t("chat.setupErrorHint")}</div>
+              <button
+                type="button"
+                className="agentz-assistant-error-action"
+                onClick={s.requestOpenSettings}
+              >
+                {s.t("chat.firstRunOpenSettings")}
               </button>
             </>
           )}
-          {!setupError && !firstTaskDone && firstTaskFailureHint(error) && (
+          {!s.setupError && !s.firstTaskDone && s.firstTaskFailureHint(s.error) && (
             <>
-              <div>{t(`chat.firstRunFailure${firstTaskFailureHint(error)}`)}</div>
-              {firstTaskFailureHint(error) === "project" && onOpenFolder && (
-                <button type="button" className="agentz-assistant-error-action" onClick={onOpenFolder}>{t("app.openFolder")}</button>
+              <div>{s.t(`chat.firstRunFailure${s.firstTaskFailureHint(s.error)}`)}</div>
+              {s.firstTaskFailureHint(s.error) === "project" && onOpenFolder && (
+                <button
+                  type="button"
+                  className="agentz-assistant-error-action"
+                  onClick={onOpenFolder}
+                >
+                  {s.t("app.openFolder")}
+                </button>
               )}
-              {firstTaskFailureHint(error) === "connection" && (
-                <button type="button" className="agentz-assistant-error-action" onClick={requestOpenSettings}>{t("chat.firstRunOpenSettings")}</button>
+              {s.firstTaskFailureHint(s.error) === "connection" && (
+                <button
+                  type="button"
+                  className="agentz-assistant-error-action"
+                  onClick={s.requestOpenSettings}
+                >
+                  {s.t("chat.firstRunOpenSettings")}
+                </button>
               )}
             </>
           )}
@@ -1539,112 +177,112 @@ export default function AssistantPanel({
       )}
 
       <ChatComposer
-        value={input}
-        onChange={onInputChange}
-        onSubmit={submit}
+        value={s.input}
+        onChange={s.onInputChange}
+        onSubmit={s.submit}
         onStop={() => void chatCancel()}
-        busy={busy}
-        placeholder={inputPlaceholder}
-        canSend={canSend}
+        busy={s.busy}
+        placeholder={s.inputPlaceholder}
+        canSend={s.canSend}
         inputDisabled={!projectDir}
-        chips={composerChips}
+        chips={s.composerChips}
         onRemoveChip={(id) =>
-          setComposerChips((cur) => {
+          s.setComposerChips((cur) => {
             const removed = cur.find((c) => c.id === id);
-            composerDbg("chip removed", {
+            s.composerDbg("chip removed", {
               id,
-              removed: removed ? chipsSnapshot([removed])[0] : null,
+              removed: removed ? s.chipsSnapshot([removed])[0] : null,
             });
             if (removed?.kind === "image-attachment" && removed.preview.startsWith("blob:")) {
               URL.revokeObjectURL(removed.preview);
             }
             const next = cur.filter((c) => c.id !== id);
-            composerDbg("composerChips after remove", chipsSnapshot(next));
+            s.composerDbg("composerChips after remove", s.chipsSnapshot(next));
             return next;
           })
         }
-        textareaRef={taRef}
-        onKeyDown={onKeyDown}
-        onPaste={(e) => void handlePaste(e)}
-        modelId={modelId}
-        modelOptions={modelOptions}
-        onModelChange={setModelId}
+        textareaRef={s.taRef}
+        onKeyDown={s.onKeyDown}
+        onPaste={(e) => void s.handlePaste(e)}
+        modelId={s.modelId}
+        modelOptions={s.modelOptions}
+        onModelChange={s.setModelId}
         attachment={null}
         attachmentPreview={null}
-        onAttach={() => void handleAttach()}
+        onAttach={() => void s.handleAttach()}
         onClearAttachment={() => {}}
-        attachTitle={t("chat.attachFile")}
-        removeAttachmentTitle={t("chat.removeAttachment")}
-        stopTitle={t("chat.stop")}
-        sendTitle={t("chat.send")}
+        attachTitle={s.t("chat.attachFile")}
+        removeAttachmentTitle={s.t("chat.removeAttachment")}
+        stopTitle={s.t("chat.stop")}
+        sendTitle={s.t("chat.send")}
         modeSelector={{
-          chatMode,
-          options: modeOptions,
-          onChange: onModeChange,
+          chatMode: s.chatMode,
+          onChange: s.onModeChange,
+          options: s.modeOptions,
         }}
         skillSelector={{
-          label: t("chat.skills"),
-          emptyHint: t("chat.skillsEmpty"),
-          selected: enabledSkills,
-          onChange: setEnabledSkills,
+          label: s.t("chat.skills"),
+          emptyHint: s.t("chat.skillsEmpty"),
+          selected: s.enabledSkills,
+          onChange: s.setEnabledSkills,
           hintPresentation: "toast",
-          onHintToast: showToast,
-          options: installedSkills.map((s) => ({
-            id: s.slug,
-            label: s.name,
+          onHintToast: s.setToast,
+          options: s.installedSkills.map((sk) => ({
+            id: sk.slug,
+            label: sk.name,
             hint:
-              i18n.language.startsWith("zh") && s.description_zh?.trim()
-                ? s.description_zh
-                : s.description,
+              s.i18n.language.startsWith("zh") && sk.description_zh?.trim()
+                ? sk.description_zh
+                : sk.description,
           })),
         }}
         agentSelector={{
-          value: activeAgent,
-          onChange: setActiveAgent,
+          value: s.activeAgent,
+          onChange: s.setActiveAgent,
           options: [
-            { id: "", label: t("chat.agentDefault") },
-            ...agents.map((a) => ({
+            { id: "", label: s.t("chat.agentDefault") },
+            ...s.agents.map((a) => ({
               id: a.id,
               label: a.icon ? `${a.icon} ${a.name}` : a.name,
               hint:
-                (i18n.language.startsWith("zh") && a.description_zh?.trim()
+                (s.i18n.language.startsWith("zh") && a.description_zh?.trim()
                   ? a.description_zh
                   : a.description) || a.role,
             })),
           ],
         }}
-        modeNotice={modeNotice}
+        modeNotice={s.modeNotice}
         mentionPopup={
-          slash && slashMatches.length > 0 ? (
+          s.slash && s.slashMatches.length > 0 ? (
             <div className="agentz-mention-popup">
-              {slashMatches.map((cmd, i) => (
+              {s.slashMatches.map((cmd, i) => (
                 <div
                   key={cmd.id}
-                  className={`agentz-mention-item ${i === slash.active ? "active" : ""}`}
+                  className={`agentz-mention-item ${i === s.slash!.active ? "active" : ""}`}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    pickSlash(cmd);
+                    s.pickSlash(cmd);
                   }}
                 >
-                  {slashLabel(cmd)}
+                  {s.slashLabel(cmd)}
                 </div>
               ))}
             </div>
-          ) : mention && matches.length > 0 ? (
+          ) : s.mention && s.matches.length > 0 ? (
             <div className="agentz-mention-popup">
-              {matches.map((f, i) => (
+              {s.matches.map((f, i) => (
                 <div
                   key={f}
-                  className={`agentz-mention-item ${i === mention.active ? "active" : ""}`}
+                  className={`agentz-mention-item ${i === s.mention!.active ? "active" : ""}`}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    pickMention(f);
+                    s.pickMention(f);
                   }}
                 >
-                  {f === CODEBASE_MENTION
-                    ? `codebase · ${t("chat.mentionCodebase")}`
-                    : f === GRAPH_MENTION
-                      ? `graph · ${t("chat.mentionGraph")}`
+                  {f === s.CODEBASE_MENTION
+                    ? `codebase · ${s.t("chat.mentionCodebase")}`
+                    : f === s.GRAPH_MENTION
+                      ? `graph · ${s.t("chat.mentionGraph")}`
                       : f}
                 </div>
               ))}

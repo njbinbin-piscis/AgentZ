@@ -15,6 +15,12 @@ export type ReadSettlement = { status: "stale" }
   | { status: "deleted"; localContent: string; preserveBuffer: boolean }
   | { status: "unavailable"; localContent: string; isDirty: boolean };
 export type SaveSettlement = { status: "stale" | "saved" | "failed" };
+export interface DiskConflictInfo {
+  path: string;
+  localContent: string;
+  diskContent: string;
+  sha256?: string | null;
+}
 interface Tab extends EditorSnapshot { readGeneration: number; saveGeneration: number }
 function next(value: number): number {
   if (!Number.isSafeInteger(value) || value < 0 || value === Number.MAX_SAFE_INTEGER) throw new Error("Editor identity exhausted");
@@ -30,16 +36,40 @@ export class EditorConflictTracker {
   private scopeGeneration = 0;
   private tabGeneration = 0;
   private tabs = new Map<string, Tab>();
+  private conflicts = new Map<string, DiskConflictInfo>();
   setScope(project: string | null): void {
-    this.scopeGeneration = next(this.scopeGeneration); this.project = project; this.tabs.clear();
+    this.scopeGeneration = next(this.scopeGeneration); this.project = project; this.tabs.clear(); this.conflicts.clear();
   }
   open(path: string, content: string, isDirty = false): EditorSnapshot {
     if (!this.project || !path) throw new Error("Live project/tab identity required");
     this.tabGeneration = next(this.tabGeneration);
+    this.conflicts.delete(path);
     this.tabs.set(path, { project: this.project, path, content, isDirty, scopeGeneration: this.scopeGeneration, tabIdentity: this.tabGeneration, localRevision: 0, readGeneration: 0, saveGeneration: 0 });
     return this.snapshot(path)!;
   }
-  close(path: string): void { this.tabs.delete(path); }
+  close(path: string): void { this.tabs.delete(path); this.conflicts.delete(path); }
+  getConflict(path: string): DiskConflictInfo | null {
+    return this.conflicts.get(path) ?? null;
+  }
+  recordConflict(path: string, diskContent: string, sha256?: string | null): DiskConflictInfo | null {
+    const tab = this.tabs.get(path);
+    if (!tab) return null;
+    const info: DiskConflictInfo = { path, localContent: tab.content, diskContent, sha256 };
+    this.conflicts.set(path, info);
+    return info;
+  }
+  resolveConflictKeepMine(path: string): boolean {
+    return this.conflicts.delete(path);
+  }
+  resolveConflictAcceptDisk(path: string, diskContentOverride?: string): ReadSettlement {
+    const conflict = this.conflicts.get(path);
+    const nextDisk = diskContentOverride ?? conflict?.diskContent;
+    if (nextDisk === undefined) return { status: "stale" };
+    const captured = this.beginRead(path, { allowDiscard: true });
+    if (!captured) return { status: "stale" };
+    this.conflicts.delete(path);
+    return this.settleRead(captured, { kind: "content", content: nextDisk });
+  }
   snapshot(path: string): EditorSnapshot | null {
     const tab = this.tabs.get(path); if (!tab) return null;
     const { project, path: p, content, isDirty, scopeGeneration, tabIdentity, localRevision } = tab;
@@ -73,8 +103,13 @@ export class EditorConflictTracker {
     const generation = next(tab.readGeneration);
     if (result.kind === "error") { tab.readGeneration = generation; return { status: "unavailable", localContent: tab.content, isDirty: tab.isDirty }; }
     if (result.kind === "deleted") { tab.readGeneration = generation; return { status: "deleted", localContent: tab.content, preserveBuffer: tab.isDirty }; }
-    if (tab.isDirty && !captured.allowDiscard) { tab.readGeneration = generation; return { status: "conflict", localContent: tab.content, diskContent: result.content }; }
+    if (tab.isDirty && !captured.allowDiscard) {
+      tab.readGeneration = generation;
+      this.conflicts.set(captured.path, { path: captured.path, localContent: tab.content, diskContent: result.content });
+      return { status: "conflict", localContent: tab.content, diskContent: result.content };
+    }
     const revision = next(tab.localRevision); tab.readGeneration = generation; tab.localRevision = revision; tab.content = result.content; tab.isDirty = false;
+    this.conflicts.delete(captured.path);
     return { status: "applied", content: result.content };
   }
   settleSave(captured: CapturedOperation, succeeded: boolean): SaveSettlement {
@@ -83,6 +118,7 @@ export class EditorConflictTracker {
     if (!succeeded) { tab.saveGeneration = generation; return { status: "failed" }; }
     const revision = next(tab.localRevision); const readGeneration = next(tab.readGeneration);
     tab.saveGeneration = generation; tab.localRevision = revision; tab.readGeneration = readGeneration; tab.isDirty = false;
+    this.conflicts.delete(captured.path);
     return { status: "saved" };
   }
 }

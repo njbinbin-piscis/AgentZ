@@ -78,6 +78,7 @@ import { debugController } from "./extensions/debug/debugController";
 import { ProjectEdgeProvider } from "./contexts/ProjectEdgeContext";
 import ProjectEdgeShell from "./components/ProjectEdgeShell";
 import NotificationInbox from "./components/NotificationInbox";
+import OnboardingModal, { isOnboardingDone } from "./components/OnboardingModal";
 import { composerDbg } from "./utils/composerDebug";
 import "./App.css";
 
@@ -110,6 +111,14 @@ export default function App() {
   const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
   const [projectDir, setProjectDir] = useState<string | null>(null);
   const [inboxTaskRoute, setInboxTaskRoute] = useState<{ projectDir: string; taskId: string; nonce: number } | null>(null);
+  const [codezTaskBinding, setCodezTaskBinding] = useState<{
+    taskId: string;
+    worktreePath: string;
+    originProjectDir: string;
+  } | null>(null);
+  useEffect(() => {
+    setCodezTaskBinding(null);
+  }, [projectDir]);
   const projectNavigationBusy = useRef(false);
   const currentProjectRef = useRef(projectDir);
   currentProjectRef.current = projectDir;
@@ -179,6 +188,8 @@ export default function App() {
     layout: LayoutSnapshot;
   } | null>(null);
   const [workspaceReady, setWorkspaceReady] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [hasConfiguredModel, setHasConfiguredModel] = useState(false);
 
   const editorPatchRef = useRef<EditorSnapshot>({
     open_paths: [],
@@ -349,6 +360,14 @@ export default function App() {
         .then((s) => {
           if (s.language === "zh" || s.language === "en") {
             setLanguage(s.language);
+          }
+          const configured = Boolean(
+            s.is_configured ||
+              (s.secret_references && s.secret_references.some((r) => r.exists)),
+          );
+          setHasConfiguredModel(configured);
+          if (!isOnboardingDone() && !configured) {
+            setOnboardingOpen(true);
           }
         })
         .catch(() => {
@@ -531,6 +550,23 @@ export default function App() {
       setMode("codez");
     },
     [switchProject],
+  );
+
+  const openTaskWorktreeInCodeZ = useCallback(
+    (opts: { taskId: string; worktreePath: string; filePath?: string | null }) => {
+      const origin = projectDir || opts.worktreePath;
+      setCodezTaskBinding({
+        taskId: opts.taskId,
+        worktreePath: opts.worktreePath,
+        originProjectDir: origin,
+      });
+      setMode("codez");
+      if (opts.filePath) {
+        const cleanRel = opts.filePath.replace(/^[\\/]+/, "");
+        setIdeWikiOpenPath({ path: cleanRel, nonce: Date.now() });
+      }
+    },
+    [projectDir],
   );
 
   const openRecentProject = useCallback(
@@ -1139,8 +1175,34 @@ export default function App() {
         <div className="agentz-pane" hidden={mode !== "codez"}>
           <div className="agentz-ide-split">
             <div className="agentz-ide-main">
+              {codezTaskBinding && (
+                <div className="agentz-worktree-handoff-bar" data-testid="worktree-handoff-bar">
+                  <span className="agentz-worktree-handoff-label">
+                    {t("agent.handoffBanner", {
+                      id: codezTaskBinding.taskId.slice(0, 8),
+                      path: codezTaskBinding.worktreePath,
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    className="agentz-worktree-handoff-return"
+                    data-testid="worktree-handoff-return"
+                    onClick={() => {
+                      const origin = codezTaskBinding.originProjectDir;
+                      const taskId = codezTaskBinding.taskId;
+                      setCodezTaskBinding(null);
+                      setMode("workz");
+                      if (origin && taskId) {
+                        setInboxTaskRoute({ projectDir: origin, taskId, nonce: Date.now() });
+                      }
+                    }}
+                  >
+                    {t("agent.returnToWorkZ")}
+                  </button>
+                </div>
+              )}
               <CodeZWorkspace
-                projectDir={projectDir}
+                projectDir={codezTaskBinding?.worktreePath ?? projectDir}
                 onOpenFolder={pickFolder}
                 recentProjects={recentProjects}
                 onOpenRecentProject={(dir) => void openRecentProject(dir)}
@@ -1169,7 +1231,7 @@ export default function App() {
                 discards the active session — only show/hide. */}
             <div className="agentz-ide-chat" style={{ width: chatWidth }} hidden={!chatOpen}>
               <IdeSidePanel
-                projectDir={projectDir}
+                projectDir={codezTaskBinding?.worktreePath ?? projectDir}
                 onOpenFolder={pickFolder}
                 insertRequest={chatInsert}
                 insertElementRequest={chatInsertElement}
@@ -1186,6 +1248,7 @@ export default function App() {
             openTaskRequest={inboxTaskRoute}
             onOpenFolder={pickFolder}
             onOpenProjectInCodeZ={(dir) => void openProjectInCodeZ(dir)}
+            onOpenTaskWorktreeInCodeZ={openTaskWorktreeInCodeZ}
             wikiBuildNonce={wikiBuildNonce}
             wikiBuildAction={wikiBuildAction}
             onWikiBusyChange={setWikiBusy}
@@ -1225,6 +1288,15 @@ export default function App() {
           onSkip={() => setTemplateProjectDir(null)}
         />
       )}
+      <OnboardingModal
+        open={onboardingOpen}
+        hasConfiguredModel={hasConfiguredModel}
+        currentMode={mode}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onSelectMode={(nextMode) => setMode(nextMode)}
+        onFinish={() => setOnboardingOpen(false)}
+        onDismiss={() => setOnboardingOpen(false)}
+      />
 
       {/* Project-scoped extension host — must live outside CodeZ/WorkZ panes so
           workspace auto-restore always boots extensions (not only after manual

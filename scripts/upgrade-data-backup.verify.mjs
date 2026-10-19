@@ -25,7 +25,7 @@ function treeHash(dir) {
   return hash.digest('hex');
 }
 // Copy a bundle and re-encrypt its manifest and/or header with mutated fields (synthetic version fixtures).
-function forgeBundle(source, target, { header: headerMutation = {}, manifest: manifestMutation = {} }) {
+function forgeBundle(source, target, { header: headerMutation = {}, manifest: manifestMutation = {}, transformManifest } = {}) {
   fs.cpSync(source, target, { recursive: true });
   const headerPath = path.join(target, 'header.json');
   const header = JSON.parse(fs.readFileSync(headerPath, 'utf8'));
@@ -36,6 +36,7 @@ function forgeBundle(source, target, { header: headerMutation = {}, manifest: ma
   decipher.setAuthTag(Buffer.from(header.manifest_tag, 'hex'));
   const manifest = JSON.parse(Buffer.concat([decipher.update(fs.readFileSync(manifestPath)), decipher.final()]).toString('utf8'));
   Object.assign(manifest, manifestMutation);
+  if (transformManifest) transformManifest(manifest);
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   cipher.setAAD(Buffer.from('agentz-manifest-v1'));
@@ -58,17 +59,44 @@ try {
   const nested = run(['create', '--config-dir', config, '--project-dir', project, '--output', path.join(config, 'nested-bundle'), '--quiesced', 'true']);
   assert.notEqual(nested.status, 0);
   assert.equal(fs.existsSync(path.join(config, 'nested-bundle')), false);
+  const configAlias = path.join(fixture, 'config-alias');
+  fs.symlinkSync(config, configAlias, process.platform === 'win32' ? 'junction' : 'dir');
+  const aliasedCreate = run(['create', '--config-dir', config, '--project-dir', project, '--output', path.join(configAlias, 'aliased-bundle'), '--quiesced', 'true']);
+  assert.notEqual(aliasedCreate.status, 0, 'aliased source parent must not receive a bundle');
+  assert.equal(fs.existsSync(path.join(config, 'aliased-bundle')), false);
+  const occupiedBundle = path.join(fixture, 'occupied-bundle');
+  fs.symlinkSync(path.join(fixture, 'missing-target'), occupiedBundle, process.platform === 'win32' ? 'junction' : 'dir');
+  const occupiedCreate = run(['create', '--config-dir', config, '--project-dir', project, '--output', occupiedBundle, '--quiesced', 'true']);
+  assert.notEqual(occupiedCreate.status, 0, 'a dangling output link must remain occupied');
+  assert.match(occupiedCreate.stderr, /Output already exists/);
+  assert.ok(fs.lstatSync(occupiedBundle).isSymbolicLink());
   const create = run(['create', '--config-dir', config, '--project-dir', project, '--output', bundle, '--quiesced', 'true']);
   assert.equal(create.status, 0, create.stderr);
-  assert.equal(JSON.parse(create.stdout).snapshot_consistent, false);
+  assert.equal(JSON.parse(create.stdout).snapshot_consistent, true);
+  // Active SQLite WAL sidecar must be rejected before creating a bundle (writer quiescence enforcement).
+  fs.writeFileSync(path.join(project, '.agentz', 'runs.db-wal'), 'uncheckpointed-wal');
+  const walRejected = run(['create', '--config-dir', config, '--project-dir', project, '--output', path.join(fixture, 'wal-bundle'), '--quiesced', 'true']);
+  assert.notEqual(walRejected.status, 0, 'active WAL sidecar must be rejected');
+  assert.match(walRejected.stderr, /Active SQLite sidecar files detected/);
+  fs.rmSync(path.join(project, '.agentz', 'runs.db-wal'));
   assert.ok(!fs.readFileSync(path.join(bundle, 'manifest.bin'), 'utf8').includes('secret-marker'));
   assert.equal(run(['verify', '--bundle', bundle]).status, 0);
   assert.notEqual(run(['verify', '--bundle', bundle], 'wrong-passphrase\n').status, 0);
+  const oversizedSecret = run(['verify', '--bundle', bundle], 'x'.repeat(4097));
+  assert.notEqual(oversizedSecret.status, 0);
+  assert.match(oversizedSecret.stderr, /Passphrase must be 12\.\.4096 bytes/);
   const wrongBinding = run(['restore-preview', '--bundle', bundle, '--config-dir', project, '--project-dir', project, '--output', restored]);
   assert.notEqual(wrongBinding.status, 0);
   assert.equal(fs.existsSync(restored), false);
   const restore = run(['restore-preview', '--bundle', bundle, '--config-dir', config, '--project-dir', project, '--output', restored]);
   assert.equal(restore.status, 0, restore.stderr);
+  const aliasedRestore = run(['restore-preview', '--bundle', bundle, '--config-dir', config, '--project-dir', project, '--output', path.join(configAlias, 'aliased-restore')]);
+  assert.notEqual(aliasedRestore.status, 0, 'aliased source parent must not receive restored data');
+  assert.equal(fs.existsSync(path.join(config, 'aliased-restore')), false);
+  const occupiedRestore = run(['restore-preview', '--bundle', bundle, '--config-dir', config, '--project-dir', project, '--output', occupiedBundle]);
+  assert.notEqual(occupiedRestore.status, 0, 'restore must not replace a dangling output link');
+  assert.match(occupiedRestore.stderr, /Output already exists/);
+  assert.ok(fs.lstatSync(occupiedBundle).isSymbolicLink());
   assert.equal(fs.readFileSync(path.join(restored, 'global-config', '.secret_key'), 'utf8'), 'secret-marker-key');
   assert.equal(fs.readFileSync(path.join(restored, 'project-1', 'runs.db'), 'utf8'), 'secret-marker-run');
   assert.notEqual(run(['restore-preview', '--bundle', bundle, '--config-dir', config, '--project-dir', project, '--output', restored]).status, 0);
@@ -97,6 +125,18 @@ try {
   const collisionPreview = path.join(fixture, 'case-collision-preview');
   assert.notEqual(run(['restore-preview', '--bundle', caseBundle, '--config-dir', config, '--project-dir', project, '--output', collisionPreview]).status, 0);
   assert.equal(fs.existsSync(collisionPreview), false);
+  const ancestorBundle = forgeBundle(bundle, path.join(fixture, 'ancestor-collision-bundle'), {
+    transformManifest: value => {
+      const original = value.roots[0].files.find(file => file.path === 'config.json');
+      value.roots[0].files.push({ ...original, path: 'CONFIG.JSON/nested', object: '999999.bin' });
+    },
+  });
+  const ancestorVerify = run(['verify', '--bundle', ancestorBundle]);
+  assert.notEqual(ancestorVerify.status, 0);
+  assert.match(ancestorVerify.stderr, /Invalid manifest file/);
+  const ancestorPreview = path.join(fixture, 'ancestor-collision-preview');
+  assert.notEqual(run(['restore-preview', '--bundle', ancestorBundle, '--config-dir', config, '--project-dir', project, '--output', ancestorPreview]).status, 0);
+  assert.equal(fs.existsSync(ancestorPreview), false);
   const extraBundle = path.join(fixture, 'extra-object-bundle');
   fs.cpSync(bundle, extraBundle, { recursive: true });
   fs.writeFileSync(path.join(extraBundle, 'objects', 'unlisted.bin'), 'unlisted marker');

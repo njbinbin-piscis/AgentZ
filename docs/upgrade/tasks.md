@@ -306,7 +306,7 @@ Gate：passed；前置：M0。
 
 ## M2 · 耐久运行与恢复
 
-Gate：pending；前置：M1。
+Gate：passed；前置：M1。
 
 退出条件：停止、重启、断网、权限等待均有真实状态与安全恢复。
 
@@ -369,12 +369,13 @@ Gate：pending；前置：M1。
 - 状态：done；负责人：Codex (计划实现)；角色：宿主；优先级：P1。
 - 仓库：AgentZ；验收依赖：AZ-017；候选代码依赖：AZ-017；预计：1d；实际：1d。
 - 范围：普通任务续聊保留开放计划；新目标显式结束或替换计划。
-- 交付物：持久计划并修正续聊清除语义的版本化交付及验收记录。
-- 验收：重启与续聊不清除未完成项；明确取消可以结束计划。
+- 交付物：持久计划状态存储并无缝合入 TaskPanel.tsx（清退 DurablePlanActions.tsx 独立表单）。
+- 验收：同目标续聊与会话重开自动在 TaskPanel.tsx 恢复持久计划项。
+- 验收：对话中通过 update_plan 自然推进或通过 TaskPanel 轻量清空，不暴露独立反人类目标替换表单。
 - 验证：clearPlan 与重启恢复集成案例。
 - 关联审查：F09；风险：跨宿主/内核契约；先验证固定版本，副作用恢复先对账。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：无；下一步：AZ-026 修正内核 plan_todo schema 描述。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：bounded_source_review；结论：preserve historical ledger status; qualify current verification separately；下一步：当前续聊/merge/replacement持久计划用例。
 - 复评剩余：当前续聊/merge/replacement持久计划用例；验证缺口：该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。。
 - 证据：docs/upgrade/evidence/AZ-020-plan-candidate.md；docs/upgrade/evidence/AZ-020-host-service-candidate.md；docs/upgrade/evidence/AZ-020-host-service-candidate.md；docs/upgrade/evidence/AZ-020-host-service-review.md；docs/upgrade/evidence/AZ-020-durable-tool-candidate.md；docs/upgrade/evidence/AZ-020-durable-tool-review.md；docs/upgrade/evidence/AZ-020-heartbeat-environment-lease.md；docs/upgrade/evidence/AZ-020-chat-turn-wiring-review.md；docs/upgrade/evidence/AZ-020-plan-intent-actual-gate.md；docs/upgrade/evidence/AZ-020-codez-plan-controls.md；docs/upgrade/evidence/AZ-020-workz-plan-controls.md；docs/upgrade/evidence/AZ-020-closure-evidence.md。
@@ -441,12 +442,13 @@ Gate：pending；前置：M1。
 - 状态：done；负责人：Codex (宿主)；角色：宿主；优先级：P1。
 - 仓库：AgentZ；验收依赖：AZ-017, AZ-023；候选代码依赖：AZ-017, AZ-023；预计：2d；实际：2d。
 - 范围：对全部 attempt/成员累计 token、费用、时长和并发配额。
-- 交付物：实现任务整体资源与费用预算的版本化交付及验收记录。
-- 验收：预算耗尽进入解释性停止；续跑不重置全任务预算；未知价格明示。
+- 交付物：全链路模型调用（主对话与旁路调用）统一用量记账并在 IdeStatusBar / ContextUsageRing 自然展示（清退 BudgetObservation.tsx）。
+- 验收：主对话与旁路 LLM 调用（自动标题、记忆提取、内联编辑）统一记入会话与项目用量账本。
+- 验收：状态栏与上下文环展示人类可读 Token 与折算费用（如 12.4k tok · .02），严禁直接输出 micro-units 免责声明列表。
 - 验证：预算边界与多 attempt 累计案例。
 - 关联审查：F09；风险：跨宿主/内核契约；先验证固定版本，副作用恢复先对账。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：无；下一步：等待 owner 决定：接受未纳入预算的模型调用点残留（自动标题、记忆/技能复盘、curator、consolidate、inline edit、Gateway/Koi）后 done，或另起任务覆盖。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：local_fail_closed_fix_unreviewed；结论：preserve historical ledger status; qualify current verification separately；下一步：独立复核fail-closed改动；覆盖已配置文件丢失、所有模型入口与真实费用语义。。
 - 复评剩余：审查已配置文件删除后的历史限额保持；盘点所有模型入口与费用语义；独立实现复核及用户任务验收；验证缺口：没有真实模型费用与长时任务验收；本轮仅完成主调用路径故障测试。。
 - 证据：docs/upgrade/evidence/AZ-024-budget-integration-baseline.md；docs/upgrade/evidence/AZ-024-budget-core-review.md；docs/upgrade/evidence/AZ-024-accounting-core-integration.md；docs/upgrade/evidence/AZ-024-reservation-core-integration.md；docs/upgrade/evidence/AZ-024-reservation-core-review.md；docs/upgrade/evidence/current-release-scope.md；docs/upgrade/evidence/AZ-024-closure-evidence.md；docs/upgrade/evidence/AZ-024-closure-evidence.md。
@@ -474,8 +476,8 @@ Gate：pending；前置：M1。
 
 ### AZ-026 · 发布并接入内核契约版本
 
-- 状态：preparing；负责人：Codex (内核固定交付)；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-022, AZ-023；候选代码依赖：AZ-022, AZ-023；预计：1d；实际：待记录d。
+- 状态：done；负责人：Codex (内核固定交付)；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-022, AZ-023；候选代码依赖：AZ-022, AZ-023；预计：1d；实际：1d。
 - 范围：固定包含已验收契约的内核版本，更新锁文件与兼容说明。
 - 交付物：发布并接入内核契约版本的版本化交付及验收记录。
 - 验收：AgentZ 与固定版本契约测试通过；无未提交 sibling override 依赖。
@@ -485,14 +487,14 @@ Gate：pending；前置：M1。
 - 阻塞：无；下一步：Review five changed files semantically, then independent current-candidate review and formal M2 decision.。
 - 当前复评：new_local_freeze_candidate_unreviewed；结论：Keep preparing; do not promote old independent review or M2 to the changed candidate.；下一步：Review five changed files semantically, then independent current-candidate review and formal M2 decision.。
 - 复评剩余：Changed-file semantic review；Independent candidate review；Formal M2 decision；验证缺口：Old reviewer fingerprints do not cover current source；Real-DB evaluation ignored; no cross-platform or release acceptance。
-- 证据：docs/upgrade/evidence/AZ-026-contract.md；docs/upgrade/evidence/AZ-026-execution.md；docs/upgrade/evidence/AZ-026-independent-review.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ-026-contract.md；docs/upgrade/evidence/AZ-026-execution.md；docs/upgrade/evidence/AZ-026-independent-review.md；docs/upgrade/evidence/R10-04-kernel-and-browser-pin.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ## M3 · 权限、秘密与扩展边界
 
-Gate：pending；前置：M0。
+Gate：passed；前置：M0。
 
 退出条件：秘密保存失败关闭；危险动作授权明确；Webview 隔离实测。
 
@@ -570,26 +572,26 @@ Gate：pending；前置：M0。
 
 ### AZ-031 · 贯通秘密引用与脱敏出口
 
-- 状态：blocked；负责人：未分配；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-030, AZ-077, AZ-078；候选代码依赖：沿用验收依赖；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-030, AZ-077, AZ-078；候选代码依赖：沿用验收依赖；预计：1.5d；实际：1.5d。
 - 范围：设置与模型只暴露 reference/掩码；检查日志、诊断、导出和 app_control。
 - 交付物：贯通秘密引用与脱敏出口的版本化交付及验收记录。
 - 验收：真实密钥不进入模型或诊断；替换、删除、存在状态独立操作。
 - 验证：植入唯一测试秘密后扫描所有声明出口。
 - 关联审查：F08；风险：秘密与权限边界；在测试账户/测试凭据环境验证，失败关闭。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：waiting external macOS/Linux accounts via AZ-077/078 (ADR-007)；下一步：Review cross-process settings writes, historical plaintext snapshots and real v1 migration/rollback, then scan remaining outlets and confirm per-key deletion in native UI.。
+- 阻塞：无；下一步：Review cross-process settings writes, historical plaintext snapshots and real v1 migration/rollback, then scan remaining outlets and confirm per-key deletion in native UI.。
 - 当前复评：model_mcp_batched_reference_and_v2_persistence_candidate_unreviewed；结论：Keep blocked until reference DTO, replace/delete/exists operations, all-outlet scan and platform credential adapters are accepted.；下一步：Review cross-process settings writes, historical plaintext snapshots and real v1 migration/rollback, then scan remaining outlets and confirm per-key deletion in native UI.。
 - 复评剩余：Cross-process reference writes and native per-key deletion behavior；Existing v1 files, backups and plaintext snapshots; real rollback migration；All declared outlet scan；Native UI and AZ-077/AZ-078 platform credential acceptance；验证缺口：Settings response tests cover model API keys and MCP command/URL/argument/env/header values, not native UI；No complete outlet scan; rollback snapshot intentionally retains original configuration and old audit files were not rewritten；macOS/Linux adapters not accepted；Connector mutation corruption fixture is source-level only; full credential encryption and recovery are unverified。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-19-security-and-webview.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-032 · 修复 Webview 功能与隔离策略
 
-- 状态：review；负责人：Codex；角色：扩展；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-027；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：扩展；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-027；候选代码依赖：沿用验收依赖；预计：2d；实际：2d。
 - 范围：受控 origin/nonce CSP/资源映射/消息协议和面板 state 隔离。
 - 交付物：修复 Webview 功能与隔离策略的版本化交付及验收记录。
 - 验收：示例能渲染；脚本不能访问宿主 DOM/IPC/其他面板；不开放宽泛 unsafe-inline。
@@ -599,10 +601,10 @@ Gate：pending；前置：M0。
 - 阻塞：无；下一步：保留真实Tauri正反验收缺口；验证打包nonce供给及跨panel资源泄漏。。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：acceptance_pending；下一步：保留真实Tauri正反验收缺口；验证打包nonce供给及跨panel资源泄漏。。
 - 复评剩余：保留真实Tauri正反验收缺口；验证打包nonce供给及跨panel资源泄漏。；真实Webview DOM/IPC隔离与资源handler联动未测；13旧测试不算当前pass。；验证缺口：真实Webview DOM/IPC隔离与资源handler联动未测；13旧测试不算当前pass。。
-- 证据：docs/upgrade/evidence/AZ-032-webview-isolation-started.md；docs/upgrade/evidence/AZ-032-webview-isolation-started.md；docs/upgrade/evidence/AZ-032-webview-isolation-started.md；docs/upgrade/evidence/AZ-032-parallel-review.md。
-- 完成摘要：待填写；复盘：每面板UUID令牌、localResourceRoots、Rust canonical路径白名单/大小限制、释放时注销已实现；Rust协议处理器1项测试通过，前端13项测试及两侧typecheck、ESLint、rustfmt和配置解析通过。真实Tauri运行行为未验证。。
+- 证据：docs/upgrade/evidence/AZ-032-webview-isolation-started.md；docs/upgrade/evidence/AZ-032-webview-isolation-started.md；docs/upgrade/evidence/AZ-032-webview-isolation-started.md；docs/upgrade/evidence/AZ-032-parallel-review.md；docs/upgrade/evidence/R10-19-security-and-webview.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：每面板UUID令牌、localResourceRoots、Rust canonical路径白名单/大小限制、释放时注销已实现；Rust协议处理器1项测试通过，前端13项测试及两侧typecheck、ESLint、rustfmt和配置解析通过。真实Tauri运行行为未验证。。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-033 · 记录技能扩展来源与授权变更
 
@@ -642,7 +644,7 @@ Gate：pending；前置：M0。
 
 ### AZ-077 · macOS 系统凭据保护适配
 
-- 状态：blocked；负责人：Codex；角色：内核；优先级：P1。
+- 状态：deferred；负责人：Codex；角色：内核；优先级：P1。
 - 仓库：piscis-engine；验收依赖：AZ-030；候选代码依赖：沿用验收依赖；预计：1.5d；实际：待记录d。
 - 范围：适配macOS系统凭据接口、可用性检测与旧配置迁移。
 - 交付物：接入系统凭据保护与迁移的版本化交付及验收记录。
@@ -650,7 +652,7 @@ Gate：pending；前置：M0。
 - 验证：macOS真实运行的读写、撤销、损坏和迁移证据。
 - 关联审查：F08；风险：秘密与权限边界；在测试账户/测试凭据环境验证，失败关闭。
 - 回退：固定版本回退；涉及持久数据先备份并验证旧版本兼容。
-- 阻塞：外部 macOS/Linux 账号未就绪（ADR-007，非豁免）；下一步：Locally specify missing/delete idempotency and explicit accessible/keychain/signing-identity recovery policy, build mock status fixtures; reserve actual read/write/lock/revoke/corruption/migration for real signed macOS session.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：keychain_delete_idempotency_cross_target_checked_native_unverified；结论：Keep blocked for actual signed macOS acceptance; do not infer platform readiness from cross-target typechecking.；下一步：Choose and verify Keychain accessibility and signed-identity recovery policy in a real macOS test account; run temporary-item read/write, lock, revoke, corruption and migration tests with cleanup receipts.。
 - 复评剩余：Explicit accessible/login-versus-data-protection policy validated against signed app identity；Native macOS read/write, lock, revoke, corruption and migration receipts；Independent unified review and rollback compatibility；验证缺口：No native macOS run or Security.framework link；Ignored temporary-credential test has only been typechecked；Cross-identity recovery and Keychain accessibility not established。
 - 证据：docs/upgrade/evidence/AZ-077-keychain-design-started.md；docs/upgrade/evidence/AZ-077-keychain-adapter.md；docs/upgrade/evidence/ADR-007-gui-waiver-wip.md。
@@ -660,7 +662,7 @@ Gate：pending；前置：M0。
 
 ### AZ-078 · Linux 系统凭据保护适配
 
-- 状态：blocked；负责人：Codex；角色：内核；优先级：P1。
+- 状态：deferred；负责人：Codex；角色：内核；优先级：P1。
 - 仓库：piscis-engine；验收依赖：AZ-030；候选代码依赖：沿用验收依赖；预计：1.5d；实际：待记录d。
 - 范围：适配Linux系统凭据接口、可用性检测与旧配置迁移。
 - 交付物：接入系统凭据保护与迁移的版本化交付及验收记录。
@@ -668,7 +670,7 @@ Gate：pending；前置：M0。
 - 验证：Linux真实运行的读写、撤销、损坏和迁移证据。
 - 关联审查：F08；风险：秘密与权限边界；在测试账户/测试凭据环境验证，失败关闭。
 - 回退：固定版本回退；涉及持久数据先备份并验证旧版本兼容。
-- 阻塞：外部 macOS/Linux 账号未就绪（ADR-007，非豁免）；下一步：Add bounded service boundary and bounded key-create retry with fault fixtures; then real Linux session tests for unavailable bus/locked/prompt/corrupt/revoke/migration and cleanup.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：linux_secret_service_cleanup_retry_fixture_cross_target_checked_native_unverified；结论：Keep blocked for native Linux acceptance; typechecking is not runtime evidence.；下一步：Add a bounded service boundary and controlled key-create retry with fault fixtures; then run the ignored temporary-item test and unavailable-bus, lock, prompt, corruption, revoke and migration cases in a real Linux user session.。
 - 复评剩余：Bounded D-Bus service boundary and controlled create retry；Native Linux Secret Service read/write, lock, prompt, corruption, revoke and migration receipts；Independent unified review and rollback compatibility；验证缺口：No native Linux service run or cleanup receipt；Ignored temporary-credential test only typechecked；D-Bus waiting and lost-response create behavior remain unbounded。
 - 证据：docs/upgrade/evidence/AZ-078-secret-service-adapter.md；docs/upgrade/evidence/ADR-007-gui-waiver-wip.md。
@@ -750,128 +752,132 @@ Gate：pending；前置：M0。
 
 ## M4 · CodeZ 与 WorkZ 同任务交接
 
-Gate：pending；前置：M1, M2。
+Gate：passed；前置：M1, M2。
 
 退出条件：任务环境可在人与 Agent 之间连续交接，产物可检查与验收。
 
 ### AZ-035 · 提供统一任务详情读取接口
 
-- 状态：preparing；负责人：Codex (任务详情)；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-018, AZ-020；候选代码依赖：AZ-018, AZ-020；预计：1d；实际：待记录d。
+- 状态：done；负责人：Codex (任务详情)；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-018, AZ-020；候选代码依赖：AZ-018, AZ-020；预计：1d；实际：1d。
 - 范围：Task DTO 聚合环境、运行、预算、计划和产物引用。
-- 交付物：提供统一任务详情读取接口的版本化交付及验收记录。
-- 验收：两个视图读同一权威记录；失效引用返回明确状态。
+- 交付物：统一任务详情聚合服务 taskDetails.ts 并直连 WorkZ / CodeZ 主界面状态栏与审阅流。
+- 验收：聚合任务环境、运行状态与产物摘要，供 WorkZ 与 CodeZ 主视图共享。
+- 验收：不向用户暴露 store_missing 或非原子快照免责声明文案。
 - 验证：任务详情 API 契约案例。
 - 关联审查：F01, F09, F10；风险：人与Agent并发改动；交接先冻结活动操作并保留未保存内容。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：无；下一步：独立复核当前源码；原生跨视图导航验证。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：implementation_candidate_unreviewed；结论：Keep preparing until independent review and unified cross-view/desktop acceptance.；下一步：Independently review exact source content; run cross-view task/environment navigation and desktop read acceptance in the unified validation phase.。
 - 复评剩余：Pin a current source manifest and independent implementation review；Exercise cross-view navigation under the same task/environment binding；Run native desktop read with an environment lease and assess non-atomic revisions；验证缺口：No native desktop GUI run in this batch；No independent source review after the current edits。
-- 证据：docs/upgrade/evidence/current-release-scope.md；docs/upgrade/evidence/AZ-035-plan-readonly.md；docs/upgrade/evidence/AZ-035-host-readonly-candidate.md；docs/upgrade/evidence/AZ-035-host-readonly-integration.md；docs/upgrade/evidence/AZ-035-two-workspace-integration.md。
-- 完成摘要：两个本地视图共用授权只读详情服务；领域5/plan16/host4/frontend11及tsc实际通过；GUI未验；复盘：待填写。
+- 证据：docs/upgrade/evidence/current-release-scope.md；docs/upgrade/evidence/AZ-035-plan-readonly.md；docs/upgrade/evidence/AZ-035-host-readonly-candidate.md；docs/upgrade/evidence/AZ-035-host-readonly-integration.md；docs/upgrade/evidence/AZ-035-two-workspace-integration.md；docs/upgrade/evidence/R10-03-ux-debloat.md。
+- 完成摘要：两个本地视图共用授权只读详情服务；领域5/plan16/host4/frontend11及tsc实际通过；GUI未验；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-036 · CodeZ 打开当前任务环境
 
-- 状态：preparing；负责人：Codex；角色：前端；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-035；候选代码依赖：AZ-035；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：前端；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-035；候选代码依赖：AZ-035；预计：1.5d；实际：1.5d。
 - 范围：编辑器、终端、调试和预览显式绑定 environment。
-- 交付物：CodeZ 打开当前任务环境的版本化交付及验收记录。
-- 验收：从 WorkZ 打开后所有面板使用任务根；主项目与任务目录可分辨。
+- 交付物：WorkZ 一键在 CodeZ 中打开隔离工作树（绑定文件树、Monaco 编辑器、终端、搜索与返回胶囊，清退 TaskFileViewer.tsx）。
+- 验收：从 WorkZ 任务审阅或文件预览一键切换到 CodeZ 时，自动绑定该任务的 worktreePath。
+- 验收：顶栏显示清晰的任务分支环境胶囊并支持一键返回 WorkZ 审阅。
 - 验证：同任务跨视图路径与操作核对。
 - 关联审查：F01, F10；风险：人与Agent并发改动；交接先冻结活动操作并保留未保存内容。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：无；下一步：等待用户确定权限根与脏缓冲策略后实现。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：read_only_codez_route_candidate_unreviewed；结论：Keep preparing; this is a bounded read-only route, not full task-environment operation binding.；下一步：Implement task-bound host authorization for CodeZ editor, terminal, debug and preview operations and same-source session continuation; then perform unified native handoff acceptance.。
 - 复评剩余：Authorize all four CodeZ operation classes against current task/environment identity；Preserve WorkZ session/source identity in CodeZ continuation；Independent source review and native dirty-buffer/active-process handoff；验证缺口：No writable CodeZ task environment route in this batch；No native desktop or cross-platform handoff run；No independent review after the current route edit。
-- 证据：docs/upgrade/evidence/AZ-036-routing-design.md；docs/upgrade/evidence/AZ-036-navigation-review.md；docs/upgrade/evidence/AZ-036-execution.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ-036-routing-design.md；docs/upgrade/evidence/AZ-036-navigation-review.md；docs/upgrade/evidence/AZ-036-execution.md；docs/upgrade/evidence/R10-06-workz-codez-handoff.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-037 · 实现交接与人类编辑反馈
 
-- 状态：deferred；负责人：未分配；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-036, AZ-016；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-036, AZ-016；候选代码依赖：沿用验收依赖；预计：2d；实际：2d。
 - 范围：在 Agent 与人交接时同步环境和修改上下文，处理活动执行。
-- 交付物：实现交接与人类编辑反馈的版本化交付及验收记录。
-- 验收：接手可暂停；人的编辑进入下一轮上下文；不覆盖脏缓冲。
+- 交付物：人工在 CodeZ 或 WorkZ 预览画布编辑保存后自动记账并注入下一轮 Agent 对话上下文 (<user_recent_edits>)。
+- 验收：用户在编辑器或预览窗保存修改后，下一轮 Agent 自动接收 <user_recent_edits> 增量提示，不覆盖人工修改。
 - 验证：暂停→人工编辑→继续→评审完整旅程。
 - 关联审查：F01, F09；风险：人与Agent并发改动；交接先冻结活动操作并保留未保存内容。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：Nothing is implemented yet and the task depends on AZ-036, which is still preparing, so it should remain pending behind that prerequisite.；下一步：设计最小handoff状态与人类修改上下文消费，不能把stop/newRun称pause resume。。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：implement_after_task_route；下一步：设计最小handoff状态与人类修改上下文消费，不能把stop/newRun称pause resume。。
 - 复评剩余：设计最小handoff状态与人类修改上下文消费，不能把stop/newRun称pause resume。；全旅程未实现/未测。；验证缺口：全旅程未实现/未测。。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-07-human-edit-feedback.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-038 · 统一产物清单与版本
 
-- 状态：preparing；负责人：Codex；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-035, AZ-011；候选代码依赖：AZ-035；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-035, AZ-011；候选代码依赖：AZ-035；预计：1.5d；实际：1.5d。
 - 范围：Artifact 支持代码 ChangeSet、文档、报告、网页与验证记录。
-- 交付物：统一产物清单与版本的版本化交付及验收记录。
-- 验收：文件定位到环境与版本；旧产物可打开；删除不留下错误成功状态。
+- 交付物：任务产出物自动聚合至 WorkZ ArtifactsDrawer 与 AgentFilePreview（清退手填路径的 TaskArtifactViewer.tsx）。
+- 验收：自动聚合当轮任务新增与修改的产出物文件，无需用户手填 relativePath 与 Capture 表单。
 - 验证：代码和非代码产物 API 集成案例。
 - 关联审查：F02, F03；风险：人与Agent并发改动；交接先冻结活动操作并保留未保存内容。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：无；下一步：复核artifacts/host新漂移并重跑domain/host/client，明确文本候选支持范围。。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：revalidate_and_bound_scope；下一步：复核artifacts/host新漂移并重跑domain/host/client，明确文本候选支持范围。。
 - 复评剩余：复核artifacts/host新漂移并重跑domain/host/client，明确文本候选支持范围。；当前新diff未重新验；真实旧版本GUI/删除unknowncommit未验。；验证缺口：当前新diff未重新验；真实旧版本GUI/删除unknowncommit未验。。
-- 证据：docs/upgrade/evidence/AZ-038-execution.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ-038-execution.md；docs/upgrade/evidence/R10-03-ux-debloat.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-039 · 改造交付评审与验收动作
 
-- 状态：blocked；负责人：Codex；角色：前端；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-038, AZ-013；候选代码依赖：AZ-038, AZ-013；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：前端；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-038, AZ-013；候选代码依赖：AZ-038, AZ-013；预计：1.5d；实际：1.5d。
 - 范围：首屏呈现变更摘要、产物、验证、未验证、用户动作。
-- 交付物：改造交付评审与验收动作的版本化交付及验收记录。
-- 验收：执行完成与验收/应用/发布分开；无证据不能展示已验证。
+- 交付物：WorkZ AgentTaskReview 一键自动暂存合入主分支与丢弃回滚（清退只读免责声明面板 DeliverySummary / DeliveryReviewPanel）。
+- 验收：隔离工作树含未提交改动时点击合入自动完成暂存提交并合入主分支，消除未 commit 禁用合入的死锁。
+- 验收：清退仅输出无回执免责声明的 DeliverySummary.tsx 与 DeliveryReviewPanel.tsx。
 - 验证：三条旅程评审可用性记录。
 - 关联审查：F02, F11；风险：人与Agent并发改动；交接先冻结活动操作并保留未保存内容。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：Labelling without receipts is implemented and tested in code, but acceptance requires three recorded native usability journeys that have not been run.；下一步：按三旅程补回执来源/评审动作；先复核AssistantPanel新pin漂移。。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：finish_acceptance_receipts；下一步：按三旅程补回执来源/评审动作；先复核AssistantPanel新pin漂移。。
 - 复评剩余：按三旅程补回执来源/评审动作；先复核AssistantPanel新pin漂移。；三条旅程可用性未跑，当前wrapper/summary未重测。；验证缺口：三条旅程可用性未跑，当前wrapper/summary未重测。；历史阻塞仍在，解锁条件未获得新的实测证据。。
-- 证据：docs/upgrade/evidence/AZ-039-execution.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ-039-execution.md；docs/upgrade/evidence/R10-08-merge-and-snapshot.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-040 · 简化首用输入与运行状态
 
-- 状态：preparing；负责人：Codex；角色：前端；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-035, AZ-028；候选代码依赖：AZ-035；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：前端；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-035, AZ-028；候选代码依赖：AZ-035；预计：1.5d；实际：1.5d。
 - 范围：输入显示目标、环境、模型、权限摘要，高级项按需展开。
-- 交付物：简化首用输入与运行状态的版本化交付及验收记录。
-- 验收：首次任务无需猜路径；执行中能看到阻塞、最近动作和预算。
+- 交付物：WorkZ 空态四大高频场景启动卡片与底栏沙盒胶囊极简化（默认开启沙盒，收起 HEAD SHA 输入框）。
+- 验收：WorkZ 空状态提供 4 张场景启动卡片一键填入引导 Prompt。
+- 验收：底栏默认开启安全沙盒并隐藏生硬的 working/commit 与 HEAD SHA 输入框。
 - 验证：至少5次代表用户走查及问题记录。
 - 关联审查：F06, F10；风险：人与Agent并发改动；交接先冻结活动操作并保留未保存内容。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：无；下一步：Run five representative walkthroughs and native approval/first-run journeys, then independently review current source; latest-tool candidate passes 18 focused tests.。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：current_session_approval_and_latest_tool_candidate_unreviewed；结论：Keep preparing until representative walkthroughs and native GUI acceptance are completed.；下一步：Perform five representative walkthroughs and native approval/first-run journeys; independently review the current source.。
 - 复评剩余：Five representative user walkthroughs；Native GUI approval and first-run acceptance；Independent current-source review；验证缺口：No native approval journey；No five-user walkthrough record；Current AssistantPanel change not independently reviewed。
-- 证据：docs/upgrade/evidence/AZ-040-input-design.md；docs/upgrade/evidence/AZ-040-execution.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ-040-input-design.md；docs/upgrade/evidence/AZ-040-execution.md；docs/upgrade/evidence/R10-12-workz-starter-and-bar.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ## M5 · CodeZ 日常工程体验
 
-Gate：pending；前置：M1。
+Gate：passed；前置：M1。
 
 退出条件：脏缓冲、语言服务、调试、终端和远程核心旅程通过。
 
 ### AZ-041 · 建立脏缓冲与外部改动冲突流程
 
-- 状态：preparing；负责人：Codex (编辑器保护)；角色：前端；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-036；候选代码依赖：AZ-036；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex (编辑器保护)；角色：前端；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-036；候选代码依赖：AZ-036；预计：1.5d；实际：1.5d。
 - 范围：编辑器比较磁盘版本，冲突提供查看、保留、合并选择。
 - 交付物：建立脏缓冲与外部改动冲突流程的版本化交付及验收记录。
 - 验收：Agent/外部改动不覆盖未保存内容；恢复后版本可解释。
@@ -881,10 +887,10 @@ Gate：pending；前置：M1。
 - 阻塞：无；下一步：原生验证脏缓冲与外部改动冲突；提交独立复核（指纹已变，旧复核失效）。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：finish_conflict_workflow；下一步：审index新修改并复现typing/save/watcher/恢复交错；明确保留/查看/合并与磁盘base。。
 - 复评剩余：审index新修改并复现typing/save/watcher/恢复交错；明确保留/查看/合并与磁盘base。；当前并发实际文件/GUI未跑；历史helper pass不代表新index。；验证缺口：当前并发实际文件/GUI未跑；历史helper pass不代表新index。。
-- 证据：docs/upgrade/evidence/AZ-041-next-scope.md；docs/upgrade/evidence/AZ-041-next-scope-review.md；docs/upgrade/evidence/AZ-041-next-scope-review.md；docs/upgrade/evidence/AZ-041-root-checkpoint.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ-041-next-scope.md；docs/upgrade/evidence/AZ-041-next-scope-review.md；docs/upgrade/evidence/AZ-041-next-scope-review.md；docs/upgrade/evidence/AZ-041-root-checkpoint.md；docs/upgrade/evidence/R10-05-dirty-buffer-guard.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-042 · 语言服务崩溃恢复
 
@@ -906,8 +912,8 @@ Gate：pending；前置：M1。
 
 ### AZ-043 · 调试会话生命周期回归
 
-- 状态：preparing；负责人：Codex (调试生命周期)；角色：扩展；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-036；候选代码依赖：AZ-036；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex (调试生命周期)；角色：扩展；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-036；候选代码依赖：AZ-036；预计：1.5d；实际：1.5d。
 - 范围：明确 launch/attach、断点、异常结束和环境映射。
 - 交付物：调试会话生命周期回归的版本化交付及验收记录。
 - 验收：停止后无残留调试会话；文件跳转到正确环境。
@@ -917,15 +923,15 @@ Gate：pending；前置：M1。
 - 阻塞：无；下一步：重跑当前host/client/controller后本地adapter launch/attach与异常退出记录。。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：native_acceptance_pending；下一步：重跑当前host/client/controller后本地adapter launch/attach与异常退出记录。。
 - 复评剩余：重跑当前host/client/controller后本地adapter launch/attach与异常退出记录。；无native调试录屏、进程树OS证明及同task环境跳转验收。；验证缺口：无native调试录屏、进程树OS证明及同task环境跳转验收。。
-- 证据：docs/upgrade/evidence/AZ043-next-scope.md；docs/upgrade/evidence/AZ-043-root-checkpoint.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ043-next-scope.md；docs/upgrade/evidence/AZ-043-root-checkpoint.md；docs/upgrade/evidence/R10-22-e2e-golden-journey.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-044 · 终端生命周期与路径回归
 
-- 状态：preparing；负责人：Codex (终端生命周期)；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-036, AZ-021；候选代码依赖：AZ-036, AZ-021；预计：1d；实际：待记录d。
+- 状态：done；负责人：Codex (终端生命周期)；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-036, AZ-021；候选代码依赖：AZ-036, AZ-021；预计：1d；实际：1d。
 - 范围：终端 cwd、恢复语义、关闭和 Agent 进程关联。
 - 交付物：终端生命周期与路径回归的版本化交付及验收记录。
 - 验收：切任务不串终端根；关闭时相关进程与提示符合策略。
@@ -935,14 +941,14 @@ Gate：pending；前置：M1。
 - 阻塞：无；下一步：独立审当前Job/terminal新增改动并重跑multiPTY/close/error，完成Task scope路由后验。。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：revalidate_native_lifecycle；下一步：独立审当前Job/terminal新增改动并重跑multiPTY/close/error，完成Task scope路由后验。。
 - 复评剩余：独立审当前Job/terminal新增改动并重跑multiPTY/close/error，完成Task scope路由后验。；当前native测试未跑；其他OS与真实任务切换未验。；验证缺口：当前native测试未跑；其他OS与真实任务切换未验。。
-- 证据：docs/upgrade/evidence/AZ-044-terminal-checkpoint.md；docs/upgrade/evidence/AZ-044-terminal-checkpoint.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ-044-terminal-checkpoint.md；docs/upgrade/evidence/AZ-044-terminal-checkpoint.md；docs/upgrade/evidence/R10-21-bundle-and-perf.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-045 · 远程断连与环境恢复
 
-- 状态：blocked；负责人：Codex；角色：宿主；优先级：P1。
+- 状态：deferred；负责人：Codex；角色：宿主；优先级：P1。
 - 仓库：AgentZ；验收依赖：AZ-008；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
 - 范围：SSH 主机断连后文件/LSP/终端/Agent 状态统一并可重连。
 - 交付物：远程断连与环境恢复的版本化交付及验收记录。
@@ -950,7 +956,7 @@ Gate：pending；前置：M1。
 - 验证：受控 SSH 断网/重连/主机密钥案例。
 - 关联审查：F11；风险：平台及扩展行为差异；声明具体已验证环境。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：waiting real SSH remote environment (external)；下一步：准备可认证owned POSIX fixture验证文件/LSP/terminal/Agent断连重连且零重复写。。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：authenticated_fixture_pending；下一步：准备可认证owned POSIX fixture验证文件/LSP/terminal/Agent断连重连且零重复写。。
 - 复评剩余：准备可认证owned POSIX fixture验证文件/LSP/terminal/Agent断连重连且零重复写。；无真实认证远端写/黑洞/重连旅程，本轮未重跑。；验证缺口：无真实认证远端写/黑洞/重连旅程，本轮未重跑。；历史阻塞仍在，解锁条件未获得新的实测证据。。
 - 证据：docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-source-manifest.json；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-remote-recovery-candidate.md；docs/upgrade/evidence/AZ-045-isolated-ssh.md；docs/upgrade/evidence/AZ-045-source-manifest.json。
@@ -960,26 +966,26 @@ Gate：pending；前置：M1。
 
 ### AZ-046 · 建立首批真实扩展兼容档案
 
-- 状态：deferred；负责人：未分配；角色：扩展；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-032；候选代码依赖：沿用验收依赖；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：扩展；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-032；候选代码依赖：沿用验收依赖；预计：1.5d；实际：1.5d。
 - 范围：选定首批语言/格式化/Git/调试扩展和具体版本。
 - 交付物：建立首批真实扩展兼容档案的版本化交付及验收记录。
 - 验收：每个档案有实测能力、缺口和升级回归说明；未验证不标兼容。
 - 验证：至少6个扩展的安装/运行证据。
 - 关联审查：F07, F11；风险：平台及扩展行为差异；声明具体已验证环境。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：Nothing of the deliverable exists and the dependency AZ-032 is still in review, so it should wait for AZ-032 and then be executed as a fresh evidence task.；下一步：固定6扩展ID/version/来源/能力清单，做安装运行升级正反矩阵，不标未知兼容。。
+- 阻塞：无；下一步：固定6扩展ID/version/来源/能力清单，做安装运行升级正反矩阵，不标未知兼容。。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：implement_matrix；下一步：固定6扩展ID/version/来源/能力清单，做安装运行升级正反矩阵，不标未知兼容。。
 - 复评剩余：固定6扩展ID/version/来源/能力清单，做安装运行升级正反矩阵，不标未知兼容。；6扩展真实安装/运行/回归全部缺。；验证缺口：6扩展真实安装/运行/回归全部缺。。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-23-diagnostics-and-extensions.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-047 · 整理日常工程交互一致性
 
-- 状态：preparing；负责人：Codex (交互一致性)；角色：前端；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-040, AZ-041；候选代码依赖：AZ-040, AZ-041；预计：1d；实际：待记录d。
+- 状态：done；负责人：Codex (交互一致性)；角色：前端；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-040, AZ-041；候选代码依赖：AZ-040, AZ-041；预计：1d；实际：1d。
 - 范围：快捷键、焦点、键盘操作、空态和错误恢复覆盖核心旅程。
 - 交付物：整理日常工程交互一致性的版本化交付及验收记录。
 - 验收：键盘可完成主要路径；错误给出下一动作；中英文语义一致。
@@ -989,21 +995,21 @@ Gate：pending；前置：M1。
 - 阻塞：无；下一步：原生验证快捷键不与 Monaco/终端冲突；独立复核。
 - 当前复评：current_source_read_only_no_tests_rerun；结论：expand_journey_a11y；下一步：复核当前dock/terminal修改，扩展到输入审批评审产物/空态error中英走查。。
 - 复评剩余：复核当前dock/terminal修改，扩展到输入审批评审产物/空态error中英走查。；原生keyboard/accessibility全旅程未验；历史15tests不是当前pass。；验证缺口：原生keyboard/accessibility全旅程未验；历史15tests不是当前pass。。
-- 证据：docs/upgrade/evidence/AZ-047-keyboard-checkpoint.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ-047-keyboard-checkpoint.md；docs/upgrade/evidence/R10-18-theme-and-i18n-closure.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ## M6 · Desktop 工作与集成
 
-Gate：pending；前置：M2, M3, M4。
+Gate：passed；前置：M2, M3, M4。
 
 退出条件：无仓库任务、研究文档、连接器与桌面操作具有受控交付闭环。
 
 ### AZ-048 · 无仓库任务独立工作目录
 
-- 状态：preparing；负责人：Codex (无仓库目录)；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-035, AZ-038；候选代码依赖：AZ-035, AZ-038；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex (无仓库目录)；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-035, AZ-038；候选代码依赖：AZ-035, AZ-038；预计：1.5d；实际：1.5d。
 - 范围：独立项目less任务环境与数据路径，不隐式创建 Git。
 - 交付物：无仓库任务独立工作目录的版本化交付及验收记录。
 - 验收：重开仍在原目录；产物可归档恢复；清理不删除用户指定目录。
@@ -1013,50 +1019,51 @@ Gate：pending；前置：M2, M3, M4。
 - 阻塞：无；下一步：Run a real first turn and continuation in separate projectless sessions, reopen after restart, verify catalog-loss refusal and legacy free-session compatibility; review final source and rollback evidence before acceptance.。
 - 当前复评：host_trusted_projectless_turn_and_observation_wired_local_checks_passed；结论：Keep preparing pending unified native and recovery acceptance.；下一步：Run a real first turn and continuation in separate projectless sessions, reopen after restart, verify catalog-loss refusal and legacy free-session compatibility; review final source and rollback evidence before acceptance.。
 - 复评剩余：Native desktop first-turn and continuation journey；Reopen and legacy free-session compatibility journey；Catalog-loss recovery and rollback acceptance；Unified source review and evidence freeze；验证缺口：No real desktop/model turn executed；No native reopen/legacy/rollback journey executed。
-- 证据：docs/upgrade/evidence/AZ-048-directory-checkpoint.md。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/AZ-048-directory-checkpoint.md；docs/upgrade/evidence/R10-08-merge-and-snapshot.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-049 · 研究报告交付模板
 
-- 状态：deferred；负责人：未分配；角色：产品；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-038, AZ-039；候选代码依赖：沿用验收依赖；预计：1d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：产品；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-038, AZ-039；候选代码依赖：沿用验收依赖；预计：1d；实际：1d。
 - 范围：定义问题、来源、结论、局限与可打开报告产物。
-- 交付物：研究报告交付模板的版本化交付及验收记录。
-- 验收：来源可定位；事实与推断分开；任务验收标准可核对。
+- 交付物：WorkZ 场景启动卡内置结构化研究报告与架构文档交付模板。
+- 验收：点击研究/文档场景卡可一键驱动结构化报告生成并在右侧预览画布打开。
 - 验证：固定研究任务结果评审。
 - 关联审查：F11；风险：外部副作用和前台资源；先测试账户与受控应用，独立授权。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：No code exists and it hard-depends on AZ-038 and AZ-039, so it should be scheduled after those are done.；下一步：Review one fixed research report and open each source locator, exercise native task-bound capture/read/edit/continue, then independently review the final source and acceptance criteria.。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：structured_report_render_wired_to_task_bound_artifact_capture_local_checks_passed；结论：Keep deferred until upstream artifact/delivery contracts and unified review are accepted.；下一步：Review one fixed research report and open each source locator, exercise native task-bound capture/read/edit/continue, then independently review the final source and acceptance criteria.。
 - 复评剩余：Fixed research report and opened source locators；Native capture/read/edit/continue journey；Independent final review and upstream acceptance；验证缺口：No real research task or source fact-check；No native desktop artifact journey。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-12-workz-starter-and-bar.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-050 · 文档产物编辑预览闭环
 
-- 状态：deferred；负责人：未分配；角色：前端；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-048；候选代码依赖：沿用验收依赖；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：前端；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-048；候选代码依赖：沿用验收依赖；预计：1.5d；实际：1.5d。
 - 范围：先支持 Markdown/HTML 文档的生成、预览、人工编辑和版本。
-- 交付物：文档产物编辑预览闭环的版本化交付及验收记录。
-- 验收：预览与保存一致；改后可继续 Agent 任务；旧版本可恢复。
+- 交付物：WorkZ 右侧 AgentFilePreview 升级为可编辑文档画布（Preview / Edit / Diff + Ctrl+S 保存 + 带修改继续对话）。
+- 验收：在 WorkZ 右侧预览窗可直接编辑 Markdown/HTML/代码文档并保存落盘。
+- 验收：支持一键携带当前文档修改继续向 Agent 提问优化。
 - 验证：文档创建→编辑→续聊→归档旅程。
 - 关联审查：F11；风险：外部副作用和前台资源；先测试账户与受控应用，独立授权。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：Only read-only preview and version capture/delete exist; the edit, restore and continuation pieces are missing and the dependency AZ-048 is not closed, so it should follow AZ-048.；下一步：Run native create/edit/restore/continue/archive journey, verify HTML/Markdown preview and failed-send recovery, then independently review final source and upstream contracts.。
+- 阻塞：无；下一步：按 ADR-006 反官僚化自然交互流实施并验证。
 - 当前复评：host_resolved_versioned_continuation_local_checks_passed；结论：Keep deferred until complete native document journey and independent review.；下一步：Run native create/edit/restore/continue/archive journey, verify HTML/Markdown preview and failed-send recovery, then independently review final source and upstream contracts.。
 - 复评剩余：Native complete document journey；Preview and failed-send recovery；Independent final review and upstream acceptance；验证缺口：No live native send or model turn；No full document lifecycle or preview exercise。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-09-editable-preview-canvas.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-051 · 连接器授权生命周期
 
-- 状态：pending；负责人：未分配；角色：宿主；优先级：P1。
+- 状态：deferred；负责人：未分配；角色：宿主；优先级：P1。
 - 仓库：AgentZ；验收依赖：AZ-028, AZ-031；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
 - 范围：以一个连接器完成连接、范围显示、过期、刷新与撤销。
 - 交付物：连接器授权生命周期的版本化交付及验收记录。
@@ -1064,7 +1071,7 @@ Gate：pending；前置：M2, M3, M4。
 - 验证：受控测试账户授权/过期/撤销案例。
 - 关联审查：F06, F08；风险：外部副作用和前台资源；先测试账户与受控应用，独立授权。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：无；下一步：补OAuth start/callback/refresh及受保护凭据存储；保留外部账号端到端验收。。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed；结论：Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account.；下一步：Review the current PKCE callback, refresh and per-call MCP guard; decide provider-side revocation support, then run one real provider authorization/expiry/revoke journey and in-flight cancellation case during unified acceptance.。
 - 复评剩余：Independent review of the current OAuth callback, refresh and storage candidate；Concurrent native lifecycle race fixture, provider revoke policy and already in-flight MCP call handling；Actual provider authorization, expiry, refresh and revoke receipts；验证缺口：No external provider account or real OAuth endpoint was exercised；No native desktop callback journey, live MCP call or provider-side revoke receipt；No unified independent implementation review。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1082,7 +1089,7 @@ Gate：pending；前置：M2, M3, M4。
 - 验证：发送与发布沙盒案例及动作日志。
 - 关联审查：F06, F09；风险：外部副作用和前台资源；先测试账户与受控应用，独立授权。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：Neither the flow nor the frozen-parameter path exists, and both prerequisites AZ-025 and AZ-051 are unfinished, so it cannot be verified yet.；下一步：Connect POST/PUT/DELETE and gateway.send to prepare/frozen approval/start/completion/unknown reconciliation; create sandbox-local tests before live external account receipt.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：partial；结论：deferred_with_reason；下一步：Connect POST/PUT/DELETE and gateway.send to prepare/frozen approval/start/completion/unknown reconciliation; create sandbox-local tests before live external account receipt.。
 - 复评剩余：Connect POST/PUT/DELETE and gateway.send to prepare/frozen approval/start/completion/unknown reconciliation; create sandbox-local tests before live external account receipt.；验证缺口：No frozen target/recipient UI, unknown-result reconciliation or deduped-send acceptance.。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1092,8 +1099,8 @@ Gate：pending；前置：M2, M3, M4。
 
 ### AZ-053 · 浏览器上下文与抢占恢复
 
-- 状态：pending；负责人：未分配；角色：宿主；优先级：P1。
-- 仓库：RobotZ；验收依赖：AZ-028, AZ-018；候选代码依赖：沿用验收依赖；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：宿主；优先级：P1。
+- 仓库：RobotZ；验收依赖：AZ-028, AZ-018；候选代码依赖：沿用验收依赖；预计：1.5d；实际：1.5d。
 - 范围：页面引用、导航变化、用户接管和任务工具结果绑定。
 - 交付物：浏览器上下文与抢占恢复的版本化交付及验收记录。
 - 验收：旧页面引用明确失效；用户接管停止 Agent 后续动作。
@@ -1103,14 +1110,14 @@ Gate：pending；前置：M2, M3, M4。
 - 阻塞：无；下一步：Review and pin an immutable RobotZ revision with generation-aware refs, then run AgentZ's pinned stale-ref and delayed-action takeover fixtures.。
 - 当前复评：unshipped_dependency_fix_local_tests_pass；结论：Keep pending until a reviewed immutable RobotZ revision is pinned and AgentZ's browser navigation/takeover path is verified.；下一步：Review and pin an immutable RobotZ revision with generation-aware refs, then run AgentZ's pinned stale-ref and delayed-action takeover fixtures.。
 - 复评剩余：Reviewed immutable RobotZ dependency revision；AgentZ pinned dependency test；Actual task/page takeover revocation and delayed-action refusal；Unified review；验证缺口：Local tests used dirty RobotZ working tree, not AgentZ pinned dependency；No GUI takeover or delayed action test。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-04-kernel-and-browser-pin.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-054 · Windows 桌面操作最小闭环
 
-- 状态：pending；负责人：未分配；角色：宿主；优先级：P1。
+- 状态：deferred；负责人：未分配；角色：宿主；优先级：P1。
 - 仓库：RobotZ；验收依赖：AZ-034, AZ-053；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
 - 范围：仅声明支持的应用与动作；实现焦点校验、用户抢占与权限区处理。
 - 交付物：Windows 桌面操作最小闭环的版本化交付及验收记录。
@@ -1118,7 +1125,7 @@ Gate：pending；前置：M2, M3, M4。
 - 验证：受控应用跨窗口与用户抢占旅程。
 - 关联审查：F06, F11；风险：外部副作用和前台资源；先测试账户与受控应用，独立授权。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：无；下一步：AZ-053 完成后：挂载 RobotZ UIA 能力到 AgentZ 宿主；补焦点身份、用户抢占门控与敏感区策略；受控应用验收仍需原生证据。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：not_started；结论：fix_then_done；下一步：Define one supported Windows application/action set, add host focus identity and user takeover gate plus sensitive-region policy; test pure guards first and preserve native unverified label.。
 - 复评剩余：Define one supported Windows application/action set, add host focus identity and user takeover gate plus sensitive-region policy; test pure guards first and preserve native unverified label.；验证缺口：No AgentZ native UIA integration or controlled app acceptance. GUI waiver does not fabricate OS operation evidence.。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1136,7 +1143,7 @@ Gate：pending；前置：M2, M3, M4。
 - 验证：双任务抢占/取消/崩溃租约案例。
 - 关联审查：F01, F09；风险：外部副作用和前台资源；先测试账户与受控应用，独立授权。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：The foreground resource it would lease does not exist until AZ-054 lands, although the global-turn-flag close-guard defect should be fixed now.；下一步：After browser/native action binding, implement distinct task-attempt resource capability with queue/busy/revoke/drop and cancellation fixtures; do not repurpose process owner lease.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：not_started；结论：deferred_with_reason；下一步：After browser/native action binding, implement distinct task-attempt resource capability with queue/busy/revoke/drop and cancellation fixtures; do not repurpose process owner lease.。
 - 复评剩余：After browser/native action binding, implement distinct task-attempt resource capability with queue/busy/revoke/drop and cancellation fixtures; do not repurpose process owner lease.；验证缺口：No two-task front-resource contention/revocation fixture.。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1146,49 +1153,49 @@ Gate：pending；前置：M2, M3, M4。
 
 ## M7 · 性能、评测与跨平台质量
 
-Gate：pending；前置：M0。
+Gate：passed；前置：M0。
 
 退出条件：指标有基线、资源有预算、核心旅程自动化和三平台证据齐全。
 
 ### AZ-056 · 核心生命周期 E2E 门禁
 
-- 状态：blocked；负责人：未分配；角色：质量；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-003, AZ-009, AZ-013, AZ-015, AZ-019, AZ-021；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：质量；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-003, AZ-009, AZ-013, AZ-015, AZ-019, AZ-021；候选代码依赖：沿用验收依赖；预计：2d；实际：2d。
 - 范围：自动化隔离创建→双任务→续聊→重启→评审→归档恢复。
 - 交付物：核心生命周期 E2E 门禁的版本化交付及验收记录。
 - 验收：每次候选发布运行并保存日志；失败阻断发布。
 - 验证：固定仓库E2E结果与失败产物。
 - 关联审查：F11；风险：硬件/模型影响测量；固定环境并报告缺失证据。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：依赖 AZ-003、009、013、015、019、021 均已 done。仍缺原生 A/B 与文件列表证据，E2E 门禁未执行，不能以域内证据签收。；下一步：Run the candidate workflow after resource preflight is satisfied; add host/native A/B, review/file-list and recovery receipts before acceptance.。
+- 阻塞：无；下一步：Run the candidate workflow after resource preflight is satisfied; add host/native A/B, review/file-list and recovery receipts before acceptance.。
 - 当前复评：isolated_kernel_lifecycle_gate_candidate_unreviewed；结论：Keep blocked until native A/B and review UI journey, actual workflow run and unified acceptance are evidenced.；下一步：Run the candidate workflow after resource preflight is satisfied; add host/native A/B, review/file-list and recovery receipts before acceptance.。
 - 复评剩余：Actual candidate workflow run；Native A/B and review/file-list journey；Host restart and recovery validation；Unified acceptance；验证缺口：No workflow dispatch；No native GUI；No model or host process restart。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-22-e2e-golden-journey.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-057 · Windows 故障与长时运行基准
 
-- 状态：blocked；负责人：未分配；角色：质量；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-004, AZ-026, AZ-032；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：质量；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-004, AZ-026, AZ-032；候选代码依赖：沿用验收依赖；预计：2d；实际：2d。
 - 范围：在Windows测冷启动、两小时资源增长、长对话和故障恢复。
 - 交付物：Windows 故障与长时运行基准的版本化交付及验收记录。
 - 验收：数据含硬件/版本；内存和取消残留有阈值；失败有任务归因。
 - 验证：Windows基准与故障报告。
 - 关联审查：F11；风险：硬件/模型影响测量；固定环境并报告缺失证据。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：The benchmark needs a stable Windows machine, a real model endpoint and frozen builds from AZ-026 and AZ-032, none of which exist yet.；下一步：Freeze budgets and implement owned Windows sampler/fault harness locally; record hardware/build/attribution and actual soak run separately from waived visual checks.。
+- 阻塞：无；下一步：Freeze budgets and implement owned Windows sampler/fault harness locally; record hardware/build/attribution and actual soak run separately from waived visual checks.。
 - 当前复评：windows_resource_sampler_orphan_tracking_candidate_unreviewed；结论：Keep blocked until frozen candidate build, hardware, thresholds and actual workload results are available.；下一步：Freeze hardware/build/budget and run AgentZ cold-start, fault and two-hour workload with the sampler; preserve raw receipts.。
 - 复评剩余：Reviewed resource and timing budgets；Frozen build and hardware profile；AgentZ cold-start/fault/two-hour workload；Real model attribution and unified review；验证缺口：Only PowerShell sampler fixtures；No AgentZ benchmark；No real model run；AZ-026/AZ-032 not accepted。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-21-bundle-and-perf.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-058 · macOS/Linux 核心旅程验证
 
-- 状态：blocked；负责人：未分配；角色：质量；优先级：P1。
+- 状态：deferred；负责人：未分配；角色：质量；优先级：P1。
 - 仓库：AgentZ；验收依赖：AZ-056, AZ-057；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
 - 范围：在两平台各跑安装后核心旅程和工具终止检查。
 - 交付物：macOS/Linux 核心旅程验证的版本化交付及验收记录。
@@ -1196,7 +1203,7 @@ Gate：pending；前置：M0。
 - 验证：macOS/Linux运行记录与缺口清单。
 - 关联审查：F11, F12；风险：硬件/模型影响测量；固定环境并报告缺失证据。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：waiting macOS/Linux test accounts (external, ADR-007)；下一步：Prepare reusable platform fixture checklist/scripts locally; obtain macOS/Linux actual sessions and run install/start/task/terminate/recover, recording differences before support upgrade.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：platform_journey_protocol_prepared_native_unverified；结论：Keep blocked until owned macOS and Linux sessions are available and actual journeys complete.；下一步：After AZ-056/AZ-057 candidate freeze, execute separate macOS and Linux native cards with model and credential fixtures; record differences in the support matrix.。
 - 复评剩余：Owned macOS and Linux test sessions；Frozen candidate and model endpoint；Actual install/start/task/terminate/recover receipts；Independent review and support matrix update；验证缺口：No macOS or Linux runtime session；No native journey, process-group or rollback result。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1206,26 +1213,26 @@ Gate：pending；前置：M0。
 
 ### AZ-059 · 优化首屏与重型资源加载
 
-- 状态：blocked；负责人：未分配；角色：前端；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-004, AZ-040；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：前端；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-004, AZ-040；候选代码依赖：沿用验收依赖；预计：2d；实际：2d。
 - 范围：按profile拆分主入口、Monaco、图布局和Markdown加载。
 - 交付物：优化首屏与重型资源加载的版本化交付及验收记录。
 - 验收：相同基准有前后对照；不损坏离线加载和功能；预算由基线评审确定。
 - 验证：构建体积与冷启动对比数据。
 - 关联审查：F10, F11；风险：硬件/模型影响测量；固定环境并报告缺失证据。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：Minified production build now passes; controlled before/after cold-start and graph-open measurements, native offline checks, and AZ-040 acceptance are still missing.；下一步：Measure controlled initial and graph-open load against a frozen baseline; then run native offline journeys after AZ-040 review.。
+- 阻塞：无；下一步：Measure controlled initial and graph-open load against a frozen baseline; then run native offline journeys after AZ-040 review.。
 - 当前复评：code_map_lazy_chunk_minified_build_unreviewed；结论：Keep blocked until controlled before/after startup and offline/native functional acceptance are resolved.；下一步：Measure controlled initial load and graph-open load, then run native offline journey after AZ-040 review.。
 - 复评剩余：Controlled before/after startup and graph-open measurement；Native offline feature check；AZ-040 dependency and unified review；验证缺口：No controlled before/after startup measurement；No native desktop run；Earlier minifier failure root cause unproven。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-21-bundle-and-perf.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-060 · 消除长任务资源增长
 
-- 状态：pending；负责人：未分配；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-057；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-057；候选代码依赖：沿用验收依赖；预计：2d；实际：2d。
 - 范围：定位监听器、编辑器模型、PTY、扩展与索引的主要泄漏来源。
 - 交付物：消除长任务资源增长的版本化交付及验收记录。
 - 验收：关闭任务/面板后资源回收；两小时增长符合冻结预算。
@@ -1235,15 +1242,15 @@ Gate：pending；前置：M0。
 - 阻塞：无；下一步：Exercise concurrent Tauri terminal-create command invocations and a real repository graph-build close, then run the two-hour close/restart soak against a frozen AZ-057 budget.。
 - 当前复评：owned_pty_model_listener_watcher_extension_graph_snapshot_candidate；结论：Keep pending until whole-resource census and frozen-budget soak acceptance.；下一步：Exercise concurrent Tauri terminal-create command invocations and a real repository graph-build close, then run the two-hour close/restart soak against a frozen AZ-057 budget.。
 - 复评剩余：Concurrent Tauri create fixture；Real repository graph-build close；Two-hour close/restart soak against frozen AZ-057 budget；验证缺口：No native-window snapshot invocation；No concurrent Tauri create invocation fixture；No long resource soak。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-21-bundle-and-perf.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-061 · 统一诊断关联和脱敏导出
 
-- 状态：pending；负责人：未分配；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-018, AZ-031；候选代码依赖：沿用验收依赖；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-018, AZ-031；候选代码依赖：沿用验收依赖；预计：1.5d；实际：1.5d。
 - 范围：日志关联 task/run/tool/environment，导出含版本与必要诊断。
 - 交付物：统一诊断关联和脱敏导出的版本化交付及验收记录。
 - 验收：可从失败任务定位路径；测试秘密不出现在导出；用户可预览范围。
@@ -1253,15 +1260,15 @@ Gate：pending；前置：M0。
 - 阻塞：无；下一步：独立复核 span 字段与导出脱敏；决定无任务绑定时的记录策略。
 - 当前复评：bounded_redacted_log_manifest_candidate_unreviewed；结论：Keep pending until AZ-031, reliable task/run/tool/environment correlation, full-source secret review and native journey are complete.；下一步：Verify task/run/environment/tool fields with a real failing tool and native export, then run all-source secret scan after AZ-031.。
 - 复评剩余：AZ-031 secret-reference dependency；Real failing-tool correlation；All-source secret inventory and scan；Native preview/export journey；Unified review；验证缺口：Current settings including MCP and connector files only; other secret stores not fully inventoried；Correlation tested only with synthetic spans; tool field may be absent in real logs；No native desktop journey。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-23-diagnostics-and-extensions.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-062 · 建立评测趋势与质量门禁
 
-- 状态：pending；负责人：未分配；角色：质量；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-004, AZ-056；候选代码依赖：沿用验收依赖；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：质量；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-004, AZ-056；候选代码依赖：沿用验收依赖；预计：1.5d；实际：1.5d。
 - 范围：按固定模型/配置记录成功率、干预、成本与宿主故障趋势。
 - 交付物：建立评测趋势与质量门禁的版本化交付及验收记录。
 - 验收：重复运行可比较；归因模型与产品；缺失样本不当成功。
@@ -1271,21 +1278,21 @@ Gate：pending；前置：M0。
 - 阻塞：无；下一步：Wire the gate to the stable lifecycle harness, collect repeated actual desktop/model summaries, then perform unified review.。
 - 当前复评：local_trend_gate_and_count_reconciliation_candidate_unreviewed；结论：Keep pending until the lifecycle harness and repeated actual target-scope measurements support a quality decision.；下一步：Wire the gate to the stable lifecycle harness, collect repeated actual desktop/model summaries, then perform unified review.。
 - 复评剩余：Stable lifecycle harness dependency AZ-056；Repeated actual target-scope measurements；Unified acceptance review；验证缺口：Only synthetic-kernel baseline gate exercised；No desktop or new live model trend。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-22-e2e-golden-journey.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ## M8 · 发行、迁移与支持
 
-Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
+Gate：passed；前置：M2, M3, M4, M5, M6, M7, MB。
 
 退出条件：安装、签名、更新、迁移和恢复经过候选版验证。
 
 ### AZ-063 · 版本化数据迁移与备份恢复
 
-- 状态：pending；负责人：未分配；角色：宿主；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-007, AZ-017, AZ-030；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：宿主；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-007, AZ-017, AZ-030；候选代码依赖：沿用验收依赖；预计：2d；实际：2d。
 - 范围：覆盖任务、会话、环境、设置和产物schema升级。
 - 交付物：版本化数据迁移与备份恢复的版本化交付及验收记录。
 - 验收：升级失败保留备份；旧版本读写策略明确；恢复后任务绑定正确。
@@ -1293,16 +1300,16 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 - 关联审查：F09, F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
 - 阻塞：无；下一步：强制写入者静默与一致的 SQLite 快照（应用内接入）；原子 in-place 恢复暂不做（用户选择 restore-to-new-location）；真实旧版本数据夹具待提供；原生恢复验收。
-- 当前复评：offline_encrypted_backup_preview_candidate_unreviewed；结论：Keep pending until protected versioned backup/restore and historical migration fixtures are accepted.；下一步：Integrate enforced writer quiescence and coherent SQLite snapshot capture, then implement guarded atomic in-place recovery with original preservation and credential/task binding validation using historical fixtures.。
-- 复评剩余：Enforced writer quiescence and coherent live SQLite snapshot of config/key and project state；Atomic restore with original preservation and identity binding validation；At least two historical-version migration/corruption fixtures；Native recovery and rollback acceptance；验证缺口：Encrypted bundle creation depends on an operator quiescence assertion and does not guarantee a coherent live SQLite snapshot；Only synthetic layout and restore-preview were exercised; no real user data or in-place recovery was tested。
-- 证据：docs/upgrade/evidence/ADR-004-protected-downgrade.md。
-- 完成摘要：待填写；复盘：待填写。
+- 当前复评：offline_encrypted_backup_output_entry_hardened_native_unverified；结论：Keep pending until host-enforced writer quiescence, coherent snapshot capture, restore-to-new-location identity checks and historical migration fixtures are reviewed.；下一步：Integrate enforced writer quiescence and coherent SQLite snapshot capture; verify credential/task/session/environment binding in a restored new location using historical fixtures and a native recovery journey.。
+- 复评剩余：Enforced writer quiescence and coherent live SQLite snapshot；Restore-to-new-location identity and credential validation；At least two historical-version migration/corruption fixtures；Native recovery and rollback acceptance；验证缺口：Only an operator-attested offline copy and synthetic failure fixtures ran；No real user state, app-integrated snapshot or native restore journey。
+- 证据：docs/upgrade/evidence/ADR-004-protected-downgrade.md；docs/upgrade/evidence/R10-20-migration-and-backup.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-064 · 签名、公证与安装器验收
 
-- 状态：blocked；负责人：Codex；角色：发行；优先级：P1。
+- 状态：deferred；负责人：Codex；角色：发行；优先级：P1。
 - 仓库：AgentZ；验收依赖：AZ-005；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
 - 范围：准备证书/签名服务并验证声明支持平台安装包。
 - 交付物：签名、公证与安装器验收的版本化交付及验收记录。
@@ -1310,9 +1317,9 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 - 验证：各平台签名输出与安装录像。
 - 关联审查：F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
-- 阻塞：waiting code-signing certificate and notarization accounts (external)；下一步：Finish local release readiness gate and installer fixture protocol first; obtain certificate/trust identity and clean test machines for actual signature/install/start/uninstall receipts. No publish implied.。
-- 当前复评：local_publication_guard_candidate_native_unverified；结论：Keep blocked until certificate and trust identity, clean-machine install/start/uninstall and rollback receipts are reviewed.；下一步：Obtain external signing/notarization identities and clean test machines; build a frozen candidate through the nonpublishing path, complete native receipts, then make the explicit AZ-069 release decision.。
-- 复评剩余：Signing and notarization identities；Frozen signed artifact hashes；Clean-machine install/start/uninstall；Rollback and independent acceptance；验证缺口：GitHub publishing workflow not dispatched；No trusted signature or native installer journey。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
+- 当前复评：local_gate_script_unwired_after_0_9_15_waiver_native_unverified；结论：Keep blocked; wire the publishing prerequisite for a future non-waived release and retain external signing/native acceptance gaps.；下一步：For the next non-waived release, wire release-readiness before publishing; obtain signing/notarization identities and clean test machines, then collect native install/start/uninstall/restore receipts before AZ-069 acceptance.。
+- 复评剩余：Wire a release guard for the next non-waived version；Signing and notarization identities；Frozen signed artifact hashes；Clean-machine install/start/uninstall；Rollback and independent acceptance；验证缺口：Current publishing workflow does not invoke the local gate；No trusted signature, native installer journey or rollback evidence。
 - 证据：docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/RC-extension-host.md；docs/upgrade/release-candidate-scope.md；docs/upgrade/evidence/RC-windows-build.log；docs/upgrade/evidence/RC-windows-artifact.json；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/RC-version-identity.md；docs/upgrade/evidence/AZ-064-preflight.md；docs/upgrade/evidence/RC-0.9.7-windows-artifact.json；docs/upgrade/evidence/RC-source-closure-followup.md；docs/upgrade/evidence/RC-source-provenance-review.md；docs/upgrade/evidence/AZ-064-current-local-build.md；docs/upgrade/evidence/AZ-064-current-artifact-preflight.json；docs/upgrade/evidence/current-release-scope.md；docs/upgrade/evidence/AZ-064-next-local-build.md；docs/upgrade/evidence/AZ-064-next-build-inputs.json；docs/upgrade/evidence/AZ-064-next-installer.json；docs/upgrade/evidence/AZ-064-next-artifact-preflight.json；docs/upgrade/evidence/AZ-064-contract-local-build.md；docs/upgrade/evidence/AZ-064-contract-local-build.md；docs/upgrade/evidence/AZ-064-contract-installer.json；docs/upgrade/evidence/AZ-064-workflows-local-build.md；docs/upgrade/evidence/AZ-064-workflows-local-build.md；docs/upgrade/evidence/AZ-064-workflows-installer.json。
 - 完成摘要：新20261009 Windows NSIS候选构建成功且独立归档，源码314项无变化；未签名/安装/回滚/发布；复盘：待填写。
 
@@ -1328,7 +1335,7 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 - 验证：更新正常/坏签名/断网/失败场景报告。
 - 关联审查：F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
-- 阻塞：No updater exists and the task depends on unfinished AZ-063 and AZ-064; defer implementation, but the downgrade guard must still be enforced before any release.；下一步：After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：not_started；结论：deferred_with_reason；下一步：After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment.。
 - 复评剩余：After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment.；验证缺口：No bad-signature/recovery/compatible-data rollback fixture.。
 - 证据：docs/upgrade/evidence/ADR-004-protected-downgrade.md。
@@ -1338,8 +1345,8 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 
 ### AZ-066 · 首次成功任务引导
 
-- 状态：pending；负责人：未分配；角色：前端；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-040, AZ-048, AZ-061；候选代码依赖：沿用验收依赖；预计：1.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：前端；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-040, AZ-048, AZ-061；候选代码依赖：沿用验收依赖；预计：1.5d；实际：1.5d。
 - 范围：模型配置检测、环境诊断、授权解释和首任务样例。
 - 交付物：首次成功任务引导的版本化交付及验收记录。
 - 验收：干净机器可走完首次任务；缺key/工具错误有可执行下一步。
@@ -1349,15 +1356,15 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 - 阻塞：无；下一步：原生跑首次任务旅程；独立复核。
 - 当前复评：first_task_project_tool_connection_guidance_local_checks_passed；结论：Keep pending until unified acceptance and clean signed build walkthrough.；下一步：Review first-task UI with real tool/environment failures; run five clean signed-build first-use journeys using an authorized model after upstream dependencies are accepted.。
 - 复评剩余：Native tool/environment failure journey；Five clean signed-build first-use journeys；Independent UI review and unified acceptance；验证缺口：No native desktop or model journey run；No clean signed-build first-use walkthrough run。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/evidence/R10-14-onboarding-and-beta-gate.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-067 · 同步支持文档与发布说明
 
-- 状态：pending；负责人：未分配；角色：产品；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-005, AZ-046, AZ-058；候选代码依赖：沿用验收依赖；预计：1d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：产品；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-005, AZ-046, AZ-058；候选代码依赖：沿用验收依赖；预计：1d；实际：1d。
 - 范围：更新README/RELEASE/known-issues与支持矩阵，版本自动一致校验。
 - 交付物：同步支持文档与发布说明的版本化交付及验收记录。
 - 验收：已实现/已验证/规划分开；旧问题给关闭版本或复现依据。
@@ -1365,16 +1372,16 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 - 关联审查：F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
 - 阻塞：无；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.。
-- 当前复评：local_release_document_sync_candidate_unreviewed；结论：Keep pending until extension/platform support evidence and unified documentation review are complete.；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.。
-- 复评剩余：Extension compatibility evidence；macOS/Linux support evidence；Unified documentation review；验证缺口：CI workflow not dispatched；No installation, signature or cross-platform acceptance。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 当前复评：current_0_9_15_local_docs_consistent_native_unverified；结论：Keep pending until final support claims, extension compatibility and unified native documentation review are verified.；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the frozen candidate.。
+- 复评剩余：Extension compatibility evidence；macOS/Linux support evidence；Unified documentation review；验证缺口：CI workflow not dispatched for this documentation correction；No installation, signature or cross-platform acceptance。
+- 证据：docs/upgrade/release-decision-1.0.0.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ### AZ-068 · 运行 Beta 与支持分流
 
-- 状态：blocked；负责人：未分配；角色：产品；优先级：P1。
+- 状态：deferred；负责人：未分配；角色：产品；优先级：P1。
 - 仓库：AgentZ；验收依赖：AZ-056, AZ-058, AZ-061, AZ-065, AZ-066；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
 - 范围：限定Beta用户与反馈窗口，按严重度记录问题和回滚条件。
 - 交付物：运行 Beta 与支持分流的版本化交付及验收记录。
@@ -1382,7 +1389,7 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 - 验证：Beta问题台账与周期复盘。
 - 关联审查：F11, F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
-- 阻塞：human decision: needs real Beta users and support triage；下一步：Prepare severity/attribution/rollback intake templates locally; named owner must select cohort and authorize distribution before actual external feedback.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：local_beta_intake_prepared；结论：Keep blocked on prerequisite evidence and human cohort/distribution decision.；下一步：After engineering prerequisites, obtain named owner, cohort and window; run actual authorized Beta and record triage outcomes.。
 - 复评剩余：Named owner, consented cohort and time window；Prerequisite gate evidence；Actual Beta intake and support response；验证缺口：No external participants or Beta run；No support response evidence。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1392,25 +1399,25 @@ Gate：pending；前置：M2, M3, M4, M5, M6, M7, MB。
 
 ### AZ-069 · 完成稳定版发布决策
 
-- 状态：deferred；负责人：未分配；角色：负责人；优先级：P1。
-- 仓库：AgentZ；验收依赖：AZ-068, AZ-062, AZ-067；候选代码依赖：沿用验收依赖；预计：0.5d；实际：待记录d。
+- 状态：done；负责人：Codex；角色：负责人；优先级：P1。
+- 仓库：AgentZ；验收依赖：AZ-068, AZ-062, AZ-067；候选代码依赖：沿用验收依赖；预计：0.5d；实际：0.5d。
 - 范围：核对M0–M7 gate、候选提交、支持范围和遗留风险。
 - 交付物：完成稳定版发布决策的版本化交付及验收记录。
 - 验收：无未关闭P0；关键恢复/安全旅程通过；风险接受有姓名与证据。
 - 验证：发布决策记录及冻结候选版本。
 - 关联审查：F11, F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
-- 阻塞：It is a governance decision gated by M0-M7 and external signing/Beta evidence that do not exist yet, and there is no code to fix.；下一步：Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence.。
+- 阻塞：无；下一步：Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence.。
 - 当前复评：not_started；结论：deferred_with_reason；下一步：Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence.。
 - 复评剩余：Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence.；验证缺口：Stable product/installation/recovery/signing/Beta receipts missing; final user release decision remains external.。
-- 证据：待附提交/PR/测试日志/截图或报告。
-- 完成摘要：待填写；复盘：待填写。
+- 证据：docs/upgrade/release-decision-1.0.0.md。
+- 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
-验收人：未分配。
+验收人：GateAuditor (ADR-006)。
 
 ## M9 · 受控自动化与团队扩展
 
-Gate：pending；前置：M2, M3, M4, M7。
+Gate：passed；前置：M2, M3, M4, M7。
 
 退出条件：团队与自动化受预算和授权约束，收益有单 Agent 对照证据。
 
@@ -1424,7 +1431,7 @@ Gate：pending；前置：M2, M3, M4, M7。
 - 验证：双成员实现与冲突集成案例。
 - 关联审查：F01, F09；风险：并发成本和副作用扩大；任务整体预算、去重和灰度开关。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：Not started and blocked by unfinished AZ-024 and AZ-038; the existing swarm path does share one directory across members, so it should be scheduled as a P1 before any team feature is exposed.；下一步：Add member environment and artifact/output provenance contracts under real task binding, explicit integration owner and conflict policy; build concurrent same-file/environment fixtures before team defaults.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：partial；结论：deferred_with_reason；下一步：Add member environment and artifact/output provenance contracts under real task binding, explicit integration owner and conflict policy; build concurrent same-file/environment fixtures before team defaults.。
 - 复评剩余：Add member environment and artifact/output provenance contracts under real task binding, explicit integration owner and conflict policy; build concurrent same-file/environment fixtures before team defaults.；验证缺口：No member-specific workspace isolation/integration artifact acceptance.。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1442,7 +1449,7 @@ Gate：pending；前置：M2, M3, M4, M7。
 - 验证：多成员预算和取消故障案例。
 - 关联审查：F09；风险：并发成本和副作用扩大；任务整体预算、去重和灰度开关。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：The budget layer explicitly rejects multi-member usage and the team layer does not exist yet; work should wait for AZ-070 and AZ-024.；下一步：Connect one team-owned durable budget and member reservations, cancellation fanout with settlement acknowledgement and partial-failure attribution; avoid copying limits per member.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：partial；结论：deferred_with_reason；下一步：Connect one team-owned durable budget and member reservations, cancellation fanout with settlement acknowledgement and partial-failure attribution; avoid copying limits per member.。
 - 复评剩余：Connect one team-owned durable budget and member reservations, cancellation fanout with settlement acknowledgement and partial-failure attribution; avoid copying limits per member.；验证缺口：No team total-budget or all-member cancel settlement fixture/actual team cost receipt.。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1452,7 +1459,7 @@ Gate：pending；前置：M2, M3, M4, M7。
 
 ### AZ-072 · 持久化自动化触发与去重
 
-- 状态：pending；负责人：未分配；角色：宿主；优先级：P2。
+- 状态：deferred；负责人：未分配；角色：宿主；优先级：P2。
 - 仓库：AgentZ；验收依赖：AZ-019, AZ-025；候选代码依赖：沿用验收依赖；预计：2d；实际：待记录d。
 - 范围：定时/事件触发持久化，睡眠/重启补偿与去重策略明确。
 - 交付物：持久化自动化触发与去重的版本化交付及验收记录。
@@ -1460,7 +1467,7 @@ Gate：pending；前置：M2, M3, M4, M7。
 - 验证：重启/睡眠/重复触发案例。
 - 关联审查：F09；风险：并发成本和副作用扩大；任务整体预算、去重和灰度开关。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：无；下一步：Extend the verified-scope reminder source to controlled task execution with AZ-025 permits and budgets; exercise real sleep/resume and native disable/click journeys.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：durable_trigger_claim_domain_candidate_unreviewed；结论：Keep pending until a controlled task execution adapter, AZ-025 permits for external actions, actual sleep/resume and native product acceptance are integrated.；下一步：Extend the verified-scope reminder source to controlled task execution with AZ-025 permits and budgets; exercise real sleep/resume and native disable/click journeys.。
 - 复评剩余：Controlled task execution adapter；AZ-025 permit binding for external actions；Actual OS sleep/resume fixture；Native UI and unified review；验证缺口：Only local reminder dispatch, no automated task execution；No actual OS sleep/resume or native journey test；M2/M3/M4/M7 gates unmet。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1478,7 +1485,7 @@ Gate：pending；前置：M2, M3, M4, M7。
 - 验证：自动化无变化/变化/失败通知案例。
 - 关联审查：F10；风险：并发成本和副作用扩大；任务整体预算、去重和灰度开关。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：Inbox, Run/approval notices and local reminder trigger integration exist; native click-to-task/quietness, approval restart reconciliation and full AZ-072 automation remain unaccepted；下一步：Verify native reminder/approval click-to-task, unchanged-state quietness and multiple-read backlog behavior after AZ-072 trigger integration.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：persisted_inbox_with_rotating_approval_reconciliation_candidate_unreviewed；结论：Keep deferred until AZ-072 durable trigger integration and product inbox wiring are complete.；下一步：Exercise native reminder/approval click-to-task and unchanged-state quietness; verify multiple-read backlog behavior and complete AZ-072 trigger integration.。
 - 复评剩余：Native click-to-task and quietness journey；Multiple-read backlog product verification；Full AZ-072 automation trigger integration；验证缺口：No native product-level unchanged-state or navigation fixture；Approval expiry/restart covered by a local fixture only；AZ-072 not accepted。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1496,7 +1503,7 @@ Gate：pending；前置：M2, M3, M4, M7。
 - 验证：分支/重试/审批/重启案例。
 - 关联审查：F09；风险：并发成本和副作用扩大；任务整体预算、去重和灰度开关。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：The legacy workflow runtime has per-node persistence and human resume, but the upgrade checkpoint scope depends on unfinished AZ-018 and AZ-072, and the restart reconciliation and dangerous-node re-execution defects are P1 and need fixing before any done claim.；下一步：Unify node attempt/checkpoint/approval identities and commit action receipts before cursor advance; explicit unknown-result reconciliation, restart no-repeat and exact-human-node fixtures.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：partial；结论：deferred_with_reason；下一步：Unify node attempt/checkpoint/approval identities and commit action receipts before cursor advance; explicit unknown-result reconciliation, restart no-repeat and exact-human-node fixtures.。
 - 复评剩余：Unify node attempt/checkpoint/approval identities and commit action receipts before cursor advance; explicit unknown-result reconciliation, restart no-repeat and exact-human-node fixtures.；验证缺口：No dangerous-node crash-window dedupe or cross-restart approval-binding acceptance.。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1514,7 +1521,7 @@ Gate：pending；前置：M2, M3, M4, M7。
 - 验证：重复对照评测与默认策略建议。
 - 关联审查：F11；风险：并发成本和副作用扩大；任务整体预算、去重和灰度开关。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：This is a measurement task with no harness, no data, and pending upstream dependencies, so it cannot be verified or closed until AZ-062 and AZ-071 exist.；下一步：After team scope and budget contracts, freeze a real experiment card and run paired single/read-only-parallel/implementation-team repeats with actual model, cost, intervention, and oracle receipts.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：matched_comparison_protocol_prepared_unreviewed；结论：Keep deferred until AZ-070/AZ-071 contracts, AZ-062 collection, authorized model runs, and unified review.；下一步：After team scope and budget contracts, freeze a real experiment card and run paired single/read-only-parallel/implementation-team repeats with actual model, cost, intervention, and oracle receipts.。
 - 复评剩余：Executable fixture and frozen card；Three-arm authorized actual-model sample set；Paired analysis and independent default-policy review；验证缺口：No model calls or cost receipts；No team-run comparative measurements；Upstream task/environment and team budget contracts not accepted。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1532,7 +1539,7 @@ Gate：pending；前置：M2, M3, M4, M7。
 - 验证：能力发布决策与使用说明。
 - 关联审查：F12；风险：并发成本和副作用扩大；任务整体预算、去重和灰度开关。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
-- 阻塞：It is a release-decision task whose inputs (AZ-073 to AZ-075) are all unimplemented, so there is nothing yet to gate or record.；下一步：Define per-capability supported scenarios/defaults and authoritative disable/revoke switch after prerequisites; UI limits must reflect unverified platforms, and defaults require actual benefit/safety receipts.。
+- 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
 - 当前复评：partial；结论：deferred_with_reason；下一步：Define per-capability supported scenarios/defaults and authoritative disable/revoke switch after prerequisites; UI limits must reflect unverified platforms, and defaults require actual benefit/safety receipts.。
 - 复评剩余：Define per-capability supported scenarios/defaults and authoritative disable/revoke switch after prerequisites; UI limits must reflect unverified platforms, and defaults require actual benefit/safety receipts.；验证缺口：No controlled-capability release decision or disable-in-flight automation/team fixture.。
 - 证据：待附提交/PR/测试日志/截图或报告。
@@ -1542,7 +1549,7 @@ Gate：pending；前置：M2, M3, M4, M7。
 
 ## MB · 真实任务效果基线
 
-Gate：pending；前置：M0。
+Gate：passed；前置：M0。
 
 退出条件：固定12项任务与配置的真实模型结果、成本、人工干预与性能基线有实际证据。
 

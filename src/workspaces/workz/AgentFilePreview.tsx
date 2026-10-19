@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ideApi } from "../../services/tauri/ide";
+import { recordUserRecentEdit } from "../../services/tauri/chat";
 import type { FileContent } from "../codez/types";
 import Markdown from "../codez/Markdown";
 import ImagePreview from "../codez/ImagePreview";
@@ -13,9 +14,13 @@ interface AgentFilePreviewProps {
   /** Isolated worktree the agent ran in (paths resolve here when set). */
   workspaceDir?: string | null;
   onClose: () => void;
+  /** Handoff the isolated worktree + file into CodeZ editor. */
+  onOpenInCodeZ?: (opts: { worktreePath: string; filePath: string }) => void;
+  /** Continue the conversation with the user's latest edits to this file. */
+  onContinueWithEdits?: (opts: { path: string; content: string }) => void;
 }
 
-type ViewMode = "preview" | "source" | "diff";
+type ViewMode = "preview" | "source" | "edit" | "diff";
 
 function languageForPath(path: string, lang: string | null | undefined): string {
   if (lang?.trim()) return lang;
@@ -73,6 +78,8 @@ export default function AgentFilePreview({
   path,
   workspaceDir,
   onClose,
+  onOpenInCodeZ,
+  onContinueWithEdits,
 }: AgentFilePreviewProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -81,6 +88,9 @@ export default function AgentFilePreview({
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [diffOriginal, setDiffOriginal] = useState("");
   const [diffModified, setDiffModified] = useState("");
+  const [draftContent, setDraftContent] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
 
   const fullPath = resolveArtifactFullPath(projectDir, path, workspaceDir);
   const fileName = path.split("/").pop() ?? path;
@@ -91,6 +101,8 @@ export default function AgentFilePreview({
     setError(null);
     setFile(null);
     setViewMode("preview");
+    setDraftContent("");
+    setSavedFlash(false);
 
     (async () => {
       try {
@@ -100,6 +112,7 @@ export default function AgentFilePreview({
         ]);
         if (cancelled) return;
         setFile(read);
+        setDraftContent(read.content ?? "");
         if (diff && (diff.original !== diff.modified || diff.hunks.length > 0)) {
           setDiffOriginal(diff.original);
           setDiffModified(diff.modified);
@@ -120,51 +133,134 @@ export default function AgentFilePreview({
     return () => {
       cancelled = true;
     };
-  }, [fullPath, projectDir, path, t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullPath, projectDir, path]);
 
+  const isEditableText = Boolean(file && !file.is_binary && !isImagePath(path) && !isPdfPath(path));
+  const isDirty = Boolean(file && isEditableText && draftContent !== file.content);
+  const effectiveDiffOriginal = diffOriginal || (file?.content ?? "");
+  const effectiveDiffModified = isDirty ? draftContent : diffModified;
   const hasDiff =
-    diffOriginal !== diffModified && (diffOriginal.length > 0 || diffModified.length > 0);
+    (diffOriginal !== diffModified && (diffOriginal.length > 0 || diffModified.length > 0)) ||
+    isDirty;
   const previewableText = file && !file.is_binary && (isMarkdownPath(path) || isHtmlPath(path));
   const showImage = Boolean(file?.preview_data && isImagePath(path));
   const showPdf = Boolean(file?.preview_data && isPdfPath(path));
 
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (!file || !isEditableText || saving) return false;
+    setSaving(true);
+    setError(null);
+    try {
+      const beforeContent = file.content;
+      const digest = await ideApi.writeFile(fullPath, draftContent, file.sha256 ?? undefined);
+      recordUserRecentEdit({
+        projectDir: workspaceDir || projectDir,
+        path,
+        beforeContent,
+        afterContent: draftContent,
+      });
+      if (workspaceDir && workspaceDir !== projectDir) {
+        recordUserRecentEdit({
+          projectDir,
+          path,
+          beforeContent,
+          afterContent: draftContent,
+        });
+      }
+      setFile((prev) =>
+        prev ? { ...prev, content: draftContent, sha256: digest ?? prev.sha256 } : prev,
+      );
+      setDiffModified(draftContent);
+      setSavedFlash(true);
+      return true;
+    } catch (e) {
+      setError(String(e));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [file, isEditableText, saving, fullPath, draftContent, workspaceDir, projectDir, path]);
+
+  const handleContinueWithEdits = useCallback(async () => {
+    if (isDirty) {
+      const ok = await handleSave();
+      if (!ok) return;
+    }
+    onContinueWithEdits?.({ path, content: draftContent });
+  }, [isDirty, handleSave, onContinueWithEdits, path, draftContent]);
+
   const toolbar = (
     <div className="agentz-workz-preview-actions">
-      {hasDiff && (
+      {isEditableText && (
         <>
           <button
             type="button"
-            className={viewMode !== "diff" ? "active" : ""}
-            onClick={() => setViewMode(file && previewableText ? "preview" : "source")}
+            data-testid="preview-mode-preview"
+            className={viewMode === "preview" || viewMode === "source" ? "active" : ""}
+            onClick={() => setViewMode(previewableText ? "preview" : "source")}
           >
-            {t("agent.previewFile")}
+            {previewableText ? t("ide.viewPreview") : t("agent.previewFile")}
           </button>
+          {previewableText && (
+            <button
+              type="button"
+              data-testid="preview-mode-source"
+              className={viewMode === "source" ? "active" : ""}
+              onClick={() => setViewMode("source")}
+            >
+              {t("ide.viewSource")}
+            </button>
+          )}
           <button
             type="button"
-            className={viewMode === "diff" ? "active" : ""}
-            onClick={() => setViewMode("diff")}
+            data-testid="preview-mode-edit"
+            className={viewMode === "edit" ? "active" : ""}
+            onClick={() => setViewMode("edit")}
           >
-            {t("agent.previewDiff")}
+            {t("agent.previewEdit")}
           </button>
         </>
       )}
-      {previewableText && viewMode !== "diff" && (
-        <>
-          <button
-            type="button"
-            className={viewMode === "preview" ? "active" : ""}
-            onClick={() => setViewMode("preview")}
-          >
-            {t("ide.viewPreview")}
-          </button>
-          <button
-            type="button"
-            className={viewMode === "source" ? "active" : ""}
-            onClick={() => setViewMode("source")}
-          >
-            {t("ide.viewSource")}
-          </button>
-        </>
+      {hasDiff && (
+        <button
+          type="button"
+          data-testid="preview-mode-diff"
+          className={viewMode === "diff" ? "active" : ""}
+          onClick={() => setViewMode("diff")}
+        >
+          {t("agent.previewDiff")}
+        </button>
+      )}
+      {isEditableText && (viewMode === "edit" || isDirty) && (
+        <button
+          type="button"
+          data-testid="preview-save-btn"
+          className="agentz-workz-preview-save"
+          disabled={saving || !isDirty}
+          onClick={() => void handleSave()}
+        >
+          {saving
+            ? t("agent.previewSaving")
+            : savedFlash && !isDirty
+              ? t("agent.previewSaved")
+              : t("agent.previewSave")}
+        </button>
+      )}
+      {onOpenInCodeZ && (
+        <button
+          type="button"
+          className="agentz-workz-preview-open-codez"
+          data-testid="preview-open-in-codez"
+          onClick={() =>
+            onOpenInCodeZ({
+              worktreePath: workspaceDir || projectDir,
+              filePath: path,
+            })
+          }
+        >
+          {t("agent.openInCodeZ")}
+        </button>
       )}
       <button type="button" className="agentz-workz-preview-close" onClick={onClose} title={t("common.close")}>
         ×
@@ -177,12 +273,31 @@ export default function AgentFilePreview({
     body = <div className="agentz-workz-preview-muted">{t("common.loading")}</div>;
   } else if (error) {
     body = <div className="agentz-workz-preview-error">{error}</div>;
+  } else if (file && viewMode === "edit" && isEditableText) {
+    body = (
+      <textarea
+        data-testid="preview-edit-textarea"
+        className="agentz-workz-preview-editor"
+        value={draftContent}
+        onChange={(e) => {
+          setDraftContent(e.target.value);
+          setSavedFlash(false);
+        }}
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+            e.preventDefault();
+            void handleSave();
+          }
+        }}
+        spellCheck={false}
+      />
+    );
   } else if (file && viewMode === "diff" && hasDiff) {
     body = (
-      <pre className="agentz-workz-preview-diff">
-        <del>{diffOriginal}</del>
+      <pre className="agentz-workz-preview-diff" data-testid="preview-diff-pane">
+        <del>{effectiveDiffOriginal}</del>
         {"\n---\n"}
-        <ins>{diffModified}</ins>
+        <ins>{effectiveDiffModified}</ins>
       </pre>
     );
   } else if (file?.preview_data && showImage) {
@@ -217,10 +332,24 @@ export default function AgentFilePreview({
       <div className="agentz-workz-preview-head">
         <span className="agentz-workz-preview-title" title={path}>
           {fileName}
+          {isDirty ? " ●" : ""}
         </span>
         {toolbar}
       </div>
       <div className="agentz-workz-preview-body">{body}</div>
+      {isEditableText && (viewMode === "edit" || savedFlash || isDirty) && onContinueWithEdits && (
+        <div className="agentz-workz-preview-foot">
+          <button
+            type="button"
+            data-testid="preview-continue-with-edits"
+            className="agentz-workz-preview-continue-btn"
+            disabled={saving}
+            onClick={() => void handleContinueWithEdits()}
+          >
+            {t("agent.continueWithEdits")}
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

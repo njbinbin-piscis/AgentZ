@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-063",
+    "verified_state": "offline_encrypted_backup_alias_hardened_native_unverified",
+    "severity": "P1",
+    "finding": "The versioned offline encrypted backup candidate now canonicalizes the output parent and rejects junction/symlink aliases into the source roots or bundle before staging. Inventory also rejects physically overlapping roots reached through an aliased parent. The passphrase reader caps input at 4096 bytes and clears buffered secret chunks on exit. Synthetic Windows junction, oversized-passphrase and full inventory/backup round trips pass. The operator quiescence flag still does not guarantee a coherent live SQLite snapshot, and no real native recovery ran.",
+    "conclusion_proposal": "Keep pending until host-enforced writer quiescence, coherent snapshot capture, restore-to-new-location identity checks and historical migration fixtures are reviewed.",
+    "next_action": "Integrate enforced writer quiescence and coherent SQLite snapshot capture; verify credential/task/session/environment binding in a restored new location using historical fixtures and a native recovery journey.",
+    "remaining_work": ["Enforced writer quiescence and coherent live SQLite snapshot", "Restore-to-new-location identity and credential validation", "At least two historical-version migration/corruption fixtures", "Native recovery and rollback acceptance"],
+    "verification_gaps": ["Only an operator-attested offline copy and synthetic alias fixture ran", "No real user state, app-integrated snapshot or native restore journey"],
+    "evidence": ["docs/upgrade/evidence/AZ-063-2026-10-18-output-alias-guard.md", "docs/upgrade/evidence/AZ-063-2026-10-16/implementation.md"]
+  }
+]

@@ -32,9 +32,11 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:e2e
       - run: npm run build:exthost
       - run: npm --prefix extension-host run smoke
       - run: npm run build
+      - run: node scripts/perf-harness.mjs
 
   rust:
     name: Desktop host (cargo check)

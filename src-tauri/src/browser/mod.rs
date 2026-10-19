@@ -7,14 +7,160 @@
 pub mod activity;
 pub mod events;
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use chromiumoxide::cdp::browser_protocol::page::CaptureScreenshotFormat;
 use chromiumoxide::page::{Page, ScreenshotParams};
+use piscis_kernel::agent::tool::{Tool, ToolContext, ToolResult};
 use robotz_browser::{create_browser_manager, BrowserOptions, SharedBrowserManager};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
+
+/// Tracks page navigation generations and snapshot-bound element refs (AZ-053 / R10-04).
+#[derive(Clone, Debug)]
+pub struct BrowserGenerationTracker {
+    navigation_generation: Arc<AtomicU64>,
+    last_snapshot_generation: Arc<AtomicU64>,
+}
+
+impl Default for BrowserGenerationTracker {
+    fn default() -> Self {
+        Self {
+            navigation_generation: Arc::new(AtomicU64::new(1)),
+            last_snapshot_generation: Arc::new(AtomicU64::new(0)),
+        }
+    }
+}
+
+impl BrowserGenerationTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn current_generation(&self) -> u64 {
+        self.navigation_generation.load(Ordering::SeqCst)
+    }
+
+    pub fn last_snapshot_generation(&self) -> u64 {
+        self.last_snapshot_generation.load(Ordering::SeqCst)
+    }
+
+    /// Synchronously advances the navigation generation and invalidates prior snapshots.
+    pub fn advance_navigation(&self) -> u64 {
+        self.navigation_generation.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    /// Records that a fresh DOM snapshot was captured for the current page generation.
+    pub fn record_snapshot(&self) -> u64 {
+        let current = self.current_generation();
+        self.last_snapshot_generation.store(current, Ordering::SeqCst);
+        current
+    }
+
+    /// Validates an element `ref` against the current page generation.
+    /// Supports explicit `snapshot_generation` parameter, `ref@gen` syntax, or the latest snapshot generation.
+    pub fn validate_element_ref(
+        &self,
+        raw_ref: &str,
+        explicit_generation: Option<u64>,
+    ) -> std::result::Result<(String, u64), String> {
+        let trimmed = raw_ref.trim();
+        if trimmed.is_empty() {
+            return Err("StaleElementRef: empty element ref".to_string());
+        }
+        let (clean_ref, inline_gen) = match trimmed.rsplit_once('@') {
+            Some((base, gen_str)) if !base.is_empty() => match gen_str.parse::<u64>() {
+                Ok(g) => (base.to_string(), Some(g)),
+                Err(_) => (trimmed.to_string(), None),
+            },
+            _ => (trimmed.to_string(), None),
+        };
+        let current = self.current_generation();
+        let expected = explicit_generation
+            .or(inline_gen)
+            .unwrap_or_else(|| self.last_snapshot_generation());
+        if expected == 0 {
+            return Err(format!(
+                "StaleElementRef: ref '{clean_ref}' used before any snapshot was taken on generation {current}; call browser snapshot first"
+            ));
+        }
+        if expected != current {
+            return Err(format!(
+                "StaleElementRef: ref '{clean_ref}' belongs to snapshot_generation {expected}, but page is at generation {current} after navigation; call browser snapshot first"
+            ));
+        }
+        Ok((clean_ref, current))
+    }
+}
+
+/// Generation-guarded wrapper around [`robotz_browser::BrowserTool`].
+pub struct GuardedBrowserTool {
+    inner: robotz_browser::BrowserTool,
+    generations: BrowserGenerationTracker,
+}
+
+impl GuardedBrowserTool {
+    pub fn new(manager: SharedBrowserManager, generations: BrowserGenerationTracker) -> Self {
+        Self {
+            inner: robotz_browser::BrowserTool::new(manager),
+            generations,
+        }
+    }
+}
+
+#[async_trait]
+impl Tool for GuardedBrowserTool {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+
+    fn input_schema(&self) -> serde_json::Value {
+        self.inner.input_schema()
+    }
+
+    async fn call(&self, mut input: serde_json::Value, ctx: &ToolContext) -> Result<ToolResult> {
+        let action = input
+            .get("action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+
+        if matches!(
+            action.as_str(),
+            "navigate" | "goto" | "open" | "reload" | "back" | "forward" | "close"
+        ) {
+            self.generations.advance_navigation();
+        } else if let Some(raw_ref) = input
+            .get("ref")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.trim().is_empty())
+        {
+            let explicit_gen = input.get("snapshot_generation").and_then(|v| v.as_u64());
+            match self.generations.validate_element_ref(raw_ref, explicit_gen) {
+                Ok((clean_ref, _)) => {
+                    if let Some(obj) = input.as_object_mut() {
+                        obj.insert("ref".to_string(), serde_json::Value::String(clean_ref));
+                    }
+                }
+                Err(msg) => return Ok(ToolResult::err(msg)),
+            }
+        }
+
+        let mut res = self.inner.call(input, ctx).await?;
+        if action == "snapshot" && !res.is_error {
+            let gen = self.generations.record_snapshot();
+            res.content = format!("{}\n[snapshot_generation={gen}]", res.content);
+        }
+        Ok(res)
+    }
+}
 
 /// Page scroll geometry, returned to the panel so it can drive a synthetic
 /// scrollbar (the screenshot-based view has no native one).
@@ -60,6 +206,8 @@ pub struct BrowserState {
     pub url: String,
     pub viewport_width: u32,
     pub viewport_height: u32,
+    #[serde(default)]
+    pub snapshot_generation: u64,
 }
 
 /// Cloneable handle to the live Chromium session. Stored in `AppState` and
@@ -68,6 +216,7 @@ pub struct BrowserState {
 pub struct BrowserManager {
     inner: SharedBrowserManager,
     viewport: Arc<Mutex<(u32, u32)>>,
+    generations: BrowserGenerationTracker,
 }
 
 impl Default for BrowserManager {
@@ -79,6 +228,7 @@ impl Default for BrowserManager {
         Self {
             inner: create_browser_manager(options),
             viewport: Arc::new(Mutex::new((1280, 800))),
+            generations: BrowserGenerationTracker::new(),
         }
     }
 }
@@ -91,6 +241,16 @@ impl BrowserManager {
     /// Shared handle for [`robotz_browser::BrowserTool`] registration.
     pub fn shared(&self) -> SharedBrowserManager {
         self.inner.clone()
+    }
+
+    /// Returns the shared generation tracker for DOM snapshot / navigation validation.
+    pub fn generations(&self) -> BrowserGenerationTracker {
+        self.generations.clone()
+    }
+
+    /// Builds a generation-guarded [`GuardedBrowserTool`] bound to this manager.
+    pub fn guarded_tool(&self) -> GuardedBrowserTool {
+        GuardedBrowserTool::new(self.inner.clone(), self.generations.clone())
     }
 
     /// Run a closure with the active page, launching Chrome first if needed.
@@ -177,6 +337,7 @@ impl BrowserManager {
 
     /// Navigate to `url` and wait for the load to settle. Returns the final URL.
     pub async fn navigate(&self, url: &str) -> Result<String> {
+        self.generations.advance_navigation();
         let target = normalise_url(url);
         self.with_page(|page| async move {
             page.goto(target.as_str())
@@ -337,11 +498,13 @@ impl BrowserManager {
             url,
             viewport_width: width,
             viewport_height: height,
+            snapshot_generation: self.generations.current_generation(),
         }
     }
 
     /// Close the browser.
     pub async fn close(&self) -> Result<()> {
+        self.generations.advance_navigation();
         self.inner.lock().await.close().await;
         Ok(())
     }
@@ -479,6 +642,74 @@ fn normalise_url(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn snapshot_generation_rejects_stale_element_refs_after_navigation() {
+        let tracker = BrowserGenerationTracker::new();
+        assert_eq!(tracker.current_generation(), 1);
+        assert_eq!(tracker.last_snapshot_generation(), 0);
+
+        // Using a ref before any snapshot fails closed with StaleElementRef.
+        let err_before = tracker.validate_element_ref("e12", None).unwrap_err();
+        assert!(err_before.contains("StaleElementRef"), "{err_before}");
+
+        // Take a snapshot on generation 1 -> ref is valid.
+        let snap_gen = tracker.record_snapshot();
+        assert_eq!(snap_gen, 1);
+        let (clean_ref, validated_gen) = tracker.validate_element_ref("e12@1", None).unwrap();
+        assert_eq!(clean_ref, "e12");
+        assert_eq!(validated_gen, 1);
+
+        // User or agent navigates -> generation advances to 2, invalidating generation 1 refs.
+        let next_gen = tracker.advance_navigation();
+        assert_eq!(next_gen, 2);
+
+        let stale_implicit = tracker.validate_element_ref("e12", None).unwrap_err();
+        assert!(stale_implicit.contains("StaleElementRef"), "{stale_implicit}");
+        assert!(stale_implicit.contains("generation 2"), "{stale_implicit}");
+
+        let stale_explicit = tracker.validate_element_ref("e12", Some(1)).unwrap_err();
+        assert!(stale_explicit.contains("StaleElementRef"), "{stale_explicit}");
+
+        // Fresh snapshot on generation 2 restores validity for generation 2 refs.
+        assert_eq!(tracker.record_snapshot(), 2);
+        let (clean2, gen2) = tracker.validate_element_ref("e42@2", None).unwrap();
+        assert_eq!(clean2, "e42");
+        assert_eq!(gen2, 2);
+    }
+
+    #[tokio::test]
+    async fn guarded_browser_tool_fails_closed_on_stale_ref_without_launching_browser() {
+        let mgr = BrowserManager::new();
+        let tool = mgr.guarded_tool();
+        mgr.generations().record_snapshot(); // snapshot at gen 1
+        mgr.generations().advance_navigation(); // navigate to gen 2
+
+        let ctx = ToolContext {
+            session_id: "test".to_string(),
+            workspace_root: std::path::PathBuf::from("."),
+            bypass_permissions: false,
+            settings: Arc::new(piscis_kernel::agent::tool::ToolSettings::default()),
+            max_iterations: None,
+            memory_owner_id: "test".to_string(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            loop_halt: None,
+        };
+        let res = tool
+            .call(
+                serde_json::json!({
+                    "action": "click",
+                    "ref": "e7@1"
+                }),
+                &ctx,
+            )
+            .await
+            .expect("tool call should not panic");
+        assert!(res.is_error);
+        assert!(res.content.contains("StaleElementRef"), "{}", res.content);
+    }
 
     /// Requires a local Chromium install; CI runners do not ship one.
     #[tokio::test]

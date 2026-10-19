@@ -1,11 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 
+export interface DiagnosticContextSummary {
+  latest_run_id?: string | null;
+  latest_task_id?: string | null;
+  latest_environment_id?: string | null;
+  failure_count?: number;
+}
+
 export interface DiagnosticExportPreview {
   schema_version: number;
   app_version: string;
   files: { name: string; bytes: number }[];
   total_bytes: number;
   redaction_ready: boolean;
+  context_summary?: DiagnosticContextSummary;
 }
 
 export function previewDiagnosticLogs(): Promise<DiagnosticExportPreview> {

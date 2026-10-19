@@ -21,6 +21,7 @@ export interface BrowserState {
   url: string;
   viewport_width: number;
   viewport_height: number;
+  snapshot_generation?: number;
 }
 
 export interface BrowserCloseGuard {

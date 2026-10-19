@@ -72,6 +72,8 @@ export interface TaskPanelProps {
   busy: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Optional lightweight clear/cancel callback for the persisted plan. */
+  onClearPlan?: () => void;
   /** Extra class for layout tweaks (e.g. agent vs IDE spacing). */
   className?: string;
 }
@@ -81,27 +83,41 @@ export interface TaskPanelProps {
  * (see {@link ToolTrace}), so this panel is purely the task plan: it hides
  * when there is no plan and never auto-expands.
  */
-function TaskPanel({ planItems, busy, open, onOpenChange, className }: TaskPanelProps) {
+function TaskPanel({ planItems, busy, open, onOpenChange, onClearPlan, className }: TaskPanelProps) {
   const { t } = useTranslation();
 
   if (planItems.length === 0) return null;
 
+  const doneCount = planItems.filter((item) => item.status === "completed").length;
+
   return (
     <div className={`agentz-task-panel${className ? ` ${className}` : ""}`}>
-      <button
-        type="button"
-        className="agentz-task-panel-header"
-        onClick={() => onOpenChange(!open)}
-        aria-expanded={open}
-      >
-        <div className="agentz-task-panel-title">
-          <span className="agentz-task-panel-label">{t("chat.taskPanel")}</span>
-          <span className="agentz-task-badge">
-            Todo · {busy ? t("chat.planWorking", { count: planItems.length }) : planItems.length}
-          </span>
-        </div>
-        <span className="agentz-task-chevron">{open ? "▲" : "▼"}</span>
-      </button>
+      <div className="agentz-task-panel-header-row">
+        <button
+          type="button"
+          className="agentz-task-panel-header"
+          onClick={() => onOpenChange(!open)}
+          aria-expanded={open}
+        >
+          <div className="agentz-task-panel-title">
+            <span className="agentz-task-panel-label">{t("chat.taskPanel")}</span>
+            <span className="agentz-task-badge">
+              Todo · {busy ? t("chat.planWorking", { count: planItems.length }) : `${doneCount}/${planItems.length}`}
+            </span>
+          </div>
+          <span className="agentz-task-chevron">{open ? "▲" : "▼"}</span>
+        </button>
+        {onClearPlan && !busy && (
+          <button
+            type="button"
+            className="agentz-task-panel-clear"
+            onClick={onClearPlan}
+            title={t("chat.durablePlan.cancel", { defaultValue: "Clear plan" })}
+          >
+            {t("common.clear", { defaultValue: "Clear" })}
+          </button>
+        )}
+      </div>
       {open && (
         <div className="agentz-task-panel-body">
           <PlanPanel items={planItems} />

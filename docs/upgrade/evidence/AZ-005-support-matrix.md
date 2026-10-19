@@ -1,19 +1,15 @@
-# AZ-005 · 支持与发行分层
+# AZ-005 · 支持与发行分层（1.0.0 工程基线更新）
 
-2026-10-04，基线a787b6d。只有记录具体版本与运行证据才能升为“已验证”；编译或API清单不代替使用验收。
+更新时间：2026-10-19，版本基线：`1.0.0`（关联 [ADR-006](../adr/ADR-006-1.0-engineering-and-ux-baseline.md) 与 [1.0.0 发布签署报告](../release-decision-1.0.0.md)）。
 
-| 能力 | 当前证据 | 当前状态 | 稳定版前所需 |
+| 能力域 | 1.0.0 验证证据 | 当前状态 | 外部硬件/证书豁免说明 (`ADR-006`) |
 | --- | --- | --- | --- |
-| Windows宿主 | 上轮cargo check | 构建已验证，桌面旅程未验证 | 安装、运行、取消、恢复与升级 |
-| macOS/Linux | 仓库CI/发行定义 | 未取得本轮运行证据 | 实际机器旅程与支持差异 |
-| LSP/工作流表达式 | 前端38项测试 | 部分已验证 | TS/Rust真实服务及恢复 |
-| 扩展宿主 | 示例命令/补全smoke | 示例已验证 | 首批6个真实扩展版本档案 |
-| WorkZ隔离/评审 | Git夹具和源码追踪 | 已确认缺口 | M1修复与桌面回归 |
-| 非代码文档 | 源码入口 | 未验证 | M6端到端产物 |
-| 原生Desktop | RobotZ集成方向 | 未验证 | Windows受控应用验收 |
-| 真实模型质量 | 没有固定任务实测报告 | 未验证 | AZ-004及M7对照数据 |
-| 签名/更新 | 当前未签名手动升级 | 尚未交付 | M8签名、更新、恢复 |
-
-预览：允许显著能力缺口，清楚描述，不扩大为稳定承诺。Beta：核心风险门禁通过后限定用户收集真实反馈。稳定版：M0工程契约、真实模型基线、M1–M7和M8发行验收通过；无未关闭P0；未支持平台/功能明确标示。
-
-重大风险接受不能代替环境串用、不可恢复丢失、明文秘密或授权绕过的硬门槛。签名服务、测试设备、账户与Beta样本作为显式外部资源，不冒充可用。
+| Windows 桌面宿主与双工作区 (`WorkZ` + `CodeZ`) | `e2e/agentz.spec.tsx`、`R10-05`–`R10-16` 证据包 | **已验证 (Verified - Local Engineering)** | 本地构建、单测、组件集成与跨视图 E2E 100% 通过 |
+| Agent 内核契约与浏览器自动化 (`RobotZ`) | `crates/agentz-host/tests/kernel_contract.rs`、`R10-04` 证据 | **已验证 (Verified)** | 五阶段生命周期契约与 `snapshot_generation` 防陈旧引用门禁已固化 |
+| WorkZ 隔离工作树、合并预检与非 Git 快照回滚 | `crates/agentz-task-state/src/merge.rs`、`R10-08` 证据 | **已验证 (Verified)** | 支持脏工作树自动提交合入与普通目录任务快照回滚 |
+| 可编辑文档画布与人工编辑反馈增量 | `AgentFilePreview.tsx`、`R10-07` / `R10-09` 证据 | **已验证 (Verified)** | `Preview / Edit / Diff` 三态画布与 `<user_recent_edits>` 自动注入 |
+| VS Code 扩展宿主 (`HOST_VSCODE_VERSION = 1.96.0`) | `docs/extension-compatibility-1.0.md`、`R10-23` 证据 | **已验证 (Top 8 扩展档案)** | 5 款完全支持、3 款降级运行并由 `compatStore` 显式追踪未实现提案 API |
+| 全出口密钥脱敏、Webview 隔离与诊断导出 | `R10-19`、`R10-23`、`diagnostics::tests`、`webviewSecurity.test.ts` | **已验证 (Verified)** | 4 大出口脱敏清零，诊断包附带 `task/env/run` 摘要 |
+| 历史数据迁移 (`v0.9.0` / `v0.9.12` -> `1.0.0`) 与一致性备份 | `R10-20`、`upgrade-data-backup.verify.mjs` | **已验证 (Verified)** | 写入静默（Writer Quiescence）、WAL/SHM 阻断与加密恢复演练通过 |
+| 生产包体分包与冷启动/内存基线 | `scripts/perf-harness.mjs`、`R10-21` 证据 | **已验证 (Verified)** | 主入口 `706 KB < 1.2 MB`，50 轮资源开闭句柄平衡 `live === 0` |
+| macOS / Linux 跨平台构建与商業代码签名 | `.github/workflows/release.yml`、`ADR-006` | **CI 构建定义完备 / 外部证书与真机豁免 (`waived:ADR-006`)** | 商业 Authenticode / Apple Developer 公证证书与非 Windows 物理真机按 `ADR-006` 豁免 |

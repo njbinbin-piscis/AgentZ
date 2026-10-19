@@ -1,0 +1,53 @@
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import WorkzEmptyState, { WORKZ_STARTER_SCENARIOS } from "./WorkzEmptyState";
+
+const tFn = (key: string) => key;
+const i18nObj = { language: "zh-CN" };
+const translationHook = { t: tFn, i18n: i18nObj };
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => translationHook,
+}));
+
+describe("WorkzEmptyState (R10-12)", () => {
+  let root: ReactTestRenderer | null = null;
+
+  afterEach(async () => {
+    if (root) {
+      await act(async () => {
+        root?.unmount();
+      });
+      root = null;
+    }
+  });
+
+  it("renders all 4 starter scenario cards and triggers onSelectScenario when clicked", async () => {
+    const onSelect = vi.fn();
+
+    await act(async () => {
+      root = create(
+        <WorkzEmptyState
+          title="AgentZ WorkZ"
+          subtitle="Choose a task"
+          onSelectScenario={onSelect}
+        />,
+      );
+    });
+
+    expect(WORKZ_STARTER_SCENARIOS).toHaveLength(4);
+    for (const sc of WORKZ_STARTER_SCENARIOS) {
+      const btn = root!.root.findByProps({ "data-testid": `workz-starter-${sc.id}` });
+      expect(btn).toBeTruthy();
+    }
+
+    const codeCard = root!.root.findByProps({ "data-testid": "workz-starter-code" });
+    await act(async () => {
+      codeCard.props.onClick();
+    });
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0][0].id).toBe("code");
+    expect(onSelect.mock.calls[0][0].recommendIsolate).toBe(true);
+  });
+});

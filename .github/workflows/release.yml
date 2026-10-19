@@ -58,6 +58,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run test:e2e
       - name: Fetch bundled Node runtime
         run: npm --prefix extension-host run fetch-node
 
@@ -129,6 +130,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run test:e2e
       - name: Fetch bundled Node runtime
         run: npm --prefix extension-host run fetch-node
 
@@ -184,6 +186,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run test:e2e
       - name: Fetch bundled Node runtime
         run: npm --prefix extension-host run fetch-node
 
@@ -238,6 +241,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run test:e2e
       - name: Fetch bundled Node runtime
         run: npm --prefix extension-host run fetch-node
 
@@ -295,6 +299,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run test:e2e
       - name: Fetch bundled Node runtime
         run: npm --prefix extension-host run fetch-node
 
@@ -352,6 +357,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run test:e2e
       - name: Fetch bundled Node runtime
         run: npm --prefix extension-host run fetch-node
 

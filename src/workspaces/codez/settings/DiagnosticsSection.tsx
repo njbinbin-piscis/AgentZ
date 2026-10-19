@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { exportDiagnosticLogs, previewDiagnosticLogs, type DiagnosticExportPreview } from "../../../services/tauri/diagnostics";
+import {
+  exportDiagnosticLogs,
+  previewDiagnosticLogs,
+  type DiagnosticExportPreview,
+} from "../../../services/tauri/diagnostics";
 
 export default function DiagnosticsSection() {
   const { t } = useTranslation();
@@ -41,16 +45,56 @@ export default function DiagnosticsSection() {
     <section className="agentz-settings-section" aria-label={t("settings.diagnosticsTitle")}>
       <h3>{t("settings.diagnosticsTitle")}</h3>
       <p>{t("settings.diagnosticsDescription")}</p>
-      <button type="button" disabled={busy} onClick={() => void loadPreview()}>{t("settings.diagnosticsPreview")}</button>
+      <button
+        type="button"
+        data-testid="diagnostics-preview-btn"
+        disabled={busy}
+        onClick={() => void loadPreview()}
+      >
+        {t("settings.diagnosticsPreview")}
+      </button>
       {preview && (
-        <div>
-          <p>{t("settings.diagnosticsScope", { version: preview.app_version, files: preview.files.length, bytes: preview.total_bytes })}</p>
-          <ul>{preview.files.map((file) => <li key={file.name}>{file.name} ({file.bytes} B)</li>)}</ul>
-          <button type="button" disabled={busy || !preview.redaction_ready} onClick={() => void exportLogs()}>{t("settings.diagnosticsExport")}</button>
+        <div data-testid="diagnostics-preview-card">
+          <p>
+            {t("settings.diagnosticsScope", {
+              version: preview.app_version,
+              files: preview.files.length,
+              bytes: preview.total_bytes,
+            })}
+          </p>
+          {preview.context_summary && (
+            <p data-testid="diagnostics-context-summary">
+              {t("settings.diagnosticsContextSummary", {
+                taskId: preview.context_summary.latest_task_id || "-",
+                envId: preview.context_summary.latest_environment_id || "-",
+                runId: preview.context_summary.latest_run_id || "-",
+                failures: preview.context_summary.failure_count ?? 0,
+              })}
+            </p>
+          )}
+          <ul>
+            {preview.files.map((file) => (
+              <li key={file.name}>
+                {file.name} ({file.bytes} B)
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            data-testid="diagnostics-export-btn"
+            disabled={busy || !preview.redaction_ready}
+            onClick={() => void exportLogs()}
+          >
+            {t("settings.diagnosticsExport")}
+          </button>
         </div>
       )}
       {error && <p role="alert">{error}</p>}
-      {exportPath && <p>{t("settings.diagnosticsSaved", { path: exportPath })}</p>}
+      {exportPath && (
+        <p data-testid="diagnostics-saved-path">
+          {t("settings.diagnosticsSaved", { path: exportPath })}
+        </p>
+      )}
     </section>
   );
 }

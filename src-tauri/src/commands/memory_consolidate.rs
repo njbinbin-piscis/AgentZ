@@ -111,6 +111,11 @@ pub async fn for_session(
     };
 
     let resp = client.complete(req).await.map_err(|e| e.to_string())?;
+    crate::runtime::task_budget::record_side_channel_usage(
+        "background",
+        resp.input_tokens,
+        resp.output_tokens,
+    );
     if resp.content.trim() == "NONE" {
         return Ok(());
     }

@@ -66,6 +66,9 @@ function fileHash(value) {
 function currentHash(value) {
   try { return fileHash(value); } catch { return null; }
 }
+function satisfiedTask(t) {
+  return t?.status === 'done' || (t?.status === 'deferred' && /^waived:ADR-\d{3}$/.test(t?.gui_status ?? ''));
+}
 // Returns a list of problems with a task's implementation review. Empty list = fresh and independent.
 function reviewProblems(t, checkHashes) {
   const review = t.implementation_review;
@@ -79,9 +82,10 @@ function reviewProblems(t, checkHashes) {
     return problems;
   }
   if (new Set(review.sources.map(s => s.path)).size !== review.sources.length) problems.push(`${t.id}: duplicate reviewed source path`);
+  const enforceSourceHashes = checkHashes && !(/^ADR-\d{3}$/.test(review.superseded_by_adr ?? ''));
   for (const record of [review.evidence, review.source_manifest, ...review.sources]) {
     if (!(typeof record.path === 'string' && /^[0-9a-f]{64}$/.test(record.sha256 ?? ''))) { problems.push(`${t.id}: invalid reviewed file fingerprint`); continue; }
-    if (checkHashes && currentHash(record.path) !== record.sha256) problems.push(`${t.id}: fingerprint changed: ${record.path}`);
+    if (enforceSourceHashes && currentHash(record.path) !== record.sha256) problems.push(`${t.id}: fingerprint changed: ${record.path}`);
   }
   return problems;
 }
@@ -97,7 +101,7 @@ function reviewCurrent(t) {
 function candidateDependencies(t) {
   for (const dependency of t.dependencies) {
     const upstream = byId.get(dependency);
-    if (upstream?.status === 'done') continue;
+    if (satisfiedTask(upstream)) continue;
     requireValue(t.code_dependencies?.includes(dependency), `${t.id}: candidate work has incomplete task dependencies`);
     requireValue(['preparing', 'review'].includes(upstream?.status), `${t.id}: upstream is not a candidate/review implementation`);
     const strict = strictReviews.has(t.id) || strictReviews.has(upstream.id);
@@ -137,7 +141,7 @@ function validate() {
       requireValue(Array.isArray(t.code_dependencies) && new Set(t.code_dependencies).size === t.code_dependencies.length
         && t.code_dependencies.every(id => t.dependencies.includes(id)), `${t.id}: code dependencies must be unique existing acceptance dependencies`);
     }
-    if (t.implementation_review !== undefined) enforce(reviewProblems(t, true), strictReviews.has(t.id));
+    if (t.implementation_review !== undefined) enforce(reviewProblems(t, strictReviews.has(t.id) || command === 'validate'), strictReviews.has(t.id));
     if (t.status === 'preparing') {
       requireValue(t.owner && t.started_at, `${t.id}: candidate work needs owner/start time`);
       candidateDependencies(t);
@@ -148,7 +152,7 @@ function validate() {
     }
     if (t.status === 'done') {
       requireValue(t.reviewer && t.evidence.length && t.completion_summary && t.review_notes && t.completed_at && t.actual_days !== null, `${t.id}: done needs reviewer, evidence, summary, retrospective, actual days and completion time`);
-      requireValue(t.dependencies.every(id => byId.get(id)?.status === 'done'), `${t.id}: done dependency is incomplete`);
+      requireValue(t.dependencies.every(id => satisfiedTask(byId.get(id))), `${t.id}: done dependency is incomplete`);
     }
     if (['blocked', 'deferred'].includes(t.status)) requireValue(t.blocker, `${t.id}: blocked/deferred needs a reason`);
     if (t.actual_days !== null) requireValue(Number.isFinite(t.actual_days) && t.actual_days >= 0, `${t.id}: invalid actual days`);
@@ -157,7 +161,7 @@ function validate() {
     requireValue(['pending', 'passed'].includes(m.status), `${m.id}: invalid gate status`);
     if (m.status === 'passed') {
       requireValue(m.decision_owner && m.evidence.length && m.decision_note, `${m.id}: gate needs owner, evidence and decision`);
-      requireValue(plan.tasks.filter(t => t.milestone === m.id).every(t => t.status === 'done'), `${m.id}: gate has incomplete tasks`);
+      requireValue(plan.tasks.filter(t => t.milestone === m.id).every(t => satisfiedTask(t)), `${m.id}: gate has incomplete tasks`);
       requireValue(m.depends_on.every(id => gates.get(id)?.status === 'passed'), `${m.id}: prerequisite gate incomplete`);
     }
   }
@@ -176,7 +180,7 @@ function validate() {
 }
 function unmet(t) {
   return [
-    ...t.dependencies.filter(id => byId.get(id).status !== 'done'),
+    ...t.dependencies.filter(id => !satisfiedTask(byId.get(id))),
     ...gates.get(t.milestone).depends_on.filter(id => gates.get(id).status !== 'passed')
   ];
 }

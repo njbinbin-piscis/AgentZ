@@ -497,6 +497,7 @@ pub async fn agent_task_merge_preview(
     task_id: String,
     base: String,
     expected_task_head: String,
+    auto_commit_uncommitted: Option<bool>,
 ) -> Result<agentz_task_state::merge::Preview, agentz_task_state::merge::MergeError> {
     use agentz_task_state::merge::MergeError;
     let project = PathBuf::from(
@@ -512,8 +513,13 @@ pub async fn agent_task_merge_preview(
     tokio::task::spawn_blocking(move || {
         let _repository_lease = repository_lease;
         let _worker_lease = lease;
+        let effective_head = if auto_commit_uncommitted.unwrap_or(false) {
+            agentz_task_state::merge::commit_uncommitted_task_changes(&project, &task_id)?
+        } else {
+            expected_task_head
+        };
         let preview =
-            agentz_task_state::merge::preview(&project, &task_id, &base, &expected_task_head)?;
+            agentz_task_state::merge::preview(&project, &task_id, &base, &effective_head)?;
         if preview.repository != key {
             return Err(MergeError::new(
                 "repository_changed",
@@ -688,5 +694,114 @@ pub async fn agent_task_open_pr(
                 String::from_utf8_lossy(&output.stderr).trim()
             ),
         })
+    }
+}
+
+/// Roll back all file changes recorded by the file journal for a task/session (`R10-08`).
+/// Works for both Git and non-Git folders by replaying `undo_turn` in reverse turn order
+/// until `latest_turn_with_changes` returns `None`.
+pub fn rollback_session_journal_changes(
+    journal: &crate::journal::FileJournal,
+    session_id: &str,
+) -> Result<Vec<String>, String> {
+    let mut restored_set = std::collections::BTreeSet::new();
+    let mut guard_limit = 500usize;
+    while guard_limit > 0 {
+        guard_limit -= 1;
+        let Some(turn_id) = journal
+            .latest_turn_with_changes(session_id)
+            .map_err(|e| e.to_string())?
+        else {
+            break;
+        };
+        let paths = journal
+            .undo_turn(session_id, &turn_id)
+            .map_err(|e| e.to_string())?;
+        if paths.is_empty() {
+            break;
+        }
+        for p in paths {
+            restored_set.insert(p);
+        }
+    }
+    Ok(restored_set.into_iter().collect())
+}
+
+#[tauri::command]
+pub async fn agent_task_rollback_snapshot(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_dir: Option<String>,
+    task_id: String,
+) -> Result<Vec<String>, String> {
+    let _lease = state.environment_access.execution().await;
+    let journal = super::journal::open_task_journal(project_dir.as_deref(), &task_id).await?;
+    rollback_session_journal_changes(&journal, &task_id)
+}
+
+#[cfg(test)]
+mod snapshot_rollback_tests {
+    use super::*;
+    use piscis_kernel::agent::hooks::{AgentHooks, ToolHookEvent};
+    use piscis_kernel::agent::tool::ToolResult;
+
+    fn apply_journal_edit(
+        journal: &piscis_kernel::agent::file_journal::FileJournal,
+        session_id: &str,
+        tool_use_id: &str,
+        rel_path: &str,
+        workspace_root: &Path,
+        new_bytes: &[u8],
+    ) {
+        let input = serde_json::json!({ "path": rel_path });
+        let ev = ToolHookEvent {
+            session_id,
+            tool_use_id,
+            tool_name: "file_write",
+            input: &input,
+            workspace_root,
+        };
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            journal.before_tool(&ev).await;
+            std::fs::write(workspace_root.join(rel_path), new_bytes).unwrap();
+            let res = ToolResult::ok("ok");
+            journal.after_tool(&ev, &res).await;
+        });
+    }
+
+    #[test]
+    fn non_git_folder_snapshot_rollback_restores_pre_task_files_across_multiple_turns() {
+        let dir = std::env::temp_dir().join(format!("agentz-nongit-snap-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file_a = dir.join("notes.md");
+        let file_b = dir.join("generated.txt");
+        std::fs::write(&file_a, b"original notes\n").unwrap();
+
+        let journal = crate::journal::open_project_journal(dir.to_str().unwrap()).unwrap();
+        // Turn 1: modify notes.md
+        journal.begin_turn("task-nongit-1");
+        apply_journal_edit(&journal, "task-nongit-1", "t1-1", "notes.md", &dir, b"turn 1 edit\n");
+
+        // Turn 2: modify notes.md again and create generated.txt
+        journal.begin_turn("task-nongit-1");
+        apply_journal_edit(&journal, "task-nongit-1", "t2-1", "notes.md", &dir, b"turn 2 edit\n");
+        apply_journal_edit(
+            &journal,
+            "task-nongit-1",
+            "t2-2",
+            "generated.txt",
+            &dir,
+            b"brand new file\n",
+        );
+
+        let restored = rollback_session_journal_changes(&journal, "task-nongit-1").unwrap();
+        assert!(restored.contains(&"notes.md".to_string()));
+        assert!(restored.contains(&"generated.txt".to_string()));
+        assert_eq!(std::fs::read(&file_a).unwrap(), b"original notes\n");
+        assert!(!file_b.exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

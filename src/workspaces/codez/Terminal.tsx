@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "../../i18n";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -454,7 +455,7 @@ export async function destroyAllTerminals(): Promise<void> {
     // Fail closed: the caller must not switch or close the project while a shell may still run.
     // Tell the user why the switch was cancelled, then keep the rejection so the caller aborts.
     if (typeof window !== "undefined" && typeof window.alert === "function") {
-      window.alert("Could not stop all terminals, so the project change was cancelled. Close the remaining terminal(s) and try again.\n\n无法关闭所有终端，已取消项目切换。请关闭剩余终端后重试。");
+      window.alert(i18n.t("ide.terminalStopFailedAlert"));
     }
     throw error;
   }

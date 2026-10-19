@@ -103,6 +103,11 @@ pub async fn inline_edit(
         .complete(req)
         .await
         .map_err(|e| format!("inline edit failed: {e}"))?;
+    crate::runtime::task_budget::record_side_channel_usage(
+        "inline_edit",
+        resp.input_tokens,
+        resp.output_tokens,
+    );
 
     Ok(strip_code_fences(&resp.content))
 }
@@ -225,6 +230,11 @@ pub async fn ai_inline_completion(
     let Some(resp) = result? else {
         return Ok(String::new());
     };
+    crate::runtime::task_budget::record_side_channel_usage(
+        "inline_edit",
+        resp.input_tokens,
+        resp.output_tokens,
+    );
     Ok(strip_code_fences(&resp.content))
 }
 

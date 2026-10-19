@@ -36,28 +36,35 @@ function enabledChannels(s: Awaited<ReturnType<typeof getImSettings>>): string[]
   return out;
 }
 
-const CHANNEL_LABELS: Record<string, string> = {
-  feishu: "飞书 Feishu",
-  wecom: "企业微信 WeCom",
-  dingtalk: "钉钉 DingTalk",
-  telegram: "Telegram",
-  slack: "Slack",
-  discord: "Discord",
-  teams: "Teams",
-  matrix: "Matrix",
-  webhook: "Webhook",
-  wechat: "微信 WeChat",
+const CHANNEL_LABEL_KEYS: Record<string, string> = {
+  feishu: "assistantPanel.channelFeishu",
+  wecom: "assistantPanel.channelWecom",
+  dingtalk: "assistantPanel.channelDingtalk",
+  wechat: "assistantPanel.channelWechat",
 };
 
-function channelLabel(slug: string): string {
-  return CHANNEL_LABELS[slug] ?? slug;
+function channelLabel(t: (key: string) => string, slug: string): string {
+  const key = CHANNEL_LABEL_KEYS[slug];
+  if (key) return t(key);
+  const fallback: Record<string, string> = {
+    telegram: "Telegram",
+    slack: "Slack",
+    discord: "Discord",
+    teams: "Teams",
+    matrix: "Matrix",
+    webhook: "Webhook",
+  };
+  return fallback[slug] ?? slug;
 }
 
-function statusText(status: ChannelStatus | undefined): { label: string; tone: string } {
-  if (!status || status === "Disconnected") return { label: "未连接", tone: "off" };
-  if (status === "Connecting") return { label: "连接中…", tone: "pending" };
-  if (status === "Connected") return { label: "已连接", tone: "on" };
-  if (typeof status === "object" && "Error" in status) return { label: "错误", tone: "err" };
+function statusText(
+  t: (key: string) => string,
+  status: ChannelStatus | undefined,
+): { label: string; tone: string } {
+  if (!status || status === "Disconnected") return { label: t("assistantPanel.statusDisconnected"), tone: "off" };
+  if (status === "Connecting") return { label: t("assistantPanel.statusConnecting"), tone: "pending" };
+  if (status === "Connected") return { label: t("assistantPanel.statusConnected"), tone: "on" };
+  if (typeof status === "object" && "Error" in status) return { label: t("assistantPanel.statusError"), tone: "err" };
   return { label: String(status), tone: "off" };
 }
 
@@ -199,7 +206,7 @@ export default function AssistantMessagesPanel({ onClose }: AssistantMessagesPan
     }
   }, [active, refreshSessions]);
 
-  const st = statusText(activeStatus);
+  const st = statusText(t, activeStatus);
 
   return (
     <div className="agentz-assistant-overlay" role="dialog" aria-modal="true">
@@ -223,7 +230,7 @@ export default function AssistantMessagesPanel({ onClose }: AssistantMessagesPan
           <>
             <div className="agentz-assistant-tabs" role="tablist">
               {channels.map((c) => {
-                const cst = statusText(statusMap[c]);
+                const cst = statusText(t, statusMap[c]);
                 return (
                   <button
                     key={c}
@@ -234,7 +241,7 @@ export default function AssistantMessagesPanel({ onClose }: AssistantMessagesPan
                     onClick={() => setActive(c)}
                   >
                     <span className={`agentz-assistant-dot ${cst.tone}`} />
-                    {channelLabel(c)}
+                    {channelLabel(t, c)}
                   </button>
                 );
               })}

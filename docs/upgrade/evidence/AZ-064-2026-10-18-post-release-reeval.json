@@ -1,0 +1,13 @@
+[
+  {
+    "id": "AZ-064",
+    "verified_state": "local_gate_script_unwired_after_version_specific_waivers_native_unverified",
+    "severity": "P1",
+    "finding": "The local release-gate script and two tests remain, but the current committed release.yml does not invoke the gate after the owner-authorized 0.9.12, 0.9.13 and 0.9.14 version-specific waivers. The earlier candidate evidence describes an uncommitted workflow state and is not current publishing protection. The 0.9.14 version check passes; running the gate locally refuses the open M2-M8/MB and AZ-069 conditions. No signing, clean-machine install or rollback receipt exists.",
+    "conclusion_proposal": "Keep blocked; treat workflow integration as unfinished for a future non-waived release, and retain the external signing/native acceptance gaps.",
+    "next_action": "After the version-specific waivers, decide and wire the release-readiness prerequisite for the next non-waived release; obtain signing/notarization identities and clean test machines, then collect native install/start/uninstall/restore receipts before AZ-069 acceptance.",
+    "remaining_work": ["Wire a release guard for the next non-waived version", "Signing and notarization identities", "Frozen signed artifact hashes", "Clean-machine install/start/uninstall", "Rollback and independent acceptance"],
+    "verification_gaps": ["Current publishing workflow does not invoke the local gate", "No trusted signature, native installer journey or rollback evidence"],
+    "evidence": ["docs/upgrade/evidence/AZ-064-2026-10-18-post-release-state.md", "docs/upgrade/release-checklist-0.9.12.md", "docs/upgrade/release-checklist-0.9.13.md", "docs/upgrade/release-checklist-0.9.14.md"]
+  }
+]

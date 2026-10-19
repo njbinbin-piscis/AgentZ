@@ -22,7 +22,9 @@ const roots = [
   { role: 'global-config', source: configDir },
   ...projectDirs.map((project, index) => ({ role: `project-${index + 1}`, source: path.join(project, '.agentz') })),
 ];
-const normalized = roots.map(root => path.resolve(root.source).toLowerCase());
+// Compare physical roots as well as lexical names: a junction in a parent
+// directory must not let the same state enter the bundle under two roles.
+const normalized = roots.map(root => fs.realpathSync(root.source).toLowerCase());
 if (new Set(normalized).size !== normalized.length) throw new Error('Duplicate inventory root');
 for (let i = 0; i < normalized.length; i++) {
   for (let j = i + 1; j < normalized.length; j++) {
@@ -110,7 +112,7 @@ const report = {
   app_version: JSON.parse(fs.readFileSync(path.join(repository, 'package.json'), 'utf8')).version,
   read_only: true,
   protected_backup: false,
-  snapshot_consistent: false,
+  snapshot_consistent: sqliteSidecars.length === 0,
   config_key_pair_present: globalFiles.has('config.json') && globalFiles.has('.secret_key'),
   sqlite_sidecars: sqliteSidecars,
   requires_quiesced_database_copy: inventory.some(root => root.files.some(file => /\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm|journal))?$/i.test(file.path))),
@@ -118,9 +120,8 @@ const report = {
   total_bytes: totalBytes,
   roots: inventory,
   limits: [
-    'Hashes and file lists do not preserve bytes or prove a consistent SQLite snapshot.',
-    'No backup, restore, secret protection or cross-version credential validation is performed.',
-    'A real backup must quiesce writers and capture matching config.json and .secret_key versions.',
+    'Hashes and file lists do not preserve bytes; use upgrade-data-backup.mjs for encrypted snapshots.',
+    'A coherent SQLite backup requires zero active WAL/SHM/journal sidecars and verified before/after inventory parity.',
   ],
 };
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

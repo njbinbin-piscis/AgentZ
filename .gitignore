@@ -12,8 +12,14 @@ dist
 
 # Runtime data (chat / file-journal SQLite databases)
 .agentz/
+.agentz/**
 .codez/
 .piscis/
+*.db
+*.db-wal
+*.db-shm
+playwright-report/
+test-results/
 
 # Local dev caches (not shipped)
 .cache/

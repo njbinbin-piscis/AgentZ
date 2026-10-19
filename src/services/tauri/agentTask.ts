@@ -140,12 +140,24 @@ export const agentTaskApi = {
       path,
     }),
 
-  mergePreview: (projectDir: string, taskId: string, base: string, expectedTaskHead: string) =>
+  mergePreview: (
+    projectDir: string,
+    taskId: string,
+    base: string,
+    expectedTaskHead: string,
+    autoCommitUncommitted?: boolean,
+  ) =>
     invoke<TaskMergePreview>("agent_task_merge_preview", {
       projectDir,
       taskId,
       base,
       expectedTaskHead,
+      autoCommitUncommitted: autoCommitUncommitted ?? false,
+    }),
+  rollbackSnapshot: (projectDir: string, taskId: string) =>
+    invoke<string[]>("agent_task_rollback_snapshot", {
+      projectDir,
+      taskId,
     }),
   merge: (
     projectDir: string,

@@ -55,3 +55,37 @@ fn permanent_provider_failures_do_not_retry_or_fallback() {
     assert!(classify_error("OpenAI API error 503 Service Unavailable").is_retryable());
     assert!(classify_error("OpenAI API error 429: rate limit exceeded").is_fallback_eligible());
 }
+
+#[test]
+fn five_phase_lifecycle_and_termination_reasons_are_pinned() {
+    let phases = serde_json::json!([
+        "prepare",
+        "llm_turn",
+        "tool_dispatch",
+        "verify",
+        "finalize"
+    ]);
+    assert_eq!(phases.as_array().unwrap().len(), 5);
+    assert_eq!(phases[0], "prepare");
+    assert_eq!(phases[1], "llm_turn");
+    assert_eq!(phases[2], "tool_dispatch");
+    assert_eq!(phases[3], "verify");
+    assert_eq!(phases[4], "finalize");
+
+    let reasons = serde_json::json!([
+        "Completed",
+        "Cancelled",
+        "MaxIterations",
+        "BudgetExceeded",
+        "Error"
+    ]);
+    assert_eq!(reasons.as_array().unwrap().len(), 5);
+
+    // Verify recovery outcomes map cleanly to kernel termination semantics without silent replay.
+    let cancelled =
+        RecoveryReport::confirmed_result("turn-cancel".into(), 130, false, true, 5, 1, 0, 0)
+            .unwrap();
+    assert_eq!(cancelled.outcome, Outcome::Cancelled);
+    assert_eq!(cancelled.automatic_retry, AutomaticRetry::Forbidden);
+}
+

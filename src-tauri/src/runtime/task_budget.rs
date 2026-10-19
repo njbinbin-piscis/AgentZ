@@ -177,6 +177,38 @@ pub fn ensure_policy(project: &Path, task: &str, limits: &TaskBudgetLimits) -> R
 /// sub-agents created earlier (with clones of the same handle) are then charged to that task.
 /// An unbound scope is transparent for calls that have no task identity. The host must
 /// propagate bind errors before it starts a task turn.
+/// Global cumulative side-channel token ledger (`source -> (input_tokens, output_tokens)`).
+static SIDE_CHANNEL_LEDGER: OnceLock<Mutex<std::collections::HashMap<String, (u64, u64)>>> =
+    OnceLock::new();
+
+fn side_channel_ledger() -> &'static Mutex<std::collections::HashMap<String, (u64, u64)>> {
+    SIDE_CHANNEL_LEDGER.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Record side-channel LLM token usage (`"background"`, `"inline_edit"`, `"turn"`, etc.)
+/// into the process-wide ledger and return the updated `(input_tokens, output_tokens)` for `source`.
+pub fn record_side_channel_usage(
+    source: &str,
+    input_tokens: u32,
+    output_tokens: u32,
+) -> (u64, u64) {
+    let mut map = side_channel_ledger()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let entry = map.entry(source.to_string()).or_insert((0, 0));
+    entry.0 = entry.0.saturating_add(u64::from(input_tokens));
+    entry.1 = entry.1.saturating_add(u64::from(output_tokens));
+    *entry
+}
+
+/// Query cumulative side-channel token usage across all recorded sources.
+pub fn query_side_channel_usage() -> std::collections::HashMap<String, (u64, u64)> {
+    side_channel_ledger()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone()
+}
+
 #[derive(Clone, Default)]
 pub struct BudgetScope(Arc<OnceLock<Bound>>);
 
@@ -204,11 +236,17 @@ impl BudgetScope {
 
     /// Wrap a model client so each call is reserved and settled against the bound task.
     pub fn guard(&self, inner: Box<dyn LlmClient>) -> Box<dyn LlmClient> {
+        self.guard_with_source(inner, "turn")
+    }
+
+    /// Wrap a model client and tag settled usage with a specific source (`"turn"`, `"background"`, `"inline_edit"`).
+    pub fn guard_with_source(&self, inner: Box<dyn LlmClient>, source: &str) -> Box<dyn LlmClient> {
         match self.0.get() {
             Some(bound) => Box::new(BudgetedClient {
                 inner,
                 project: bound.project.clone(),
                 binding: bound.binding.clone(),
+                source_tag: source.to_string(),
             }),
             None => inner,
         }
@@ -219,6 +257,7 @@ struct BudgetedClient {
     inner: Box<dyn LlmClient>,
     project: PathBuf,
     binding: Binding,
+    source_tag: String,
 }
 
 struct Ticket {
@@ -417,16 +456,28 @@ impl BudgetedClient {
     /// remains as a started call and is recovered conservatively on a later attempt.
     fn finish(&self, ticket: Ticket, measured: Option<(u32, u32)>) {
         let active_ms = i64::try_from(ticket.started.elapsed().as_millis()).unwrap_or(i64::MAX);
+        let tag = if self.source_tag.is_empty() {
+            "turn"
+        } else {
+            self.source_tag.as_str()
+        };
         let (input_tokens, output_tokens, source) = match measured {
-            Some((input, output)) => (i64::from(input), i64::from(output), "kernel-usage"),
-            None => (ticket.reserved_tokens, 0, "estimate-without-usage"),
+            Some((input, output)) => {
+                record_side_channel_usage(tag, input, output);
+                (i64::from(input), i64::from(output), tag.to_string())
+            }
+            None => (
+                ticket.reserved_tokens,
+                0,
+                format!("{tag}:estimate-without-usage"),
+            ),
         };
         match self.usage_for(
             &ticket.operation,
             input_tokens,
             output_tokens,
             active_ms,
-            source,
+            &source,
         ) {
             Ok(usage) => self.settle_or_queue(usage),
             Err(error) => {
@@ -610,6 +661,7 @@ mod tests {
                 inner,
                 project: self.path.clone(),
                 binding: self.binding.clone(),
+                source_tag: "turn".to_string(),
             }
         }
     }
@@ -973,5 +1025,35 @@ mod tests {
         )
         .is_err());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn usage_accounting_records_turn_background_and_inline_edit_sources() {
+        let f = Fixture::new();
+        let scope = BudgetScope::default();
+        scope
+            .bind(&f.path, &f.binding, &TaskBudgetLimits::default())
+            .unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let bg_client = scope.guard_with_source(
+            Box::new(FakeClient {
+                calls: calls.clone(),
+                input: 12,
+                output: 8,
+            }),
+            "background",
+        );
+        bg_client.complete(request(4)).await.unwrap();
+
+        let (inline_in, inline_out) = record_side_channel_usage("inline_edit", 30, 15);
+        assert!(inline_in >= 30);
+        assert!(inline_out >= 15);
+
+        let all = query_side_channel_usage();
+        let bg = all.get("background").copied().unwrap_or((0, 0));
+        assert!(bg.0 >= 12 && bg.1 >= 8);
+        let snap = snapshot(&f.path);
+        assert_eq!(snap.usage.known_input_tokens, 12);
+        assert_eq!(snap.usage.known_output_tokens, 8);
     }
 }
