@@ -206,7 +206,8 @@ export class OutputChannel {
 
 export class Terminal {
   readonly processId: Promise<number | undefined> = Promise.resolve(undefined);
-  readonly state = { isInteractedWith: false };
+  readonly state = { isInteractedWith: false, shell: undefined as string | undefined };
+  readonly shellIntegration: undefined = undefined;
   exitStatus: { readonly code: number | undefined; readonly reason: number } | undefined = undefined;
 
   constructor(
@@ -248,6 +249,17 @@ export class ExtHostWindow {
   readonly onDidCloseTerminalEmitter = new EventEmitter<Terminal>();
   readonly onDidChangeActiveTerminalEmitter = new EventEmitter<Terminal | undefined>();
   readonly onDidChangeTerminalStateEmitter = new EventEmitter<Terminal>();
+  readonly onDidWriteTerminalDataEmitter = new EventEmitter<{ readonly terminal: Terminal; readonly data: string }>();
+  readonly onDidExecuteTerminalCommandEmitter = new EventEmitter<{
+    readonly terminal: Terminal;
+    readonly commandLine: string;
+    readonly cwd?: unknown;
+    readonly exitCode?: number;
+    readonly output?: unknown;
+  }>();
+  readonly onDidStartTerminalShellExecutionEmitter = new EventEmitter<unknown>();
+  readonly onDidEndTerminalShellExecutionEmitter = new EventEmitter<unknown>();
+  readonly onDidChangeTerminalShellIntegrationEmitter = new EventEmitter<unknown>();
 
   constructor(rpc: IRPCProtocol) {
     this.msgProxy = rpc.getProxy(MainContext.MainThreadMessageService);
@@ -386,14 +398,21 @@ export class ExtHostWindow {
     );
   }
 
-  createQuickPick<T extends { label: string; description?: string; detail?: string; picked?: boolean; kind?: number }>(): {
+  createQuickPick<T extends { label: string; description?: string; detail?: string; picked?: boolean; kind?: number; tooltip?: unknown; iconPath?: unknown; buttons?: readonly unknown[]; alwaysShow?: boolean }>(): {
     value: string;
     placeholder: string | undefined;
     title: string | undefined;
+    step: number | undefined;
+    totalSteps: number | undefined;
     items: readonly T[];
     selectedItems: readonly T[];
     activeItems: readonly T[];
     canSelectMany: boolean;
+    matchOnDescription: boolean;
+    matchOnDetail: boolean;
+    keepScrollPosition: boolean;
+    sortByLabel: boolean;
+    buttons: readonly unknown[];
     busy: boolean;
     enabled: boolean;
     ignoreFocusOut: boolean;
@@ -402,6 +421,8 @@ export class ExtHostWindow {
     onDidHide: (listener: () => void) => Disposable;
     onDidChangeSelection: (listener: (items: readonly T[]) => void) => Disposable;
     onDidChangeActive: (listener: (items: readonly T[]) => void) => Disposable;
+    onDidTriggerButton: (listener: (button: unknown) => void) => Disposable;
+    onDidTriggerItemButton: (listener: (event: { button: unknown; item: T }) => void) => Disposable;
     show: () => void;
     hide: () => void;
     dispose: () => void;
@@ -411,14 +432,23 @@ export class ExtHostWindow {
     const hideEmitter = new EventEmitter<void>();
     const selectionEmitter = new EventEmitter<readonly T[]>();
     const activeEmitter = new EventEmitter<readonly T[]>();
+    const triggerButtonEmitter = new EventEmitter<unknown>();
+    const triggerItemButtonEmitter = new EventEmitter<{ button: unknown; item: T }>();
     const qp = {
       value: "",
       placeholder: undefined as string | undefined,
       title: undefined as string | undefined,
+      step: undefined as number | undefined,
+      totalSteps: undefined as number | undefined,
       items: [] as readonly T[],
       selectedItems: [] as readonly T[],
       activeItems: [] as readonly T[],
       canSelectMany: false,
+      matchOnDescription: false,
+      matchOnDetail: false,
+      keepScrollPosition: false,
+      sortByLabel: true,
+      buttons: [] as readonly unknown[],
       busy: false,
       enabled: true,
       ignoreFocusOut: false,
@@ -427,8 +457,14 @@ export class ExtHostWindow {
       onDidHide: hideEmitter.event,
       onDidChangeSelection: selectionEmitter.event,
       onDidChangeActive: activeEmitter.event,
+      onDidTriggerButton: triggerButtonEmitter.event,
+      onDidTriggerItemButton: triggerItemButtonEmitter.event,
       show: () => {
-        void this.showQuickPick(qp.items, {
+        const itemsToShow =
+          qp.sortByLabel
+            ? [...qp.items].sort((a, b) => (a.label ?? "").localeCompare(b.label ?? ""))
+            : qp.items;
+        void this.showQuickPick(itemsToShow, {
           placeHolder: qp.placeholder ?? qp.title,
           canPickMany: qp.canSelectMany,
         }).then((picked) => {
@@ -451,6 +487,8 @@ export class ExtHostWindow {
         hideEmitter.dispose();
         selectionEmitter.dispose();
         activeEmitter.dispose();
+        triggerButtonEmitter.dispose();
+        triggerItemButtonEmitter.dispose();
       },
     };
     return qp;
@@ -461,6 +499,9 @@ export class ExtHostWindow {
     placeholder: string | undefined;
     prompt: string | undefined;
     title: string | undefined;
+    step: number | undefined;
+    totalSteps: number | undefined;
+    buttons: readonly unknown[];
     password: boolean;
     busy: boolean;
     enabled: boolean;
@@ -469,6 +510,7 @@ export class ExtHostWindow {
     onDidChangeValue: (listener: (v: string) => void) => Disposable;
     onDidAccept: (listener: () => void) => Disposable;
     onDidHide: (listener: () => void) => Disposable;
+    onDidTriggerButton: (listener: (button: unknown) => void) => Disposable;
     show: () => void;
     hide: () => void;
     dispose: () => void;
@@ -476,11 +518,15 @@ export class ExtHostWindow {
     const changeValueEmitter = new EventEmitter<string>();
     const acceptEmitter = new EventEmitter<void>();
     const hideEmitter = new EventEmitter<void>();
+    const triggerButtonEmitter = new EventEmitter<unknown>();
     const ib = {
       value: "",
       placeholder: undefined as string | undefined,
       prompt: undefined as string | undefined,
       title: undefined as string | undefined,
+      step: undefined as number | undefined,
+      totalSteps: undefined as number | undefined,
+      buttons: [] as readonly unknown[],
       password: false,
       busy: false,
       enabled: true,
@@ -489,6 +535,7 @@ export class ExtHostWindow {
       onDidChangeValue: changeValueEmitter.event,
       onDidAccept: acceptEmitter.event,
       onDidHide: hideEmitter.event,
+      onDidTriggerButton: triggerButtonEmitter.event,
       show: () => {
         void this.showInputBox({
           prompt: ib.prompt ?? ib.title,
@@ -511,6 +558,7 @@ export class ExtHostWindow {
         changeValueEmitter.dispose();
         acceptEmitter.dispose();
         hideEmitter.dispose();
+        triggerButtonEmitter.dispose();
       },
     };
     return ib;

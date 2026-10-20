@@ -5,6 +5,15 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-10-21
+
+### Fixed
+
+- **Python (`ms-python.python`) & Python Debugger (`ms-python.debugpy`) VS Code Extension Compatibility**:
+  - Implemented and whitelisted all 9 proposed APIs declared by `ms-python.python` (`contribEditorContentMenu`, `quickPickSortByLabel`, `testObserver`, `quickPickItemTooltip`, `terminalDataWriteEvent`, `terminalExecuteCommandEvent`, `codeActionAI`, `notebookReplDocument`, `notebookVariableProvider`) as well as `ms-python.debugpy`'s proposed APIs (`portsAttributes`, `debugVisualization`, `contribViewsWelcome`) and `terminalShellIntegration`.
+  - Added full runtime support for `window.onDidWriteTerminalData`, `window.onDidExecuteTerminalCommand`, `window.onDidStartTerminalShellExecution`, `window.onDidEndTerminalShellExecution`, `window.onDidChangeTerminalShellIntegration`, `Terminal.shellIntegration`, `QuickPick.sortByLabel` / `buttons` / `onDidTriggerButton` / `onDidTriggerItemButton`, `QuickInputButtons.Back`, `tests.testResults` / `onDidChangeTestResults` / `createTestObserver`, `TestResultState`, `FileCoverage` / `StatementCoverage` / `BranchCoverage` / `DeclarationCoverage` / `TestCoverageCount`, `NotebookController.variableProvider`, `NotebookVariablesRequestKind`, `window.showNotebookDocument`, `workspace.openNotebookDocument`, `CodeAction.isAI`, `DebugConfigurationProviderTriggerKind`, `workspace.registerPortAttributesProvider`, `PortAutoForwardAction`, `PortAttributes`, `debug.registerDebugVisualizationProvider` / `registerDebugVisualizationTreeProvider`, `DebugVisualization`, `env.createTelemetryLogger`, and `vscode.lm` (`registerTool`, `invokeTool`, `LanguageModelTextPart`, `LanguageModelToolResult`, `LanguageModelChatMessage`).
+  - Wired automatic `onLanguage:<langId>` extension activation when opening or switching editor models in `CodeZ`, and extended editor title action `when` evaluation (`editorLangId`, `resourceLangId`, `!virtualWorkspace`, `shellExecutionSupported`).
+
 ## [1.0.3] - 2026-10-21
 
 ### Fixed

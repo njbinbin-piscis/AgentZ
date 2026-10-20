@@ -255,6 +255,11 @@ export function createApiFactory(services: Services) {
     onDidCloseTerminal: s.window.onDidCloseTerminalEmitter.event,
     onDidChangeActiveTerminal: s.window.onDidChangeActiveTerminalEmitter.event,
     onDidChangeTerminalState: s.window.onDidChangeTerminalStateEmitter.event,
+    onDidWriteTerminalData: s.window.onDidWriteTerminalDataEmitter.event,
+    onDidExecuteTerminalCommand: s.window.onDidExecuteTerminalCommandEmitter.event,
+    onDidStartTerminalShellExecution: s.window.onDidStartTerminalShellExecutionEmitter.event,
+    onDidEndTerminalShellExecution: s.window.onDidEndTerminalShellExecutionEmitter.event,
+    onDidChangeTerminalShellIntegration: s.window.onDidChangeTerminalShellIntegrationEmitter.event,
     setStatusBarMessage: (t: string, hideAfter?: number | Thenable<unknown>) =>
       s.window.setStatusBarMessage(t, hideAfter),
     withProgress: <R>(
@@ -311,6 +316,32 @@ export function createApiFactory(services: Services) {
         await s.commands.executeCommand("vscode.open", targetUri.toString());
       }
       return undefined;
+    },
+    showNotebookDocument: async (doc: unknown) => {
+      const uri =
+        doc && typeof doc === "object" && "uri" in doc
+          ? (doc as { uri: types.Uri }).uri
+          : types.Uri.parse("untitled:Notebook-1.ipynb");
+      return {
+        notebook: doc ?? {
+          uri,
+          notebookType: "jupyter-notebook",
+          version: 1,
+          isDirty: false,
+          isUntitled: true,
+          isClosed: false,
+          metadata: {},
+          cellCount: 0,
+          cellAt: () => undefined,
+          getCells: () => [],
+          save: () => Promise.resolve(true),
+        },
+        selection: new types.NotebookRange(0, 0),
+        selections: [new types.NotebookRange(0, 0)],
+        visibleRanges: [new types.NotebookRange(0, 0)],
+        viewColumn: types.ViewColumn.One,
+        revealRange: () => undefined,
+      };
     },
   };
 
@@ -395,7 +426,41 @@ export function createApiFactory(services: Services) {
       }
       return existing;
     },
-    openNotebookDocument: async () => undefined,
+    openNotebookDocument: async (uriOrType?: types.Uri | string, content?: types.NotebookData) => {
+      const uri =
+        uriOrType instanceof types.Uri
+          ? uriOrType
+          : types.Uri.parse(`untitled:Untitled-${Date.now()}.ipynb`);
+      const notebookType = typeof uriOrType === "string" ? uriOrType : "jupyter-notebook";
+      const cells = (content?.cells ?? []).map((c, idx) => ({
+        index: idx,
+        notebook: undefined as unknown,
+        kind: c.kind,
+        document: {
+          uri: types.Uri.parse(`${uri.toString()}#cell${idx}`),
+          languageId: c.languageId,
+          version: 1,
+          getText: () => c.value,
+          lineCount: c.value.split(/\r?\n/).length,
+        },
+        metadata: c.metadata ?? {},
+        outputs: c.outputs ?? [],
+        executionSummary: c.executionSummary,
+      }));
+      return {
+        uri,
+        notebookType,
+        version: 1,
+        isDirty: false,
+        isUntitled: uri.scheme === "untitled",
+        isClosed: false,
+        metadata: content?.metadata ?? {},
+        cellCount: cells.length,
+        cellAt: (idx: number) => cells[idx],
+        getCells: () => cells,
+        save: () => Promise.resolve(true),
+      };
+    },
     createFileSystemWatcher: (
       globPattern: string | types.RelativePattern,
       ignoreCreateEvents?: boolean,
@@ -413,7 +478,10 @@ export function createApiFactory(services: Services) {
       s.notebook.registerNotebookSerializer(viewType, serializer),
     registerTextDocumentContentProvider: noopDisposable,
     registerFileSystemProvider: noopDisposable,
+    registerPortAttributesProvider: noopDisposable,
     applyEdit: () => s.workspace.applyEdit(),
+    save: () => Promise.resolve(undefined),
+    saveAs: () => Promise.resolve(undefined),
     saveAll: () => Promise.resolve(true),
     onDidChangeConfiguration: s.workspace.onDidChangeConfigurationEmitter.event,
     onDidChangeWorkspaceFolders: s.workspace.onDidChangeWorkspaceFoldersEmitter.event,
@@ -526,14 +594,17 @@ export function createApiFactory(services: Services) {
   };
 
   const debug = {
-    registerDebugConfigurationProvider: (type: string, provider: any) =>
+    registerDebugConfigurationProvider: (type: string, provider: any, _triggerKind?: number) =>
       s.debug.registerDebugConfigurationProvider(type, provider),
     registerDebugAdapterDescriptorFactory: () => s.debug.registerDebugAdapterDescriptorFactory(),
     registerDebugAdapterTrackerFactory: noopDisposable,
+    registerDebugVisualizationProvider: noopDisposable,
+    registerDebugVisualizationTreeProvider: noopDisposable,
     startDebugging: (folder: unknown, config: any) => s.debug.startDebugging(folder, config),
     stopDebugging: () => Promise.resolve(),
     addBreakpoints: () => undefined,
     removeBreakpoints: () => undefined,
+    asDebugSourceUri: (src: unknown) => types.Uri.parse(`debug:${JSON.stringify(src ?? "")}`),
     onDidStartDebugSession: s.debug.onDidStartDebugSessionEmitter.event,
     onDidTerminateDebugSession: s.debug.onDidTerminateDebugSessionEmitter.event,
     onDidChangeActiveDebugSession: new types.EventEmitter<unknown>().event,
@@ -551,30 +622,44 @@ export function createApiFactory(services: Services) {
 
   const tests = {
     createTestController: (id: string, label: string) => s.testing.createTestController(id, label),
+    get testResults() {
+      return s.testing.testResults;
+    },
+    onDidChangeTestResults: s.testing.onDidChangeTestResultsEmitter.event,
+    createTestObserver: () => s.testing.createTestObserver(),
   };
 
   const notebooks = {
     registerNotebookSerializer: (viewType: string, serializer: any) =>
       s.notebook.registerNotebookSerializer(viewType, serializer),
-    createNotebookController: () => ({
-      id: "notebook-controller",
-      notebookType: "*",
-      label: "",
-      supportedLanguages: [],
+    createNotebookController: (id?: string, notebookType?: string, label?: string, handler?: unknown) => ({
+      id: id ?? "notebook-controller",
+      notebookType: notebookType ?? "*",
+      label: label ?? "",
+      description: undefined as string | undefined,
+      detail: undefined as string | undefined,
+      supportedLanguages: [] as string[],
       supportsExecutionOrder: false,
-      executeHandler: undefined,
-      interruptHandler: undefined,
+      executeHandler: handler,
+      interruptHandler: undefined as unknown,
+      variableProvider: undefined as unknown,
       onDidChangeSelectedNotebooks: new types.EventEmitter<unknown>().event,
       createNotebookCellExecution: () => ({
+        executionOrder: undefined as number | undefined,
+        token: new types.CancellationTokenSource().token,
         start: () => undefined,
         end: () => undefined,
         clearOutput: () => Promise.resolve(),
         appendOutput: () => Promise.resolve(),
         replaceOutput: () => Promise.resolve(),
+        appendOutputItems: () => Promise.resolve(),
+        replaceOutputItems: () => Promise.resolve(),
       }),
+      createNotebookCellStatusBarItemProvider: noopDisposable,
       updateNotebookAffinity: () => undefined,
       dispose: () => undefined,
     }),
+    registerNotebookCellStatusBarItemProvider: noopDisposable,
   };
 
   const env = {
@@ -588,6 +673,31 @@ export function createApiFactory(services: Services) {
     isNewAppInstall: false,
     isTelemetryEnabled: false,
     onDidChangeTelemetryEnabled: new types.EventEmitter<boolean>().event,
+    onDidChangeShell: new types.EventEmitter<string>().event,
+    logLevel: types.LogLevel.Info,
+    onDidChangeLogLevel: new types.EventEmitter<types.LogLevel>().event,
+    createTelemetryLogger: (
+      sender?: { flush?: () => void | Thenable<void> },
+      _options?: unknown,
+    ) => {
+      const enableEmitter = new types.EventEmitter<unknown>();
+      const logger = {
+        isUsageEnabled: false,
+        isErrorsEnabled: false,
+        onDidChangeEnableStates: enableEmitter.event,
+        logUsage: () => undefined,
+        logError: () => undefined,
+        dispose: () => {
+          enableEmitter.dispose();
+          try {
+            void sender?.flush?.();
+          } catch {
+            // ignore
+          }
+        },
+      };
+      return logger;
+    },
     remoteName: undefined,
     shell: typeof process !== "undefined" ? (process.env.COMSPEC || process.env.SHELL || "") : "",
     uiKind: types.UIKind.Desktop,
@@ -603,6 +713,74 @@ export function createApiFactory(services: Services) {
       return res ?? true;
     },
     asExternalUri: (uri: types.Uri) => Promise.resolve(uri),
+  };
+
+  const lmTools = new Map<string, { name: string; tool: any }>();
+  const lm = {
+    get tools() {
+      return [...lmTools.values()].map((t) => ({
+        name: t.name,
+        description: "",
+        inputSchema: undefined,
+        tags: [] as readonly string[],
+      }));
+    },
+    onDidChangeChatModels: new types.EventEmitter<void>().event,
+    selectChatModels: () => Promise.resolve([]),
+    registerTool: (name: string, tool: any) => {
+      lmTools.set(name, { name, tool });
+      return new types.Disposable(() => lmTools.delete(name));
+    },
+    invokeTool: async (name: string, options: any, token?: unknown) => {
+      const entry = lmTools.get(name);
+      if (entry?.tool && typeof entry.tool.invoke === "function") {
+        const tok = token ?? new types.CancellationTokenSource().token;
+        const res = await entry.tool.invoke(options, tok);
+        if (res) return res;
+      }
+      return new types.LanguageModelToolResult([]);
+    },
+    registerMcpServerDefinitionProvider: noopDisposable,
+  };
+
+  const authentication = {
+    onDidChangeSessions: new types.EventEmitter<unknown>().event,
+    getSession: () => Promise.resolve(undefined),
+    getAccounts: () => Promise.resolve([]),
+    registerAuthenticationProvider: noopDisposable,
+  };
+
+  const comments = {
+    createCommentController: (id: string, label: string) => ({
+      id,
+      label,
+      options: undefined,
+      commentingRangeProvider: undefined,
+      reactionHandler: undefined,
+      createCommentThread: (uri: types.Uri, range: types.Range, threadComments: unknown[]) => ({
+        uri,
+        range,
+        comments: threadComments,
+        collapsibleState: 0,
+        canReply: true,
+        contextValue: undefined,
+        label: undefined,
+        state: 0,
+        dispose: () => undefined,
+      }),
+      dispose: () => undefined,
+    }),
+  };
+
+  const chat = {
+    createChatParticipant: (id: string, handler: unknown) => ({
+      id,
+      requestHandler: handler,
+      iconPath: undefined,
+      followupProvider: undefined,
+      onDidReceiveFeedback: new types.EventEmitter<unknown>().event,
+      dispose: () => undefined,
+    }),
   };
 
   return function api(
@@ -631,6 +809,10 @@ export function createApiFactory(services: Services) {
       tests,
       notebooks,
       env,
+      lm,
+      authentication,
+      comments,
+      chat,
       extensions: {
         getExtension: (id: string) => {
           const list = allExtensions ? allExtensions() : [extension];

@@ -93,6 +93,11 @@ function toDto(item: TestItem, parentId?: string): dto.TestItemDto {
   };
 }
 
+export interface TestRunResultDto {
+  readonly completedAt: number;
+  readonly results: readonly unknown[];
+}
+
 class TestController {
   readonly items: TestItemCollection;
   resolveHandler?: (item: TestItem | undefined) => Thenable<void> | void;
@@ -103,6 +108,7 @@ class TestController {
     public readonly id: string,
     public label: string,
     private readonly publish: () => void,
+    private readonly onRunFinished?: (result: TestRunResultDto) => void,
   ) {
     this.items = new TestItemCollection(undefined, this.publish);
   }
@@ -127,6 +133,7 @@ class TestController {
     supportsContinuousRun: boolean;
     runHandler: (request: unknown, token: unknown) => void;
     configureHandler: undefined;
+    loadDetailedCoverage: undefined;
     onDidChangeDefault: ReturnType<typeof ExtHostTesting.emitter<boolean>>["event"];
     dispose(): void;
   } {
@@ -140,6 +147,7 @@ class TestController {
       supportsContinuousRun: !!supportsContinuousRun,
       runHandler,
       configureHandler: undefined,
+      loadDetailedCoverage: undefined,
       onDidChangeDefault: defaultEmitter.event,
       dispose: () => defaultEmitter.dispose(),
     };
@@ -160,6 +168,9 @@ class TestController {
       appendOutput: (_output: string, _location?: unknown, _test?: unknown) => undefined,
       addCoverage: (_fileCoverage: unknown) => undefined,
       end: () => {
+        if (persist) {
+          this.onRunFinished?.({ completedAt: Date.now(), results: [] });
+        }
         disposeEmitter.fire();
         disposeEmitter.dispose();
         cts.dispose();
@@ -185,12 +196,32 @@ class TestController {
 export class ExtHostTesting implements ExtHostTestingShape {
   private readonly proxy: MainThreadTestingShape;
   private readonly controllers = new Map<string, TestController>();
+  private readonly _testResults: TestRunResultDto[] = [];
+  readonly onDidChangeTestResultsEmitter = new EventEmitter<void>();
+
   constructor(rpc: IRPCProtocol) {
     this.proxy = rpc.getProxy(MainContext.MainThreadTesting);
   }
+  get testResults(): readonly TestRunResultDto[] {
+    return this._testResults;
+  }
+  createTestObserver() {
+    const diffEmitter = new EventEmitter<unknown>();
+    return {
+      tests: [] as readonly unknown[],
+      onDidChangeTests: diffEmitter.event,
+      dispose: () => diffEmitter.dispose(),
+    };
+  }
   createTestController(id: string, label: string): TestController {
-    const controller = new TestController(id, label, () =>
-      this.proxy.$publishTestItems(id, controller.snapshot()),
+    const controller = new TestController(
+      id,
+      label,
+      () => this.proxy.$publishTestItems(id, controller.snapshot()),
+      (res) => {
+        this._testResults.push(res);
+        this.onDidChangeTestResultsEmitter.fire();
+      },
     );
     this.controllers.set(id, controller);
     this.proxy.$registerTestController(id, label);

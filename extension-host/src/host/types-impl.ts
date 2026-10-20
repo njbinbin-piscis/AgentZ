@@ -503,6 +503,7 @@ export class CodeAction {
   edit?: WorkspaceEdit;
   command?: { command: string; title: string; arguments?: unknown[] };
   isPreferred?: boolean;
+  isAI?: boolean;
   disabled?: { readonly reason: string };
   constructor(public title: string, kind?: CodeActionKind) {
     this.kind = kind;
@@ -1106,6 +1107,143 @@ export enum TestRunProfileKind {
   Run = 1,
   Debug = 2,
   Coverage = 3,
+}
+
+export enum TestResultState {
+  Queued = 1,
+  Running = 2,
+  Passed = 3,
+  Failed = 4,
+  Skipped = 5,
+  Errored = 6,
+}
+
+export class TestCoverageCount {
+  constructor(
+    public covered: number,
+    public total: number,
+  ) {}
+}
+
+export class StatementCoverage {
+  constructor(
+    public executed: number | boolean,
+    public location: Position | Range,
+    public branches: BranchCoverage[] = [],
+  ) {}
+}
+
+export class BranchCoverage {
+  constructor(
+    public executed: number | boolean,
+    public location?: Position | Range,
+    public label?: string,
+  ) {}
+}
+
+export class DeclarationCoverage {
+  constructor(
+    public name: string,
+    public executed: number | boolean,
+    public location: Position | Range,
+  ) {}
+}
+
+export class FileCoverage {
+  static fromDetails(uri: Uri, details: readonly (StatementCoverage | DeclarationCoverage)[]): FileCoverage {
+    let stmts = 0;
+    let coveredStmts = 0;
+    for (const d of details) {
+      if (d instanceof StatementCoverage) {
+        stmts++;
+        if (typeof d.executed === "boolean" ? d.executed : d.executed > 0) coveredStmts++;
+      }
+    }
+    return new FileCoverage(uri, new TestCoverageCount(coveredStmts, stmts));
+  }
+  constructor(
+    public readonly uri: Uri,
+    public statementCoverage: TestCoverageCount,
+    public branchCoverage?: TestCoverageCount,
+    public declarationCoverage?: TestCoverageCount,
+    public includesTests: readonly unknown[] = [],
+  ) {}
+}
+
+export class QuickInputButtons {
+  static readonly Back: { readonly iconPath: ThemeIcon; readonly tooltip?: string } = {
+    iconPath: new ThemeIcon("arrow-left"),
+    tooltip: "Back",
+  };
+  private constructor() {}
+}
+
+export enum DebugConfigurationProviderTriggerKind {
+  Initial = 1,
+  Dynamic = 2,
+}
+
+export enum NotebookVariablesRequestKind {
+  Named = 1,
+  Indexed = 2,
+}
+
+export enum PortAutoForwardAction {
+  Notify = 1,
+  OpenBrowser = 2,
+  OpenPreview = 3,
+  Silent = 4,
+  Ignore = 5,
+  OpenBrowserOnce = 6,
+}
+
+export class PortAttributes {
+  constructor(public autoForwardAction: PortAutoForwardAction) {}
+}
+
+export class DebugVisualization {
+  iconPath?: Uri | { light: Uri; dark: Uri } | ThemeIcon;
+  visualization?: { readonly id: string } | unknown;
+  constructor(public name: string) {}
+}
+
+export class LanguageModelTextPart {
+  constructor(public value: string) {}
+}
+
+export class LanguageModelToolResult {
+  constructor(public content: Array<LanguageModelTextPart | unknown> = []) {}
+}
+
+export class LanguageModelChatMessage {
+  static User(content: string | Array<LanguageModelTextPart | unknown>, name?: string): LanguageModelChatMessage {
+    return new LanguageModelChatMessage(1, content, name);
+  }
+  static Assistant(content: string | Array<LanguageModelTextPart | unknown>, name?: string): LanguageModelChatMessage {
+    return new LanguageModelChatMessage(2, content, name);
+  }
+  content: Array<LanguageModelTextPart | unknown>;
+  constructor(
+    public role: number,
+    content: string | Array<LanguageModelTextPart | unknown>,
+    public name?: string,
+  ) {
+    this.content = typeof content === "string" ? [new LanguageModelTextPart(content)] : content;
+  }
+}
+
+export enum TerminalShellExecutionCommandLineConfidence {
+  Low = 0,
+  Medium = 1,
+  High = 2,
+}
+
+export enum TerminalExitReason {
+  Unknown = 0,
+  Shutdown = 1,
+  Process = 2,
+  User = 3,
+  Extension = 4,
 }
 
 export class TestTag {

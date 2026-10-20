@@ -76,7 +76,21 @@ function workspaceContainsMatch(root: string, rawPattern: string): boolean {
 
 // Proposed API names this host actually implements. Anything an extension
 // declares in `enabledApiProposals` outside this set is reported as unsupported.
-const SUPPORTED_PROPOSALS = new Set<string>();
+const SUPPORTED_PROPOSALS = new Set<string>([
+  "contribEditorContentMenu",
+  "contribViewsWelcome",
+  "quickPickSortByLabel",
+  "quickPickItemTooltip",
+  "testObserver",
+  "terminalDataWriteEvent",
+  "terminalExecuteCommandEvent",
+  "terminalShellIntegration",
+  "codeActionAI",
+  "notebookReplDocument",
+  "notebookVariableProvider",
+  "portsAttributes",
+  "debugVisualization",
+]);
 
 interface ActivatedExtension {
   description: ExtensionDescriptionDto;
@@ -143,6 +157,24 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
                   events.add(`onView:${(v as { id: string }).id}`);
                 }
               }
+            }
+          }
+        }
+        const debuggers = contrib.debuggers;
+        if (Array.isArray(debuggers)) {
+          for (const dbg of debuggers) {
+            if (dbg && typeof dbg === "object" && typeof (dbg as { type?: unknown }).type === "string") {
+              events.add("onDebug");
+              events.add("onDebugInitialConfigurations");
+              events.add(`onDebugResolve:${(dbg as { type: string }).type}`);
+            }
+          }
+        }
+        const taskDefs = contrib.taskDefinitions;
+        if (Array.isArray(taskDefs)) {
+          for (const td of taskDefs) {
+            if (td && typeof td === "object" && typeof (td as { type?: unknown }).type === "string") {
+              events.add(`onTaskType:${(td as { type: string }).type}`);
             }
           }
         }

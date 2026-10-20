@@ -196,6 +196,31 @@ async function run(): Promise<void> {
   const tc = vscodeApi.tests.createTestController("smoke.tests", "Smoke Tests");
   assert(typeof tc.items.replace === "function" && typeof tc.createTestRun === "function", "TestController items.replace & createTestRun");
 
+  // 11. Python & Debugpy proposed/runtime API surface
+  assert(Array.isArray(vscodeApi.tests.testResults), "tests.testResults is array");
+  assert(typeof vscodeApi.tests.onDidChangeTestResults === "function", "tests.onDidChangeTestResults is function");
+  assert(typeof vscodeApi.tests.createTestObserver === "function", "tests.createTestObserver is function");
+  assert(typeof vscodeApi.window.onDidWriteTerminalData === "function", "window.onDidWriteTerminalData is function");
+  assert(typeof vscodeApi.window.onDidExecuteTerminalCommand === "function", "window.onDidExecuteTerminalCommand is function");
+  assert(typeof vscodeApi.window.onDidStartTerminalShellExecution === "function", "window.onDidStartTerminalShellExecution is function");
+  assert(typeof vscodeApi.window.onDidEndTerminalShellExecution === "function", "window.onDidEndTerminalShellExecution is function");
+  assert(typeof vscodeApi.window.onDidChangeTerminalShellIntegration === "function", "window.onDidChangeTerminalShellIntegration is function");
+  assert(typeof vscodeApi.window.showNotebookDocument === "function", "window.showNotebookDocument is function");
+  assert(typeof vscodeApi.workspace.registerPortAttributesProvider === "function", "workspace.registerPortAttributesProvider is function");
+  assert(typeof vscodeApi.debug.registerDebugVisualizationProvider === "function", "debug.registerDebugVisualizationProvider is function");
+  assert(typeof vscodeApi.debug.registerDebugVisualizationTreeProvider === "function", "debug.registerDebugVisualizationTreeProvider is function");
+  assert(typeof vscodeApi.env.createTelemetryLogger === "function", "env.createTelemetryLogger is function");
+  assert(typeof vscodeApi.lm.registerTool === "function" && typeof vscodeApi.lm.invokeTool === "function", "lm.registerTool & lm.invokeTool are functions");
+  assert(vscodeApi.DebugConfigurationProviderTriggerKind?.Dynamic === 2, "DebugConfigurationProviderTriggerKind.Dynamic === 2");
+  const qp = vscodeApi.window.createQuickPick();
+  qp.sortByLabel = false;
+  assert(qp.sortByLabel === false && typeof qp.onDidTriggerButton === "function", "QuickPick sortByLabel & onDidTriggerButton");
+  qp.dispose();
+  const nbCtrl = vscodeApi.notebooks.createNotebookController("py-repl", "jupyter-notebook", "Python REPL");
+  nbCtrl.variableProvider = { provideVariables: async function* () {} };
+  assert(nbCtrl.id === "py-repl" && !!nbCtrl.variableProvider, "NotebookController variableProvider");
+  nbCtrl.dispose();
+
   console.log("\nSMOKE OK — all assertions passed");
   console.log(`  commands: ${registered.join(", ")}`);
   console.log(`  messages: ${messages.join(" | ")}`);

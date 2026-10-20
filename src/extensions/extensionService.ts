@@ -337,13 +337,26 @@ export class ExtensionService {
   /** Push currently-open Monaco models to the host and keep them in sync. */
   private wireDocumentSync(): void {
     const extHostDocs = this.rpc!.getProxy(ExtHostContext.ExtHostDocuments);
+    const extHost = this.rpc!.getProxy(ExtHostContext.ExtHostExtensionService);
 
     const openModel = (model: monaco.editor.ITextModel) => {
       this.ensureModelSynced(model);
+      const langId = model.getLanguageId();
+      if (langId && langId !== "plaintext") {
+        void extHost.$activateByEvent(`onLanguage:${langId}`);
+      }
     };
 
     for (const model of monaco.editor.getModels()) openModel(model);
     this.disposables.push(monaco.editor.onDidCreateModel(openModel));
+    this.disposables.push(
+      monaco.editor.onDidChangeModelLanguage((e) => {
+        const langId = e.model.getLanguageId();
+        if (langId && langId !== "plaintext") {
+          void extHost.$activateByEvent(`onLanguage:${langId}`);
+        }
+      }),
+    );
     this.disposables.push(
       monaco.editor.onWillDisposeModel((model) => {
         this.flushModelChanges(model);
@@ -415,12 +428,44 @@ export class ExtensionService {
     const fileName = activeFilePath
       ? activeFilePath.replace(/\\/g, "/").split("/").pop() ?? ""
       : "";
-    const extName = fileName.includes(".") ? `.${fileName.split(".").pop()}` : "";
+    const extName = fileName.includes(".") ? `.${fileName.split(".").pop()?.toLowerCase()}` : "";
+    const extLangMap: Record<string, string> = {
+      ".py": "python",
+      ".pyw": "python",
+      ".pyi": "python",
+      ".rs": "rust",
+      ".ts": "typescript",
+      ".tsx": "typescriptreact",
+      ".js": "javascript",
+      ".jsx": "javascriptreact",
+      ".mjs": "javascript",
+      ".cjs": "javascript",
+      ".json": "json",
+      ".md": "markdown",
+      ".toml": "toml",
+      ".yaml": "yaml",
+      ".yml": "yaml",
+      ".go": "go",
+      ".java": "java",
+      ".c": "c",
+      ".cpp": "cpp",
+      ".h": "c",
+      ".hpp": "cpp",
+      ".sh": "shellscript",
+    };
+    const langId = extLangMap[extName] ?? "";
 
     const matchesWhen = (when?: string): boolean => {
       if (!when || !when.trim()) return true;
       const clauses = when.split(/&&/).map((s) => s.trim());
       for (const clause of clauses) {
+        if (!clause) continue;
+        if (clause === "!isInDiffEditor" || clause === "!virtualWorkspace" || clause === "shellExecutionSupported") {
+          continue;
+        }
+        if (clause === "isInDiffEditor" || clause === "virtualWorkspace") {
+          return false;
+        }
         const eqMatch = clause.match(/^resourceFilename\s*==\s*(.+)$/);
         if (eqMatch) {
           if (fileName !== eqMatch[1].trim().replace(/^['"]|['"]$/g, "")) return false;
@@ -428,7 +473,18 @@ export class ExtensionService {
         }
         const extMatch = clause.match(/^resourceExtname\s*==\s*(.+)$/);
         if (extMatch) {
-          if (extName !== extMatch[1].trim().replace(/^['"]|['"]$/g, "")) return false;
+          if (extName !== extMatch[1].trim().replace(/^['"]|['"]$/g, "").toLowerCase()) return false;
+          continue;
+        }
+        const langMatch = clause.match(/^(?:resourceLangId|editorLangId)\s*==\s*(.+)$/);
+        if (langMatch) {
+          const expectedLang = langMatch[1].trim().replace(/^['"]|['"]$/g, "");
+          if (langId !== expectedLang) return false;
+          continue;
+        }
+        if (clause.startsWith("!")) {
+          const ctxVal = this.handles?.commands.getContextKey(clause.slice(1).trim());
+          if (ctxVal === true) return false;
           continue;
         }
         const ctxVal = this.handles?.commands.getContextKey(clause);
