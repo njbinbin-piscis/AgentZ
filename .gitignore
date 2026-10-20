@@ -11,10 +11,10 @@ dist
 /src-tauri/target
 
 # Runtime data (chat / file-journal SQLite databases)
-.agentz/
-.agentz/**
-.codez/
-.piscis/
+/.agentz/
+/.agentz/**
+/.codez/
+/.piscis/
 *.db
 *.db-wal
 *.db-shm

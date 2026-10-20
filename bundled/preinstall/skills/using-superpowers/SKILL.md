@@ -1,14 +1,15 @@
 ---
 name: "using-superpowers"
-description: "Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions"
-description_zh: "Claude Code 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description: "Use when starting any conversation - establishes how to find and use skills, requiring reading the matching SKILL.md before ANY response including clarifying questions"
+description_zh: "核心工程技能工作流：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
 version: "1.0.0"
+tools: [file_read, plan_todo]
 source: codebuddy
 source_plugin: "superpowers"
 ---
 
 <EXTREMELY-IMPORTANT>
-If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST load and follow the skill.
 
 IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
 
@@ -17,7 +18,7 @@ This is not negotiable. This is not optional. You cannot rationalize your way ou
 
 ## How to Access Skills
 
-**In AgentZ:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you—follow it directly. Never use the Read tool on skill files.
+**In AgentZ:** Check the `## Available skills` list in your system prompt, then call `file_read` on the matching skill's `SKILL.md` path. Once read, follow its instructions directly and use `plan_todo` to track checklist steps.
 
 **In other environments:** Check your platform's documentation for how skills are loaded.
 
@@ -25,13 +26,13 @@ This is not negotiable. This is not optional. You cannot rationalize your way ou
 
 ## The Rule
 
-**Invoke relevant or requested skills BEFORE any response or action.** Even a 1% chance a skill might apply means that you should invoke the skill to check. If an invoked skill turns out to be wrong for the situation, you don't need to use it.
+**Load relevant or requested skills via `file_read` BEFORE any response or action.** Even a 1% chance a skill might apply means that you should read its `SKILL.md` to check. If a loaded skill turns out to be wrong for the situation, you don't need to use it.
 
 ```dot
 digraph skill_flow {
     "User message received" [shape=doublecircle];
     "Might any skill apply?" [shape=diamond];
-    "Invoke Skill tool" [shape=box];
+    "Read SKILL.md via file_read" [shape=box];
     "Announce: 'Using [skill] to [purpose]'" [shape=box];
     "Has checklist?" [shape=diamond];
     "Create plan_todo tool todo per item" [shape=box];
@@ -39,9 +40,9 @@ digraph skill_flow {
     "Respond (including clarifications)" [shape=doublecircle];
 
     "User message received" -> "Might any skill apply?";
-    "Might any skill apply?" -> "Invoke Skill tool" [label="yes, even 1%"];
+    "Might any skill apply?" -> "Read SKILL.md via file_read" [label="yes, even 1%"];
     "Might any skill apply?" -> "Respond (including clarifications)" [label="definitely not"];
-    "Invoke Skill tool" -> "Announce: 'Using [skill] to [purpose]'";
+    "Read SKILL.md via file_read" -> "Announce: 'Using [skill] to [purpose]'";
     "Announce: 'Using [skill] to [purpose]'" -> "Has checklist?";
     "Has checklist?" -> "Create plan_todo tool todo per item" [label="yes"];
     "Has checklist?" -> "Follow skill exactly" [label="no"];

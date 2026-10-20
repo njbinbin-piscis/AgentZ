@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-10-21
+
+### Fixed
+
+- **Project templates (`superpowers` and all bundled templates)**: Fixed `.gitignore` unanchored `.agentz/` patterns that previously excluded template rule files from the repository, and added concrete `.agentz/rules/*.md` workflows for all 9 bundled project templates (`superpowers`, `agent-browser`, `atuin`, `cloudbase`, `hookify`, `plugin-finder`, `ralph-loop`, `security-guidance`, `tsmart`). Updated `project_apply_template` and `project_has_agentz`, added an "Apply template…" button in `Settings -> Project Rules`, removed external `CodeBuddy` wording from the template dialog and metadata, and aligned `using-superpowers/SKILL.md` with AgentZ's `file_read` + `plan_todo` workflow.
+- **Coding tool self-healing & reliability (`file_edit`, `file_search`, `shell`, `terminal_read`)**:
+  - `file_edit` now embeds numbered closest-matching file context in `MatchNotFound` errors and 1-based match line numbers in `MatchAmbiguous` errors so models can self-heal without an extra `file_read` round-trip.
+  - `file_search` now supports `include_ignored: true` to search inside excluded directories (`node_modules`, `target`, etc.) and lists skipped excluded directories when returning 0 matches.
+  - Windows `shell` (`powershell` / `powershell32`) automatically rewrites top-level unquoted `&&` command chains into Windows PowerShell 5.1-compatible conditional blocks.
+  - `terminal_read` now supports an optional `wait_ms` (`0..=15000`) parameter to wait briefly before snapshotting PTY output.
+
 ## [1.0.2] - 2026-10-20
 
 ### Fixed

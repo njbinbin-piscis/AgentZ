@@ -25,6 +25,8 @@ impl Tool for TerminalReadTool {
          - `lines` (default 50): return the last N lines of output.\n\
          - `grep` + `grep_lines` (default 100): search for a substring in the \
            last M lines and return matching lines only.\n\
+         - `wait_ms` (0..=15000): optionally wait before snapshotting output so \
+           in-progress commands can flush without polling in a loop.\n\
          - `terminal_id`: optional session id; defaults to the first live session.\n\
          \n\
          Output is captured server-side as the terminal runs — use this to inspect \
@@ -50,6 +52,10 @@ impl Tool for TerminalReadTool {
                 "grep_lines": {
                     "type": "integer",
                     "description": "When grep is set, how many recent lines to search (default 100)."
+                },
+                "wait_ms": {
+                    "type": "integer",
+                    "description": "Optional milliseconds to wait (0..=15000) before reading terminal output."
                 }
             }
         })
@@ -59,7 +65,7 @@ impl Tool for TerminalReadTool {
         true
     }
 
-    async fn call(&self, input: Value, _ctx: &ToolContext) -> anyhow::Result<ToolResult> {
+    async fn call(&self, input: Value, ctx: &ToolContext) -> anyhow::Result<ToolResult> {
         let terminal_id = input
             .get("terminal_id")
             .and_then(|v| v.as_str())
@@ -76,6 +82,23 @@ impl Tool for TerminalReadTool {
             .get("grep_lines")
             .and_then(|v| v.as_u64())
             .map(|n| n as usize);
+        let wait_ms = input
+            .get("wait_ms")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            .min(15_000);
+        if wait_ms > 0 {
+            let step = 100u64;
+            let mut waited = 0u64;
+            while waited < wait_ms {
+                if ctx.cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
+                let chunk = (wait_ms - waited).min(step);
+                tokio::time::sleep(std::time::Duration::from_millis(chunk)).await;
+                waited += chunk;
+            }
+        }
 
         let registry = self.terminals.lock().await;
         let tid = if let Some(id) = terminal_id.filter(|s| !s.trim().is_empty()) {

@@ -2,7 +2,7 @@
   "id": "tpl-plugin-finder-template",
   "name": "plugin-finder",
   "name_zh": "plugin-finder",
-  "description": "智能插件发现和管理助手 - 支持智能搜索、多插件并行对比、多插件协同工作流（sequence-run）、插件信息详解、许愿新插件等功能",
-  "description_zh": "智能插件发现和管理助手 - 支持智能搜索、多插件并行对比、多插件协同工作流（sequence-run）、插件信息详解、许愿新插件等功能",
+  "description": "Skill, tool, and extension orchestration workflow: capability discovery, multi-skill composition, and minimal-privilege tool selection.",
+  "description_zh": "技能与工具协同工作流：规范内置工具、扩展、MCP 与技能包的按需发现、组合调用与最小权限选择。",
   "source_plugin": "plugin-finder"
 }

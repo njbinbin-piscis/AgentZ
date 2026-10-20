@@ -8,6 +8,7 @@ import {
   writeRule,
   type RuleFile,
 } from "../../../services/tauri/workbench";
+import ProjectTemplateDialog from "../../../components/ProjectTemplateDialog";
 
 interface RulesTabProps {
   projectDir: string | null;
@@ -28,6 +29,7 @@ export default function RulesTab({ projectDir }: RulesTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!projectDir) {
@@ -197,10 +199,25 @@ export default function RulesTab({ projectDir }: RulesTabProps) {
                 ))}
               </div>
             )}
-            <button type="button" className="agentz-llm-add" onClick={() => void openEditor()}>
-              + {t("rules.add")}
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" className="agentz-llm-add" onClick={() => void openEditor()}>
+                + {t("rules.add")}
+              </button>
+              <button type="button" className="agentz-llm-add" onClick={() => setShowTemplates(true)}>
+                {t("rules.applyTemplate")}
+              </button>
+            </div>
           </>
+        )}
+        {showTemplates && projectDir && (
+          <ProjectTemplateDialog
+            projectDir={projectDir}
+            onDone={() => {
+              setShowTemplates(false);
+              void refresh();
+            }}
+            onSkip={() => setShowTemplates(false)}
+          />
         )}
       </section>
     </div>

@@ -88,6 +88,10 @@ impl Tool for FileSearchTool {
                 "context_lines": {
                     "type": "integer",
                     "description": "For grep: number of lines of context to show around each match (default 0)"
+                },
+                "include_ignored": {
+                    "type": "boolean",
+                    "description": "When true, also search inside normally excluded directories (node_modules, target, .cache, __pycache__, .vs). Default false (.git is always skipped)."
                 }
             },
             "required": ["action", "pattern"]
@@ -153,8 +157,17 @@ impl Tool for FileSearchTool {
             Some(&file_extensions)
         };
 
+        let include_ignored = input["include_ignored"].as_bool().unwrap_or(false);
+
         match action {
-            "glob" => self.do_glob(pattern, &root, max_results, max_depth, ext_filter),
+            "glob" => self.do_glob(
+                pattern,
+                &root,
+                max_results,
+                max_depth,
+                ext_filter,
+                include_ignored,
+            ),
             "grep" => {
                 let include = input["include"].as_str();
                 let case_sensitive = input["case_sensitive"].as_bool().unwrap_or(false);
@@ -168,6 +181,7 @@ impl Tool for FileSearchTool {
                     max_depth,
                     case_sensitive,
                     context_lines,
+                    include_ignored,
                 )
             }
             _ => Ok(ToolResult::err(format!("Unknown action: {}", action))),
@@ -176,6 +190,7 @@ impl Tool for FileSearchTool {
 }
 
 impl FileSearchTool {
+    #[allow(clippy::too_many_arguments)]
     fn do_glob(
         &self,
         pattern: &str,
@@ -183,6 +198,7 @@ impl FileSearchTool {
         max_results: usize,
         max_depth: usize,
         ext_filter: Option<&[String]>,
+        include_ignored: bool,
     ) -> Result<ToolResult> {
         let regex_pat = glob_to_regex(pattern);
         let re = match regex::Regex::new(&regex_pat) {
@@ -196,39 +212,49 @@ impl FileSearchTool {
         };
 
         let mut matches: Vec<String> = Vec::new();
-        walk_dir(root, 0, max_depth, &mut |path: &Path| {
-            if matches.len() >= max_results {
-                return false;
-            }
-            if path.is_file() {
-                // Apply extension filter
-                if let Some(exts) = ext_filter {
-                    let file_ext = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .map(|e| e.to_lowercase())
-                        .unwrap_or_default();
-                    if !exts.iter().any(|e| e == &file_ext) {
-                        return true;
+        let mut skipped_dirs: Vec<String> = Vec::new();
+        walk_dir_opts(
+            root,
+            0,
+            max_depth,
+            include_ignored,
+            &mut skipped_dirs,
+            &mut |path: &Path| {
+                if matches.len() >= max_results {
+                    return false;
+                }
+                if path.is_file() {
+                    // Apply extension filter
+                    if let Some(exts) = ext_filter {
+                        let file_ext = path
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .map(|e| e.to_lowercase())
+                            .unwrap_or_default();
+                        if !exts.iter().any(|e| e == &file_ext) {
+                            return true;
+                        }
+                    }
+                    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    let rel = path.strip_prefix(root).unwrap_or(path);
+                    let rel_str = rel.to_string_lossy().replace('\\', "/");
+                    if re.is_match(&rel_str) || re.is_match(file_name) {
+                        matches.push(path.to_string_lossy().to_string());
                     }
                 }
-                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                let rel = path.strip_prefix(root).unwrap_or(path);
-                let rel_str = rel.to_string_lossy().replace('\\', "/");
-                if re.is_match(&rel_str) || re.is_match(file_name) {
-                    matches.push(path.to_string_lossy().to_string());
-                }
-            }
-            true
-        });
+                true
+            },
+        );
 
         matches.sort_by_key(|p| p.matches('/').count() + p.matches('\\').count());
 
         if matches.is_empty() {
+            let ignored_note = format_skipped_dirs_note(&skipped_dirs);
             return Ok(ToolResult::ok(format!(
-                "No files found matching '{}' under {}",
+                "No files found matching '{}' under {}{}",
                 pattern,
-                root.display()
+                root.display(),
+                ignored_note
             )));
         }
 
@@ -252,6 +278,7 @@ impl FileSearchTool {
         max_depth: usize,
         case_sensitive: bool,
         context_lines: usize,
+        include_ignored: bool,
     ) -> Result<ToolResult> {
         let re = {
             let pat = if case_sensitive {
@@ -278,97 +305,105 @@ impl FileSearchTool {
 
         let mut results: Vec<String> = Vec::new();
         let mut skipped: Vec<String> = Vec::new();
+        let mut skipped_dirs: Vec<String> = Vec::new();
         let mut total_matches = 0usize;
 
-        walk_dir(root, 0, max_depth, &mut |path: &Path| {
-            if total_matches >= max_results {
-                return false;
-            }
-            if !path.is_file() {
-                return true;
-            }
-
-            let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
-            // Apply extension filter (takes priority over include pattern)
-            if let Some(exts) = ext_filter {
-                let file_ext = path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .map(|e| e.to_lowercase())
-                    .unwrap_or_default();
-                if !exts.iter().any(|e| e == &file_ext) {
+        walk_dir_opts(
+            root,
+            0,
+            max_depth,
+            include_ignored,
+            &mut skipped_dirs,
+            &mut |path: &Path| {
+                if total_matches >= max_results {
+                    return false;
+                }
+                if !path.is_file() {
                     return true;
                 }
-            } else if let Some(ref inc_re) = include_re {
-                // Fall back to include glob pattern
-                if !inc_re.is_match(fname) {
-                    return true;
-                }
-            }
 
-            let meta = match std::fs::metadata(path) {
-                Ok(m) => m,
-                Err(_) => return true,
-            };
-            if meta.len() > MAX_CONTENT_BYTES as u64 * 4 {
-                skipped.push(format!(
-                    "[skipped: {} ({:.0}KB)]",
-                    path.display(),
-                    meta.len() as f64 / 1024.0
-                ));
-                return true;
-            }
+                let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
-            let content = match std::fs::read_to_string(path) {
-                Ok(c) => c,
-                Err(_) => return true,
-            };
-
-            let lines: Vec<&str> = content.lines().collect();
-            let mut file_matches: Vec<String> = Vec::new();
-
-            for (i, line) in lines.iter().enumerate() {
-                if total_matches + file_matches.len() >= max_results {
-                    break;
-                }
-                if re.is_match(line) {
-                    let line_num = i + 1;
-                    if context_lines == 0 {
-                        file_matches.push(format!(
-                            "  {}:{}:{}",
-                            path.display(),
-                            line_num,
-                            line.trim_end()
-                        ));
-                    } else {
-                        let start = i.saturating_sub(context_lines);
-                        let end = (i + context_lines + 1).min(lines.len());
-                        for (j, ctx_line) in lines[start..end].iter().enumerate() {
-                            let actual_line = start + j + 1;
-                            let marker = if actual_line == line_num { ">" } else { " " };
-                            file_matches.push(format!(
-                                "  {}:{}{}: {}",
-                                path.display(),
-                                marker,
-                                actual_line,
-                                ctx_line.trim_end()
-                            ));
-                        }
-                        file_matches.push(String::new());
+                // Apply extension filter (takes priority over include pattern)
+                if let Some(exts) = ext_filter {
+                    let file_ext = path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .map(|e| e.to_lowercase())
+                        .unwrap_or_default();
+                    if !exts.iter().any(|e| e == &file_ext) {
+                        return true;
+                    }
+                } else if let Some(ref inc_re) = include_re {
+                    // Fall back to include glob pattern
+                    if !inc_re.is_match(fname) {
+                        return true;
                     }
                 }
-            }
 
-            if !file_matches.is_empty() {
-                total_matches += file_matches.len();
-                let rel = path.to_string_lossy();
-                results.push(format!("{}:", rel));
-                results.extend(file_matches);
-            }
+                let meta = match std::fs::metadata(path) {
+                    Ok(m) => m,
+                    Err(_) => return true,
+                };
+                if meta.len() > MAX_CONTENT_BYTES as u64 * 4 {
+                    skipped.push(format!(
+                        "[skipped: {} ({:.0}KB)]",
+                        path.display(),
+                        meta.len() as f64 / 1024.0
+                    ));
+                    return true;
+                }
 
-            true
-        });
+                let content = match std::fs::read_to_string(path) {
+                    Ok(c) => c,
+                    Err(_) => return true,
+                };
+
+                let lines: Vec<&str> = content.lines().collect();
+                let mut file_matches: Vec<String> = Vec::new();
+
+                for (i, line) in lines.iter().enumerate() {
+                    if total_matches + file_matches.len() >= max_results {
+                        break;
+                    }
+                    if re.is_match(line) {
+                        let line_num = i + 1;
+                        if context_lines == 0 {
+                            file_matches.push(format!(
+                                "  {}:{}:{}",
+                                path.display(),
+                                line_num,
+                                line.trim_end()
+                            ));
+                        } else {
+                            let start = i.saturating_sub(context_lines);
+                            let end = (i + context_lines + 1).min(lines.len());
+                            for (j, ctx_line) in lines[start..end].iter().enumerate() {
+                                let actual_line = start + j + 1;
+                                let marker = if actual_line == line_num { ">" } else { " " };
+                                file_matches.push(format!(
+                                    "  {}:{}{}: {}",
+                                    path.display(),
+                                    marker,
+                                    actual_line,
+                                    ctx_line.trim_end()
+                                ));
+                            }
+                            file_matches.push(String::new());
+                        }
+                    }
+                }
+
+                if !file_matches.is_empty() {
+                    total_matches += file_matches.len();
+                    let rel = path.to_string_lossy();
+                    results.push(format!("{}:", rel));
+                    results.extend(file_matches);
+                }
+
+                true
+            },
+        );
 
         if results.is_empty() {
             let filter_note = match (ext_filter, include) {
@@ -376,11 +411,13 @@ impl FileSearchTool {
                 (None, Some(i)) => format!(" (filter: {})", i),
                 _ => String::new(),
             };
+            let ignored_note = format_skipped_dirs_note(&skipped_dirs);
             return Ok(ToolResult::ok(format!(
-                "No matches found for '{}' under {}{}",
+                "No matches found for '{}' under {}{}{}",
                 pattern,
                 root.display(),
-                filter_note
+                filter_note,
+                ignored_note
             )));
         }
 
@@ -399,9 +436,33 @@ impl FileSearchTool {
     }
 }
 
+fn format_skipped_dirs_note(skipped_dirs: &[String]) -> String {
+    if skipped_dirs.is_empty() {
+        String::new()
+    } else {
+        format!(
+            " (skipped excluded directories: {}; pass include_ignored=true to search inside them)",
+            skipped_dirs.join(", ")
+        )
+    }
+}
+
 /// Walk a directory recursively, calling `visitor` for each entry.
 /// Returns early if visitor returns false.
+#[allow(dead_code)]
 fn walk_dir<F: FnMut(&Path) -> bool>(dir: &Path, depth: usize, max_depth: usize, visitor: &mut F) {
+    let mut skipped = Vec::new();
+    walk_dir_opts(dir, depth, max_depth, false, &mut skipped, visitor);
+}
+
+fn walk_dir_opts<F: FnMut(&Path) -> bool>(
+    dir: &Path,
+    depth: usize,
+    max_depth: usize,
+    include_ignored: bool,
+    skipped_dirs: &mut Vec<String>,
+    visitor: &mut F,
+) {
     if depth > max_depth {
         return;
     }
@@ -412,19 +473,24 @@ fn walk_dir<F: FnMut(&Path) -> bool>(dir: &Path, depth: usize, max_depth: usize,
     for entry in entries.flatten() {
         let path = entry.path();
         let is_dir = path.is_dir();
-        if is_dir
-            && path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(is_excluded_search_directory)
-        {
-            continue;
+        if is_dir {
+            if let Some(dir_name) = path.file_name().and_then(|name| name.to_str()) {
+                if dir_name.eq_ignore_ascii_case(".git") {
+                    continue;
+                }
+                if !include_ignored && is_excluded_search_directory(dir_name) {
+                    if !skipped_dirs.iter().any(|d| d.eq_ignore_ascii_case(dir_name)) {
+                        skipped_dirs.push(dir_name.to_string());
+                    }
+                    continue;
+                }
+            }
         }
         if !visitor(&path) {
             return;
         }
         if is_dir {
-            walk_dir(&path, depth + 1, max_depth, visitor);
+            walk_dir_opts(&path, depth + 1, max_depth, include_ignored, skipped_dirs, visitor);
         }
     }
 }
@@ -517,5 +583,31 @@ mod tests {
                 "excluded directory {excluded} or its contents reached the visitor"
             );
         }
+    }
+
+    #[test]
+    fn include_ignored_searches_excluded_dirs_and_default_reports_skipped_dirs() {
+        let root = std::env::temp_dir().join(format!(
+            "file-search-include-ignored-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(root.join("node_modules/pkg")).unwrap();
+        std::fs::write(root.join("node_modules/pkg/index.d.ts"), "export type Foo = string;")
+            .unwrap();
+
+        let tool = FileSearchTool;
+        let res_default = tool
+            .do_grep("export type Foo", &root, None, None, 10, 5, false, 0, false)
+            .unwrap();
+        assert!(res_default.content.contains("No matches found"));
+        assert!(res_default.content.contains("skipped excluded directories: node_modules"));
+
+        let res_ignored = tool
+            .do_grep("export type Foo", &root, None, None, 10, 5, false, 0, true)
+            .unwrap();
+        assert!(res_ignored.content.contains("Found 1 match"));
+        assert!(res_ignored.content.contains("index.d.ts"));
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

@@ -2,7 +2,7 @@
   "id": "tpl-superpowers-template",
   "name": "superpowers",
   "name_zh": "superpowers",
-  "description": "Claude Code 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法",
-  "description_zh": "Claude Code 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法",
+  "description": "Core engineering workflow discipline: brainstorming-first design, step-by-step execution plans, test-driven development (TDD), systematic root-cause debugging, and verification before completion.",
+  "description_zh": "核心工程纪律工作流：包含先设计后实现、分步执行计划、测试驱动开发（TDD）、系统化根因调试与完成前实证校验。",
   "source_plugin": "superpowers"
 }

@@ -251,16 +251,16 @@ const en = {
     goDiscoverConnectors: "Discover connectors in library",
     goDiscoverSkills: "Discover skills in library",
     commandsSearch: "Search slash commands…",
-    commandsEmpty: "No slash commands installed yet. CodeBuddy presets are seeded on first launch.",
+    commandsEmpty: "No slash commands installed yet. Built-in presets are seeded on first launch.",
     commandsArgs: "Arguments",
   },
 
   projectTemplate: {
     title: "Project template",
     subtitle:
-      "This folder has no .agentz setup yet. Optionally apply a CodeBuddy rules/hooks template.",
+      "This folder has no .agentz setup yet. Optionally apply a project rules and workflow template.",
     none: "No templates available.",
-    hint: "Templates write .agentz/rules and hooks.json only when absent (hooks default to disabled).",
+    hint: "Templates write project rules into .agentz/rules without overwriting existing files.",
     skip: "Skip",
     apply: "Apply template",
   },
@@ -749,6 +749,7 @@ const en = {
     content: "Rule content (Markdown)",
     contentPlaceholder: "# Coding style\n- Always …\n- …",
     add: "New rule",
+    applyTemplate: "Apply template…",
     enabled: "Enabled",
     disabled: "Disabled",
     enable: "Enable",

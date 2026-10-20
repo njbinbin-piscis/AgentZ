@@ -152,6 +152,41 @@ pub fn project_templates_list(app: AppHandle) -> Result<Vec<ProjectTemplateInfo>
     Ok(list_from_dir(&root))
 }
 
+fn apply_template_from_root(root: &Path, project: &Path, template_id: &str) -> Result<(), String> {
+    let tpl_dir = root.join(template_id.trim());
+    if !tpl_dir.is_dir() {
+        return Err(format!("unknown template: {template_id}"));
+    }
+    let agentz = project.join(".agentz");
+    std::fs::create_dir_all(&agentz).map_err(|e| e.to_string())?;
+
+    for rules_src in [
+        tpl_dir.join("rules"),
+        tpl_dir.join(".agentz").join("rules"),
+    ] {
+        if rules_src.is_dir() {
+            copy_dir_if_absent(&rules_src, &agentz.join("rules"));
+        }
+    }
+
+    let hooks_dest = agentz.join("hooks.json");
+    if !hooks_dest.exists() {
+        for hooks_src in [
+            tpl_dir.join("hooks.json"),
+            tpl_dir.join(".agentz").join("hooks.json"),
+        ] {
+            if hooks_src.is_file() {
+                let raw = std::fs::read_to_string(&hooks_src).map_err(|e| e.to_string())?;
+                let converted = convert_codebuddy_hooks(&raw)?;
+                let json = serde_json::to_string_pretty(&converted).map_err(|e| e.to_string())?;
+                std::fs::write(&hooks_dest, json).map_err(|e| e.to_string())?;
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn project_apply_template(
     app: AppHandle,
@@ -169,27 +204,7 @@ pub fn project_apply_template(
     let Some(root) = bundled_templates_root(&app) else {
         return Err("bundled project templates not found".to_string());
     };
-    let tpl_dir = root.join(template_id.trim());
-    if !tpl_dir.is_dir() {
-        return Err(format!("unknown template: {template_id}"));
-    }
-    let agentz = project.join(".agentz");
-    std::fs::create_dir_all(&agentz).map_err(|e| e.to_string())?;
-
-    let rules_src = tpl_dir.join(".agentz").join("rules");
-    if rules_src.is_dir() {
-        copy_dir_if_absent(&rules_src, &agentz.join("rules"));
-    }
-
-    let hooks_src = tpl_dir.join(".agentz").join("hooks.json");
-    let hooks_dest = agentz.join("hooks.json");
-    if hooks_src.is_file() && !hooks_dest.exists() {
-        let raw = std::fs::read_to_string(&hooks_src).map_err(|e| e.to_string())?;
-        let converted = convert_codebuddy_hooks(&raw)?;
-        let json = serde_json::to_string_pretty(&converted).map_err(|e| e.to_string())?;
-        std::fs::write(&hooks_dest, json).map_err(|e| e.to_string())?;
-    }
-
+    apply_template_from_root(&root, &project, &template_id)?;
     let _ = resolve_global_config_dir(&app)?;
     Ok(())
 }
@@ -200,5 +215,101 @@ pub fn project_has_agentz(project_dir: String) -> Result<bool, String> {
     if trimmed.is_empty() {
         return Ok(false);
     }
-    Ok(PathBuf::from(trimmed).join(".agentz").is_dir())
+    let agentz = PathBuf::from(trimmed).join(".agentz");
+    if !agentz.is_dir() {
+        return Ok(false);
+    }
+    if agentz.join("hooks.json").is_file() {
+        return Ok(true);
+    }
+    let rules_dir = agentz.join("rules");
+    if let Ok(entries) = std::fs::read_dir(&rules_dir) {
+        let has_rule = entries.flatten().any(|e| {
+            let p = e.path();
+            p.is_file()
+                && matches!(
+                    p.extension().and_then(|ext| ext.to_str()),
+                    Some("md") | Some("mdc") | Some("disabled")
+                )
+        });
+        if has_rule {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::workbench::rules_list;
+
+    #[test]
+    fn bundled_templates_have_rules_and_no_codebuddy_wording() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../bundled/preinstall/project-templates");
+        let list = list_from_dir(&root);
+        assert!(
+            list.len() >= 9,
+            "expected at least 9 bundled templates, got {}",
+            list.len()
+        );
+        for tpl in &list {
+            assert!(
+                !tpl.description.to_lowercase().contains("codebuddy")
+                    && !tpl.description_zh.to_lowercase().contains("codebuddy"),
+                "template {} still contains CodeBuddy wording",
+                tpl.id
+            );
+            let rules_dir = root.join(&tpl.id).join("rules");
+            assert!(
+                rules_dir.is_dir(),
+                "template {} missing rules/ directory",
+                tpl.id
+            );
+            let has_md = std::fs::read_dir(&rules_dir)
+                .unwrap()
+                .flatten()
+                .any(|e| e.path().extension().and_then(|x| x.to_str()) == Some("md"));
+            assert!(
+                has_md,
+                "template {} has no .md rule files in rules/",
+                tpl.id
+            );
+        }
+    }
+
+    #[test]
+    fn apply_superpowers_template_populates_rules_and_prompt_context() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../bundled/preinstall/project-templates");
+        let proj = std::env::temp_dir().join(format!(
+            "agentz-tpl-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&proj).unwrap();
+        let proj_str = proj.to_string_lossy().to_string();
+
+        // Empty .agentz directory (e.g. from index/graph db) should not count as configured template
+        std::fs::create_dir_all(proj.join(".agentz")).unwrap();
+        assert!(!project_has_agentz(proj_str.clone()).unwrap());
+
+        apply_template_from_root(&root, &proj, "tpl-superpowers-template").unwrap();
+        assert!(project_has_agentz(proj_str.clone()).unwrap());
+
+        let rule_path = proj.join(".agentz").join("rules").join("superpowers.md");
+        assert!(rule_path.is_file());
+        let content = std::fs::read_to_string(&rule_path).unwrap();
+        assert!(content.contains("systematic-debugging"));
+        assert!(content.contains("verification-before-completion"));
+
+        let listed = rules_list(proj_str).unwrap();
+        assert!(listed.iter().any(|r| r.name == "superpowers.md" && r.enabled));
+
+        let _ = std::fs::remove_dir_all(&proj);
+    }
+}
+

@@ -2,7 +2,7 @@
   "id": "tpl-atuin-template",
   "name": "atuin",
   "name_zh": "atuin",
-  "description": "腾讯玄武实验室安全插件",
-  "description_zh": "腾讯玄武实验室安全插件",
+  "description": "Security auditing and vulnerability investigation workflow: attack surface mapping, high-risk pattern detection, minimal reproduction, and safe remediation.",
+  "description_zh": "安全审计与漏洞排查工作流：攻击面梳理、高危漏洞模式识别、最小复现验证与安全修复规范。",
   "source_plugin": "atuin"
 }

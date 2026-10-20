@@ -2,7 +2,7 @@
   "id": "tpl-ralph-loop-template",
   "name": "ralph-loop",
   "name_zh": "ralph-loop",
-  "description": "用于迭代开发的交互式自引用AI循环，实现Ralph Wiggum技术。Claude重复执行同一任务，查看之前的工作，直到完成为止。",
-  "description_zh": "用于迭代开发的交互式自引用AI循环，实现Ralph Wiggum技术。Claude重复执行同一任务，查看之前的工作，直到完成为止。",
+  "description": "Iterative self-correcting execution loop: stateful task breakdown, continuous test/lint feedback, and autonomous convergence until all acceptance criteria pass.",
+  "description_zh": "迭代式自演进开发循环：基于状态追踪与持续测试反馈，逐项推进并自我修正直至全部验收标准通过。",
   "source_plugin": "ralph-loop"
 }

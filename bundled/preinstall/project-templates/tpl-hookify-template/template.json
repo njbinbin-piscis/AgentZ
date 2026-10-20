@@ -2,7 +2,7 @@
   "id": "tpl-hookify-template",
   "name": "hookify",
   "name_zh": "hookify",
-  "description": "创建和管理自定义钩子,自动化你的工作流程。",
-  "description_zh": "创建和管理自定义钩子,自动化你的工作流程。",
+  "description": "Automated lifecycle hooks and guardrails workflow: pre-turn context checks, post-edit diagnostics, and repeatable project automation.",
+  "description_zh": "生命周期钩子与自动化护栏工作流：规范对话前上下文检查、修改后自动静态检查与可复现脚本约定。",
   "source_plugin": "hookify"
 }

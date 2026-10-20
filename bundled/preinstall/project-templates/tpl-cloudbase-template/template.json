@@ -2,7 +2,7 @@
   "id": "tpl-cloudbase-template",
   "name": "cloudbase",
   "name_zh": "cloudbase",
-  "description": "CloudBase AI 开发插件，提供 Web、小程序、云函数、CloudRun、数据库（NoSQL/MySQL）、云存储、AI 模型、UI 设计等全栈开发能力。",
-  "description_zh": "CloudBase AI 开发插件，提供 Web、小程序、云函数、CloudRun、数据库（NoSQL/MySQL）、云存储、AI 模型、UI 设计等全栈开发能力。",
+  "description": "Full-stack cloud application workflow: frontend UI, backend/serverless APIs, database modeling and queries, authentication, and deployment conventions.",
+  "description_zh": "全栈云应用开发工作流：涵盖前端页面、后端接口/云函数、数据库建模与查询、鉴权及部署规范。",
   "source_plugin": "cloudbase"
 }

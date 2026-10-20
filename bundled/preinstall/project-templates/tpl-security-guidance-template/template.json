@@ -2,7 +2,7 @@
   "id": "tpl-security-guidance-template",
   "name": "security-guidance",
   "name_zh": "security-guidance",
-  "description": "安全提醒钩子，在编辑文件时警告潜在的安全问题，包括命令注入、XSS 和不安全的代码模式",
-  "description_zh": "安全提醒钩子，在编辑文件时警告潜在的安全问题，包括命令注入、XSS 和不安全的代码模式",
+  "description": "Secure coding guardrails during file edits: proactive prevention of command injection, XSS, SQL injection, path traversal, and secret leakage.",
+  "description_zh": "安全编码实时护栏：在编写和修改代码时主动防范命令注入、XSS、SQL 注入、路径穿越与密钥泄露。",
   "source_plugin": "security-guidance"
 }

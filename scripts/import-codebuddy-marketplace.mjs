@@ -354,23 +354,28 @@ function main() {
     if (existsSync(rulesDir) || hooksFile) {
       const tplId = sanitizeId(`${entry.name}-template`, "tpl-");
       const tplRoot = join(templatesOut, tplId);
-      mkdirSync(join(tplRoot, ".agentz", "rules"), { recursive: true });
+      mkdirSync(join(tplRoot, "rules"), { recursive: true });
+      const cleanDesc = (s) =>
+        String(s || "")
+          .replace(/CodeBuddy\s*(Code)?/gi, "AgentZ")
+          .replace(/Claude\s*Code/gi, "AgentZ")
+          .trim();
       const tplMeta = {
         id: tplId,
         name: entry.name,
         name_zh: hasCjk(entry.description) ? entry.name : entry.name,
-        description: entry.description || entry.name,
-        description_zh: hasCjk(entry.description || "") ? entry.description : "",
+        description: cleanDesc(entry.description || entry.name),
+        description_zh: hasCjk(entry.description || "") ? cleanDesc(entry.description) : "",
         source_plugin: entry.name,
       };
       writeFileSync(join(tplRoot, "template.json"), JSON.stringify(tplMeta, null, 2));
       if (existsSync(rulesDir)) {
-        copyTree(rulesDir, join(tplRoot, ".agentz", "rules"));
+        copyTree(rulesDir, join(tplRoot, "rules"));
       }
       if (hooksFile) {
         let hooksRaw = readFileSync(hooksFile, "utf8");
         hooksRaw = hooksRaw.replace(/\$\{CODEBUDDY_PLUGIN_ROOT\}/g, "${AGENTZ_BUNDLE_ROOT}");
-        writeFileSync(join(tplRoot, ".agentz", "hooks.json"), hooksRaw);
+        writeFileSync(join(tplRoot, "hooks.json"), hooksRaw);
       }
       manifest.templates.push({ id: tplId, plugin: entry.name });
     }

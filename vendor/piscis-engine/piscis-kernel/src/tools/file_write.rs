@@ -69,6 +69,90 @@ fn adapt_eol(s: &str, crlf: bool) -> String {
     }
 }
 
+/// Find 1-based line numbers for up to `max_samples` occurrences of `needle` in `content`.
+fn find_ambiguous_match_lines(content: &str, needle: &str, max_samples: usize) -> Vec<usize> {
+    content
+        .match_indices(needle)
+        .take(max_samples)
+        .map(|(byte_pos, _)| {
+            content[..byte_pos]
+                .bytes()
+                .filter(|&b| b == b'\n')
+                .count()
+                + 1
+        })
+        .collect()
+}
+
+/// Locate the closest matching line window in `content` when `old_string` fails to match verbatim,
+/// returning a hint that embeds the actual surrounding lines so the model can self-heal in one turn.
+fn find_closest_context_hint(content: &str, needle: &str) -> String {
+    const DEFAULT_HINT: &str = "Re-read the file with file_read and copy an exact unique snippet.";
+    let content_lines: Vec<&str> = content.lines().collect();
+    if content_lines.is_empty() {
+        return DEFAULT_HINT.to_string();
+    }
+    let needle_lines: Vec<&str> = needle
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect();
+    if needle_lines.is_empty() {
+        return DEFAULT_HINT.to_string();
+    }
+
+    let window_len = needle.lines().count().max(1);
+    let mut best_idx = 0usize;
+    let mut best_score = 0usize;
+
+    for start in 0..content_lines.len() {
+        let end = (start + window_len + 1).min(content_lines.len());
+        let mut score = 0usize;
+        let first_cl_trimmed = content_lines[start].trim();
+        if first_cl_trimmed == needle_lines[0] {
+            score += 2;
+        }
+        for &nl in &needle_lines {
+            for &cl in &content_lines[start..end] {
+                let cl_trimmed = cl.trim();
+                if cl_trimmed == nl {
+                    score += 3;
+                    break;
+                } else if nl.len() >= 4
+                    && (cl_trimmed.contains(nl)
+                        || (nl.contains(cl_trimmed) && cl_trimmed.len() >= 4))
+                {
+                    score += 1;
+                    break;
+                }
+            }
+        }
+        if score > best_score {
+            best_score = score;
+            best_idx = start;
+        }
+    }
+
+    if best_score == 0 {
+        return DEFAULT_HINT.to_string();
+    }
+
+    let ctx_start = best_idx.saturating_sub(2);
+    let ctx_end = (best_idx + window_len + 3)
+        .min(content_lines.len())
+        .min(ctx_start + 20);
+    let mut snippet = String::new();
+    for (idx, line) in content_lines[ctx_start..ctx_end].iter().enumerate() {
+        let line_no = ctx_start + idx + 1;
+        snippet.push_str(&format!("{line_no:>4}| {line}\n"));
+    }
+    format!(
+        "Copy the exact text (including indentation) from the closest match around line {}:\n{}",
+        best_idx + 1,
+        snippet.trim_end()
+    )
+}
+
 #[async_trait]
 impl Tool for FileWriteTool {
     fn name(&self) -> &str {
@@ -461,10 +545,11 @@ impl Tool for FileEditTool {
                 } else {
                     format!("edits[{}].old_string", i)
                 };
+                let hint = find_closest_context_hint(&content, old);
                 return Ok(ToolResult::err(format_err(
                     ToolErrorCode::MatchNotFound,
                     &format!("{} not found in file: {}", label, path.display()),
-                    "Re-read the file with file_read and copy an exact unique snippet.",
+                    &hint,
                 )));
             }
             if count > 1 {
@@ -473,6 +558,16 @@ impl Tool for FileEditTool {
                 } else {
                     format!("edits[{}].old_string", i)
                 };
+                let lines = find_ambiguous_match_lines(&content, old, 8);
+                let line_list = lines
+                    .iter()
+                    .map(|l| l.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let hint = format!(
+                    "Matches found at line(s): {}. Include more surrounding lines in old_string to make it unique.",
+                    line_list
+                );
                 return Ok(ToolResult::err(format_err(
                     ToolErrorCode::MatchAmbiguous,
                     &format!(
@@ -481,7 +576,7 @@ impl Tool for FileEditTool {
                         count,
                         path.display()
                     ),
-                    "Include more surrounding lines in old_string to make it unique.",
+                    &hint,
                 )));
             }
         }
@@ -545,7 +640,7 @@ impl Tool for FileEditTool {
 
 #[cfg(test)]
 mod eol_tests {
-    use super::adapt_eol;
+    use super::{adapt_eol, find_ambiguous_match_lines, find_closest_context_hint};
 
     #[test]
     fn lf_snippet_becomes_crlf_for_crlf_file() {
@@ -556,5 +651,20 @@ mod eol_tests {
     #[test]
     fn crlf_snippet_becomes_lf_for_lf_file() {
         assert_eq!(adapt_eol("a\r\nb", false), "a\nb");
+    }
+
+    #[test]
+    fn closest_context_hint_returns_numbered_window_on_indentation_mismatch() {
+        let content = "fn alpha() {\n    let x = 1;\n    let y = 2;\n}\n";
+        let hint = find_closest_context_hint(content, "  let x = 1;\n  let y = 2;");
+        assert!(hint.contains("closest match around line 2"));
+        assert!(hint.contains("2|     let x = 1;"));
+        assert!(hint.contains("3|     let y = 2;"));
+    }
+
+    #[test]
+    fn ambiguous_match_lines_reports_one_based_lines() {
+        let content = "let a = 1;\nlet b = 2;\nlet a = 1;\n";
+        assert_eq!(find_ambiguous_match_lines(content, "let a = 1;", 5), vec![1, 3]);
     }
 }

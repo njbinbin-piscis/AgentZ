@@ -24,6 +24,82 @@ const MAX_TIMEOUT_SECS: u64 = 300;
 #[cfg(windows)]
 const MAX_OUTPUT_BYTES: usize = 200 * 1024;
 
+/// Rewrite top-level unquoted `&&` chains into Windows PowerShell 5.1 compatible
+/// conditional blocks so LLM-generated `cmd1 && cmd2` commands do not fail with
+/// `The token '&&' is not a valid statement separator in this version`.
+pub fn rewrite_powershell5_chain(command: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    let bytes = command.as_bytes();
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut brace_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut seg_start = 0usize;
+    let mut i = 0usize;
+
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_single {
+            if b == b'\'' {
+                if i + 1 < bytes.len() && bytes[i + 1] == b'\'' {
+                    i += 2;
+                    continue;
+                }
+                in_single = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_double {
+            if b == b'`' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
+            if b == b'"' {
+                in_double = false;
+            }
+            i += 1;
+            continue;
+        }
+        match b {
+            b'\'' => in_single = true,
+            b'"' => in_double = true,
+            b'{' => brace_depth += 1,
+            b'}' => brace_depth = brace_depth.saturating_sub(1),
+            b'(' => paren_depth += 1,
+            b')' => paren_depth = paren_depth.saturating_sub(1),
+            b'&' if brace_depth == 0
+                && paren_depth == 0
+                && i + 1 < bytes.len()
+                && bytes[i + 1] == b'&' =>
+            {
+                parts.push(command[seg_start..i].trim());
+                i += 2;
+                seg_start = i;
+                continue;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    if parts.is_empty() {
+        return command.to_string();
+    }
+    parts.push(command[seg_start..].trim());
+    if parts.iter().any(|p| p.is_empty()) {
+        return command.to_string();
+    }
+
+    let mut acc = parts.last().unwrap().to_string();
+    for seg in parts[..parts.len() - 1].iter().rev() {
+        acc = format!(
+            "{seg}; if ($? -and ($null -eq $LASTEXITCODE -or $LASTEXITCODE -eq 0)) {{ {acc} }}"
+        );
+    }
+    format!("$global:LASTEXITCODE = 0; {acc}")
+}
+
 pub struct ShellTool;
 
 #[async_trait]
@@ -184,8 +260,9 @@ impl Tool for ShellTool {
                     let program = windir
                         .join(system_dir)
                         .join("WindowsPowerShell\\v1.0\\powershell.exe");
+                    let compat_cmd = rewrite_powershell5_chain(command);
                     let full_command = format!(
-                        "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.Encoding]::UTF8; {command}"
+                        "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.Encoding]::UTF8; {compat_cmd}"
                     );
                     (
                         program,
@@ -359,6 +436,16 @@ fn recovery_error(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rewrite_powershell5_chain_converts_top_level_and_and_only() {
+        let rewritten = rewrite_powershell5_chain("Set-Location src && cargo check");
+        assert!(rewritten.contains("Set-Location src; if ($?"));
+        assert!(rewritten.contains("cargo check"));
+
+        let quoted = "Write-Output \"a && b\"";
+        assert_eq!(rewrite_powershell5_chain(quoted), quoted);
+    }
 
     #[test]
     fn shell_discloses_supported_os_sandbox_boundary() {
