@@ -356,7 +356,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 72px;
+  min-width: 116px;
   padding: 4px;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -384,6 +384,39 @@
 .agentz-font-scale-popover button.active {
   color: var(--text);
   background: var(--accent-dim);
+}
+
+.agentz-font-scale-divider {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--border);
+}
+
+.agentz-font-scale-editor-label {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.agentz-font-scale-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+.agentz-font-scale-stepper button {
+  flex: 1;
+  padding: 0 6px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.agentz-font-scale-stepper button.agentz-font-scale-readout {
+  flex: 1.4;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
 }
 
 .agentz-wiki-menu {

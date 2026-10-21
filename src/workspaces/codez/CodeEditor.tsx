@@ -3,6 +3,12 @@ import { useTranslation } from "react-i18next";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import { themeStore, ACTIVE_EDITOR_THEME_KEY, syncEditorThemeWithAppearance } from "./themeStore";
+import {
+  DEFAULT_EDITOR_FONT_SIZE,
+  getEffectiveEditorFontSize,
+  setEditorBaseFontSize,
+  stepEditorBaseFontSize,
+} from "../../theme";
 import type { OpenTab } from "./types";
 import {
   languageForFile,
@@ -81,6 +87,11 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
   const { t } = useTranslation();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editorRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const diffEditorRef = useRef<any>(null);
+  const [editorFontSize, setEditorFontSize] = useState<number>(() =>
+    getEffectiveEditorFontSize(),
+  );
   const lspRef = useRef<LspProvidersRegistration | null>(null);
   const lspGenerationRef = useRef(0);
   const lspClientRef = useRef<import("../../services/tauri/lsp").LspClient | null>(null);
@@ -118,6 +129,17 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
   useEffect(() => {
     if (reveal) applyReveal();
   }, [reveal, applyReveal]);
+
+  useEffect(() => {
+    const syncFontSize = () => {
+      const nextSize = getEffectiveEditorFontSize();
+      setEditorFontSize(nextSize);
+      editorRef.current?.updateOptions?.({ fontSize: nextSize });
+      diffEditorRef.current?.updateOptions?.({ fontSize: nextSize });
+    };
+    window.addEventListener("agentz-font-scale", syncFontSize);
+    return () => window.removeEventListener("agentz-font-scale", syncFontSize);
+  }, []);
 
   // Monaco decorations (green "added" lines) + view zone (red "removed" block)
   // backing the in-editor inline diff preview.
@@ -465,6 +487,33 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
         },
       );
 
+      // Ctrl/Cmd + = (zoom in), Ctrl/Cmd + - (zoom out), Ctrl/Cmd + 0 (reset editor font size)
+      editor.addCommand(
+        // eslint-disable-next-line no-bitwise
+        2048 | 86, // KeyMod.CtrlCmd | KeyCode.Equal
+        () => {
+          stepEditorBaseFontSize(1);
+        },
+      );
+      editor.addCommand(
+        // eslint-disable-next-line no-bitwise
+        2048 | 88, // KeyMod.CtrlCmd | KeyCode.Minus
+        () => {
+          stepEditorBaseFontSize(-1);
+        },
+      );
+      editor.addCommand(
+        // eslint-disable-next-line no-bitwise
+        2048 | 21, // KeyMod.CtrlCmd | KeyCode.Digit0
+        () => {
+          setEditorBaseFontSize(DEFAULT_EDITOR_FONT_SIZE);
+        },
+      );
+      editor.updateOptions?.({
+        fontSize: getEffectiveEditorFontSize(),
+        mouseWheelZoom: true,
+      });
+
       // Restore a previously imported .vsix theme (persisted by ExtensionsPanel)
       // so it applies on startup without opening the Extensions panel.
       try {
@@ -691,11 +740,15 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
           language={editorLanguage}
           original={tab.originalContent}
           modified={tab.content}
+          onMount={(diffEditor) => {
+            diffEditorRef.current = diffEditor;
+            diffEditor.updateOptions?.({ fontSize: getEffectiveEditorFontSize() });
+          }}
           options={{
             readOnly: true,
             renderSideBySide: true,
             minimap: { enabled: false },
-            fontSize: 13,
+            fontSize: editorFontSize,
             fontFamily: 'Consolas, "Courier New", monospace',
             scrollBeyondLastLine: false,
           }}
@@ -782,7 +835,8 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
           readOnly: tab.isReadOnly,
           minimap: { enabled: !isLargeDocument },
           glyphMargin: true,
-          fontSize: 13,
+          fontSize: editorFontSize,
+          mouseWheelZoom: true,
           fontFamily: 'Consolas, "Courier New", monospace',
           scrollBeyondLastLine: false,
           wordWrap: isLargeDocument ? "off" : "on",

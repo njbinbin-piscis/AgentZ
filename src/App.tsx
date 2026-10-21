@@ -37,6 +37,11 @@ import {
   UI_FONT_SCALES,
   uiFontScaleLabel,
   type UiFontScale,
+  DEFAULT_EDITOR_FONT_SIZE,
+  getEditorBaseFontSize,
+  getEffectiveEditorFontSize,
+  setEditorBaseFontSize,
+  stepEditorBaseFontSize,
 } from "./theme";
 import { syncEditorThemeWithAppearance } from "./workspaces/codez/themeStore";
 import CodeZWorkspace from "./workspaces/codez";
@@ -180,6 +185,9 @@ export default function App() {
   );
   const [appearance, setAppearance] = useState<AppearanceTheme>(() => getAppearanceTheme());
   const [fontScale, setFontScale] = useState<UiFontScale>(() => getUiFontScale());
+  const [editorBaseFontSize, setEditorBaseFontSizeState] = useState<number>(() =>
+    getEditorBaseFontSize(),
+  );
   const [fontScaleOpen, setFontScaleOpen] = useState(false);
   const fontScaleRef = useRef<HTMLDivElement>(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
@@ -431,6 +439,15 @@ export default function App() {
       off();
       void un.then((f) => f());
     };
+  }, []);
+
+  useEffect(() => {
+    const syncFont = () => {
+      setFontScale(getUiFontScale());
+      setEditorBaseFontSizeState(getEditorBaseFontSize());
+    };
+    window.addEventListener("agentz-font-scale", syncFont);
+    return () => window.removeEventListener("agentz-font-scale", syncFont);
   }, []);
 
   useEffect(() => {
@@ -1098,6 +1115,34 @@ export default function App() {
                     {uiFontScaleLabel(s)}
                   </button>
                 ))}
+                <div className="agentz-font-scale-divider" />
+                <div className="agentz-font-scale-editor-label">{t("app.editorFontSize")}</div>
+                <div className="agentz-font-scale-stepper">
+                  <button
+                    type="button"
+                    data-testid="editor-font-decrease"
+                    onClick={() => setEditorBaseFontSizeState(stepEditorBaseFontSize(-1))}
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    className="agentz-font-scale-readout"
+                    data-testid="editor-font-reset"
+                    onClick={() =>
+                      setEditorBaseFontSizeState(setEditorBaseFontSize(DEFAULT_EDITOR_FONT_SIZE))
+                    }
+                  >
+                    {getEffectiveEditorFontSize(fontScale, editorBaseFontSize)}px
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="editor-font-increase"
+                    onClick={() => setEditorBaseFontSizeState(stepEditorBaseFontSize(1))}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             )}
           </div>

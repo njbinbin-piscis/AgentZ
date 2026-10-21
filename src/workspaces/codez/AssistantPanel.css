@@ -536,13 +536,13 @@
   left: 8px;
   right: 8px;
   bottom: calc(100% + 4px);
-  max-height: 200px;
+  max-height: min(200px, calc(100vh - 160px));
   overflow-y: auto;
   background: var(--bg-elev, #14141c);
   border: 1px solid var(--border, #2a2a38);
   border-radius: 10px;
   box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.4);
-  z-index: 25;
+  z-index: 1000;
 }
 
 .agentz-mention-item {

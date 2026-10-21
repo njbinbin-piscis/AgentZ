@@ -9,6 +9,7 @@ import { confirmDialog } from "../../services/tauri/confirm";
 import { ideApi, onTerminalOutput } from "../../services/tauri/ide";
 import { acquireTerminal, terminalBackendId } from "./terminalLifecycle";
 import { cssVar } from "./useAppTheme";
+import { getEffectiveTerminalFontSize } from "../../theme";
 import { perfCounters } from "../../utils/perfCounters";
 
 export interface TerminalTab {
@@ -110,7 +111,7 @@ function TerminalSession({
 
     const term = new XTerm({
       cursorBlink: true,
-      fontSize: 13,
+      fontSize: getEffectiveTerminalFontSize(),
       fontFamily: 'Consolas, "Courier New", monospace',
       lineHeight: 1.2,
       scrollback: 5000,
@@ -256,10 +257,14 @@ function TerminalSession({
   useEffect(() => {
     const onFontScale = () => {
       fontScalePauseRef.current = performance.now() + 400;
+      if (termRef.current) {
+        termRef.current.options.fontSize = getEffectiveTerminalFontSize();
+        requestAnimationFrame(() => fitTerminal());
+      }
     };
     window.addEventListener("agentz-font-scale", onFontScale);
     return () => window.removeEventListener("agentz-font-scale", onFontScale);
-  }, []);
+  }, [fitTerminal]);
 
   useEffect(() => {
     if (!active || !panelVisible || !containerRef.current) return;

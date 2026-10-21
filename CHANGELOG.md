@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-10-21
+
+### Fixed
+
+- **Composer dropdown menus in `WorkZ` and `CodeZ` clipped, rendered off-screen, or obscured by other UI**:
+  - Portaled `DropdownSelect` and `DropdownMultiSelect` popups to `document.body` (`z-index: 100100`) so they escape parent `overflow: hidden` / `overflow: clip` containers and ancestor stacking contexts (`.agentz-composer-wrap`, `.agentz-workz-isolate-bar`).
+  - Fixed `computeFixedPopupPosition` so upward-opening composer menus (`placement="up"`) anchor directly above the trigger via `bottom`, clamp `maxHeight` to the available viewport space instead of flipping off-screen below the bottom window edge, clamp `left` inside the right window edge for `CodeZ`'s right-hand chat panel, and normalize coordinates when `.agentz-app` uses CSS `zoom`.
+  - Rendered skill hints inline (clamped to 2 lines) inside `DropdownMultiSelect` instead of spawning an overlapping toast at `bottom: 120px`.
+- **Editor and terminal text unaffected by font size setting**:
+  - `CodeEditor`, `DiffEditor`, `NotebookEditor`, `Terminal`, and `WorkZ`'s file preview/editor now scale their font sizes proportionally with `UI_FONT_SCALES` (`88%`–`150%`) and update live when the `Aa` font size setting changes.
+  - Added an explicit Editor Font Size stepper (`−` / `px` reset / `+`, `10px`–`32px`) to the titlebar `Aa` popover, enabled `Ctrl + MouseWheel` zoom (`mouseWheelZoom: true`), and bound `Ctrl/Cmd + =`, `Ctrl/Cmd + -`, and `Ctrl/Cmd + 0` inside the editor.
+
 ## [1.0.5] - 2026-10-21
 
 ### Fixed

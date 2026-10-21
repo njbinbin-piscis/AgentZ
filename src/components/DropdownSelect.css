@@ -111,38 +111,48 @@
 .agentz-dropdown-popup {
   position: absolute;
   left: 0;
-  z-index: 50;
+  z-index: 100100;
   min-width: 200px;
-  max-width: min(320px, 90vw);
-  max-height: 280px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: min(280px, calc(100vh - 24px));
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
   padding: 4px;
   border: 1px solid var(--border, #3a3a4a);
   border-radius: 10px;
   background: var(--bg-elev, #14141c);
+  color: var(--text, #e8e8f0);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
 .agentz-dropdown-popup.is-fixed {
-  /* top/left/z-index set inline from useFixedPopupPosition (viewport coords). */
+  position: fixed;
+  width: max-content;
   bottom: auto;
   right: auto;
+  z-index: 100100;
 }
 
-.agentz-dropdown.popup-up .agentz-dropdown-popup {
+.agentz-dropdown.popup-up .agentz-dropdown-popup:not(.is-fixed) {
   bottom: calc(100% + 6px);
 }
 
-.agentz-dropdown.popup-down .agentz-dropdown-popup {
+.agentz-dropdown.popup-down .agentz-dropdown-popup:not(.is-fixed) {
   top: calc(100% + 4px);
 }
 
-.agentz-dropdown.field .agentz-dropdown-popup,
-.agentz-dropdown.inline .agentz-dropdown-popup {
+.agentz-dropdown.field .agentz-dropdown-popup:not(.is-fixed),
+.agentz-dropdown.inline .agentz-dropdown-popup:not(.is-fixed) {
   left: 0;
   right: 0;
   min-width: 0;
   max-width: none;
+}
+
+.agentz-dropdown-popup.field.is-fixed,
+.agentz-dropdown-popup.inline.is-fixed {
+  max-width: min(520px, calc(100vw - 16px));
 }
 
 .agentz-dropdown-popup button {
@@ -151,12 +161,14 @@
   align-items: flex-start;
   gap: 2px;
   width: 100%;
+  box-sizing: border-box;
   padding: 8px 10px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: var(--text, #e8e8f0);
-  font-size: 12px;
+  font-family: inherit;
+  font-size: calc(12px * var(--ui-font-scale, 1));
   text-align: left;
   cursor: pointer;
 }
@@ -168,12 +180,18 @@
 
 .agentz-dropdown-option-label {
   font-weight: 600;
+  word-break: break-word;
 }
 
 .agentz-dropdown-option-hint {
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-font-scale, 1));
   color: var(--text-dim, #9a9ab0);
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .agentz-dropdown-empty {

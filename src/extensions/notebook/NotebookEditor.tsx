@@ -4,6 +4,7 @@ import { parseIpynb, serializeIpynb, emptyCell, type NbCell } from "./ipynb";
 import { extensionService } from "../extensionService";
 import MarkdownPreview from "../../workspaces/codez/MarkdownPreview";
 import { themeStore } from "../../workspaces/codez/themeStore";
+import { getEffectiveEditorFontSize } from "../../theme";
 import "./notebook.css";
 
 interface NotebookEditorProps {
@@ -29,7 +30,7 @@ function CodeCell({ cell, onSource }: { cell: NbCell; onSource: (v: string) => v
       scrollBeyondLastLine: false,
       automaticLayout: true,
       folding: false,
-      fontSize: 13,
+      fontSize: getEffectiveEditorFontSize(),
       padding: { top: 6, bottom: 6 },
       scrollbar: { alwaysConsumeMouseWheel: false },
     });
@@ -39,10 +40,16 @@ function CodeCell({ cell, onSource }: { cell: NbCell; onSource: (v: string) => v
       if (hostRef.current) hostRef.current.style.height = `${h}px`;
       editor.layout();
     };
+    const onFontScale = () => {
+      editor.updateOptions({ fontSize: getEffectiveEditorFontSize() });
+      resize();
+    };
+    window.addEventListener("agentz-font-scale", onFontScale);
     resize();
     const cs = editor.onDidContentSizeChange(resize);
     const ch = editor.onDidChangeModelContent(() => onSource(editor.getValue()));
     return () => {
+      window.removeEventListener("agentz-font-scale", onFontScale);
       cs.dispose();
       ch.dispose();
       editor.dispose();
