@@ -156,6 +156,7 @@ impl Drop for AppContainerProfile {
     }
 }
 
+
 struct OwnedHandle(HANDLE);
 
 impl OwnedHandle {
@@ -200,6 +201,47 @@ pub fn run_appcontainer_command(
     env_overrides: &[(std::ffi::OsString, std::ffi::OsString)],
     max_output_bytes: usize,
 ) -> Result<AppContainerOutput> {
+    run_sandboxed_command(
+        program,
+        args,
+        workspace_root,
+        cwd,
+        timeout,
+        cancel,
+        env_overrides,
+        max_output_bytes,
+        crate::agent::tool::SandboxMode::Isolated,
+    )
+}
+
+/// Launch a Windows command under the sandbox strength derived from the
+/// user's security level (see [`crate::agent::tool::SandboxMode`]).
+///
+/// - `Isolated`: zero-capability AppContainer, no network.
+/// - `Networked`: run as the current user in the Job Object (network,
+///   loopback, proxies and user toolchain caches reachable) with `cwd`
+///   still pinned inside `workspace_root`. An AppContainer with network
+///   capabilities cannot reach loopback services without an administrator
+///   loopback exemption, which would break local dev-server workflows.
+/// - `Disabled`: no AppContainer and no workspace pin; the command runs as
+///   the current user inside the kill-on-close Job Object only, and `cwd`
+///   may point outside `workspace_root`.
+///
+/// The mode comes from Settings via the tool context; it is never taken
+/// from tool input.
+#[allow(clippy::too_many_arguments)]
+pub fn run_sandboxed_command(
+    program: &OsStr,
+    args: &[std::ffi::OsString],
+    workspace_root: &Path,
+    cwd: &Path,
+    timeout: Duration,
+    cancel: Arc<AtomicBool>,
+    env_overrides: &[(std::ffi::OsString, std::ffi::OsString)],
+    max_output_bytes: usize,
+    mode: crate::agent::tool::SandboxMode,
+) -> Result<AppContainerOutput> {
+    use crate::agent::tool::SandboxMode;
     anyhow::ensure!(timeout > Duration::ZERO, "sandbox timeout must be positive");
     let workspace_root = workspace_root
         .canonicalize()
@@ -211,12 +253,18 @@ pub fn run_appcontainer_command(
     let cwd = cwd
         .canonicalize()
         .context("resolve sandbox working directory")?;
-    anyhow::ensure!(
-        cwd.is_dir() && cwd.starts_with(&workspace_root),
-        "sandbox working directory must be inside workspace_root"
-    );
-    let force_unprivileged_job =
-        command_requires_unprivileged_toolchain_fallback(program, args, env_overrides);
+    if mode == SandboxMode::Disabled {
+        anyhow::ensure!(cwd.is_dir(), "working directory is not a directory");
+    } else {
+        anyhow::ensure!(
+            cwd.is_dir() && cwd.starts_with(&workspace_root),
+            "sandbox working directory must be inside workspace_root"
+        );
+    }
+    // Developer toolchains need user-profile caches; Networked and Disabled
+    // modes run as the current user in the Job Object (see above).
+    let force_unprivileged_job = mode != SandboxMode::Isolated
+        || command_requires_unprivileged_toolchain_fallback(program, args, env_overrides);
     let mut profile = None;
     let mut workspace_lease = None;
     if !force_unprivileged_job {
@@ -233,7 +281,7 @@ pub fn run_appcontainer_command(
         }
     }
     let use_appcontainer = workspace_lease.is_some();
-    let _pinned_readonly_workspace = if !use_appcontainer {
+    let _pinned_readonly_workspace = if !use_appcontainer && mode != SandboxMode::Disabled {
         Some(verify_and_pin_readonly_workspace(&workspace_root)?)
     } else {
         None
@@ -834,6 +882,157 @@ mod runner_tests {
             "AppContainer curl unexpectedly connected"
         );
         assert!(!acceptor.join().expect("join local listener"));
+    }
+
+    #[test]
+    fn sandboxed_command_with_network_allowed_reaches_local_listener() {
+        let temp = tempfile::tempdir().expect("create network-allowed test root");
+        let work = temp.path().join("work");
+        std::fs::create_dir_all(&work).expect("create network-allowed workspace");
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind local probe");
+        listener
+            .set_nonblocking(true)
+            .expect("set listener nonblocking");
+        let port = listener.local_addr().expect("read listener address").port();
+        let acceptor = thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        use std::io::Write;
+                        let _ = stream.write_all(
+                            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+                        );
+                        return true;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        if Instant::now() >= deadline {
+                            return false;
+                        }
+                        thread::sleep(Duration::from_millis(20));
+                    }
+                    Err(_) => return false,
+                }
+            }
+        });
+        let curl =
+            PathBuf::from(std::env::var_os("WINDIR").expect("WINDIR")).join("System32\\curl.exe");
+        let network = run_sandboxed_command(
+            curl.as_os_str(),
+            &[
+                OsString::from("--silent"),
+                OsString::from("--max-time"),
+                OsString::from("2"),
+                OsString::from("--connect-timeout"),
+                OsString::from("1"),
+                OsString::from(format!("http://127.0.0.1:{port}/")),
+            ],
+            &work,
+            &work,
+            Duration::from_secs(6),
+            Arc::new(AtomicBool::new(false)),
+            &[],
+            1024,
+            crate::agent::tool::SandboxMode::Disabled,
+        )
+        .expect("run network-allowed probe");
+        assert_eq!(
+            network.exit_code, 0,
+            "network-allowed curl failed: stderr={}",
+            String::from_utf8_lossy(&network.stderr)
+        );
+        assert!(
+            acceptor.join().expect("join local listener"),
+            "network-allowed curl never reached the local listener"
+        );
+    }
+
+    #[test]
+    fn sandboxed_command_networked_mode_reaches_loopback_and_pins_cwd() {
+        // Networked (balanced) runs as the current user: loopback works, but
+        // the runner still refuses a working directory outside the workspace.
+        let temp = tempfile::tempdir().expect("create networked test root");
+        let work = temp.path().join("work");
+        let outside = temp.path().join("outside");
+        std::fs::create_dir_all(&work).expect("create networked workspace");
+        std::fs::create_dir_all(&outside).expect("create outside directory");
+
+        let cwd_err = run_sandboxed_command(
+            cmd_exe().as_os_str(),
+            &[
+                OsString::from("/d"),
+                OsString::from("/c"),
+                OsString::from("echo must-not-run"),
+            ],
+            &work,
+            &outside,
+            Duration::from_secs(10),
+            Arc::new(AtomicBool::new(false)),
+            &[],
+            1024,
+            crate::agent::tool::SandboxMode::Networked,
+        )
+        .expect_err("Networked mode must pin cwd inside the workspace");
+        assert!(
+            cwd_err.to_string().contains("inside workspace_root"),
+            "unexpected cwd error: {cwd_err}"
+        );
+
+        // Loopback reachability as the current user.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind local probe");
+        listener
+            .set_nonblocking(true)
+            .expect("set listener nonblocking");
+        let port = listener.local_addr().expect("read listener address").port();
+        let acceptor = thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        use std::io::Write;
+                        let _ = stream.write_all(
+                            b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+                        );
+                        return true;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        if Instant::now() >= deadline {
+                            return false;
+                        }
+                        thread::sleep(Duration::from_millis(20));
+                    }
+                    Err(_) => return false,
+                }
+            }
+        });
+        let curl =
+            PathBuf::from(std::env::var_os("WINDIR").expect("WINDIR")).join("System32\\curl.exe");
+        let network = run_sandboxed_command(
+            curl.as_os_str(),
+            &[
+                OsString::from("--silent"),
+                OsString::from("--max-time"),
+                OsString::from("2"),
+                OsString::from("--connect-timeout"),
+                OsString::from("1"),
+                OsString::from(format!("http://127.0.0.1:{port}/")),
+            ],
+            &work,
+            &work,
+            Duration::from_secs(6),
+            Arc::new(AtomicBool::new(false)),
+            &[],
+            1024,
+            crate::agent::tool::SandboxMode::Networked,
+        )
+        .expect("run networked loopback probe");
+        assert_eq!(
+            network.exit_code, 0,
+            "Networked curl could not reach local listener: stderr={}",
+            String::from_utf8_lossy(&network.stderr)
+        );
+        assert!(acceptor.join().expect("join local listener"));
     }
 
     #[test]

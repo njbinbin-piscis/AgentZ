@@ -110,7 +110,7 @@ impl Tool for ShellTool {
 
     fn description(&self) -> &str {
         #[cfg(windows)]
-        return "Execute a Windows shell command inside a Windows AppContainer with filesystem access limited to the selected workspace and no network capability. The working directory must be inside workspace_root; by default it is workspace_root. Elevated execution and other platforms are unavailable. Setup or cleanup failures stop execution without an unsandboxed retry. Supports PowerShell, 32-bit PowerShell, and cmd.exe.";
+        return "Execute a Windows shell command inside a Windows AppContainer with filesystem access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled (cwd may leave workspace_root). The working directory must be inside workspace_root unless the sandbox is disabled; by default it is workspace_root. Elevated execution and other platforms are unavailable. Setup or cleanup failures stop execution without an unsandboxed retry. Supports PowerShell, 32-bit PowerShell, and cmd.exe.";
 
         #[cfg(not(windows))]
         return "Unavailable: this platform does not have an enabled operating-system command sandbox. Commands are not executed.";
@@ -149,7 +149,7 @@ impl Tool for ShellTool {
 
     fn description_minimal(&self) -> Cow<'_, str> {
         #[cfg(windows)]
-        return Cow::Borrowed("Run a Windows shell command in a no-network AppContainer scoped to workspace_root. cwd must remain inside that root. elevated=true is refused; other platforms do not execute shell commands.");
+        return Cow::Borrowed("Run a Windows shell command in an AppContainer scoped to workspace_root; network/isolation follow the Settings security level (strict/balanced/dev, dev disables the sandbox). cwd must remain inside that root unless the sandbox is disabled. elevated=true is refused; other platforms do not execute shell commands.");
 
         #[cfg(not(windows))]
         Cow::Borrowed("Unavailable: shell commands are not executed because an OS sandbox is unavailable on this platform.")
@@ -214,8 +214,15 @@ impl Tool for ShellTool {
                 Some(cwd) => workspace_root.join(cwd),
                 None => workspace_root.clone(),
             };
+            let sandbox_disabled =
+                ctx.settings.sandbox_mode == crate::agent::tool::SandboxMode::Disabled;
             let cwd = match requested_cwd.canonicalize() {
-                Ok(cwd) if cwd.is_dir() && cwd.starts_with(&workspace_root) => cwd,
+                Ok(cwd)
+                    if cwd.is_dir()
+                        && (sandbox_disabled || cwd.starts_with(&workspace_root)) =>
+                {
+                    cwd
+                }
                 Ok(_) => {
                     return recovery_error(
                         "Sandbox working directory must be an existing directory inside workspace_root.", ctx, false)
@@ -302,6 +309,7 @@ impl Tool for ShellTool {
                 .unwrap_or_default();
             let timeout = Duration::from_secs(timeout_secs);
             let cancel = ctx.cancel.clone();
+            let sandbox_mode = ctx.settings.sandbox_mode;
             let worker_workspace_root = workspace_root.clone();
             let worker_cwd = cwd.clone();
             let started = Instant::now();
@@ -315,7 +323,7 @@ impl Tool for ShellTool {
                 .stack_size(8 * 1024 * 1024)
                 .spawn(move || {
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        crate::proc::windows_sandbox::run_appcontainer_command(
+                        crate::proc::windows_sandbox::run_sandboxed_command(
                             program.as_os_str(),
                             &args,
                             &worker_workspace_root,
@@ -324,6 +332,7 @@ impl Tool for ShellTool {
                             cancel,
                             &env_overrides,
                             MAX_OUTPUT_BYTES,
+                            sandbox_mode,
                         )
                     }))
                     .unwrap_or_else(|_| {
@@ -468,7 +477,8 @@ mod tests {
         let description = ShellTool.description();
         if cfg!(windows) {
             assert!(description.contains("Windows AppContainer"));
-            assert!(description.contains("no network capability"));
+            assert!(description.contains("security level in Settings"));
+            assert!(description.contains("sandbox disabled"));
             assert!(description.contains("Elevated execution"));
         } else {
             assert!(description.contains("Commands are not executed"));
@@ -491,7 +501,10 @@ mod tests {
             session_id: "shell-appcontainer-test".into(),
             workspace_root: workspace,
             bypass_permissions: false,
-            settings: Arc::new(ToolSettings::default()),
+            settings: Arc::new(ToolSettings {
+                sandbox_mode: crate::agent::tool::SandboxMode::Isolated,
+                ..ToolSettings::default()
+            }),
             max_iterations: None,
             memory_owner_id: "test".into(),
             pool_session_id: None,

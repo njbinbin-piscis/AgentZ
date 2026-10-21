@@ -582,6 +582,7 @@ const en = {
     titleHub: "Settings",
     subtitleHub: "Models & runtime environment",
     tabModels: "Models",
+    tabGeneral: "General",
     tabChannels: "Message channels",
     tabSkills: "Skills",
     tabStudio: "Studio",
@@ -615,10 +616,12 @@ const en = {
     maxIterations: "Agent maximum iterations",
     maxIterationsHint:
       "Maximum model/tool iterations in one Agent task. Default: 200; the task stops safely at the limit.",
-    policyMode: "Agent policy",
-    policyStrict: "Strict (block risky operations)",
-    policyBalanced: "Balanced (recommended)",
-    policyDev: "Developer (auto-allow tools / unattended runs)",
+    policyMode: "Security level",
+    policyStrict: "Strict (sandboxed · no network · block risky operations)",
+    policyBalanced: "Balanced (networked · working directory pinned to the project, recommended)",
+    policyDev: "Developer (sandbox disabled · run as current user · auto-allow tools)",
+    policyModeHint:
+      "The security level also sets the shell / code_run sandbox: Strict = AppContainer with no network; Balanced = run as the current user with access to the network, local services and toolchain caches, working directory still pinned to the project; Developer = sandbox disabled, commands run as the current user and the working directory may leave the project.",
     confirmShellCommands: "Ask for confirmation before running Shell commands",
     confirmShellCommandsHint:
       "When unchecked, the Agent can run sandboxed Shell and script commands without per-call prompts (ideal for long-horizon automation).",

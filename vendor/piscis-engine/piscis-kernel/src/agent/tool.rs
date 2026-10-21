@@ -25,6 +25,37 @@ pub struct ToolSettings {
     /// Per-tool config map: tool_name → { field: value }
     /// Populated from Settings.user_tool_configs at agent launch.
     pub user_tool_configs: HashMap<String, Value>,
+    /// OS sandbox strength for shell/code_run, derived from the policy mode.
+    pub sandbox_mode: SandboxMode,
+}
+
+/// Sandbox strength for command execution, mapped from the user's security
+/// level (`policy_mode` in Settings):
+///
+/// - `strict` → [`SandboxMode::Isolated`]: AppContainer, no network.
+/// - `balanced` → [`SandboxMode::Networked`]: run as the current user in
+///   the Job Object with network/loopback access and `cwd` still pinned
+///   inside the workspace (an AppContainer cannot reach loopback services
+///   without an administrator exemption).
+/// - `dev` → [`SandboxMode::Disabled`]: no AppContainer; commands run as
+///   the current user (Job Object timeout/cancellation still apply, and
+///   the working directory is no longer pinned inside the workspace).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SandboxMode {
+    Isolated,
+    #[default]
+    Networked,
+    Disabled,
+}
+
+impl SandboxMode {
+    pub fn from_policy_mode(policy_mode: &str) -> Self {
+        match policy_mode.to_ascii_lowercase().as_str() {
+            "strict" => Self::Isolated,
+            "dev" => Self::Disabled,
+            _ => Self::Networked,
+        }
+    }
 }
 
 impl ToolSettings {
@@ -39,6 +70,7 @@ impl ToolSettings {
             imap_port: s.imap_port,
             email_enabled: s.email_enabled,
             user_tool_configs: s.user_tool_configs.clone(),
+            sandbox_mode: SandboxMode::from_policy_mode(&s.policy_mode),
         }
     }
 }
@@ -684,6 +716,16 @@ mod tests {
         assert!(single.is_some());
         let missing = registry.to_tool_defs_for("nope", ToolDefMode::Full);
         assert!(missing.is_none());
+    }
+
+    #[test]
+    fn sandbox_mode_maps_from_policy_mode() {
+        assert_eq!(SandboxMode::from_policy_mode("strict"), SandboxMode::Isolated);
+        assert_eq!(SandboxMode::from_policy_mode("STRICT"), SandboxMode::Isolated);
+        assert_eq!(SandboxMode::from_policy_mode("balanced"), SandboxMode::Networked);
+        assert_eq!(SandboxMode::from_policy_mode("dev"), SandboxMode::Disabled);
+        assert_eq!(SandboxMode::from_policy_mode(""), SandboxMode::Networked);
+        assert_eq!(SandboxMode::default(), SandboxMode::Networked);
     }
 
     #[test]

@@ -25,7 +25,7 @@ import DiagnosticsSection from "./settings/DiagnosticsSection";
 import DropdownSelect from "../../components/DropdownSelect";
 import "./SettingsPanel.css";
 
-type SettingsTab = "models" | "assistants" | "extensions" | "rules" | "hooks";
+type SettingsTab = "general" | "models" | "assistants" | "extensions" | "rules" | "hooks";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -456,6 +456,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
         <div className="agentz-settings-tabs" role="tablist">
           {(
             [
+              ["general", t("settings.tabGeneral")],
               ["models", t("settings.tabModels")],
               ["assistants", t("settings.tabChannels")],
               ["extensions", t("settings.tabExtensions")],
@@ -498,6 +499,83 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
           </div>
         )}
 
+        {tab === "general" && (
+          <>
+            {error && <div className="agentz-settings-error">{error}</div>}
+            {loading ? (
+              <div className="agentz-settings-loading">{t("settings.loading")}</div>
+            ) : (
+              <>
+                <div className="agentz-settings-body">
+                  <section className="agentz-settings-section">
+                    <div className="agentz-settings-field">
+                      <label htmlFor="agentz-settings-language">{t("settings.language")}</label>
+                      <DropdownSelect
+                        id="agentz-settings-language"
+                        variant="field"
+                        value={form.language}
+                        options={[
+                          { id: "zh", label: t("settings.languageZh") },
+                          { id: "en", label: t("settings.languageEn") },
+                        ]}
+                        onChange={(v) => update("language", v)}
+                      />
+                    </div>
+                    <div className="agentz-settings-field">
+                      <label htmlFor="agentz-settings-policy">{t("settings.policyMode")}</label>
+                      <DropdownSelect
+                        id="agentz-settings-policy"
+                        variant="field"
+                        value={form.policy_mode}
+                        options={[
+                          { id: "balanced", label: t("settings.policyBalanced") },
+                          { id: "strict", label: t("settings.policyStrict") },
+                          { id: "dev", label: t("settings.policyDev") },
+                        ]}
+                        onChange={(v) => update("policy_mode", v)}
+                      />
+                      <p className="agentz-settings-hint">{t("settings.policyModeHint")}</p>
+                    </div>
+                  </section>
+
+                  <WorkzDirSection />
+                  <AppChangesSection />
+
+                  <div className="agentz-settings-status">
+                    <span
+                      className={`agentz-settings-status-dot ${configured ? "ok" : "missing"}`}
+                    />
+                    <span style={{ color: configured ? "#4ade80" : "#f87171" }}>
+                      {configured ? t("settings.configuredOk") : t("settings.configuredMissing")}
+                    </span>
+                  </div>
+
+                  <div className="agentz-settings-config-path">
+                    {t("settings.configDir")}：<code>{configDir || "—"}</code>
+                    <br />
+                    {t("settings.configDirHint")}
+                  </div>
+                </div>
+
+                <DiagnosticsSection />
+                <div className="agentz-settings-footer">
+                  <button type="button" className="agentz-settings-cancel" onClick={onClose}>
+                    {t("common.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    className="agentz-settings-save"
+                    onClick={() => void handleSave()}
+                    disabled={busy}
+                  >
+                    {busy ? t("common.saving") : t("common.save")}
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
         {tab === "models" && (
           <>
             {error && <div className="agentz-settings-error">{error}</div>}
@@ -507,40 +585,6 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
             ) : (
           <>
             <div className="agentz-settings-body">
-              <section className="agentz-settings-section">
-                <div className="agentz-settings-field">
-                  <label htmlFor="agentz-settings-language">{t("settings.language")}</label>
-                  <DropdownSelect
-                    id="agentz-settings-language"
-                    variant="field"
-                    value={form.language}
-                    options={[
-                      { id: "zh", label: t("settings.languageZh") },
-                      { id: "en", label: t("settings.languageEn") },
-                    ]}
-                    onChange={(v) => update("language", v)}
-                  />
-                </div>
-              </section>
-
-              <WorkzDirSection />
-              <AppChangesSection />
-
-              <div className="agentz-settings-status">
-                <span
-                  className={`agentz-settings-status-dot ${configured ? "ok" : "missing"}`}
-                />
-                <span style={{ color: configured ? "#4ade80" : "#f87171" }}>
-                  {configured ? t("settings.configuredOk") : t("settings.configuredMissing")}
-                </span>
-              </div>
-
-              <div className="agentz-settings-config-path">
-                {t("settings.configDir")}：<code>{configDir || "—"}</code>
-                <br />
-                {t("settings.configDirHint")}
-              </div>
-
               <section className="agentz-settings-section">
                 <h3>{t("settings.aiProvider")}</h3>
 
@@ -645,21 +689,6 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     onChange={(e) => update("max_iterations", Math.min(1000, Math.max(1, Number(e.target.value) || 1)))}
                   />
                   <p className="agentz-settings-hint">{t("settings.maxIterationsHint")}</p>
-                </div>
-
-                <div className="agentz-settings-field">
-                  <label htmlFor="agentz-settings-policy">{t("settings.policyMode")}</label>
-                  <DropdownSelect
-                    id="agentz-settings-policy"
-                    variant="field"
-                    value={form.policy_mode}
-                    options={[
-                      { id: "balanced", label: t("settings.policyBalanced") },
-                      { id: "strict", label: t("settings.policyStrict") },
-                      { id: "dev", label: t("settings.policyDev") },
-                    ]}
-                    onChange={(v) => update("policy_mode", v)}
-                  />
                 </div>
 
                 <div className="agentz-settings-field">
@@ -1094,7 +1123,6 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
               </section>
             </div>
 
-            <DiagnosticsSection />
             <div className="agentz-settings-footer">
               <button type="button" className="agentz-settings-cancel" onClick={onClose}>
                 {t("common.cancel")}

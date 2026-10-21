@@ -451,7 +451,7 @@ fn builtin_tool_catalog() -> Vec<BuiltinToolInfo> {
 fn command_sandbox_catalog_hint() -> &'static str {
     #[cfg(windows)]
     {
-        "Run commands in a Windows AppContainer scoped to the selected workspace with no network capability. Other platforms and elevated commands are unavailable."
+        "Run commands in a Windows AppContainer scoped to the selected workspace; network and isolation follow the Settings security level (strict/balanced/dev). Other platforms and elevated commands are unavailable."
     }
     #[cfg(not(windows))]
     {
@@ -486,7 +486,7 @@ mod smoke_tests {
         if cfg!(windows) {
             for tool in [code_run, shell] {
                 assert!(tool.hint.contains("Windows AppContainer"));
-                assert!(tool.hint.contains("no network capability"));
+                assert!(tool.hint.contains("security level"));
                 assert!(tool.hint.contains("unavailable"));
             }
         } else {

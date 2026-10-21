@@ -27,7 +27,7 @@ impl Tool for CodeRunTool {
 
     fn description(&self) -> &str {
         #[cfg(windows)]
-        return "Run commands inside a Windows AppContainer with access limited to the selected workspace and no network capability. Commands outside the workspace are denied. Other platforms do not execute this tool because an OS sandbox is unavailable.";
+        return "Run commands inside a Windows AppContainer with access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled. Other platforms do not execute this tool because an OS sandbox is unavailable.";
 
         #[cfg(not(windows))]
         return "Unavailable: this platform does not have an enabled operating-system command sandbox. Commands are not executed.";
@@ -125,8 +125,15 @@ impl Tool for CodeRunTool {
                     )
                 }
             };
+            let sandbox_disabled =
+                ctx.settings.sandbox_mode == crate::agent::tool::SandboxMode::Disabled;
             let cwd = match cwd.canonicalize() {
-                Ok(cwd) if cwd.is_dir() && cwd.starts_with(&workspace_root) => cwd,
+                Ok(cwd)
+                    if cwd.is_dir()
+                        && (sandbox_disabled || cwd.starts_with(&workspace_root)) =>
+                {
+                    cwd
+                }
                 Ok(_) => {
                     return recovery_error(
                         "Sandbox working directory must be an existing directory inside workspace_root.", ctx, false)
@@ -166,6 +173,7 @@ impl Tool for CodeRunTool {
                 .unwrap_or_default();
             let timeout = Duration::from_secs(timeout_secs);
             let cancel = ctx.cancel.clone();
+            let sandbox_mode = ctx.settings.sandbox_mode;
             let worker_workspace_root = workspace_root.clone();
             let start = Instant::now();
             let receipt = match ctx.owned_completion().register() {
@@ -178,7 +186,7 @@ impl Tool for CodeRunTool {
                 .stack_size(8 * 1024 * 1024)
                 .spawn(move || {
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        crate::proc::windows_sandbox::run_appcontainer_command(
+                        crate::proc::windows_sandbox::run_sandboxed_command(
                             program.as_os_str(),
                             &args,
                             &worker_workspace_root,
@@ -187,6 +195,7 @@ impl Tool for CodeRunTool {
                             cancel,
                             &env_overrides,
                             MAX_STREAM_BYTES,
+                            sandbox_mode,
                         )
                     }))
                     .unwrap_or_else(|_| {
@@ -434,7 +443,8 @@ mod tests {
         let description = CodeRunTool.description();
         if cfg!(windows) {
             assert!(description.contains("Windows AppContainer"));
-            assert!(description.contains("no network capability"));
+            assert!(description.contains("security level in Settings"));
+            assert!(description.contains("sandbox disabled"));
         } else {
             assert!(description.contains("Commands are not executed"));
         }
@@ -456,7 +466,10 @@ mod tests {
             session_id: "code-run-appcontainer-test".into(),
             workspace_root: workspace,
             bypass_permissions: false,
-            settings: Arc::new(ToolSettings::default()),
+            settings: Arc::new(ToolSettings {
+                sandbox_mode: crate::agent::tool::SandboxMode::Isolated,
+                ..ToolSettings::default()
+            }),
             max_iterations: None,
             memory_owner_id: "test".into(),
             pool_session_id: None,

@@ -572,6 +572,7 @@ const zh = {
     titleHub: "设置",
     subtitleHub: "模型与运行环境",
     tabModels: "模型",
+    tabGeneral: "通用",
     tabChannels: "消息渠道",
     tabSkills: "技能",
     tabStudio: "工作室",
@@ -604,10 +605,12 @@ const zh = {
     maxIterations: "Agent 最大迭代次数",
     maxIterationsHint:
       "一次 Agent 任务最多可进行多少轮模型/工具迭代。默认 200；达到上限会安全停止。",
-    policyMode: "Agent 策略",
-    policyStrict: "严格（阻止高风险操作）",
-    policyBalanced: "均衡（推荐）",
-    policyDev: "开发者（自动允许工具 / 长程无人值守）",
+    policyMode: "安全级别",
+    policyStrict: "严格（沙箱隔离 · 无网络 · 阻止高风险操作）",
+    policyBalanced: "均衡（联网运行 · 工作目录锁定在项目内，推荐）",
+    policyDev: "开发者（禁用沙箱 · 以当前用户运行 · 自动允许工具）",
+    policyModeHint:
+      "安全级别同时决定 shell / code_run 的沙箱强度：严格 = AppContainer 隔离且无网络；均衡 = 以当前用户身份运行，可访问网络、本机服务与工具链缓存，工作目录仍锁定在项目内；开发者 = 禁用沙箱，命令以当前用户身份运行，工作目录可离开当前项目。",
     confirmShellCommands: "执行 Shell 与脚本命令前询问确认",
     confirmShellCommandsHint:
       "关闭后 Agent 可直接执行沙盒内 Shell 与脚本命令，无需每次弹窗授权，适合自动化长程任务。",
