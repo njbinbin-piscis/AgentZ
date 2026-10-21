@@ -207,7 +207,7 @@ async function create() {
   try {
     stage = newOutputDirectory(target);
     fs.mkdirSync(path.join(stage, 'objects'));
-    const manifest = { schema_version: 1, app_version: inventory.app_version, captured_at: new Date().toISOString(), snapshot_consistent: true, roots: [] };
+    const manifest = { schema_version: 1, app_version: inventory.app_version, captured_at: new Date().toISOString(), snapshot_consistent: false, capture_mode: 'operator_asserted_offline', roots: [] };
     let objectNumber = 0;
     for (const [index, root] of inventory.roots.entries()) {
       const files = [];
@@ -233,7 +233,7 @@ async function create() {
     fs.writeFileSync(path.join(stage, 'header.json'), JSON.stringify({ schema_version: 1, kdf: 'scrypt-N32768-r8-p1', salt: hex(salt), manifest_iv: hex(iv), manifest_tag: hex(cipher.getAuthTag()) }), { flag: 'wx' });
     publishDirectory(stage, target);
     stage = undefined;
-    process.stdout.write(`${JSON.stringify({ schema_version: 1, protected_backup: true, bundle: target, files: objectNumber, snapshot_consistent: true })}\n`);
+    process.stdout.write(`${JSON.stringify({ schema_version: 1, protected_backup: true, bundle: target, files: objectNumber, snapshot_consistent: false, capture_mode: 'operator_asserted_offline' })}\n`);
   } finally {
     key.fill(0);
     removeOwnedStage(stage);

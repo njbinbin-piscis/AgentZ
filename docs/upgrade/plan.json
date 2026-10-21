@@ -32272,15 +32272,24 @@
             "severity": "P1",
             "conclusion_proposal": "Retain the historical 1.0.0 engineering decision but do not treat AZ-063 as native recovery or rollback acceptance; complete the listed gaps before declaring the full roadmap finished."
           }
+        },
+        {
+          "at": "2026-10-21T07:27:31.097Z",
+          "note": "AZ-063 corrected backup snapshot consistency claim; native recovery remains unverified",
+          "reeval": {
+            "verified_state": "local_fixture_backup_consistency_claim_corrected_native_restore_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Retain the historical ADR-006 engineering decision and Gate record; do not treat this claim correction as broader backup or rollback acceptance."
+          }
         }
       ],
       "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-063",
-        "verified_state": "local_fixture_migration_and_operator_asserted_offline_backup_native_restore_unverified",
+        "verified_state": "local_fixture_backup_consistency_claim_corrected_native_restore_unverified",
         "severity": "P1",
-        "finding": "R10-20 local fixtures validate settings/skills migration and synthetic encrypted restore-preview. The CLI does not enforce host writer quiescence or an atomic SQLite snapshot, and it does not validate native task/session/environment identity after restore. AZ-063 is marked done for the ADR-006 local engineering baseline while its next_action still lists these broader acceptance gaps.",
-        "conclusion_proposal": "Retain the historical 1.0.0 engineering decision but do not treat AZ-063 as native recovery or rollback acceptance; complete the listed gaps before declaring the full roadmap finished.",
+        "finding": "The local inventory and encrypted backup no longer claim a coherent snapshot from absent SQLite sidecars and matching inventories. Both report snapshot_consistent false; the backup identifies operator_asserted_offline capture. Synthetic inventory and encrypted backup/restore-preview tests pass. Host writer quiescence, coherent SQLite capture and native identity recovery remain unverified.",
+        "conclusion_proposal": "Retain the historical ADR-006 engineering decision and Gate record; do not treat this claim correction as broader backup or rollback acceptance.",
         "next_action": "Implement host-coordinated writer quiescence and a coherent SQLite snapshot, then test historical task/session/environment identity and native restore-to-new-location recovery before full-roadmap acceptance.",
         "remaining_work": [
           "Host-coordinated writer quiescence",
@@ -32293,10 +32302,11 @@
           "No native recovery receipt or restored identity validation"
         ],
         "evidence": [
+          "docs/upgrade/evidence/AZ-063-2026-10-21-consistency-claim-correction.md",
           "docs/upgrade/evidence/AZ-063-2026-10-19-post-signoff-audit.md",
           "docs/upgrade/evidence/R10-20-migration-and-backup.md"
         ],
-        "recorded_at": "2026-10-19T08:39:43.207Z"
+        "recorded_at": "2026-10-21T07:27:31.097Z"
       },
       "gui_status": "waived:ADR-006"
     },

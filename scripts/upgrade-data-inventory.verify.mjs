@@ -37,7 +37,7 @@ try {
   assert.notEqual(changed.roots[1].files[0].sha256, report.roots[1].files[0].sha256);
   fs.rmSync(path.join(project, '.agentz', 'runs.db-wal'));
   const quiesced = JSON.parse(execFileSync(process.execPath, [script, '--config-dir', config, '--project-dir', project], { encoding: 'utf8' }));
-  assert.equal(quiesced.snapshot_consistent, true);
+  assert.equal(quiesced.snapshot_consistent, false);
   assert.deepEqual(quiesced.sqlite_sidecars, []);
   const overlapping = spawnSync(process.execPath, [script, '--config-dir', project, '--project-dir', project], { encoding: 'utf8' });
   assert.notEqual(overlapping.status, 0);

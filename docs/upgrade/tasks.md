@@ -1300,7 +1300,7 @@ Gate：passed；前置：M2, M3, M4, M5, M6, M7, MB。
 - 关联审查：F09, F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
 - 阻塞：无；下一步：强制写入者静默与一致的 SQLite 快照（应用内接入）；原子 in-place 恢复暂不做（用户选择 restore-to-new-location）；真实旧版本数据夹具待提供；原生恢复验收。
-- 当前复评：local_fixture_migration_and_operator_asserted_offline_backup_native_restore_unverified；结论：Retain the historical 1.0.0 engineering decision but do not treat AZ-063 as native recovery or rollback acceptance; complete the listed gaps before declaring the full roadmap finished.；下一步：Implement host-coordinated writer quiescence and a coherent SQLite snapshot, then test historical task/session/environment identity and native restore-to-new-location recovery before full-roadmap acceptance.。
+- 当前复评：local_fixture_backup_consistency_claim_corrected_native_restore_unverified；结论：Retain the historical ADR-006 engineering decision and Gate record; do not treat this claim correction as broader backup or rollback acceptance.；下一步：Implement host-coordinated writer quiescence and a coherent SQLite snapshot, then test historical task/session/environment identity and native restore-to-new-location recovery before full-roadmap acceptance.。
 - 复评剩余：Host-coordinated writer quiescence；Coherent SQLite snapshot under concurrent writes；Historical task/session/environment migration fixtures；Native restore-to-new-location recovery and rollback drill；验证缺口：No exclusive host writer lock or SQLite online backup integration；No native recovery receipt or restored identity validation。
 - 证据：docs/upgrade/evidence/ADR-004-protected-downgrade.md；docs/upgrade/evidence/R10-20-migration-and-backup.md。
 - 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。

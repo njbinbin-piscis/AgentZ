@@ -1,0 +1,25 @@
+[
+  {
+    "id": "AZ-063",
+    "verified_state": "local_fixture_backup_consistency_claim_corrected_native_restore_unverified",
+    "severity": "P1",
+    "finding": "The local inventory and encrypted backup no longer claim a coherent snapshot from absent SQLite sidecars and matching inventories. Both report snapshot_consistent false; the backup identifies operator_asserted_offline capture. Synthetic inventory and encrypted backup/restore-preview tests pass. Host writer quiescence, coherent SQLite capture and native identity recovery remain unverified.",
+    "conclusion_proposal": "Retain the historical ADR-006 engineering decision and Gate record; do not treat this claim correction as broader backup or rollback acceptance.",
+    "next_action": "Implement host-coordinated writer quiescence and a coherent SQLite snapshot, then test historical task/session/environment identity and native restore-to-new-location recovery before full-roadmap acceptance.",
+    "remaining_work": [
+      "Host-coordinated writer quiescence",
+      "Coherent SQLite snapshot under concurrent writes",
+      "Historical task/session/environment migration fixtures",
+      "Native restore-to-new-location recovery and rollback drill"
+    ],
+    "verification_gaps": [
+      "No exclusive host writer lock or SQLite online backup integration",
+      "No native recovery receipt or restored identity validation"
+    ],
+    "evidence": [
+      "docs/upgrade/evidence/AZ-063-2026-10-21-consistency-claim-correction.md",
+      "docs/upgrade/evidence/AZ-063-2026-10-19-post-signoff-audit.md",
+      "docs/upgrade/evidence/R10-20-migration-and-backup.md"
+    ]
+  }
+]

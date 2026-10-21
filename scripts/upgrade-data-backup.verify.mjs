@@ -72,7 +72,8 @@ try {
   assert.ok(fs.lstatSync(occupiedBundle).isSymbolicLink());
   const create = run(['create', '--config-dir', config, '--project-dir', project, '--output', bundle, '--quiesced', 'true']);
   assert.equal(create.status, 0, create.stderr);
-  assert.equal(JSON.parse(create.stdout).snapshot_consistent, true);
+  assert.equal(JSON.parse(create.stdout).snapshot_consistent, false);
+  assert.equal(JSON.parse(create.stdout).capture_mode, 'operator_asserted_offline');
   // Active SQLite WAL sidecar must be rejected before creating a bundle (writer quiescence enforcement).
   fs.writeFileSync(path.join(project, '.agentz', 'runs.db-wal'), 'uncheckpointed-wal');
   const walRejected = run(['create', '--config-dir', config, '--project-dir', project, '--output', path.join(fixture, 'wal-bundle'), '--quiesced', 'true']);

@@ -112,7 +112,8 @@ const report = {
   app_version: JSON.parse(fs.readFileSync(path.join(repository, 'package.json'), 'utf8')).version,
   read_only: true,
   protected_backup: false,
-  snapshot_consistent: sqliteSidecars.length === 0,
+  // A directory scan cannot establish writer quiescence or an atomic SQLite snapshot.
+  snapshot_consistent: false,
   config_key_pair_present: globalFiles.has('config.json') && globalFiles.has('.secret_key'),
   sqlite_sidecars: sqliteSidecars,
   requires_quiesced_database_copy: inventory.some(root => root.files.some(file => /\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm|journal))?$/i.test(file.path))),
@@ -121,7 +122,7 @@ const report = {
   roots: inventory,
   limits: [
     'Hashes and file lists do not preserve bytes; use upgrade-data-backup.mjs for encrypted snapshots.',
-    'A coherent SQLite backup requires zero active WAL/SHM/journal sidecars and verified before/after inventory parity.',
+    'Missing SQLite sidecars and matching inventories do not prove writer quiescence or an atomic SQLite snapshot.',
   ],
 };
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
