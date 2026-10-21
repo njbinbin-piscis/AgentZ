@@ -89,6 +89,7 @@ pub fn format_err(code: ToolErrorCode, message: &str, hint: &str) -> String {
     out
 }
 
+#[allow(dead_code)]
 fn char_boundary_index(s: &str, byte_idx: usize) -> usize {
     if byte_idx >= s.len() {
         return s.len();
@@ -100,39 +101,121 @@ fn char_boundary_index(s: &str, byte_idx: usize) -> usize {
     i
 }
 
+/// Per-line character cap. A single minified/base64/progress line can be
+/// megabytes long; without a per-line cap it eats the whole presentation
+/// budget while telling the model nothing. Long lines keep their head and
+/// tail (paths, URLs and status codes usually sit at the ends).
+pub const MAX_LINE_CHARS: usize = 1_000;
+
+/// Elide the middle of every line longer than [`MAX_LINE_CHARS`].
+/// Returns the rewritten text and how many lines were elided.
+pub fn cap_long_lines(s: &str) -> (String, usize) {
+    let mut elided = 0usize;
+    let mut out = String::with_capacity(s.len().min(1 << 20));
+    for (i, line) in s.split('\n').enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        let chars: Vec<(usize, char)> = line.char_indices().collect();
+        if chars.len() <= MAX_LINE_CHARS {
+            out.push_str(line);
+            continue;
+        }
+        elided += 1;
+        let head_chars = MAX_LINE_CHARS * 3 / 5;
+        let tail_chars = MAX_LINE_CHARS - head_chars - 40;
+        let head_end = chars[head_chars - 1].0 + chars[head_chars - 1].1.len_utf8();
+        let tail_start = chars[chars.len() - tail_chars].0;
+        out.push_str(&line[..head_end]);
+        out.push_str(&format!(
+            " …[{} chars elided from long line]… ",
+            chars.len() - head_chars - tail_chars
+        ));
+        out.push_str(&line[tail_start..]);
+    }
+    (out, elided)
+}
+
 /// Smart truncate `s` to at most `max_bytes` using `strategy`.
 pub fn smart_truncate(s: &str, max_bytes: usize, strategy: TruncateStrategy) -> (String, ToolMeta) {
     let total = s.len();
-    if total <= max_bytes {
+    // Balance step 1: cap individual long lines first so one huge line
+    // cannot consume the entire budget (wasted tokens, no information).
+    let (capped, elided_lines) = cap_long_lines(s);
+    if capped.len() <= max_bytes {
+        let truncated = elided_lines > 0;
         return (
-            s.to_string(),
+            capped.clone(),
             ToolMeta {
-                truncated: false,
+                truncated,
                 total_bytes: total,
-                shown_bytes: total,
-                hint: None,
+                shown_bytes: capped.len(),
+                hint: truncated.then(|| {
+                    format!(
+                        "{elided_lines} over-long line(s) were middle-elided (cap {MAX_LINE_CHARS} chars/line)."
+                    )
+                }),
             },
         );
     }
 
+    // Balance step 2: whole-line head/tail selection (never slice mid-line).
     match strategy {
-        TruncateStrategy::HeadTail => head_tail_truncate(s, max_bytes, total),
-        TruncateStrategy::ErrorAware => error_aware_truncate(s, max_bytes, total),
+        TruncateStrategy::HeadTail => head_tail_truncate(&capped, max_bytes, total),
+        TruncateStrategy::ErrorAware => error_aware_truncate(&capped, max_bytes, total),
     }
 }
 
+/// Pick whole head lines (55%) + whole tail lines (45%) fitting `max_bytes`,
+/// with a marker naming the omitted line count. Input is already line-capped.
+fn head_tail_lines(s: &str, max_bytes: usize) -> String {
+    let lines: Vec<&str> = s.split('\n').collect();
+    let marker_reserve = 96usize;
+    let budget = max_bytes.saturating_sub(marker_reserve);
+    let head_budget = budget * 55 / 100;
+    let tail_budget = budget - head_budget;
+
+    let mut head_end = 0usize; // exclusive line index
+    let mut used = 0usize;
+    while head_end < lines.len() && used + lines[head_end].len() + 1 <= head_budget {
+        used += lines[head_end].len() + 1;
+        head_end += 1;
+    }
+    let mut tail_start = lines.len();
+    let mut tused = 0usize;
+    while tail_start > head_end && tused + lines[tail_start - 1].len() + 1 <= tail_budget {
+        tused += lines[tail_start - 1].len() + 1;
+        tail_start -= 1;
+    }
+    if head_end >= tail_start {
+        return s.to_string();
+    }
+    if head_end == 0 && tail_start == lines.len() {
+        // A single (already line-capped) line still exceeds the whole budget:
+        // fall back to a char-boundary head/tail slice of that line.
+        let head = &s[..char_boundary_index(s, head_budget)];
+        let tail = &s[char_boundary_index(s, s.len().saturating_sub(tail_budget))..];
+        return format!(
+            "{head}\n… [{} bytes omitted from over-long output] …\n{tail}",
+            s.len().saturating_sub(head.len() + tail.len())
+        );
+    }
+    let omitted_lines = tail_start - head_end;
+    let omitted_bytes: usize = lines[head_end..tail_start].iter().map(|l| l.len() + 1).sum();
+    let mut out = String::new();
+    out.push_str(&lines[..head_end].join("\n"));
+    if head_end > 0 {
+        out.push('\n');
+    }
+    out.push_str(&format!(
+        "… [{omitted_lines} lines / ~{omitted_bytes} bytes omitted] …\n"
+    ));
+    out.push_str(&lines[tail_start..].join("\n"));
+    out
+}
+
 fn head_tail_truncate(s: &str, max_bytes: usize, total: usize) -> (String, ToolMeta) {
-    let head_bytes = (max_bytes * 3) / 5;
-    let tail_bytes = max_bytes.saturating_sub(head_bytes).saturating_sub(64);
-    let head_end = char_boundary_index(s, head_bytes.min(total));
-    let tail_start = char_boundary_index(s, total.saturating_sub(tail_bytes));
-    let omitted = total.saturating_sub(head_end + (total - tail_start));
-    let out = format!(
-        "{}\n\n... [{} bytes truncated] ...\n\n{}",
-        &s[..head_end],
-        omitted,
-        &s[tail_start..]
-    );
+    let out = head_tail_lines(s, max_bytes);
     let shown = out.len();
     (
         out,
@@ -140,9 +223,61 @@ fn head_tail_truncate(s: &str, max_bytes: usize, total: usize) -> (String, ToolM
             truncated: true,
             total_bytes: total,
             shown_bytes: shown,
-            hint: Some("Output was truncated. Re-run with a narrower command or filter.".into()),
+            hint: Some(
+                "Output was truncated by lines (long lines elided first).                  The full output is preserved — re-run filtered, or read the saved copy when one is named."
+                    .into(),
+            ),
         },
     )
+}
+
+/// Balance step 3: keep the full output on disk so truncation never loses
+/// information — the model can page through it with file_read / file_search
+/// instead of re-running the command. Writes into
+/// `<workspace>/.agentz/logs/tool-output/` and prunes to the newest 30
+/// files. Returns the path when written.
+pub fn spill_tool_output(
+    workspace_root: &std::path::Path,
+    tool: &str,
+    stdout: &str,
+    stderr: &str,
+) -> Option<std::path::PathBuf> {
+    let dir = workspace_root.join(".agentz").join("logs").join("tool-output");
+    std::fs::create_dir_all(&dir).ok()?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let path = dir.join(format!("{tool}-{stamp}.log"));
+    let mut body = String::new();
+    body.push_str(stdout);
+    if !stderr.is_empty() {
+        if !body.is_empty() && !body.ends_with('\n') {
+            body.push('\n');
+        }
+        body.push_str("--- stderr ---\n");
+        body.push_str(stderr);
+    }
+    std::fs::write(&path, body).ok()?;
+    // Prune old spills so the folder stays bounded.
+    if let Ok(read) = std::fs::read_dir(&dir) {
+        let mut files: Vec<(std::time::SystemTime, std::path::PathBuf)> = read
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|x| x == "log"))
+            .filter_map(|e| {
+                e.metadata()
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .map(|t| (t, e.path()))
+            })
+            .collect();
+        files.sort_by_key(|(t, _)| *t);
+        let excess = files.len().saturating_sub(30);
+        for (_, old) in files.into_iter().take(excess) {
+            let _ = std::fs::remove_file(old);
+        }
+    }
+    Some(path)
 }
 
 fn error_aware_truncate(s: &str, max_bytes: usize, total: usize) -> (String, ToolMeta) {
@@ -159,8 +294,7 @@ fn error_aware_truncate(s: &str, max_bytes: usize, total: usize) -> (String, Too
     picked.push_str("\n--- output (truncated) ---\n");
     let budget = max_bytes.saturating_sub(picked.len());
     if budget > 256 {
-        let (tail, _) = head_tail_truncate(s, budget, total);
-        picked.push_str(&tail);
+        picked.push_str(&head_tail_lines(s, budget));
     }
     (
         picked.clone(),
@@ -294,7 +428,7 @@ mod tests {
         let s = "a".repeat(10_000);
         let (out, meta) = smart_truncate(&s, 500, TruncateStrategy::HeadTail);
         assert!(meta.truncated);
-        assert!(out.contains("truncated"));
+        assert!(out.contains("omitted"), "{out}");
         assert!(out.len() < 10_000);
     }
 
@@ -315,6 +449,46 @@ mod tests {
         );
         assert!(s.contains("[error: match_not_found]"));
         assert!(s.contains("hint:"));
+    }
+
+    #[test]
+    fn long_lines_are_middle_elided_not_budget_eating() {
+        let long_line = format!("START{}END", "x".repeat(50_000));
+        let s = format!("{long_line}\nshort tail line");
+        let (out, meta) = smart_truncate(&s, 24 * 1024, TruncateStrategy::HeadTail);
+        assert!(meta.truncated);
+        assert!(out.contains("chars elided from long line"), "{out}");
+        assert!(out.contains("START"));
+        assert!(out.contains("END"));
+        assert!(out.contains("short tail line"));
+        assert!(out.len() < 4_000, "elided output stays small: {}", out.len());
+    }
+
+    #[test]
+    fn many_lines_truncate_on_line_boundaries() {
+        let s = (0..5_000)
+            .map(|i| format!("line number {i} with some content"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let (out, meta) = smart_truncate(&s, 4 * 1024, TruncateStrategy::HeadTail);
+        assert!(meta.truncated);
+        assert!(out.contains("lines / ~"), "{out}");
+        assert!(out.contains("line number 0"));
+        assert!(out.contains("line number 4999"));
+        // Middle lines are omitted whole, never sliced.
+        assert!(!out.contains("line number 2500 with"));
+        assert!(out.len() <= 4 * 1024 + 512);
+    }
+
+    #[test]
+    fn spill_writes_full_output_and_prunes() {
+        let dir = tempfile::tempdir().unwrap();
+        let big = "y".repeat(100_000);
+        let path = spill_tool_output(dir.path(), "shell", &big, "err text").expect("spilled");
+        let body = std::fs::read_to_string(&path).unwrap();
+        assert!(body.contains(&big));
+        assert!(body.contains("--- stderr ---"));
+        assert!(path.starts_with(dir.path().join(".agentz").join("logs")));
     }
 
     #[test]

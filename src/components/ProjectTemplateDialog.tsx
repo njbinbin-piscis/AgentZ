@@ -78,13 +78,15 @@ export default function ProjectTemplateDialog({
                 return (
                   <li key={tpl.id}>
                     <label className={selected === tpl.id ? "active" : ""}>
-                      <input
-                        type="radio"
-                        name="project-template"
-                        checked={selected === tpl.id}
-                        onChange={() => setSelected(tpl.id)}
-                      />
-                      <span className="agentz-tpl-name">{name}</span>
+                      <span className="agentz-tpl-row">
+                        <input
+                          type="radio"
+                          name="project-template"
+                          checked={selected === tpl.id}
+                          onChange={() => setSelected(tpl.id)}
+                        />
+                        <span className="agentz-tpl-name">{name}</span>
+                      </span>
                       {desc && <span className="agentz-tpl-desc">{desc}</span>}
                     </label>
                   </li>

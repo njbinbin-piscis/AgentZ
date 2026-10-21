@@ -7,7 +7,7 @@
 
 use crate::agent::tool::{Tool, ToolContext, ToolResult};
 use crate::background::{
-    BackgroundRegistry, BgEntry, BgOutcome, BgSpec, NotifyOn, ReadySpec,
+    BackgroundRegistry, BgEntry, BgOutcome, BgSnapshot, BgSpec, NotifyOn, ReadySpec,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -91,7 +91,7 @@ pub fn detached_result(
     }
     parts.push(
         "The task is registered and keeps running after this turn. \
-         Use process_wait to block until it exits (or is ready), process_output to read new output, \
+         Use the wait tool to block until it exits (or is ready), process_output to read new output, \
          and process_kill to stop it. Do not poll with sleep loops."
             .to_string(),
     );
@@ -350,6 +350,51 @@ mod tests {
         );
         assert_eq!(snap.status, "killed");
     }
+
+    #[tokio::test]
+    async fn wait_tool_session_scope_and_plain_delay() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let workspace = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace).expect("workspace");
+        let registry = Arc::new(BackgroundRegistry::new());
+        let tool = ShellTool {
+            background_registry: Some(registry.clone()),
+        };
+        let ctx = ctx(workspace);
+        let started = tool
+            .call(
+                json!({"command": "ping -n 30 127.0.0.1", "interpreter": "cmd", "background": true}),
+                &ctx,
+            )
+            .await
+            .expect("background start");
+        let bg_id = bg_id_of(&started.content);
+
+        let wait = WaitTool {
+            background_registry: Some(registry.clone()),
+        };
+        // Session-scope wait (no bg_id) sees the running task and times out politely.
+        let waited = wait
+            .call(json!({"timeout_secs": 1}), &ctx)
+            .await
+            .expect("session wait");
+        assert!(waited.content.contains("Still waiting"), "{}", waited.content);
+
+        // After kill, waiting on the id reports the terminal state.
+        assert!(registry.kill(&bg_id));
+        let done = wait
+            .call(json!({"bg_id": bg_id, "timeout_secs": 10}), &ctx)
+            .await
+            .expect("id wait");
+        assert!(done.content.contains("killed"), "{}", done.content);
+
+        // Plain delay path with nothing running.
+        let delayed = wait
+            .call(json!({"seconds": 1}), &ctx)
+            .await
+            .expect("plain delay");
+        assert!(delayed.content.contains("Waited 1s"), "{}", delayed.content);
+    }
 }
 
 fn registry_of(
@@ -435,6 +480,198 @@ impl Tool for ProcessWaitTool {
             text.push_str("\n\n(still running after the wait; call process_wait again or process_kill)");
         }
         Ok(ToolResult::ok(text))
+    }
+}
+
+/// The general-purpose wait primitive (Cursor-style "await").
+///
+/// - With `bg_id`: block until that background task exits / is ready.
+/// - Without `bg_id`: block until background tasks of this session finish —
+///   `scope: "any"` (default; first finisher wins) or `"all"`.
+/// - With `seconds` and no running tasks: a plain bounded delay, so agents
+///   never need `sleep` shell hacks. Respects turn cancellation.
+///
+/// All waiting happens host-side in this single call; no LLM iterations or
+/// polling loops are burned while waiting.
+pub struct WaitTool {
+    pub background_registry: Option<Arc<BackgroundRegistry>>,
+}
+
+#[async_trait]
+impl Tool for WaitTool {
+    fn name(&self) -> &str {
+        "wait"
+    }
+
+    fn description(&self) -> &str {
+        "Wait for background work, host-side in one call. Pass bg_id to wait for one task, \
+         or omit it to wait for this session's background tasks (scope=any: first to finish; scope=all: every one). \
+         until=ready waits for the readiness condition (port/log) instead of exit. \
+         With seconds and nothing to wait on, it is a plain bounded delay. \
+         Prefer this over shell sleep/poll loops whenever you start long-running work."
+    }
+
+    fn input_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "bg_id": { "type": "string", "description": "Optional background task id (from shell/code_run/process_control). Omit to wait on this session's tasks." },
+                "scope": { "type": "string", "enum": ["any", "all"], "description": "Without bg_id: return when the first task finishes (any, default) or when all finish (all)." },
+                "until": { "type": "string", "enum": ["exit", "ready"], "description": "Wait for process exit (default) or the readiness condition given at start." },
+                "timeout_secs": { "type": "integer", "description": "Max seconds to wait (default 120, max 600)." },
+                "seconds": { "type": "integer", "description": "Plain delay in seconds when there is no task to wait on (max 600)." }
+            }
+        })
+    }
+
+    fn is_read_only(&self) -> bool {
+        true
+    }
+
+    async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult> {
+        let registry = match registry_of(&self.background_registry) {
+            Ok(r) => r,
+            Err(e) => return Ok(e),
+        };
+        let timeout = Duration::from_secs(
+            input["timeout_secs"].as_u64().unwrap_or(120).clamp(1, 600),
+        );
+        let want_ready = input["until"].as_str() == Some("ready");
+
+        // One specific task: identical semantics to process_wait.
+        if let Some(id) = input["bg_id"].as_str().filter(|v| !v.is_empty()) {
+            let entry = match entry_of(&registry, &json!({ "bg_id": id })) {
+                Ok(e) => e,
+                Err(e) => return Ok(e),
+            };
+            let reg = registry.clone();
+            let entry_for_wait = entry.clone();
+            let snap = tokio::task::spawn_blocking(move || {
+                reg.wait_for(&entry_for_wait, timeout, want_ready)
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("wait worker failed: {e}"))?;
+            let mut text = snapshot_text(&entry, 8192);
+            if snap.status == "running" && !(want_ready && snap.ready) {
+                text.push_str("\n\n(still running after the wait; call wait again or process_kill)");
+            }
+            return Ok(ToolResult::ok(text));
+        }
+
+        // Session-wide wait over currently running tasks.
+        let session_tasks: Vec<Arc<BgEntry>> = registry
+            .list(Some(&ctx.session_id), None)
+            .iter()
+            .filter(|snap| snap.status == "running")
+            .filter_map(|snap| registry.get(&snap.id))
+            .collect();
+
+        if session_tasks.is_empty() {
+            if let Some(seconds) = input["seconds"].as_u64().filter(|v| *v > 0) {
+                let total = Duration::from_secs(seconds.min(600));
+                let started = std::time::Instant::now();
+                while started.elapsed() < total {
+                    if ctx.cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                        return Ok(ToolResult::ok(format!(
+                            "Wait cancelled after {}s of {}s.",
+                            started.elapsed().as_secs(),
+                            total.as_secs()
+                        )));
+                    }
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                }
+                return Ok(ToolResult::ok(format!(
+                    "Waited {}s (no background tasks running in this session).",
+                    total.as_secs()
+                )));
+            }
+            let recent = registry.list(Some(&ctx.session_id), None);
+            if recent.is_empty() {
+                return Ok(ToolResult::ok(
+                    "No background tasks in this session — nothing to wait for. \
+                     Start one with shell/code_run background=true, then call wait."
+                        .to_string(),
+                ));
+            }
+            let summary = recent
+                .iter()
+                .take(5)
+                .map(|t| format!("{} [{}] {}", t.id, t.status, t.label))
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Ok(ToolResult::ok(format!(
+                "No running background tasks in this session. Recent tasks:\n{summary}"
+            )));
+        }
+
+        let scope_all = input["scope"].as_str() == Some("all");
+        let reg = registry.clone();
+        let tasks = session_tasks.clone();
+        let finished = tokio::task::spawn_blocking(move || {
+            let deadline = std::time::Instant::now() + timeout;
+            loop {
+                let mut done: Vec<BgSnapshot> = Vec::new();
+                let mut pending = 0usize;
+                for entry in &tasks {
+                    if want_ready {
+                        reg.probe_ready(entry);
+                    }
+                    let snap = entry.snapshot();
+                    let satisfied = if want_ready {
+                        snap.ready || snap.status != "running"
+                    } else {
+                        snap.status != "running"
+                    };
+                    if satisfied {
+                        done.push(snap);
+                    } else {
+                        pending += 1;
+                    }
+                }
+                let satisfied_all = pending == 0;
+                if (scope_all && satisfied_all) || (!scope_all && !done.is_empty()) {
+                    return done;
+                }
+                if std::time::Instant::now() >= deadline {
+                    return done;
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("wait worker failed: {e}"))?;
+
+        if finished.is_empty() {
+            let names = session_tasks
+                .iter()
+                .map(|e| format!("{} ({})", e.id, e.label))
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Ok(ToolResult::ok(format!(
+                "Still waiting after {}s — no task satisfied the condition yet: {names}. Call wait again to keep waiting.",
+                timeout.as_secs()
+            )));
+        }
+        let mut parts = vec![format!(
+            "Wait finished: {} task(s) {}.",
+            finished.len(),
+            if want_ready { "ready/finished" } else { "finished" }
+        )];
+        for snap in &finished {
+            if let Some(entry) = registry.get(&snap.id) {
+                parts.push(snapshot_text(&entry, 4096));
+            }
+        }
+        let still = session_tasks
+            .iter()
+            .filter(|e| e.snapshot().status == "running")
+            .count();
+        if still > 0 {
+            parts.push(format!(
+                "{still} background task(s) still running in this session."
+            ));
+        }
+        Ok(ToolResult::ok(parts.join("\n\n")))
     }
 }
 

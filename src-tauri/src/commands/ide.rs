@@ -2642,7 +2642,19 @@ pub async fn ide_start_watcher(
                             let kind = match event.kind {
                                 notify::EventKind::Create(_) => "created",
                                 notify::EventKind::Modify(_) => "modified",
-                                notify::EventKind::Remove(_) => "deleted",
+                                notify::EventKind::Remove(_) => {
+                                    // Atomic save (write temp + rename over the
+                                    // target — our own ide_write_file included)
+                                    // surfaces as a Remove event for the target
+                                    // on Windows, but the file is still there.
+                                    // Only a path that is actually gone counts
+                                    // as a deletion; otherwise it is a modify.
+                                    if path.exists() {
+                                        "modified"
+                                    } else {
+                                        "deleted"
+                                    }
+                                }
                                 _ => "unknown",
                             };
 

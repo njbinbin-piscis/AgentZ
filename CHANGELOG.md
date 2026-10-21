@@ -5,6 +5,21 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.11] - 2026-10-22
+
+### Added
+
+- **`wait` tool**: actively wait for long-running background tasks — one task by `bg_id`, or this session's tasks with `scope=any|all`, `until=exit|ready`; falls back to a bounded plain delay (`seconds`) when nothing is running. All waiting happens host-side in a single call, complementing `process_wait`.
+
+### Changed
+
+- **Balanced tool-output truncation** (`shell` / `code_run` / `process_control`): per-line cap of 1000 chars with middle elision (head/tail of the line kept), whole-line head/tail selection (55/45) instead of mid-line byte slicing, and — whenever output is truncated — the full output is spilled to `.agentz/logs/tool-output/` with its path named in the result so the agent can page through it with file_read/file_search instead of re-running. Presentation budgets are tightened (shell 24KB/12KB, code_run 16KB/8KB, process_control 24KB/12KB) while code_run's capture cap rises from 8KB to 64KB per stream.
+
+### Fixed
+
+- **Ctrl+S in the editor closed the file tab** (and could claim the file "was deleted on disk"): saves use temp-file + atomic rename, which the Windows watcher reported as a removal. The watcher backend now reclassifies Remove events for paths that still exist as modifications, and the frontend verifies a "deleted" event (debounced read-back) before closing anything; genuine deletions behave as before.
+- **Project template dialog**: the radio button sat alone on a centered line; it now shares a left-aligned row with the template name, with the description indented beneath.
+
 ## [1.0.10] - 2026-10-22
 
 ### Added

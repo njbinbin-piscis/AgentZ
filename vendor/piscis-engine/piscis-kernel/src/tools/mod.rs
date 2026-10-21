@@ -151,6 +151,11 @@ pub fn register_neutral_into(registry: &mut ToolRegistry, cfg: &NeutralToolsConf
             background_registry: cfg.background_registry.clone(),
         }));
     }
+    if cfg.is_enabled("wait") {
+        registry.register(Box::new(background_process::WaitTool {
+            background_registry: cfg.background_registry.clone(),
+        }));
+    }
     if cfg.is_enabled("process_wait") {
         registry.register(Box::new(background_process::ProcessWaitTool {
             background_registry: cfg.background_registry.clone(),

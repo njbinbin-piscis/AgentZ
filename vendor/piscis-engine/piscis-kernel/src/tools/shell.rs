@@ -532,14 +532,13 @@ impl Tool for ShellTool {
                     .map_err(anyhow::Error::msg);
             }
 
-            let (stdout, stdout_trimmed) = truncate_output(
-                &String::from_utf8_lossy(&output.stdout),
-                MAX_OUTPUT_BYTES * 3 / 4,
-            );
-            let (stderr, stderr_trimmed) = truncate_output(
-                &String::from_utf8_lossy(&output.stderr),
-                MAX_OUTPUT_BYTES / 4,
-            );
+            // Presentation budget is deliberately far below the capture
+            // cap: long lines are elided, whole lines head/tailed, and the
+            // full output spills to disk (named below) when truncated.
+            let stdout_raw = String::from_utf8_lossy(&output.stdout).into_owned();
+            let stderr_raw = String::from_utf8_lossy(&output.stderr).into_owned();
+            let (stdout, stdout_trimmed) = truncate_output(&stdout_raw, 24 * 1024);
+            let (stderr, stderr_trimmed) = truncate_output(&stderr_raw, 12 * 1024);
             let collapsed_stdout = collapse_repeated_lines(&stdout);
             let collapsed_stderr = collapse_repeated_lines(&stderr);
             report.note_presentation_truncation(
@@ -560,6 +559,19 @@ impl Tool for ShellTool {
             }
             if stdout.is_empty() && stderr.is_empty() {
                 parts.push("(no output)".to_string());
+            }
+            if stdout_trimmed || stderr_trimmed {
+                if let Some(path) = crate::tools::output::spill_tool_output(
+                    &workspace_root,
+                    "shell",
+                    &stdout_raw,
+                    &stderr_raw,
+                ) {
+                    parts.push(format!(
+                        "Full output saved to {} — inspect omitted parts with file_read (offset/limit) or file_search instead of re-running.",
+                        path.display()
+                    ));
+                }
             }
             if output.exit_code != 0 {
                 let errors = extract_error_lines(&stdout, &stderr);

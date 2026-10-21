@@ -15,7 +15,7 @@ const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_TIMEOUT_SECS: u64 = 300;
 /// Keep head + tail of each stream; long build logs are rarely useful in full.
 #[cfg(windows)]
-const MAX_STREAM_BYTES: usize = 8 * 1024; // 8 KB per stream
+const MAX_STREAM_BYTES: usize = 64 * 1024; // 64 KB capture per stream (presentation truncates lower)
 
 #[derive(Default)]
 pub struct CodeRunTool {
@@ -357,12 +357,21 @@ impl Tool for CodeRunTool {
         {
             let stdout_raw = String::from_utf8_lossy(&stdout_bytes);
             let stderr_raw = String::from_utf8_lossy(&stderr_bytes);
-            let stdout = trim_stream(&stdout_raw, MAX_STREAM_BYTES);
-            let stderr = trim_stream(&stderr_raw, MAX_STREAM_BYTES);
-            report.note_presentation_truncation(
-                stdout_raw.trim().len() > MAX_STREAM_BYTES,
-                stderr_raw.trim().len() > MAX_STREAM_BYTES,
+            // Balanced presentation: per-line elision + whole-line head/tail
+            // (see tools::output::smart_truncate), far below the capture cap.
+            let (stdout, stdout_meta) = crate::tools::output::smart_truncate(
+                stdout_raw.trim(),
+                16 * 1024,
+                crate::tools::output::TruncateStrategy::HeadTail,
             );
+            let (stderr, stderr_meta) = crate::tools::output::smart_truncate(
+                stderr_raw.trim(),
+                8 * 1024,
+                crate::tools::output::TruncateStrategy::HeadTail,
+            );
+            let stdout_trimmed = stdout_meta.truncated;
+            let stderr_trimmed = stderr_meta.truncated;
+            report.note_presentation_truncation(stdout_trimmed, stderr_trimmed);
             let status_label = if exit_code == 0 { "SUCCESS" } else { "FAILED" };
             let mut parts = vec![format!(
                 "exit_code: {} ({})  duration: {}ms  cwd: {}",
@@ -380,6 +389,19 @@ impl Tool for CodeRunTool {
             if stdout.is_empty() && stderr.is_empty() {
                 parts.push("(no output)".to_string());
             }
+            if stdout_trimmed || stderr_trimmed {
+                if let Some(path) = crate::tools::output::spill_tool_output(
+                    &ctx.workspace_root,
+                    "code_run",
+                    &stdout_raw,
+                    &stderr_raw,
+                ) {
+                    parts.push(format!(
+                        "Full output saved to {} — inspect omitted parts with file_read (offset/limit) or file_search instead of re-running.",
+                        path.display()
+                    ));
+                }
+            }
             if exit_code != 0 {
                 let combined = format!("{}{}", stdout_raw, stderr_raw);
                 if let Some(hint) = diagnose(&combined, command) {
@@ -395,37 +417,6 @@ impl Tool for CodeRunTool {
                 .map_err(anyhow::Error::msg)
         }
     }
-}
-
-/// Trim a stream to at most `max_bytes`, keeping head and tail.
-#[cfg(windows)]
-fn trim_stream(s: &str, max_bytes: usize) -> String {
-    let s = s.trim();
-    if s.len() <= max_bytes {
-        return s.to_string();
-    }
-    let head_bytes = max_bytes * 3 / 4;
-    let tail_bytes = max_bytes - head_bytes;
-    // Find valid char boundaries
-    let head_end = s
-        .char_indices()
-        .map(|(i, _)| i)
-        .take_while(|&i| i <= head_bytes)
-        .last()
-        .unwrap_or(0);
-    let tail_start = s
-        .char_indices()
-        .rev()
-        .map(|(i, _)| i)
-        .take_while(|&i| s.len() - i <= tail_bytes)
-        .last()
-        .unwrap_or(s.len());
-    format!(
-        "{}\n\n... [{} bytes trimmed — use file_read or scroll output for full log] ...\n\n{}",
-        &s[..head_end],
-        s.len() - max_bytes,
-        &s[tail_start..]
-    )
 }
 
 /// Heuristic diagnosis for common build/test failure patterns.

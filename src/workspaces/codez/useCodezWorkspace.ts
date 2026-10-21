@@ -557,24 +557,55 @@ export function useCodezWorkspace({
   // Debounced reload for open tabs whose backing files changed externally.
   const tabReloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTabPaths = useRef<Map<string, CapturedOperation>>(new Map());
+  // "deleted" watcher events are verified before acting: an atomic save
+  // (temp file + rename, our own Ctrl+S included) also surfaces as a
+  // removal on Windows, and closing the tab on that false positive was the
+  // "Ctrl+S closes the file / claims it was deleted" bug.
+  const pendingDeleteTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const scheduleTabReloadRef = useRef<
+    ((path: string, kind: "modified" | "deleted") => void) | null
+  >(null);
 
   const scheduleTabReload = useCallback((evtPath: string, kind: "modified" | "deleted") => {
     if (!projectDirRef.current || isRecoveryPath(evtPath)) return;
 
     if (kind === "deleted") {
-      const tab = tabsRef.current.find(row => row.path === evtPath);
-      if (tab?.isDirty) {
-        const captured = conflicts.current.beginRead(evtPath);
-        if (captured) conflicts.current.settleRead(captured, { kind: "deleted" });
-        setFileLoadError(`"${evtPath}" was deleted on disk. Unsaved editor content has been retained.`);
-        return;
-      }
-      setTabs((p) => p.filter((t) => t.path !== evtPath));
-      setActiveTabPath((cur) => {
-        if (cur !== evtPath) return cur;
-        const rest = tabsRef.current.filter((t) => t.path !== evtPath);
-        return rest[0]?.path ?? null;
-      });
+      const project = projectDirRef.current;
+      const timers = pendingDeleteTimers.current;
+      const existing = timers.get(evtPath);
+      if (existing) clearTimeout(existing);
+      timers.set(
+        evtPath,
+        setTimeout(() => {
+          timers.delete(evtPath);
+          if (projectDirRef.current !== project) return;
+          void ideApi
+            .readFile(`${project}/${evtPath}`)
+            .then(() => {
+              // Still on disk — atomic-save rename or delete+recreate.
+              // Treat it as a modification and take the reload path.
+              scheduleTabReloadRef.current?.(evtPath, "modified");
+            })
+            .catch(() => {
+              // Genuinely gone from disk.
+              const tab = tabsRef.current.find((row) => row.path === evtPath);
+              if (tab?.isDirty) {
+                const captured = conflicts.current.beginRead(evtPath);
+                if (captured) conflicts.current.settleRead(captured, { kind: "deleted" });
+                setFileLoadError(
+                  `"${evtPath}" was deleted on disk. Unsaved editor content has been retained.`,
+                );
+                return;
+              }
+              setTabs((p) => p.filter((t) => t.path !== evtPath));
+              setActiveTabPath((cur) => {
+                if (cur !== evtPath) return cur;
+                const rest = tabsRef.current.filter((t) => t.path !== evtPath);
+                return rest[0]?.path ?? null;
+              });
+            });
+        }, 400),
+      );
       return;
     }
 
@@ -625,6 +656,8 @@ export function useCodezWorkspace({
       }
     }, 250);
   }, [setTabs]);
+
+  scheduleTabReloadRef.current = scheduleTabReload;
 
   const reloadTabFromDisk = useCallback(
     async (path: string) => {
@@ -775,6 +808,8 @@ export function useCodezWorkspace({
     }).then((raw) => perfCounters.trackListener(raw));
 
     return () => {
+      for (const timer of pendingDeleteTimers.current.values()) clearTimeout(timer);
+      pendingDeleteTimers.current.clear();
       if (tabReloadTimer.current) {
         clearTimeout(tabReloadTimer.current);
         tabReloadTimer.current = null;

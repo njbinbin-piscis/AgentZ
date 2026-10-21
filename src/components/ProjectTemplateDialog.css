@@ -63,6 +63,22 @@
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
+  text-align: left;
+}
+
+.agentz-tpl-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agentz-tpl-row input[type="radio"] {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.agentz-tpl-desc {
+  margin-left: 1.5rem;
 }
 
 .agentz-tpl-list label.active {

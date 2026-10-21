@@ -15,7 +15,6 @@ use tokio::time::sleep;
 use tokio::time::timeout;
 
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
-const MAX_OUTPUT_BYTES: usize = 100 * 1024;
 
 #[derive(Default)]
 pub struct ProcessControlTool {
@@ -158,20 +157,27 @@ impl ProcessControlTool {
                 ))),
                 Ok(Err(e)) => Ok(ToolResult::err(format!("Failed to start process: {}", e))),
                 Ok(Ok(output)) => {
-                    let stdout = smart_truncate(
-                        &String::from_utf8_lossy(&output.stdout),
-                        MAX_OUTPUT_BYTES * 3 / 4,
-                        TruncateStrategy::HeadTail,
-                    )
-                    .0;
-                    let stderr = smart_truncate(
-                        &String::from_utf8_lossy(&output.stderr),
-                        MAX_OUTPUT_BYTES / 4,
-                        TruncateStrategy::HeadTail,
-                    )
-                    .0;
+                    let stdout_full = String::from_utf8_lossy(&output.stdout).into_owned();
+                    let stderr_full = String::from_utf8_lossy(&output.stderr).into_owned();
+                    let (stdout, out_meta) =
+                        smart_truncate(&stdout_full, 24 * 1024, TruncateStrategy::HeadTail);
+                    let (stderr, err_meta) =
+                        smart_truncate(&stderr_full, 12 * 1024, TruncateStrategy::HeadTail);
                     let exit_code = output.status.code().unwrap_or(-1);
                     let mut parts = vec![format!("Exit code: {}", exit_code)];
+                    if out_meta.truncated || err_meta.truncated {
+                        if let Some(path) = super::output::spill_tool_output(
+                            &ctx.workspace_root,
+                            "process_control",
+                            &stdout_full,
+                            &stderr_full,
+                        ) {
+                            parts.push(format!(
+                                "Full output saved to {} — inspect omitted parts with file_read (offset/limit) or file_search instead of re-running.",
+                                path.display()
+                            ));
+                        }
+                    }
                     if !stdout.is_empty() {
                         parts.push(format!("STDOUT:\n{}", stdout));
                     }
