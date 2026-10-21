@@ -65,6 +65,9 @@
   --text-muted: #787890;
   --accent-hover: #5846d8;
   --accent-glow: 0 0 16px rgba(107, 88, 232, 0.18);
+  --success: #15803d;
+  --warning: #b45309;
+  --error: #dc2626;
   --sidebar-bg: #f0f0f6;
   --sidebar-border: #d8d8e4;
   --scrollbar-thumb: #b8b8cc;

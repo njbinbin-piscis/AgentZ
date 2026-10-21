@@ -21,15 +21,54 @@ export interface TerminalTab {
 }
 
 /** Build an xterm theme from the app's CSS theme tokens so the terminal
- *  matches light/dark. Reads computed custom properties at call time. */
-function buildXtermTheme(): Record<string, string> {
+ *  matches light/dark, including a full 16-color ANSI palette with high
+ *  contrast in light mode (e.g. PowerShell PSReadLine's yellow command tokens). */
+export function buildXtermTheme(): Record<string, string> {
   const isLight = document.documentElement.dataset.theme === "light";
+  const ansiPalette = isLight
+    ? {
+        black: "#1a1a24",
+        red: "#c92a2a",
+        green: "#1b7f37",
+        yellow: "#854d0e",
+        blue: "#0969da",
+        magenta: "#8250df",
+        cyan: "#0e7490",
+        white: "#4a4a62",
+        brightBlack: "#5c5c72",
+        brightRed: "#b91c1c",
+        brightGreen: "#15803d",
+        brightYellow: "#713f12",
+        brightBlue: "#1d4ed8",
+        brightMagenta: "#7e22ce",
+        brightCyan: "#0f766e",
+        brightWhite: "#1a1a24",
+      }
+    : {
+        black: "#1a1a24",
+        red: "#f87171",
+        green: "#4ade80",
+        yellow: "#facc15",
+        blue: "#60a5fa",
+        magenta: "#c084fc",
+        cyan: "#22d3ee",
+        white: "#cbd5e1",
+        brightBlack: "#9090a8",
+        brightRed: "#fca5a5",
+        brightGreen: "#86efac",
+        brightYellow: "#fde047",
+        brightBlue: "#93c5fd",
+        brightMagenta: "#d8b4fe",
+        brightCyan: "#67e8f9",
+        brightWhite: "#f8fafc",
+      };
   return {
     background: cssVar("--bg-primary", isLight ? "#ffffff" : "#14141c"),
     foreground: cssVar("--text-primary", isLight ? "#1a1a24" : "#e8e8f0"),
     cursor: cssVar("--accent", "#7c6af7"),
     cursorAccent: cssVar("--bg-primary", isLight ? "#ffffff" : "#14141c"),
     selectionBackground: isLight ? "rgba(107, 88, 232, 0.22)" : "rgba(124, 106, 247, 0.35)",
+    ...ansiPalette,
   };
 }
 
@@ -119,6 +158,7 @@ function TerminalSession({
       fontFamily: 'Consolas, "Courier New", monospace',
       lineHeight: 1.2,
       scrollback: 5000,
+      minimumContrastRatio: 4.5,
       theme: buildXtermTheme(),
     });
 

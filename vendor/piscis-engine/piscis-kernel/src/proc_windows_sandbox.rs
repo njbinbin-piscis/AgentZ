@@ -215,23 +215,24 @@ pub fn run_appcontainer_command(
         cwd.is_dir() && cwd.starts_with(&workspace_root),
         "sandbox working directory must be inside workspace_root"
     );
-    let profile = AppContainerProfile::create()?;
-    let mut workspace_lease = match unsafe { WorkspaceAclLease::grant(&workspace_root, profile.sid) }
-    {
-        Ok(lease) => Some(lease),
-        Err(error) if is_write_dac_denied_error(&error) => None,
-        Err(error) => return Err(error),
-    };
-    let use_appcontainer = if workspace_lease.is_some()
-        && command_requires_unprivileged_toolchain_fallback(program, args, env_overrides)
-    {
-        if let Some(mut lease) = workspace_lease.take() {
-            lease.finish()?;
+    let force_unprivileged_job =
+        command_requires_unprivileged_toolchain_fallback(program, args, env_overrides);
+    let mut profile = None;
+    let mut workspace_lease = None;
+    if !force_unprivileged_job {
+        let created_profile = AppContainerProfile::create()?;
+        match unsafe { WorkspaceAclLease::grant(&workspace_root, created_profile.sid) } {
+            Ok(lease) => {
+                workspace_lease = Some(lease);
+                profile = Some(created_profile);
+            }
+            Err(error) if is_write_dac_denied_error(&error) => {
+                drop(created_profile);
+            }
+            Err(error) => return Err(error),
         }
-        false
-    } else {
-        workspace_lease.is_some()
-    };
+    }
+    let use_appcontainer = workspace_lease.is_some();
     let _pinned_readonly_workspace = if !use_appcontainer {
         Some(verify_and_pin_readonly_workspace(&workspace_root)?)
     } else {
@@ -266,7 +267,7 @@ pub fn run_appcontainer_command(
 
     let attribute_list = AttributeList::new(if use_appcontainer { 2 } else { 1 })?;
     let capabilities = SECURITY_CAPABILITIES {
-        AppContainerSid: profile.sid,
+        AppContainerSid: profile.as_ref().map(|p| p.sid).unwrap_or_default(),
         Capabilities: std::ptr::null_mut(),
         CapabilityCount: 0,
         Reserved: 0,
@@ -684,6 +685,8 @@ mod runner_tests {
     #[test]
     fn production_runner_reports_both_truncated_streams_after_cleanup() {
         let temp = tempfile::tempdir().expect("create truncation fixture");
+        let work = temp.path().join("work");
+        std::fs::create_dir_all(&work).expect("create truncation workspace");
         let result = run_appcontainer_command(
             cmd_exe().as_os_str(),
             &[
@@ -693,8 +696,8 @@ mod runner_tests {
                     "for /L %i in (1,1,100) do @(echo stdout-line & echo stderr-line 1>&2)",
                 ),
             ],
-            temp.path(),
-            temp.path(),
+            &work,
+            &work,
             Duration::from_secs(10),
             Arc::new(AtomicBool::new(false)),
             &[],
@@ -1695,6 +1698,84 @@ mod runner_tests {
         let stdout = String::from_utf8_lossy(&ps_result.stdout);
         assert!(stdout.contains("exceljs OK"), "stdout={stdout}");
     }
+
+    #[test]
+    fn windows_sandbox_large_node_modules_nutstore_workspace_does_not_overflow_or_rewrite_dacls() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let work = temp.path().join("DimLab");
+        let nm = work.join("node_modules");
+        std::fs::create_dir_all(&nm).expect("create node_modules");
+
+        // Populate > MAX_APPCONTAINER_ACL_ENTRIES files and a deep directory chain plus a hardlink
+        // inside node_modules (matching real npm/pnpm node_modules inside a Nutstore directory).
+        for i in 0..300 {
+            let pkg_dir = nm.join(format!("pkg-{i:03}"));
+            std::fs::create_dir_all(&pkg_dir).expect("create pkg dir");
+            std::fs::write(pkg_dir.join("index.js"), b"module.exports = 1;\n")
+                .expect("write index.js");
+        }
+        let link_src = nm.join("pkg-000").join("index.js");
+        let link_dst = nm.join("pkg-000").join("index.hardlink.js");
+        let _ = std::fs::hard_link(&link_src, &link_dst);
+
+        let work_for_thread = work.clone();
+        let handle = std::thread::Builder::new()
+            .name("nutstore-small-stack-test".to_string())
+            .stack_size(512 * 1024)
+            .spawn(move || {
+                // 1) Exact command from user bug report: `node -v && echo OK` via cmd.exe
+                let node_res = run_appcontainer_command(
+                    cmd_exe().as_os_str(),
+                    &[
+                        OsString::from("/d"),
+                        OsString::from("/c"),
+                        OsString::from("chcp 65001 >nul 2>&1 & node -v && echo OK"),
+                    ],
+                    &work_for_thread,
+                    &work_for_thread,
+                    Duration::from_secs(15),
+                    Arc::new(AtomicBool::new(false)),
+                    &[],
+                    4096,
+                )
+                .expect("run node -v && echo OK in large workspace");
+                assert_eq!(
+                    node_res.exit_code,
+                    0,
+                    "stderr={}",
+                    String::from_utf8_lossy(&node_res.stderr)
+                );
+                let stdout = String::from_utf8_lossy(&node_res.stdout);
+                assert!(stdout.contains("OK"), "stdout={stdout}");
+
+                // 2) Non-toolchain command in the same >256-entry workspace with hardlinks
+                let echo_res = run_appcontainer_command(
+                    cmd_exe().as_os_str(),
+                    &[
+                        OsString::from("/d"),
+                        OsString::from("/c"),
+                        OsString::from("echo NON_TOOLCHAIN_OK"),
+                    ],
+                    &work_for_thread,
+                    &work_for_thread,
+                    Duration::from_secs(15),
+                    Arc::new(AtomicBool::new(false)),
+                    &[],
+                    4096,
+                )
+                .expect("run non-toolchain command in large workspace");
+                assert_eq!(
+                    echo_res.exit_code,
+                    0,
+                    "stderr={}",
+                    String::from_utf8_lossy(&echo_res.stderr)
+                );
+                let echo_stdout = String::from_utf8_lossy(&echo_res.stdout);
+                assert!(echo_stdout.contains("NON_TOOLCHAIN_OK"), "stdout={echo_stdout}");
+            })
+            .expect("spawn small-stack test thread");
+        handle.join().expect("small-stack thread must not overflow or panic");
+    }
 }
 
 struct OriginalDacl {
@@ -1862,6 +1943,8 @@ impl Drop for WorkspaceAclLease {
     }
 }
 
+const MAX_APPCONTAINER_ACL_ENTRIES: usize = 256;
+
 fn collect_prepared_tree(
     root: &Path,
     parent: HANDLE,
@@ -1876,81 +1959,108 @@ fn collect_prepared_tree(
     collect_prepared_node(entry, prepared)
 }
 
-fn collect_prepared_node(entry: PreparedAcl, prepared: &mut Vec<PreparedAcl>) -> Result<()> {
-    let path = entry.path.clone();
-    let info = file_information(&entry.handle)?;
-    let is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
-    prepared.push(entry);
-    if !is_directory {
+fn collect_prepared_node(root_entry: PreparedAcl, prepared: &mut Vec<PreparedAcl>) -> Result<()> {
+    let root_info = file_information(&root_entry.handle)?;
+    let root_is_dir = root_info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
+    let root_idx = prepared.len();
+    prepared.push(root_entry);
+    if !root_is_dir {
         return Ok(());
     }
 
-    let mut children =
-        directory_entry_names(prepared.last().expect("prepared directory").handle.raw())?;
-    children.sort_by(|left, right| left.0.cmp(&right.0));
-    let parent_handle = prepared.last().expect("prepared directory").handle.raw();
-    for (component, is_directory) in children {
-        let child = path.join(&component);
-        match open_relative_acl_handle(parent_handle, &component, &child, is_directory, true) {
-            Ok(handle) => {
-                let info = file_information(&handle)?;
-                let child_is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
-                let child_inheritance = if child_is_directory {
-                    ACE_FLAGS(OBJECT_INHERIT_ACE.0 | CONTAINER_INHERIT_ACE.0)
-                } else {
-                    ACE_FLAGS(0)
-                };
-                let entry =
-                    prepare_acl_handle(&child, handle, FILE_ALL_ACCESS.0, child_inheritance)?;
-                collect_prepared_node(entry, prepared)?;
+    let mut worklist = vec![root_idx];
+    while let Some(dir_idx) = worklist.pop() {
+        let dir_path = prepared[dir_idx].path.clone();
+        let parent_handle = prepared[dir_idx].handle.raw();
+        let mut children = directory_entry_names(parent_handle)?;
+        children.sort_by(|left, right| left.0.cmp(&right.0));
+        anyhow::ensure!(
+            prepared.len().saturating_add(children.len()) <= MAX_APPCONTAINER_ACL_ENTRIES,
+            "sandbox workspace exceeds per-file AppContainer ACL lease limit ({MAX_APPCONTAINER_ACL_ENTRIES} entries)"
+        );
+        let mut child_dir_indices = Vec::new();
+        for (component, is_directory) in children {
+            let child = dir_path.join(&component);
+            match open_relative_acl_handle(parent_handle, &component, &child, is_directory, true) {
+                Ok(handle) => {
+                    let info = file_information(&handle)?;
+                    let child_is_directory =
+                        info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
+                    let child_inheritance = if child_is_directory {
+                        ACE_FLAGS(OBJECT_INHERIT_ACE.0 | CONTAINER_INHERIT_ACE.0)
+                    } else {
+                        ACE_FLAGS(0)
+                    };
+                    let entry =
+                        prepare_acl_handle(&child, handle, FILE_ALL_ACCESS.0, child_inheritance)?;
+                    let idx = prepared.len();
+                    prepared.push(entry);
+                    if child_is_directory {
+                        child_dir_indices.push(idx);
+                    }
+                }
+                Err(error) if is_write_dac_denied_error(&error) => {
+                    let readonly = open_relative_acl_handle(
+                        parent_handle,
+                        &component,
+                        &child,
+                        is_directory,
+                        false,
+                    )?;
+                    validate_readonly_tree(&child, readonly)?;
+                }
+                Err(error) => return Err(error),
             }
-            Err(error) if is_write_dac_denied_error(&error) => {
-                // Cloud-synced or read-only-ACL child inside a workspace whose root
-                // already carries inheritable ACEs: verify all structural/DACL
-                // invariants using a read-only ACL handle instead of failing setup.
-                let readonly = open_relative_acl_handle(
-                    parent_handle,
-                    &component,
-                    &child,
-                    is_directory,
-                    false,
-                )?;
-                validate_readonly_tree(&child, readonly)?;
-            }
-            Err(error) => return Err(error),
+        }
+        for idx in child_dir_indices.into_iter().rev() {
+            worklist.push(idx);
         }
     }
     Ok(())
 }
 
-fn validate_readonly_tree(path: &Path, handle: OwnedHandle) -> Result<()> {
-    let info = file_information(&handle)?;
-    ensure_not_redirection_reparse_point(&handle, &info, "sandbox workspace contains a reparse point", path)?;
-    let is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
-    if !is_directory {
+fn validate_readonly_tree(root_path: &Path, root_handle: OwnedHandle) -> Result<()> {
+    let mut worklist = vec![(root_path.to_path_buf(), root_handle)];
+    let mut visited = 0usize;
+    while let Some((path, handle)) = worklist.pop() {
+        visited += 1;
         anyhow::ensure!(
-            info.nNumberOfLinks == 1,
-            "sandbox workspace contains a file with multiple hard links: {}",
-            path.display()
+            visited <= MAX_APPCONTAINER_ACL_ENTRIES,
+            "sandbox workspace exceeds per-file AppContainer ACL lease limit ({MAX_APPCONTAINER_ACL_ENTRIES} entries)"
         );
-    }
-    let (old_acl, descriptor) = get_dacl_handle(path, &handle)?;
-    unsafe {
-        let _ = LocalFree(HLOCAL(descriptor.0));
-    }
-    if old_acl.is_none() {
-        bail!("refusing sandbox scope on a null DACL: {}", path.display());
-    }
-    if !is_directory {
-        return Ok(());
-    }
-    let mut children = directory_entry_names(handle.raw())?;
-    children.sort_by(|left, right| left.0.cmp(&right.0));
-    for (component, child_is_dir) in children {
-        let child = path.join(&component);
-        let child_handle =
-            open_relative_acl_handle(handle.raw(), &component, &child, child_is_dir, false)?;
-        validate_readonly_tree(&child, child_handle)?;
+        let info = file_information(&handle)?;
+        ensure_not_redirection_reparse_point(
+            &handle,
+            &info,
+            "sandbox workspace contains a reparse point",
+            &path,
+        )?;
+        let is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
+        if !is_directory {
+            anyhow::ensure!(
+                info.nNumberOfLinks == 1,
+                "sandbox workspace contains a file with multiple hard links: {}",
+                path.display()
+            );
+        }
+        let (old_acl, descriptor) = get_dacl_handle(&path, &handle)?;
+        unsafe {
+            let _ = LocalFree(HLOCAL(descriptor.0));
+        }
+        if old_acl.is_none() {
+            bail!("refusing sandbox scope on a null DACL: {}", path.display());
+        }
+        if !is_directory {
+            continue;
+        }
+        let mut children = directory_entry_names(handle.raw())?;
+        children.sort_by(|left, right| right.0.cmp(&left.0));
+        for (component, child_is_dir) in children {
+            let child = path.join(&component);
+            let child_handle =
+                open_relative_acl_handle(handle.raw(), &component, &child, child_is_dir, false)?;
+            worklist.push((child, child_handle));
+        }
     }
     Ok(())
 }
@@ -1999,50 +2109,57 @@ fn collect_current_handles(
     root_handle: HANDLE,
     objects: &mut Vec<(PathBuf, OwnedHandle)>,
 ) -> Result<()> {
-    let mut children = directory_entry_names(root_handle)?;
-    children.sort_by(|left, right| left.0.cmp(&right.0));
-    for (component, enumerated_directory) in children {
-        let path = root.join(&component);
-        let handle = match open_relative_acl_handle(
-            root_handle,
-            &component,
-            &path,
-            enumerated_directory,
-            true,
-        ) {
-            Ok(handle) => handle,
-            Err(error) if is_write_dac_denied_error(&error) => {
-                let readonly = open_relative_acl_handle(
-                    root_handle,
-                    &component,
-                    &path,
-                    enumerated_directory,
-                    false,
-                )?;
-                let info = file_information(&readonly)?;
-                ensure_not_redirection_reparse_point(
-                    &readonly,
-                    &info,
-                    "sandbox workspace contains a reparse point during ACL cleanup",
-                    &path,
-                )?;
-                continue;
+    let mut worklist = vec![(root.to_path_buf(), root_handle)];
+    while let Some((dir_path, dir_handle)) = worklist.pop() {
+        let mut children = directory_entry_names(dir_handle)?;
+        children.sort_by(|left, right| left.0.cmp(&right.0));
+        let mut subdirs = Vec::new();
+        for (component, enumerated_directory) in children {
+            let path = dir_path.join(&component);
+            let handle = match open_relative_acl_handle(
+                dir_handle,
+                &component,
+                &path,
+                enumerated_directory,
+                true,
+            ) {
+                Ok(handle) => handle,
+                Err(error) if is_write_dac_denied_error(&error) => {
+                    let readonly = open_relative_acl_handle(
+                        dir_handle,
+                        &component,
+                        &path,
+                        enumerated_directory,
+                        false,
+                    )?;
+                    let info = file_information(&readonly)?;
+                    ensure_not_redirection_reparse_point(
+                        &readonly,
+                        &info,
+                        "sandbox workspace contains a reparse point during ACL cleanup",
+                        &path,
+                    )?;
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
+            let info = file_information(&handle)?;
+            ensure_not_redirection_reparse_point(
+                &handle,
+                &info,
+                "sandbox workspace contains a reparse point during ACL cleanup",
+                &path,
+            )?;
+            let is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
+            let child_handle = handle.raw();
+            let child_path = path.clone();
+            objects.push((path, handle));
+            if is_directory {
+                subdirs.push((child_path, child_handle));
             }
-            Err(error) => return Err(error),
-        };
-        let info = file_information(&handle)?;
-        ensure_not_redirection_reparse_point(
-            &handle,
-            &info,
-            "sandbox workspace contains a reparse point during ACL cleanup",
-            &path,
-        )?;
-        let is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
-        let child_handle = handle.raw();
-        let child_path = path.clone();
-        objects.push((path, handle));
-        if is_directory {
-            collect_current_handles(&child_path, child_handle, objects)?;
+        }
+        for subdir in subdirs.into_iter().rev() {
+            worklist.push(subdir);
         }
     }
     Ok(())
@@ -2090,30 +2207,18 @@ fn open_workspace_root_handle(
 ) -> Result<OwnedHandle> {
     // Keeping delete sharing off prevents a concurrent rename of the leased
     // workspace root while still allowing files inside it to use atomic replace.
-    // If a cloud sync daemon (e.g. Nutstore / OneDrive) or filesystem watcher
-    // already holds a delete-shared handle on the directory, fall back to
-    // allowing delete sharing so the open is not rejected.
-    match open_relative_acl_handle_with_sharing(
+    // If a cloud sync daemon (e.g. Nutstore / OneDrive) already holds a
+    // delete-shared handle on the directory, this returns 0xC0000022 / 0xC0000043
+    // so the caller cleanly falls back to the read-only pinned Job Object runner
+    // without mutating DACLs inside an active cloud-synced folder.
+    open_relative_acl_handle_with_sharing(
         parent,
         component,
         diagnostic_path,
         true,
         true,
         false,
-    ) {
-        Ok(handle) => Ok(handle),
-        Err(error) if is_write_dac_denied_error(&error) => {
-            open_relative_acl_handle_with_sharing(
-                parent,
-                component,
-                diagnostic_path,
-                true,
-                true,
-                true,
-            )
-        }
-        Err(error) => Err(error),
-    }
+    )
 }
 
 fn open_relative_acl_handle_with_sharing(
@@ -2360,6 +2465,7 @@ fn is_write_dac_denied_error(error: &anyhow::Error) -> bool {
     text.contains("NTSTATUS 0xC0000022")
         || text.contains("NTSTATUS 0xC0000043")
         || text.contains("SetSecurityInfo failed")
+        || text.contains("exceeds per-file AppContainer ACL lease limit")
 }
 
 struct PinnedReadonlyWorkspace {
@@ -2385,9 +2491,14 @@ fn verify_and_pin_readonly_workspace(root: &Path) -> Result<PinnedReadonlyWorksp
         .context("workspace root has no final path component")?;
     let root_handle =
         open_relative_acl_handle(parent_handle.raw(), component, &root, true, false)?;
-    let check_handle =
-        open_relative_acl_handle(parent_handle.raw(), component, &root, true, false)?;
-    validate_readonly_tree(&root, check_handle)?;
+    ensure_directory_handle(&root_handle, &root)?;
+    let (root_acl, root_desc) = get_dacl_handle(&root, &root_handle)?;
+    unsafe {
+        let _ = LocalFree(HLOCAL(root_desc.0));
+    }
+    if root_acl.is_none() {
+        bail!("refusing sandbox scope on a null DACL: {}", root.display());
+    }
     Ok(PinnedReadonlyWorkspace {
         _ancestor_handles: ancestor_handles,
         _parent_handle: parent_handle,
@@ -2395,21 +2506,21 @@ fn verify_and_pin_readonly_workspace(root: &Path) -> Result<PinnedReadonlyWorksp
     })
 }
 
-/// Checks whether the command invokes a developer toolchain binary on `PATH`
-/// (such as `node`, `npm`, `npx`, `python`, `cargo`, `rustc`, `uv`, `pnpm`, `yarn`, `bun`)
-/// whose installation directory on `PATH` lacks the `ALL APPLICATION PACKAGES`
-/// (`S-1-15-2-1`) ACE required by Windows LowBox AppContainer access checks.
+/// Checks whether the command invokes a developer toolchain binary
+/// (such as `node`, `npm`, `npx`, `python`, `cargo`, `rustc`, `uv`, `pnpm`, `yarn`, `bun`, `git`)
+/// that requires standard user token access to toolchain caches/runtimes and must run inside
+/// the Job Object + pinned workspace root runner rather than a zero-capability LowBox AppContainer.
 fn command_requires_unprivileged_toolchain_fallback(
     program: &OsStr,
     args: &[std::ffi::OsString],
-    env_overrides: &[(std::ffi::OsString, std::ffi::OsString)],
+    _env_overrides: &[(std::ffi::OsString, std::ffi::OsString)],
 ) -> bool {
     const TOOLCHAIN_BINARIES: &[&str] = &[
         "node", "node.exe", "npm", "npm.cmd", "npx", "npx.cmd", "pnpm", "pnpm.cmd", "yarn",
         "yarn.cmd", "bun", "bun.exe", "python", "python.exe", "python3", "python3.exe", "pip",
         "pip.exe", "pip3", "pip3.exe", "uv", "uv.exe", "pytest", "pytest.exe", "cargo",
         "cargo.exe", "rustc", "rustc.exe", "rustup", "rustup.exe", "tsc", "tsc.cmd", "vitest",
-        "vitest.cmd", "dotnet", "dotnet.exe", "go", "go.exe",
+        "vitest.cmd", "dotnet", "dotnet.exe", "go", "go.exe", "git", "git.exe",
     ];
     let combined = std::iter::once(program)
         .chain(args.iter().map(|s| s.as_os_str()))
@@ -2418,30 +2529,10 @@ fn command_requires_unprivileged_toolchain_fallback(
         .join(" ");
     let lower = combined.to_ascii_lowercase();
 
-    let mut matched_tools = Vec::new();
     for &tool in TOOLCHAIN_BINARIES {
         let base = tool.trim_end_matches(".exe").trim_end_matches(".cmd");
-        if contains_command_token(&lower, base) && !matched_tools.contains(&base) {
-            matched_tools.push(base);
-        }
-    }
-    if matched_tools.is_empty() {
-        return false;
-    }
-
-    let path_var = env_overrides
-        .iter()
-        .rev()
-        .find(|(k, _)| k.to_string_lossy().eq_ignore_ascii_case("PATH"))
-        .map(|(_, v)| v.clone())
-        .or_else(|| std::env::var_os("PATH"))
-        .unwrap_or_default();
-
-    for tool in matched_tools {
-        if let Some(exe_path) = resolve_executable_on_path(tool, &path_var) {
-            if !path_grants_all_application_packages(&exe_path) {
-                return true;
-            }
+        if contains_command_token(&lower, base) {
+            return true;
         }
     }
     false
@@ -2457,62 +2548,6 @@ fn contains_command_token(haystack: &str, token: &str) -> bool {
         }
     }
     false
-}
-
-fn resolve_executable_on_path(tool: &str, path_var: &OsStr) -> Option<PathBuf> {
-    for dir in std::env::split_paths(path_var) {
-        for ext in ["exe", "cmd", "bat"] {
-            let candidate = dir.join(format!("{tool}.{ext}"));
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-        }
-    }
-    None
-}
-
-fn path_grants_all_application_packages(path: &Path) -> bool {
-    // S-1-15-2-1 (APPLICATION PACKAGE AUTHORITY\ALL APPLICATION PACKAGES)
-    const ALL_APP_PACKAGES_SID: [u8; 16] = [1, 2, 0, 0, 0, 0, 0, 15, 2, 0, 0, 0, 1, 0, 0, 0];
-    let check_single = |target: &Path| -> bool {
-        let path_wide = wide(target.as_os_str());
-        let handle = unsafe {
-            CreateFileW(
-                PCWSTR(path_wide.as_ptr()),
-                READ_CONTROL.0 | FILE_READ_ATTRIBUTES.0,
-                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                None,
-                OPEN_EXISTING,
-                FILE_FLAG_BACKUP_SEMANTICS,
-                None,
-            )
-        };
-        let Ok(handle) = handle else {
-            return false;
-        };
-        let owned = OwnedHandle::new(handle);
-        let Ok((Some(acl), descriptor)) = get_dacl_handle(target, &owned) else {
-            return false;
-        };
-        let bytes = unsafe {
-            std::slice::from_raw_parts(acl.cast::<u8>(), (*acl).AclSize as usize).to_vec()
-        };
-        unsafe {
-            let _ = LocalFree(HLOCAL(descriptor.0));
-        }
-        bytes
-            .windows(ALL_APP_PACKAGES_SID.len())
-            .any(|w| w == ALL_APP_PACKAGES_SID)
-    };
-    if !check_single(path) {
-        return false;
-    }
-    if let Some(parent) = path.parent() {
-        if !check_single(parent) {
-            return false;
-        }
-    }
-    true
 }
 
 fn open_directory_anchor_handle(path: &Path) -> Result<OwnedHandle> {
@@ -2556,40 +2591,47 @@ fn directory_entry_names(handle: HANDLE) -> Result<Vec<(std::ffi::OsString, bool
 
         let mut offset = 0usize;
         loop {
-            let fixed = std::mem::size_of::<FILE_ID_BOTH_DIR_INFO>() - std::mem::size_of::<u16>();
+            let fixed = std::mem::offset_of!(FILE_ID_BOTH_DIR_INFO, FileName);
             anyhow::ensure!(
                 offset <= BUFFER_BYTES.saturating_sub(fixed),
                 "invalid directory information record offset"
             );
-            let record = unsafe { &*buffer.add(offset).cast::<FILE_ID_BOTH_DIR_INFO>() };
-            let name_bytes = record.FileNameLength as usize;
+            let record_ptr = unsafe { buffer.add(offset).cast::<FILE_ID_BOTH_DIR_INFO>() };
+            let name_bytes =
+                unsafe { std::ptr::addr_of!((*record_ptr).FileNameLength).read_unaligned() }
+                    as usize;
+            let file_attributes =
+                unsafe { std::ptr::addr_of!((*record_ptr).FileAttributes).read_unaligned() };
+            let next_entry_offset =
+                unsafe { std::ptr::addr_of!((*record_ptr).NextEntryOffset).read_unaligned() }
+                    as usize;
             anyhow::ensure!(
                 name_bytes % std::mem::size_of::<u16>() == 0
                     && name_bytes <= BUFFER_BYTES - offset - fixed,
                 "invalid directory entry name length"
             );
-            let name = unsafe {
-                std::slice::from_raw_parts(
-                    record.FileName.as_ptr(),
-                    name_bytes / std::mem::size_of::<u16>(),
-                )
-            };
-            let name = std::ffi::OsString::from_wide(name);
+            let name_len = name_bytes / std::mem::size_of::<u16>();
+            let name_ptr = unsafe { buffer.add(offset + fixed).cast::<u16>() };
+            let mut name_buf = Vec::with_capacity(name_len);
+            for i in 0..name_len {
+                name_buf.push(unsafe { name_ptr.add(i).read_unaligned() });
+            }
+            let name = std::ffi::OsString::from_wide(&name_buf);
             if name != "." && name != ".." {
                 entries.push((
                     name,
-                    record.FileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0,
+                    file_attributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0,
                 ));
             }
-            if record.NextEntryOffset == 0 {
+            if next_entry_offset == 0 {
                 break;
             }
             anyhow::ensure!(
-                record.NextEntryOffset as usize >= fixed
-                    && offset + record.NextEntryOffset as usize <= BUFFER_BYTES - fixed,
+                next_entry_offset >= fixed
+                    && offset + next_entry_offset <= BUFFER_BYTES - fixed,
                 "invalid directory information record chain"
             );
-            offset += record.NextEntryOffset as usize;
+            offset += next_entry_offset;
         }
     }
     Ok(entries)

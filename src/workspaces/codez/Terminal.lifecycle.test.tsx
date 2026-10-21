@@ -13,7 +13,7 @@ vi.mock("@xterm/xterm", () => ({ Terminal: class {
   loadAddon() {} open() {} onData() {} onResize() {} attachCustomKeyEventHandler() {}
   dispose() {} write(data: string) { api.output(data); } focus() { api.focus(); } getSelection() { return ""; }
 } }));
-import TerminalPanel, { confirmTerminalCloseOnProjectChange, destroyAllTerminals } from "./Terminal";
+import TerminalPanel, { buildXtermTheme, confirmTerminalCloseOnProjectChange, destroyAllTerminals } from "./Terminal";
 let renderer: ReactTestRenderer | undefined;
 const props = (projectDir = "A", visible = true) => ({ projectDir, visible, onHide: vi.fn() });
 beforeEach(() => {
@@ -86,3 +86,18 @@ it("delayed terminal activation respects focus on the owning dock tablist", asyn
   callbacks.forEach(callback => callback());
   expect(api.focus).not.toHaveBeenCalled();
 });
+
+it("provides high-contrast ANSI yellow and brightYellow in light theme for typed commands", () => {
+  vi.stubGlobal("document", { documentElement: { dataset: { theme: "light" } } });
+  const lightTheme = buildXtermTheme();
+  expect(lightTheme.yellow).toBe("#854d0e");
+  expect(lightTheme.brightYellow).toBe("#713f12");
+  expect(lightTheme.white).toBe("#4a4a62");
+  expect(lightTheme.brightWhite).toBe("#1a1a24");
+
+  vi.stubGlobal("document", { documentElement: { dataset: { theme: "dark" } } });
+  const darkTheme = buildXtermTheme();
+  expect(darkTheme.yellow).toBe("#facc15");
+  expect(darkTheme.brightYellow).toBe("#fde047");
+});
+

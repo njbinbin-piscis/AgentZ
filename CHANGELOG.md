@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-10-21
+
+### Fixed
+
+- **Windows sandbox crash on Nutstore-synced workspaces when running `code_run` / `shell`**: Commands such as `node -v && echo OK` no longer walk the whole workspace (including `node_modules`) to rewrite DACLs, recurse on the default 1 MB thread stack, or dereference unaligned directory records from cloud filter drivers. Developer toolchains run in the pinned Job Object path before any ACL lease, large trees fail closed at 256 entries, and both tools execute on an 8 MB worker thread.
+- **Typed terminal commands unreadable in light theme**: The xterm theme now ships a full ANSI palette. Light mode maps PowerShell `brightYellow` input to `#713f12` and `yellow` to `#854d0e`, and the terminal enforces a 4.5 minimum contrast ratio. Light theme `--warning`, `--success`, and `--error` tokens are set for the same backgrounds.
+
 ## [1.0.7] - 2026-10-21
 
 ### Fixed

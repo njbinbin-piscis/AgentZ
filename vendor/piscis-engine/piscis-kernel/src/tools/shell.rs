@@ -309,26 +309,42 @@ impl Tool for ShellTool {
                 Ok(receipt) => receipt,
                 Err(error) => return recovery_error(error, ctx, false),
             };
-            let result = tokio::task::spawn_blocking(move || {
-                let result = crate::proc::windows_sandbox::run_appcontainer_command(
-                    program.as_os_str(),
-                    &args,
-                    &worker_workspace_root,
-                    &worker_cwd,
-                    timeout,
-                    cancel,
-                    &env_overrides,
-                    MAX_OUTPUT_BYTES,
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            let spawn_res = std::thread::Builder::new()
+                .name("shell-sandbox".to_string())
+                .stack_size(8 * 1024 * 1024)
+                .spawn(move || {
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        crate::proc::windows_sandbox::run_appcontainer_command(
+                            program.as_os_str(),
+                            &args,
+                            &worker_workspace_root,
+                            &worker_cwd,
+                            timeout,
+                            cancel,
+                            &env_overrides,
+                            MAX_OUTPUT_BYTES,
+                        )
+                    }))
+                    .unwrap_or_else(|_| {
+                        Err(anyhow::anyhow!("sandbox worker panicked unexpectedly"))
+                    });
+                    receipt.complete(
+                        result
+                            .as_ref()
+                            .map(|_| ())
+                            .map_err(|_| "sandbox cleanup unconfirmed".into()),
+                    );
+                    let _ = tx.send(result);
+                });
+            if let Err(error) = spawn_res {
+                return recovery_error(
+                    format!("Failed to spawn sandbox worker thread: {error}"),
+                    ctx,
+                    false,
                 );
-                receipt.complete(
-                    result
-                        .as_ref()
-                        .map(|_| ())
-                        .map_err(|_| "sandbox cleanup unconfirmed".into()),
-                );
-                result
-            })
-            .await;
+            }
+            let result = rx.await;
             let duration_ms = started.elapsed().as_millis();
             let output = match result {
                 Ok(Ok(output)) => output,

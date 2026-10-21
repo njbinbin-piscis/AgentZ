@@ -1,6 +1,6 @@
 # AgentZ release procedure
 
-Current source version: **1.0.7**. See the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md), [historical support baseline](docs/upgrade/evidence/AZ-005-support-matrix.md), [current upgrade progress](docs/upgrade/progress.md), [1.0.7 release notes](docs/upgrade/release-notes-1.0.7.md), and [1.0.7 checklist](docs/upgrade/release-checklist-1.0.7.md) for the recorded scope and checks.
+Current source version: **1.0.8**. See the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md), [historical support baseline](docs/upgrade/evidence/AZ-005-support-matrix.md), [current upgrade progress](docs/upgrade/progress.md), [1.0.8 release notes](docs/upgrade/release-notes-1.0.8.md), and [1.0.8 checklist](docs/upgrade/release-checklist-1.0.8.md) for the recorded scope and checks.
 
 ## Build and distribution boundary
 
