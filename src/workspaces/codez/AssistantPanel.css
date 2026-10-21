@@ -531,23 +531,36 @@
   color: var(--text-dim, #9a9ab0);
 }
 
+.agentz-mention-popup-portal {
+  display: flex;
+  flex-direction: column;
+  z-index: 100100;
+}
+
+.agentz-mention-popup-portal > .agentz-mention-popup {
+  position: static;
+  max-height: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .agentz-mention-popup {
   position: absolute;
   left: 8px;
   right: 8px;
   bottom: calc(100% + 4px);
-  max-height: min(200px, calc(100vh - 160px));
+  max-height: min(200px, calc(100vh / var(--ui-font-scale, 1) - 160px));
   overflow-y: auto;
   background: var(--bg-elev, #14141c);
   border: 1px solid var(--border, #2a2a38);
   border-radius: 10px;
   box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.4);
-  z-index: 1000;
+  z-index: 100100;
 }
 
 .agentz-mention-item {
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: calc(6px * var(--ui-font-scale, 1)) calc(10px * var(--ui-font-scale, 1));
+  font-size: calc(12px * var(--ui-font-scale, 1));
   font-family: Consolas, monospace;
   color: var(--text-dim, #9a9ab0);
   cursor: pointer;

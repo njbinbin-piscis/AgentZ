@@ -1,14 +1,26 @@
 import {
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
-  type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import {
+  canPortalToBody,
+  computeContextMenuPosition,
+  computeFixedPopupPosition,
+  useContextMenuPosition,
+  useFixedPopupPosition,
+} from "../utils/popupPosition";
 import "./DropdownSelect.css";
+
+export {
+  canPortalToBody,
+  computeContextMenuPosition,
+  computeFixedPopupPosition,
+  useContextMenuPosition,
+  useFixedPopupPosition,
+};
 
 export interface DropdownOption {
   id: string;
@@ -23,206 +35,6 @@ function ChevronDown() {
       <path d="M6 9l6 6 6-6" />
     </svg>
   );
-}
-
-export function computeFixedPopupPosition(
-  trigger: HTMLElement | null,
-  popup: HTMLElement | null,
-  placement: "up" | "down",
-  variant: "pill" | "text" | "field" | "inline" = "text",
-): CSSProperties {
-  if (!trigger || typeof trigger.getBoundingClientRect !== "function") {
-    return {
-      position: "fixed",
-      zIndex: 100100,
-    };
-  }
-
-  const vw =
-    (typeof window !== "undefined" && window.innerWidth) ||
-    (typeof document !== "undefined" && document.documentElement?.clientWidth) ||
-    800;
-  const vh =
-    (typeof window !== "undefined" && window.innerHeight) ||
-    (typeof document !== "undefined" && document.documentElement?.clientHeight) ||
-    600;
-  const rawTr = trigger.getBoundingClientRect();
-
-  // Normalize coordinates if `.agentz-app` applies CSS `zoom` and the engine reports local zoomed rects.
-  const appEl =
-    typeof trigger.closest === "function"
-      ? (trigger.closest(".agentz-app") as HTMLElement | null)
-      : null;
-  const appRect =
-    appEl && typeof appEl.getBoundingClientRect === "function"
-      ? appEl.getBoundingClientRect()
-      : null;
-  const rawScaleX = appRect && appRect.width > 0 ? vw / appRect.width : 1;
-  const rawScaleY = appRect && appRect.height > 0 ? vh / appRect.height : 1;
-  const useScale =
-    Math.abs(rawScaleX - rawScaleY) < 0.08 && rawScaleX >= 0.5 && rawScaleX <= 3;
-  const scaleX = useScale ? rawScaleX : 1;
-  const scaleY = useScale ? rawScaleY : 1;
-
-  const tr = {
-    top: rawTr.top * scaleY,
-    bottom: rawTr.bottom * scaleY,
-    left: rawTr.left * scaleX,
-    right: rawTr.right * scaleX,
-    width: rawTr.width * scaleX,
-    height: rawTr.height * scaleY,
-  };
-
-  const gap = 6;
-  const margin = 8;
-  const defaultMaxH = 280;
-
-  const spaceAbove = Math.max(0, tr.top - gap - margin);
-  const spaceBelow = Math.max(0, vh - tr.bottom - gap - margin);
-  const naturalH = Math.min(
-    defaultMaxH,
-    popup ? popup.scrollHeight || popup.offsetHeight || 220 : 220,
-  );
-
-  // Only flip direction when the preferred side cannot fit the menu AND the opposite side has strictly more space.
-  const openUp =
-    placement === "up"
-      ? spaceAbove >= naturalH || spaceAbove >= spaceBelow
-      : spaceBelow < naturalH && spaceAbove > spaceBelow;
-
-  const availH = openUp ? spaceAbove : spaceBelow;
-  const maxHeight =
-    availH >= 48 ? Math.min(defaultMaxH, availH) : Math.min(defaultMaxH, Math.max(72, vh - margin * 2));
-
-  const isFieldLike = variant === "field" || variant === "inline";
-  const minWidth = isFieldLike
-    ? Math.max(120, Math.min(tr.width || 200, vw - margin * 2))
-    : Math.min(200, Math.max(120, vw - margin * 2));
-  const maxWidth = isFieldLike
-    ? Math.max(minWidth, Math.min(520, vw - margin * 2))
-    : Math.max(minWidth, Math.min(320, vw - margin * 2));
-
-  const measuredW = popup
-    ? popup.offsetWidth ||
-      (typeof popup.getBoundingClientRect === "function"
-        ? popup.getBoundingClientRect().width
-        : 0) ||
-      0
-    : 0;
-  const pw = Math.min(maxWidth, Math.max(minWidth, measuredW || minWidth));
-
-  let left = tr.left;
-  if (left + pw > vw - margin) {
-    left = tr.right - pw;
-  }
-  if (left + pw > vw - margin) {
-    left = vw - pw - margin;
-  }
-  left = Math.max(margin, left);
-
-  if (openUp) {
-    const bottom = Math.max(margin, vh - tr.top + gap);
-    return {
-      position: "fixed",
-      top: "auto",
-      bottom,
-      left,
-      right: "auto",
-      minWidth,
-      maxWidth,
-      maxHeight,
-      zIndex: 100100,
-    };
-  }
-
-  const top = Math.max(margin, Math.min(tr.bottom + gap, vh - margin - 48));
-  return {
-    position: "fixed",
-    top,
-    bottom: "auto",
-    left,
-    right: "auto",
-    minWidth,
-    maxWidth,
-    maxHeight,
-    zIndex: 100100,
-  };
-}
-
-function canPortalToBody(): boolean {
-  return (
-    typeof document !== "undefined" &&
-    Boolean(document.body) &&
-    typeof (document.body as unknown as { nodeType?: number }).nodeType === "number"
-  );
-}
-
-/** Escape overflow:hidden/clip ancestors and stacking contexts by portaling to document.body and clamping to viewport. */
-function useFixedPopupPosition(
-  open: boolean,
-  triggerRef: RefObject<HTMLElement | null>,
-  popupRef: RefObject<HTMLElement | null>,
-  placement: "up" | "down",
-  variant: "pill" | "text" | "field" | "inline" = "text",
-) {
-  const [style, setStyle] = useState<CSSProperties>({});
-
-  useLayoutEffect(() => {
-    if (!open) {
-      setStyle({});
-      return;
-    }
-    const trigger = triggerRef.current;
-    const popup = popupRef.current;
-    if (!trigger) return;
-
-    const reposition = () => {
-      setStyle(
-        computeFixedPopupPosition(
-          triggerRef.current,
-          popupRef.current,
-          placement,
-          variant,
-        ),
-      );
-    };
-
-    reposition();
-    const rafId =
-      typeof window !== "undefined" && typeof window.requestAnimationFrame === "function"
-        ? window.requestAnimationFrame(reposition)
-        : 0;
-    let ro: ResizeObserver | null = null;
-    if (popup && typeof ResizeObserver !== "undefined") {
-      ro = new ResizeObserver(() => reposition());
-      ro.observe(popup);
-    }
-    if (typeof window !== "undefined") {
-      window.addEventListener("resize", reposition);
-      window.addEventListener("scroll", reposition, true);
-    }
-    return () => {
-      if (typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function" && rafId) {
-        window.cancelAnimationFrame(rafId);
-      }
-      ro?.disconnect();
-      if (typeof window !== "undefined") {
-        window.removeEventListener("resize", reposition);
-        window.removeEventListener("scroll", reposition, true);
-      }
-    };
-  }, [open, placement, variant, triggerRef, popupRef]);
-
-  if (open && Object.keys(style).length === 0 && triggerRef.current) {
-    return computeFixedPopupPosition(
-      triggerRef.current,
-      popupRef.current,
-      placement,
-      variant,
-    );
-  }
-
-  return style;
 }
 
 export interface DropdownSelectProps {

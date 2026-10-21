@@ -2,6 +2,7 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import DropdownSelect, {
   DropdownMultiSelect,
+  computeContextMenuPosition,
   computeFixedPopupPosition,
 } from "./DropdownSelect";
 import {
@@ -136,7 +137,7 @@ describe("DropdownSelect & DropdownMultiSelect", () => {
     expect(style.zIndex).toBe(100100);
   });
 
-  it("clamps horizontal position inside the right window edge for CodeZ right-panel composer menus", () => {
+  it("anchors horizontal position from right when popup right edge exceeds the window", () => {
     (globalThis as { window?: unknown }).window = {
       innerWidth: 1200,
       innerHeight: 800,
@@ -161,8 +162,69 @@ describe("DropdownSelect & DropdownMultiSelect", () => {
     } as unknown as HTMLElement;
 
     const style = computeFixedPopupPosition(trigger, popup, "up", "text");
-    expect(Number(style.left) + 300).toBeLessThanOrEqual(1200 - 8);
-    expect(Number(style.left)).toBeGreaterThanOrEqual(8);
+    expect(style.left).toBe("auto");
+    expect(style.right).toBe(1200 - 1175);
+    expect(1200 - Number(style.right) - 300).toBeGreaterThanOrEqual(8);
+  });
+
+  it("anchors vertical position from bottom when placement='down' exceeds the bottom of the window", () => {
+    (globalThis as { window?: unknown }).window = {
+      innerWidth: 1200,
+      innerHeight: 600,
+    };
+
+    // Case 1: Trigger near bottom — flips above trigger using `bottom` as reference
+    const bottomTrigger = {
+      getBoundingClientRect: () => ({
+        top: 460,
+        bottom: 492,
+        left: 120,
+        right: 280,
+        width: 160,
+        height: 32,
+      }),
+      closest: () => null,
+    } as unknown as HTMLElement;
+
+    const popup = {
+      scrollHeight: 240,
+      offsetHeight: 240,
+      offsetWidth: 220,
+    } as unknown as HTMLElement;
+
+    const flippedStyle = computeFixedPopupPosition(bottomTrigger, popup, "down", "field");
+    expect(flippedStyle.top).toBe("auto");
+    expect(flippedStyle.bottom).toBe(600 - 460 + 6);
+
+    // Case 2: Trigger near top of a short window where popup exceeds bottom — anchors to window bottom
+    (globalThis as { window?: unknown }).window = {
+      innerWidth: 1200,
+      innerHeight: 300,
+    };
+    const topTrigger = {
+      getBoundingClientRect: () => ({
+        top: 8,
+        bottom: 36,
+        left: 120,
+        right: 220,
+        width: 100,
+        height: 28,
+      }),
+      closest: () => null,
+    } as unknown as HTMLElement;
+
+    const tallPopup = {
+      scrollHeight: 360,
+      offsetHeight: 360,
+      offsetWidth: 260,
+    } as unknown as HTMLElement;
+
+    const clampedStyle = computeFixedPopupPosition(topTrigger, tallPopup, "down", "text", {
+      maxHeight: 360,
+    });
+    expect(clampedStyle.top).toBe("auto");
+    expect(clampedStyle.bottom).toBe(8);
+    expect(Number(clampedStyle.maxHeight)).toBeLessThanOrEqual(300 - 42 - 8);
   });
 
   it("normalizes coordinates when .agentz-app has CSS zoom scaling", () => {
@@ -191,7 +253,7 @@ describe("DropdownSelect & DropdownMultiSelect", () => {
         width: 60,
         height: 24,
       }),
-      closest: (sel: string) => (sel === ".agentz-app" ? appEl : null),
+      closest: (sel: string) => (sel.includes(".agentz-app") ? appEl : null),
     } as unknown as HTMLElement;
 
     const popup = {
@@ -202,7 +264,45 @@ describe("DropdownSelect & DropdownMultiSelect", () => {
     const style = computeFixedPopupPosition(trigger, popup, "up", "text");
     // 1000 - (720 * 1.25) + 6 = 106
     expect(style.bottom).toBe(106);
-    expect(Number(style.left) + 280).toBeLessThanOrEqual(1250 - 8);
+    expect(style.left).toBe("auto");
+    expect(style.right).toBe(1250 - 1175);
+  });
+
+  it("calculates right-click context menu position from right and bottom when exceeding window bounds", () => {
+    (globalThis as { window?: unknown }).window = {
+      innerWidth: 1000,
+      innerHeight: 700,
+    };
+
+    const menuEl = {
+      offsetWidth: 220,
+      scrollWidth: 220,
+      offsetHeight: 280,
+      scrollHeight: 280,
+    } as unknown as HTMLElement;
+
+    // 1. Inside viewport bounds -> uses top & left
+    const normal = computeContextMenuPosition({ x: 150, y: 120 }, menuEl);
+    expect(normal.left).toBe(150);
+    expect(normal.right).toBe("auto");
+    expect(normal.top).toBe(120);
+    expect(normal.bottom).toBe("auto");
+
+    // 2. Exceeds right and bottom edges -> anchors via right & bottom
+    const corner = computeContextMenuPosition({ x: 860, y: 520 }, menuEl);
+    expect(corner.left).toBe("auto");
+    expect(corner.right).toBe(1000 - 860);
+    expect(corner.top).toBe("auto");
+    expect(corner.bottom).toBe(700 - 520);
+
+    // 3. Very short window where flipping above cursor would also exceed top -> pins bottom to window margin (8px)
+    (globalThis as { window?: unknown }).window = {
+      innerWidth: 1000,
+      innerHeight: 360,
+    };
+    const shortWin = computeContextMenuPosition({ x: 200, y: 200 }, menuEl);
+    expect(shortWin.top).toBe("auto");
+    expect(shortWin.bottom).toBe(8);
   });
 
   it("scales editor and terminal font sizes proportionally with UI font scale and base editor font size", () => {

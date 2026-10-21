@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { canPortalToBody, useFixedPopupPosition } from "../utils/popupPosition";
 import "./TagMultiSelect.css";
 
 export interface TagOption {
@@ -32,6 +34,7 @@ export default function TagMultiSelect({
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLUListElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
@@ -73,7 +76,10 @@ export default function TagMultiSelect({
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (!rootRef.current?.contains(target) && !dropdownRef.current?.contains(target)) {
+        setOpen(false);
+      }
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -113,6 +119,10 @@ export default function TagMultiSelect({
   const optionMinH = 52;
   const visibleRows = Math.max(1, Math.min(maxVisible, dropdownItems.length || 1));
   const listMaxH = visibleRows * optionMinH;
+  const popupStyle = useFixedPopupPosition(open, rootRef, dropdownRef, "down", "field", {
+    maxHeight: listMaxH,
+    matchTriggerWidth: true,
+  });
 
   return (
     <div
@@ -159,41 +169,46 @@ export default function TagMultiSelect({
         />
       </div>
 
-      {open && (
-        <ul
-          id={listId}
-          className="agentz-tag-ms-dropdown"
-          role="listbox"
-          style={{ maxHeight: listMaxH, minHeight: optionMinH }}
-          onMouseDown={(e) => e.preventDefault()}
-        >
-          {dropdownItems.length === 0 ? (
-            <li className="agentz-tag-ms-empty">
-              {emptyText ?? t("tagMultiSelect.noMatch")}
-            </li>
-          ) : (
-            dropdownItems.map((o, i) => (
-              <li key={o.value}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={i === activeIdx}
-                  className={`agentz-tag-ms-option${i === activeIdx ? " active" : ""}`}
-                  onClick={() => add(o.value)}
-                >
-                  <span className="agentz-tag-ms-option-label">{o.label}</span>
-                  {o.hint && <span className="agentz-tag-ms-option-hint">{o.hint}</span>}
-                </button>
-              </li>
-            ))
-          )}
-          {truncated && (
-            <li className="agentz-tag-ms-more">
-              {t("tagMultiSelect.moreResults", { count: available.length - DROPDOWN_CAP })}
-            </li>
-          )}
-        </ul>
-      )}
+      {open &&
+        (() => {
+          const dropdownNode = (
+            <ul
+              ref={dropdownRef}
+              id={listId}
+              className="agentz-tag-ms-dropdown is-fixed"
+              role="listbox"
+              style={{ ...popupStyle, minHeight: optionMinH }}
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              {dropdownItems.length === 0 ? (
+                <li className="agentz-tag-ms-empty">
+                  {emptyText ?? t("tagMultiSelect.noMatch")}
+                </li>
+              ) : (
+                dropdownItems.map((o, i) => (
+                  <li key={o.value}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={i === activeIdx}
+                      className={`agentz-tag-ms-option${i === activeIdx ? " active" : ""}`}
+                      onClick={() => add(o.value)}
+                    >
+                      <span className="agentz-tag-ms-option-label">{o.label}</span>
+                      {o.hint && <span className="agentz-tag-ms-option-hint">{o.hint}</span>}
+                    </button>
+                  </li>
+                ))
+              )}
+              {truncated && (
+                <li className="agentz-tag-ms-more">
+                  {t("tagMultiSelect.moreResults", { count: available.length - DROPDOWN_CAP })}
+                </li>
+              )}
+            </ul>
+          );
+          return canPortalToBody() ? createPortal(dropdownNode, document.body) : dropdownNode;
+        })()}
     </div>
   );
 }

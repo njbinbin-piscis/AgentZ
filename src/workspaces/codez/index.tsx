@@ -1,7 +1,10 @@
+import { useRef } from "react";
+import { createPortal } from "react-dom";
 import { revealInFolder } from "../../services/tauri";
 import type { PickedElement } from "../../services/tauri/browser";
 import type { WorkzProject } from "../../services/tauri/workz";
 import type { EditorSnapshot, LayoutSnapshot } from "../../services/tauri/workspace";
+import { canPortalToBody, useContextMenuPosition } from "../../utils/popupPosition";
 import FileTree from "./FileTree";
 import EditorTabs from "./EditorTabs";
 import FileViewer from "./FileViewer";
@@ -90,6 +93,8 @@ export default function CodeZWorkspace(props: IDEProps) {
   } = props;
 
   const s = useCodezWorkspace(props);
+  const fileTreeMenuRef = useRef<HTMLDivElement>(null);
+  const fileTreeMenuStyle = useContextMenuPosition(s.fileTreeContextMenu, fileTreeMenuRef);
 
   return (
     <div className="pond-ide" ref={s.ideRef}>
@@ -423,126 +428,128 @@ export default function CodeZWorkspace(props: IDEProps) {
       />
 
       {/* File tree right-click context menu */}
-      {s.fileTreeContextMenu && (
-        <div
-          className="ide-tab-context-menu"
-          style={{
-            position: "fixed",
-            left: s.fileTreeContextMenu.x,
-            top: s.fileTreeContextMenu.y,
-            zIndex: 1000,
-          }}
-        >
-          <button
-            onClick={() => {
-              s.openFile(s.fileTreeContextMenu!.targetPath);
-              s.setFileTreeContextMenu(null);
-            }}
-          >
-            {s.t("ide.openFile") || "Open"}
-          </button>
-          {onSendToChat && (
-            <button
-              onClick={() => {
-                const paths =
-                  s.fileTreeSelection.size > 1 &&
-                  s.fileTreeSelection.has(s.fileTreeContextMenu!.targetPath)
-                    ? collectSelectedPaths(s.fileTree, s.fileTreeSelection)
-                    : [
-                        s.fileTreeContextMenu!.isDir
-                          ? s.fileTreeContextMenu!.targetPath.endsWith("/")
-                            ? s.fileTreeContextMenu!.targetPath
-                            : `${s.fileTreeContextMenu!.targetPath}/`
-                          : s.fileTreeContextMenu!.targetPath,
-                      ];
-                if (paths.length > 0) onSendToChat(paths);
-                s.setFileTreeContextMenu(null);
-              }}
+      {s.fileTreeContextMenu &&
+        (() => {
+          const menuNode = (
+            <div
+              ref={fileTreeMenuRef}
+              className="ide-tab-context-menu"
+              style={fileTreeMenuStyle}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
-              {s.t("ide.sendToChat")}
-            </button>
-          )}
-          <button
-            onClick={() => {
-              s.fileTreeRef.current?.renameActive?.();
-              s.setFileTreeContextMenu(null);
-            }}
-          >
-            {s.t("ide.renameFile") || "Rename"}{" "}
-            <span style={{ opacity: 0.5, fontSize: 11, marginLeft: 8 }}>F2</span>
-          </button>
-          <button
-            onClick={() => {
-              s.fileTreeRef.current?.deleteSelected?.();
-              s.setFileTreeContextMenu(null);
-            }}
-          >
-            {s.t("ide.deleteFile") || "Delete"}{" "}
-            <span style={{ opacity: 0.5, fontSize: 11, marginLeft: 8 }}>Del</span>
-          </button>
-          <div className="ide-tab-context-menu-sep" />
-          <button
-            onClick={() => {
-              const dir = s.projectDirRef.current;
-              if (dir)
-                navigator.clipboard
-                  .writeText(`${dir}/${s.fileTreeContextMenu!.targetPath}`)
-                  .catch(() => {});
-              s.setFileTreeContextMenu(null);
-            }}
-          >
-            {s.t("ide.copyPath") || "Copy Path"}
-          </button>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(s.fileTreeContextMenu!.targetPath).catch(() => {});
-              s.setFileTreeContextMenu(null);
-            }}
-          >
-            {s.t("ide.copyRelPath") || "Copy Relative Path"}
-          </button>
-          <button
-            onClick={() => {
-              const dir = s.projectDirRef.current;
-              if (!dir || !s.fileTreeContextMenu) return;
-              const abs = joinProjectPath(dir, s.fileTreeContextMenu.targetPath);
-              void revealInFolder(abs).catch((e: unknown) => {
-                window.alert(String(e));
-              });
-              s.setFileTreeContextMenu(null);
-            }}
-          >
-            {s.t("ide.revealInExplorer") || "Reveal in File Manager"}
-          </button>
-          <div className="ide-tab-context-menu-sep" />
-          <button
-            onClick={() => {
-              if (!s.fileTreeContextMenu) return;
-              const parent = parentPathForCreate(
-                s.fileTreeContextMenu.targetPath,
-                s.fileTreeContextMenu.isDir,
-              );
-              s.fileTreeRef.current?.startCreate?.(false, parent);
-              s.setFileTreeContextMenu(null);
-            }}
-          >
-            {s.t("ide.newFile") || "New File"}
-          </button>
-          <button
-            onClick={() => {
-              if (!s.fileTreeContextMenu) return;
-              const parent = parentPathForCreate(
-                s.fileTreeContextMenu.targetPath,
-                s.fileTreeContextMenu.isDir,
-              );
-              s.fileTreeRef.current?.startCreate?.(true, parent);
-              s.setFileTreeContextMenu(null);
-            }}
-          >
-            {s.t("ide.newFolder") || "New Folder"}
-          </button>
-        </div>
-      )}
+              <button
+                onClick={() => {
+                  s.openFile(s.fileTreeContextMenu!.targetPath);
+                  s.setFileTreeContextMenu(null);
+                }}
+              >
+                {s.t("ide.openFile") || "Open"}
+              </button>
+              {onSendToChat && (
+                <button
+                  onClick={() => {
+                    const paths =
+                      s.fileTreeSelection.size > 1 &&
+                      s.fileTreeSelection.has(s.fileTreeContextMenu!.targetPath)
+                        ? collectSelectedPaths(s.fileTree, s.fileTreeSelection)
+                        : [
+                            s.fileTreeContextMenu!.isDir
+                              ? s.fileTreeContextMenu!.targetPath.endsWith("/")
+                                ? s.fileTreeContextMenu!.targetPath
+                                : `${s.fileTreeContextMenu!.targetPath}/`
+                              : s.fileTreeContextMenu!.targetPath,
+                          ];
+                    if (paths.length > 0) onSendToChat(paths);
+                    s.setFileTreeContextMenu(null);
+                  }}
+                >
+                  {s.t("ide.sendToChat")}
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  s.fileTreeRef.current?.renameActive?.();
+                  s.setFileTreeContextMenu(null);
+                }}
+              >
+                {s.t("ide.renameFile") || "Rename"}{" "}
+                <span style={{ opacity: 0.5, fontSize: 11, marginLeft: 8 }}>F2</span>
+              </button>
+              <button
+                onClick={() => {
+                  s.fileTreeRef.current?.deleteSelected?.();
+                  s.setFileTreeContextMenu(null);
+                }}
+              >
+                {s.t("ide.deleteFile") || "Delete"}{" "}
+                <span style={{ opacity: 0.5, fontSize: 11, marginLeft: 8 }}>Del</span>
+              </button>
+              <div className="ide-tab-context-menu-sep" />
+              <button
+                onClick={() => {
+                  const dir = s.projectDirRef.current;
+                  if (dir)
+                    navigator.clipboard
+                      .writeText(`${dir}/${s.fileTreeContextMenu!.targetPath}`)
+                      .catch(() => {});
+                  s.setFileTreeContextMenu(null);
+                }}
+              >
+                {s.t("ide.copyPath") || "Copy Path"}
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(s.fileTreeContextMenu!.targetPath).catch(() => {});
+                  s.setFileTreeContextMenu(null);
+                }}
+              >
+                {s.t("ide.copyRelPath") || "Copy Relative Path"}
+              </button>
+              <button
+                onClick={() => {
+                  const dir = s.projectDirRef.current;
+                  if (!dir || !s.fileTreeContextMenu) return;
+                  const abs = joinProjectPath(dir, s.fileTreeContextMenu.targetPath);
+                  void revealInFolder(abs).catch((e: unknown) => {
+                    window.alert(String(e));
+                  });
+                  s.setFileTreeContextMenu(null);
+                }}
+              >
+                {s.t("ide.revealInExplorer") || "Reveal in File Manager"}
+              </button>
+              <div className="ide-tab-context-menu-sep" />
+              <button
+                onClick={() => {
+                  if (!s.fileTreeContextMenu) return;
+                  const parent = parentPathForCreate(
+                    s.fileTreeContextMenu.targetPath,
+                    s.fileTreeContextMenu.isDir,
+                  );
+                  s.fileTreeRef.current?.startCreate?.(false, parent);
+                  s.setFileTreeContextMenu(null);
+                }}
+              >
+                {s.t("ide.newFile") || "New File"}
+              </button>
+              <button
+                onClick={() => {
+                  if (!s.fileTreeContextMenu) return;
+                  const parent = parentPathForCreate(
+                    s.fileTreeContextMenu.targetPath,
+                    s.fileTreeContextMenu.isDir,
+                  );
+                  s.fileTreeRef.current?.startCreate?.(true, parent);
+                  s.setFileTreeContextMenu(null);
+                }}
+              >
+                {s.t("ide.newFolder") || "New Folder"}
+              </button>
+            </div>
+          );
+          return canPortalToBody() ? createPortal(menuNode, document.body) : menuNode;
+        })()}
     </div>
   );
 }

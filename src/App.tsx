@@ -1,5 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { canPortalToBody, useFixedPopupPosition } from "./utils/popupPosition";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getProjectScope, pickProjectScope, restoreProjectScope, revokeProjectScope } from "./services/tauri/projectScope";
@@ -175,6 +177,7 @@ export default function App() {
   const [codeMapOpen, setCodeMapOpen] = useState(false);
   const [graphIndexRefreshNonce, setGraphIndexRefreshNonce] = useState(0);
   const wikiMenuRef = useRef<HTMLDivElement>(null);
+  const wikiPopoverRef = useRef<HTMLDivElement>(null);
   const graphIndexStatus = useGraphIndexStatus(projectDir, graphIndexRefreshNonce);
   const graphIndexVisual = graphIndexStatus
     ? graphIndexVisualState(graphIndexStatus)
@@ -190,8 +193,34 @@ export default function App() {
   );
   const [fontScaleOpen, setFontScaleOpen] = useState(false);
   const fontScaleRef = useRef<HTMLDivElement>(null);
+  const fontScalePopoverRef = useRef<HTMLDivElement>(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const projectMenuRef = useRef<HTMLDivElement>(null);
+  const projectPopoverRef = useRef<HTMLDivElement>(null);
+  const projectPopoverStyle = useFixedPopupPosition(
+    projectMenuOpen,
+    projectMenuRef,
+    projectPopoverRef,
+    "down",
+    "text",
+    { align: "left", minWidth: 260, maxWidth: 340, maxHeight: 340 },
+  );
+  const wikiPopoverStyle = useFixedPopupPosition(
+    wikiMenuOpen,
+    wikiMenuRef,
+    wikiPopoverRef,
+    "down",
+    "text",
+    { align: "right", minWidth: 210, maxWidth: 320, maxHeight: 340 },
+  );
+  const fontScalePopoverStyle = useFixedPopupPosition(
+    fontScaleOpen,
+    fontScaleRef,
+    fontScalePopoverRef,
+    "down",
+    "text",
+    { align: "right", minWidth: 132, maxWidth: 220, maxHeight: 320 },
+  );
   const [recentProjects, setRecentProjects] = useState<WorkzProject[]>([]);
   const [exitToast, setExitToast] = useState(false);
   const [workspaceRestore, setWorkspaceRestore] = useState<{
@@ -453,7 +482,12 @@ export default function App() {
   useEffect(() => {
     if (!fontScaleOpen) return;
     const close = (e: MouseEvent) => {
-      if (fontScaleRef.current && !fontScaleRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        fontScaleRef.current &&
+        !fontScaleRef.current.contains(target) &&
+        !fontScalePopoverRef.current?.contains(target)
+      ) {
         setFontScaleOpen(false);
       }
     };
@@ -464,7 +498,12 @@ export default function App() {
   useEffect(() => {
     if (!wikiMenuOpen) return;
     const close = (e: MouseEvent) => {
-      if (wikiMenuRef.current && !wikiMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        wikiMenuRef.current &&
+        !wikiMenuRef.current.contains(target) &&
+        !wikiPopoverRef.current?.contains(target)
+      ) {
         setWikiMenuOpen(false);
       }
     };
@@ -486,7 +525,12 @@ export default function App() {
     if (!projectMenuOpen) return;
     refreshRecentProjects();
     const close = (e: MouseEvent) => {
-      if (projectMenuRef.current && !projectMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        projectMenuRef.current &&
+        !projectMenuRef.current.contains(target) &&
+        !projectPopoverRef.current?.contains(target)
+      ) {
         setProjectMenuOpen(false);
       }
     };
@@ -887,63 +931,72 @@ export default function App() {
           >
             <FolderIcon />
           </button>
-          {projectMenuOpen && (
-            <div className="agentz-project-popover" role="menu">
-              <button
-                type="button"
-                className="agentz-project-popover-pick"
-                role="menuitem"
-                onClick={() => {
-                  setProjectMenuOpen(false);
-                  void pickFolder();
-                }}
-              >
-                {t("app.chooseFolder")}
-              </button>
-              {recentProjects.length > 0 && (
-                <>
-                  <div className="agentz-project-popover-divider" />
-                  <div className="agentz-project-popover-heading">{t("app.recentProjects")}</div>
-                  <div className="agentz-project-popover-list">
-                    {recentProjects.map((p) => {
-                      const isCurrent = Boolean(
-                        projectDir && normProjectPath(p.path) === normProjectPath(projectDir),
-                      );
-                      return (
-                        <div
-                          key={p.path}
-                          className={`agentz-project-popover-row ${isCurrent ? "active" : ""}`}
-                        >
-                          <button
-                            type="button"
-                            className="agentz-project-popover-item"
-                            role="menuitem"
-                            title={p.path}
-                            onClick={() => void openRecentProject(p.path)}
-                          >
-                            <strong>{p.name}</strong>
-                            <span>{p.path}</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="agentz-project-popover-remove"
-                            title={t("app.removeRecentProject")}
-                            aria-label={t("app.removeRecentProject")}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeRecentProject(p.path);
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+          {projectMenuOpen &&
+            (() => {
+              const node = (
+                <div
+                  ref={projectPopoverRef}
+                  className="agentz-project-popover is-fixed"
+                  role="menu"
+                  style={projectPopoverStyle}
+                >
+                  <button
+                    type="button"
+                    className="agentz-project-popover-pick"
+                    role="menuitem"
+                    onClick={() => {
+                      setProjectMenuOpen(false);
+                      void pickFolder();
+                    }}
+                  >
+                    {t("app.chooseFolder")}
+                  </button>
+                  {recentProjects.length > 0 && (
+                    <>
+                      <div className="agentz-project-popover-divider" />
+                      <div className="agentz-project-popover-heading">{t("app.recentProjects")}</div>
+                      <div className="agentz-project-popover-list">
+                        {recentProjects.map((p) => {
+                          const isCurrent = Boolean(
+                            projectDir && normProjectPath(p.path) === normProjectPath(projectDir),
+                          );
+                          return (
+                            <div
+                              key={p.path}
+                              className={`agentz-project-popover-row ${isCurrent ? "active" : ""}`}
+                            >
+                              <button
+                                type="button"
+                                className="agentz-project-popover-item"
+                                role="menuitem"
+                                title={p.path}
+                                onClick={() => void openRecentProject(p.path)}
+                              >
+                                <strong>{p.name}</strong>
+                                <span>{p.path}</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="agentz-project-popover-remove"
+                                title={t("app.removeRecentProject")}
+                                aria-label={t("app.removeRecentProject")}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeRecentProject(p.path);
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+              return canPortalToBody() ? createPortal(node, document.body) : node;
+            })()}
         </div>
 
         <span
@@ -1025,65 +1078,74 @@ export default function App() {
             >
               <WikiIcon />
             </button>
-            {wikiMenuOpen && (
-              <div className="agentz-wiki-popover" role="menu">
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setWikiMenuOpen(false);
-                    setCodeMapOpen(true);
-                  }}
-                >
-                  {t("agent.codeMapOpen")}
-                  <span>{t("agent.codeMapOpenHint")}</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => handleWikiAction("overview")}
-                >
-                  {t("agent.repoWikiOverview")}
-                  <span>{t("agent.repoWikiOverviewHint")}</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => handleWikiAction("deep")}
-                >
-                  {t("agent.repoWikiDeep")}
-                  <span>{t("agent.repoWikiDeepHint")}</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => handleWikiAction("memory")}
-                >
-                  {t("agent.repoWikiMemory")}
-                  <span>{t("agent.repoWikiMemoryHint")}</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={[
-                    graphIndexVisual === "indexing" ? "graph-indexing" : "",
-                    graphIndexVisual === "ready" ? "graph-ready" : "",
-                    graphIndexVisual === "error" ? "graph-error" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onClick={() => handleWikiAction("graph")}
-                >
-                  <span className="agentz-wiki-menu-row">
-                    {t("agent.repoWikiGraph")}
-                    {graphMenuStatusLabel && (
-                      <span className="agentz-wiki-graph-status">{graphMenuStatusLabel}</span>
-                    )}
-                  </span>
-                  <span>{t("agent.repoWikiGraphHint")}</span>
-                </button>
-              </div>
-            )}
+            {wikiMenuOpen &&
+              (() => {
+                const node = (
+                  <div
+                    ref={wikiPopoverRef}
+                    className="agentz-wiki-popover is-fixed"
+                    role="menu"
+                    style={wikiPopoverStyle}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setWikiMenuOpen(false);
+                        setCodeMapOpen(true);
+                      }}
+                    >
+                      {t("agent.codeMapOpen")}
+                      <span>{t("agent.codeMapOpenHint")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleWikiAction("overview")}
+                    >
+                      {t("agent.repoWikiOverview")}
+                      <span>{t("agent.repoWikiOverviewHint")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleWikiAction("deep")}
+                    >
+                      {t("agent.repoWikiDeep")}
+                      <span>{t("agent.repoWikiDeepHint")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleWikiAction("memory")}
+                    >
+                      {t("agent.repoWikiMemory")}
+                      <span>{t("agent.repoWikiMemoryHint")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={[
+                        graphIndexVisual === "indexing" ? "graph-indexing" : "",
+                        graphIndexVisual === "ready" ? "graph-ready" : "",
+                        graphIndexVisual === "error" ? "graph-error" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => handleWikiAction("graph")}
+                    >
+                      <span className="agentz-wiki-menu-row">
+                        {t("agent.repoWikiGraph")}
+                        {graphMenuStatusLabel && (
+                          <span className="agentz-wiki-graph-status">{graphMenuStatusLabel}</span>
+                        )}
+                      </span>
+                      <span>{t("agent.repoWikiGraphHint")}</span>
+                    </button>
+                  </div>
+                );
+                return canPortalToBody() ? createPortal(node, document.body) : node;
+              })()}
           </div>
           <div className="agentz-font-scale-menu" ref={fontScaleRef}>
             <button
@@ -1097,54 +1159,63 @@ export default function App() {
             >
               Aa
             </button>
-            {fontScaleOpen && (
-              <div className="agentz-font-scale-popover" role="menu">
-                {UI_FONT_SCALES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={fontScale === s}
-                    className={fontScale === s ? "active" : ""}
-                    onClick={() => {
-                      applyUiFontScale(s);
-                      setFontScale(s);
-                      setFontScaleOpen(false);
-                    }}
+            {fontScaleOpen &&
+              (() => {
+                const node = (
+                  <div
+                    ref={fontScalePopoverRef}
+                    className="agentz-font-scale-popover is-fixed"
+                    role="menu"
+                    style={fontScalePopoverStyle}
                   >
-                    {uiFontScaleLabel(s)}
-                  </button>
-                ))}
-                <div className="agentz-font-scale-divider" />
-                <div className="agentz-font-scale-editor-label">{t("app.editorFontSize")}</div>
-                <div className="agentz-font-scale-stepper">
-                  <button
-                    type="button"
-                    data-testid="editor-font-decrease"
-                    onClick={() => setEditorBaseFontSizeState(stepEditorBaseFontSize(-1))}
-                  >
-                    −
-                  </button>
-                  <button
-                    type="button"
-                    className="agentz-font-scale-readout"
-                    data-testid="editor-font-reset"
-                    onClick={() =>
-                      setEditorBaseFontSizeState(setEditorBaseFontSize(DEFAULT_EDITOR_FONT_SIZE))
-                    }
-                  >
-                    {getEffectiveEditorFontSize(fontScale, editorBaseFontSize)}px
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="editor-font-increase"
-                    onClick={() => setEditorBaseFontSizeState(stepEditorBaseFontSize(1))}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            )}
+                    {UI_FONT_SCALES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={fontScale === s}
+                        className={fontScale === s ? "active" : ""}
+                        onClick={() => {
+                          applyUiFontScale(s);
+                          setFontScale(s);
+                          setFontScaleOpen(false);
+                        }}
+                      >
+                        {uiFontScaleLabel(s)}
+                      </button>
+                    ))}
+                    <div className="agentz-font-scale-divider" />
+                    <div className="agentz-font-scale-editor-label">{t("app.editorFontSize")}</div>
+                    <div className="agentz-font-scale-stepper">
+                      <button
+                        type="button"
+                        data-testid="editor-font-decrease"
+                        onClick={() => setEditorBaseFontSizeState(stepEditorBaseFontSize(-1))}
+                      >
+                        −
+                      </button>
+                      <button
+                        type="button"
+                        className="agentz-font-scale-readout"
+                        data-testid="editor-font-reset"
+                        onClick={() =>
+                          setEditorBaseFontSizeState(setEditorBaseFontSize(DEFAULT_EDITOR_FONT_SIZE))
+                        }
+                      >
+                        {getEffectiveEditorFontSize(fontScale, editorBaseFontSize)}px
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="editor-font-increase"
+                        onClick={() => setEditorBaseFontSizeState(stepEditorBaseFontSize(1))}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+                return canPortalToBody() ? createPortal(node, document.body) : node;
+              })()}
           </div>
           <button
             type="button"

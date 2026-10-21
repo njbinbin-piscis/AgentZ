@@ -1,5 +1,6 @@
 .agentz-remote-dialog {
-  width: min(560px, 92vw);
+  width: min(560px, calc(92vw / var(--ui-font-scale, 1)), 100%);
+  max-height: min(calc(84vh / var(--ui-font-scale, 1)), 100%);
 }
 
 .agentz-remote-dialog input {
@@ -95,7 +96,7 @@
 }
 
 .agentz-remote-dirs {
-  max-height: 45vh;
+  max-height: calc(45vh / var(--ui-font-scale, 1));
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 8px;

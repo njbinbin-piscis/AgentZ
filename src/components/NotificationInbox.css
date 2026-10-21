@@ -1,9 +1,10 @@
 .agentz-notification-inbox { position: relative; }
 .agentz-notification-count { position: absolute; top: 0; right: 0; min-width: 15px; height: 15px; border-radius: 8px; background: var(--accent, #7466e6); color: white; font-size: 10px; line-height: 15px; }
-.agentz-notification-popover { position: absolute; right: 0; top: 34px; z-index: 10060; width: min(360px, 90vw); max-height: 420px; overflow: auto; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); box-shadow: 0 12px 32px #0004; }
-.agentz-notification-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.agentz-notification-heading button { color: var(--text); }
-.agentz-notification-row { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 9px; text-align: left; color: var(--text); border: 0; border-radius: 6px; background: transparent; }
+.agentz-notification-popover { position: absolute; right: 0; top: 34px; z-index: 100100; width: min(360px, calc(90vw / var(--ui-font-scale, 1))); max-height: min(420px, calc(100vh / var(--ui-font-scale, 1) - 56px)); overflow: auto; padding: calc(12px * var(--ui-font-scale, 1)); box-sizing: border-box; font-size: calc(12px * var(--ui-font-scale, 1)); border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); box-shadow: 0 12px 32px #0004; }
+.agentz-notification-popover.is-fixed { position: fixed; top: auto; bottom: auto; left: auto; right: auto; width: auto; }
+.agentz-notification-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: calc(13px * var(--ui-font-scale, 1)); }
+.agentz-notification-heading button { color: var(--text); font-size: calc(12px * var(--ui-font-scale, 1)); }
+.agentz-notification-row { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: calc(9px * var(--ui-font-scale, 1)); text-align: left; color: var(--text); font-size: calc(12px * var(--ui-font-scale, 1)); border: 0; border-radius: 6px; background: transparent; }
 .agentz-notification-row:hover { background: var(--bg-elev-2); }
-.agentz-notification-row small { color: var(--text-dim); }
+.agentz-notification-row small { color: var(--text-dim); font-size: calc(11px * var(--ui-font-scale, 1)); }
 .agentz-notification-unread { font-weight: 700; }

@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { isBrowserTab } from "./browserTab";
 import { extensionService } from "../../extensions/extensionService";
 import { useExtensionUi } from "../../extensions/ui/useExtensionUi";
+import { canPortalToBody, useContextMenuPosition } from "../../utils/popupPosition";
 import type { OpenTab } from "./types";
 
 interface TabContextMenu {
@@ -43,6 +45,8 @@ export default function EditorTabs({
   const { t } = useTranslation();
   const { running: extRunning } = useExtensionUi();
   const tabsRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuStyle = useContextMenuPosition(contextMenu, menuRef);
   const titleActions = extRunning ? extensionService.listEditorTitleActions(activeTabPath) : [];
 
   useEffect(() => {
@@ -123,70 +127,70 @@ export default function EditorTabs({
         )}
       </div>
 
-      {contextMenu && (
-        <div
-          className="ide-tab-context-menu"
-          style={{
-            position: "fixed",
-            left: contextMenu.x,
-            top: contextMenu.y,
-            zIndex: 1000,
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={runMenuAction(() => {
-              if (ctxTarget) onTabClose(ctxTarget.path);
-            })}
-          >
-            {t("ide.closeCurrent") || "Close"}
-          </button>
-          {onCloseOther && (
-            <button
-              type="button"
-              onClick={runMenuAction(() => {
-                if (ctxTarget) onCloseOther(ctxTarget.path);
-              })}
+      {contextMenu &&
+        (() => {
+          const menuNode = (
+            <div
+              ref={menuRef}
+              className="ide-tab-context-menu"
+              style={menuStyle}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
-              {t("ide.closeOther") || "Close Others"}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={runMenuAction(() => onCloseAll?.())}
-          >
-            {t("ide.closeAll") || "Close All"}
-          </button>
-          <div className="ide-tab-context-separator" />
-          <button
-            type="button"
-            onClick={runMenuAction(() => {
-              if (ctxTarget) onSave?.(ctxTarget.path);
-            })}
-            disabled={!ctxTarget?.isDirty}
-          >
-            {t("ide.saveFile") || "Save"}
-          </button>
-          {onReloadFromDisk && ctxTarget && !isBrowserTab(ctxTarget.path) && (
-            <button
-              type="button"
-              onClick={runMenuAction(() => onReloadFromDisk(ctxTarget.path))}
-            >
-              {t("ide.reloadFromDisk") || "Reload from Disk"}
-            </button>
-          )}
-          <div className="ide-tab-context-separator" />
-          <button
-            type="button"
-            onClick={runMenuAction(() => onCloseSaved?.())}
-            disabled={!hasSavedTabs}
-          >
-            {t("ide.closeSaved") || "Close Saved"}
-          </button>
-        </div>
-      )}
+              <button
+                type="button"
+                onClick={runMenuAction(() => {
+                  if (ctxTarget) onTabClose(ctxTarget.path);
+                })}
+              >
+                {t("ide.closeCurrent") || "Close"}
+              </button>
+              {onCloseOther && (
+                <button
+                  type="button"
+                  onClick={runMenuAction(() => {
+                    if (ctxTarget) onCloseOther(ctxTarget.path);
+                  })}
+                >
+                  {t("ide.closeOther") || "Close Others"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={runMenuAction(() => onCloseAll?.())}
+              >
+                {t("ide.closeAll") || "Close All"}
+              </button>
+              <div className="ide-tab-context-separator" />
+              <button
+                type="button"
+                onClick={runMenuAction(() => {
+                  if (ctxTarget) onSave?.(ctxTarget.path);
+                })}
+                disabled={!ctxTarget?.isDirty}
+              >
+                {t("ide.saveFile") || "Save"}
+              </button>
+              {onReloadFromDisk && ctxTarget && !isBrowserTab(ctxTarget.path) && (
+                <button
+                  type="button"
+                  onClick={runMenuAction(() => onReloadFromDisk(ctxTarget.path))}
+                >
+                  {t("ide.reloadFromDisk") || "Reload from Disk"}
+                </button>
+              )}
+              <div className="ide-tab-context-separator" />
+              <button
+                type="button"
+                onClick={runMenuAction(() => onCloseSaved?.())}
+                disabled={!hasSavedTabs}
+              >
+                {t("ide.closeSaved") || "Close Saved"}
+              </button>
+            </div>
+          );
+          return canPortalToBody() ? createPortal(menuNode, document.body) : menuNode;
+        })()}
     </>
   );
 }

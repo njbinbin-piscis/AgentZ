@@ -7,14 +7,16 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+  box-sizing: border-box;
+  zoom: var(--ui-font-scale, 1);
 }
 
 .agentz-settings-panel {
   position: relative;
   z-index: 10001;
-  width: min(720px, 100%);
-  min-height: 320px;
-  max-height: min(85vh, 720px);
+  width: min(720px, calc(92vw / var(--ui-font-scale, 1)), 100%);
+  min-height: min(320px, 100%);
+  max-height: min(720px, calc(85vh / var(--ui-font-scale, 1)), 100%);
   display: flex;
   flex-direction: column;
   background: var(--bg-elev, #14141c);
@@ -27,8 +29,8 @@
 
 /* Workflow designer needs a much wider canvas — ~80% of the viewport. */
 .agentz-settings-panel.agentz-settings-panel--wide {
-  width: min(80vw, 1400px);
-  max-height: min(92vh, 960px);
+  width: min(1400px, calc(80vw / var(--ui-font-scale, 1)), 100%);
+  max-height: min(960px, calc(92vh / var(--ui-font-scale, 1)), 100%);
 }
 
 .agentz-settings-header {

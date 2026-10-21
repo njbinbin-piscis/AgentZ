@@ -10,8 +10,8 @@
 }
 
 .agentz-library {
-  width: min(960px, 100%);
-  max-height: min(88vh, 860px);
+  width: min(960px, calc(92vw / var(--ui-font-scale, 1)), 100%);
+  max-height: min(860px, calc(88vh / var(--ui-font-scale, 1)), 100%);
   display: flex;
   flex-direction: column;
   background: var(--bg-elev, #14141c);
@@ -22,8 +22,8 @@
 }
 
 .agentz-library.agentz-library--wide {
-  width: min(80vw, 1400px);
-  max-height: min(92vh, 960px);
+  width: min(1400px, calc(80vw / var(--ui-font-scale, 1)), 100%);
+  max-height: min(960px, calc(92vh / var(--ui-font-scale, 1)), 100%);
 }
 
 .agentz-library-head {

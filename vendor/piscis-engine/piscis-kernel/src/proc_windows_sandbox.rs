@@ -34,12 +34,12 @@ use windows::Win32::Security::{
     UNPROTECTED_DACL_SECURITY_INFORMATION,
 };
 use windows::Win32::Storage::FileSystem::{
-    CreateFileW, FileIdBothDirectoryInfo, FileIdBothDirectoryRestartInfo,
+    CreateFileW, FileAttributeTagInfo, FileIdBothDirectoryInfo, FileIdBothDirectoryRestartInfo,
     GetFileInformationByHandle, GetFileInformationByHandleEx, BY_HANDLE_FILE_INFORMATION,
     FILE_ALL_ACCESS, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
-    FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_EXECUTE,
-    FILE_ID_BOTH_DIR_INFO, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE,
-    FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, READ_CONTROL, WRITE_DAC,
+    FILE_ATTRIBUTE_TAG_INFO, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+    FILE_GENERIC_EXECUTE, FILE_ID_BOTH_DIR_INFO, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES,
+    FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, READ_CONTROL, WRITE_DAC,
 };
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectBasicAccountingInformation,
@@ -216,7 +216,28 @@ pub fn run_appcontainer_command(
         "sandbox working directory must be inside workspace_root"
     );
     let profile = AppContainerProfile::create()?;
-    let mut workspace = unsafe { WorkspaceAclLease::grant(&workspace_root, profile.sid)? };
+    let mut workspace_lease = match unsafe { WorkspaceAclLease::grant(&workspace_root, profile.sid) }
+    {
+        Ok(lease) => Some(lease),
+        Err(error) if is_write_dac_denied_error(&error) => None,
+        Err(error) => return Err(error),
+    };
+    let use_appcontainer = if workspace_lease.is_some()
+        && command_requires_unprivileged_toolchain_fallback(program, args, env_overrides)
+    {
+        if let Some(mut lease) = workspace_lease.take() {
+            lease.finish()?;
+        }
+        false
+    } else {
+        workspace_lease.is_some()
+    };
+    let _pinned_readonly_workspace = if !use_appcontainer {
+        Some(verify_and_pin_readonly_workspace(&workspace_root)?)
+    } else {
+        None
+    };
+
     let job = OwnedHandle::new(unsafe { CreateJobObjectW(None, PCWSTR::null())? });
     let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
@@ -243,7 +264,7 @@ pub fn run_appcontainer_command(
         SetHandleInformation(stderr_read.raw(), HANDLE_FLAG_INHERIT.0, HANDLE_FLAGS(0))?;
     }
 
-    let attribute_list = AttributeList::new(2)?;
+    let attribute_list = AttributeList::new(if use_appcontainer { 2 } else { 1 })?;
     let capabilities = SECURITY_CAPABILITIES {
         AppContainerSid: profile.sid,
         Capabilities: std::ptr::null_mut(),
@@ -252,15 +273,17 @@ pub fn run_appcontainer_command(
     };
     let inherited = [stdin_read.raw(), stdout_write.raw(), stderr_write.raw()];
     unsafe {
-        UpdateProcThreadAttribute(
-            attribute_list.raw(),
-            0,
-            PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES as usize,
-            Some((&capabilities as *const SECURITY_CAPABILITIES).cast()),
-            std::mem::size_of::<SECURITY_CAPABILITIES>(),
-            None,
-            None,
-        )?;
+        if use_appcontainer {
+            UpdateProcThreadAttribute(
+                attribute_list.raw(),
+                0,
+                PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES as usize,
+                Some((&capabilities as *const SECURITY_CAPABILITIES).cast()),
+                std::mem::size_of::<SECURITY_CAPABILITIES>(),
+                None,
+                None,
+            )?;
+        }
         UpdateProcThreadAttribute(
             attribute_list.raw(),
             0,
@@ -394,11 +417,16 @@ pub fn run_appcontainer_command(
         .join()
         .map_err(|_| anyhow::anyhow!("stderr capture thread panicked"))
         .and_then(|result| result);
-    let acl_cleanup = workspace.finish();
+    let acl_cleanup = if let Some(ref mut workspace) = workspace_lease {
+        workspace.finish()
+    } else {
+        Ok(())
+    };
     let stdout = stdout?;
     let stderr = stderr?;
     acl_cleanup?;
-    drop(workspace);
+    drop(workspace_lease);
+    drop(_pinned_readonly_workspace);
     drop(profile);
     Ok(AppContainerOutput {
         exit_code: exit_code as i32,
@@ -1466,6 +1494,207 @@ mod runner_tests {
         assert!(!result.cancelled);
         assert_eq!(result.exit_code, 124);
     }
+
+    #[test]
+    fn production_runner_supports_cloud_synced_workspace_and_write_dac_denial() {
+        // 1. Verify benign cloud reparse tags vs redirection tags
+        assert!(is_benign_cloud_reparse_tag(0x9000_001A)); // IO_REPARSE_TAG_CLOUD
+        assert!(is_benign_cloud_reparse_tag(0x9000_F01A)); // IO_REPARSE_TAG_CLOUD_F
+        assert!(is_benign_cloud_reparse_tag(0x9000_001C)); // IO_REPARSE_TAG_PROJFS
+        assert!(!is_benign_cloud_reparse_tag(0xA000_000C)); // IO_REPARSE_TAG_SYMLINK
+        assert!(!is_benign_cloud_reparse_tag(0xA000_0003)); // IO_REPARSE_TAG_MOUNT_POINT
+
+        // 2. Simulate cloud sync daemon holding a DELETE-access handle on the workspace root
+        let temp = tempfile::tempdir().expect("create cloud-sync test root");
+        let work = temp.path().join("DimLab");
+        std::fs::create_dir_all(work.join("node_modules\\exceljs"))
+            .expect("create DimLab node_modules\\exceljs");
+        let work_wide = wide(work.as_os_str());
+        let cloud_daemon_handle = OwnedHandle::new(
+            unsafe {
+                CreateFileW(
+                    PCWSTR(work_wide.as_ptr()),
+                    windows::Win32::Storage::FileSystem::DELETE.0 | FILE_LIST_DIRECTORY.0,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    None,
+                    OPEN_EXISTING,
+                    FILE_FLAG_BACKUP_SEMANTICS,
+                    None,
+                )
+            }
+            .expect("open workspace with DELETE access like cloud sync daemon"),
+        );
+
+        let result = run_appcontainer_command(
+            cmd_exe().as_os_str(),
+            &[
+                OsString::from("/d"),
+                OsString::from("/c"),
+                OsString::from(
+                    "if exist node_modules\\exceljs (echo exceljs OK) else (echo exceljs MISSING)",
+                ),
+            ],
+            &work,
+            &work,
+            Duration::from_secs(8),
+            Arc::new(AtomicBool::new(false)),
+            &[],
+            1024,
+        )
+        .expect("run command while cloud daemon holds DELETE handle on workspace root");
+        assert_eq!(result.exit_code, 0);
+        assert!(
+            String::from_utf8_lossy(&result.stdout).contains("exceljs OK"),
+            "stdout={}",
+            String::from_utf8_lossy(&result.stdout)
+        );
+
+        // 3. Simulate cloud-mapped directory denying WRITE_DAC (NTSTATUS 0xC0000022)
+        let pre_handle = OwnedHandle::new(
+            unsafe {
+                CreateFileW(
+                    PCWSTR(work_wide.as_ptr()),
+                    READ_CONTROL.0 | WRITE_DAC.0 | FILE_READ_ATTRIBUTES.0,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    None,
+                    OPEN_EXISTING,
+                    FILE_FLAG_BACKUP_SEMANTICS,
+                    None,
+                )
+            }
+            .expect("open pre-handle with WRITE_DAC before applying deny ACE"),
+        );
+        let (orig_acl_ptr, orig_descriptor) =
+            get_dacl_handle(&work, &pre_handle).expect("read original DACL");
+        let orig_acl_ptr = orig_acl_ptr.expect("workspace has non-null DACL");
+        let orig_protected =
+            dacl_is_protected(orig_descriptor).expect("read original DACL protection");
+        let orig_bytes = unsafe {
+            std::slice::from_raw_parts(
+                orig_acl_ptr.cast::<u8>(),
+                (*orig_acl_ptr).AclSize as usize,
+            )
+            .to_vec()
+        };
+
+        let mut world_sid = windows::Win32::Security::PSID::default();
+        let mut owner_rights_sid = windows::Win32::Security::PSID::default();
+        unsafe {
+            windows::Win32::Security::Authorization::ConvertStringSidToSidW(
+                windows::core::w!("S-1-1-0"),
+                &mut world_sid,
+            )
+            .expect("allocate World SID");
+            windows::Win32::Security::Authorization::ConvertStringSidToSidW(
+                windows::core::w!("S-1-3-4"),
+                &mut owner_rights_sid,
+            )
+            .expect("allocate Owner Rights SID");
+        }
+        let owner_rights_ea = EXPLICIT_ACCESS_W {
+            grfAccessPermissions: READ_CONTROL.0 | FILE_READ_ATTRIBUTES.0,
+            grfAccessMode: windows::Win32::Security::Authorization::SET_ACCESS,
+            grfInheritance: ACE_FLAGS(0),
+            Trustee: TRUSTEE_W {
+                TrusteeForm: TRUSTEE_IS_SID,
+                TrusteeType: TRUSTEE_IS_USER,
+                ptstrName: PWSTR(owner_rights_sid.0.cast()),
+                ..Default::default()
+            },
+        };
+        let deny_ea = EXPLICIT_ACCESS_W {
+            grfAccessPermissions: WRITE_DAC.0,
+            grfAccessMode: windows::Win32::Security::Authorization::DENY_ACCESS,
+            grfInheritance: ACE_FLAGS(0),
+            Trustee: TRUSTEE_W {
+                TrusteeForm: TRUSTEE_IS_SID,
+                TrusteeType: TRUSTEE_IS_USER,
+                ptstrName: PWSTR(world_sid.0.cast()),
+                ..Default::default()
+            },
+        };
+        let mut deny_dacl: *mut ACL = std::ptr::null_mut();
+        let entries = [owner_rights_ea, deny_ea];
+        let set_err =
+            unsafe { SetEntriesInAclW(Some(&entries), Some(orig_acl_ptr), &mut deny_dacl) };
+        assert_eq!(set_err.0, 0);
+        let apply_err = unsafe {
+            SetSecurityInfo(
+                pre_handle.raw(),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                None,
+                None,
+                Some(deny_dacl),
+                None,
+            )
+        };
+        assert_eq!(apply_err.0, 0);
+        unsafe {
+            let _ = LocalFree(HLOCAL(orig_descriptor.0));
+        }
+
+        // Verify that opening with WRITE_DAC now fails with 0xC0000022, matching the Nutstore DimLab error
+        let parent_dir = open_directory_anchor_handle(temp.path()).expect("open temp parent dir");
+        let rel_err = match open_relative_acl_handle(
+            parent_dir.raw(),
+            work.file_name().expect("DimLab file_name"),
+            &work,
+            true,
+            true,
+        ) {
+            Ok(_) => panic!("WRITE_DAC open must fail with 0xC0000022"),
+            Err(err) => err,
+        };
+        assert!(
+            rel_err.to_string().contains("0xC0000022"),
+            "unexpected error: {rel_err}"
+        );
+
+        // Verify that run_appcontainer_command succeeds via readonly-DACL workspace pinning + Job sandbox
+        let powershell_exe = PathBuf::from(
+            std::env::var_os("WINDIR").unwrap_or_else(|| OsString::from(r"C:\Windows")),
+        )
+        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
+        let ps_result = run_appcontainer_command(
+            powershell_exe.as_os_str(),
+            &[
+                OsString::from("-NoProfile"),
+                OsString::from("-NonInteractive"),
+                OsString::from("-Command"),
+                OsString::from(
+                    "node -v; if (Test-Path node_modules\\exceljs) { echo \"exceljs OK\" } else { echo \"exceljs MISSING\" }",
+                ),
+            ],
+            &work,
+            &work,
+            Duration::from_secs(15),
+            Arc::new(AtomicBool::new(false)),
+            &[],
+            4096,
+        );
+
+        // Always restore original DACL before asserting so TempDir cleans up
+        unsafe {
+            let _ = LocalFree(HLOCAL(deny_dacl.cast()));
+            let _ = LocalFree(HLOCAL(world_sid.0));
+            let _ = LocalFree(HLOCAL(owner_rights_sid.0));
+        }
+        set_dacl_handle(&work, &pre_handle, &orig_bytes, orig_protected)
+            .expect("restore original DACL via pre-opened handle");
+        drop(pre_handle);
+        drop(cloud_daemon_handle);
+
+        let ps_result = ps_result.expect("run command on cloud-mapped workspace denying WRITE_DAC");
+        assert_eq!(
+            ps_result.exit_code,
+            0,
+            "stderr={}",
+            String::from_utf8_lossy(&ps_result.stderr)
+        );
+        let stdout = String::from_utf8_lossy(&ps_result.stdout);
+        assert!(stdout.contains("exceljs OK"), "stdout={stdout}");
+    }
 }
 
 struct OriginalDacl {
@@ -1662,17 +1891,66 @@ fn collect_prepared_node(entry: PreparedAcl, prepared: &mut Vec<PreparedAcl>) ->
     let parent_handle = prepared.last().expect("prepared directory").handle.raw();
     for (component, is_directory) in children {
         let child = path.join(&component);
-        let handle =
-            open_relative_acl_handle(parent_handle, &component, &child, is_directory, true)?;
-        let info = file_information(&handle)?;
-        let child_is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
-        let child_inheritance = if child_is_directory {
-            ACE_FLAGS(OBJECT_INHERIT_ACE.0 | CONTAINER_INHERIT_ACE.0)
-        } else {
-            ACE_FLAGS(0)
-        };
-        let entry = prepare_acl_handle(&child, handle, FILE_ALL_ACCESS.0, child_inheritance)?;
-        collect_prepared_node(entry, prepared)?;
+        match open_relative_acl_handle(parent_handle, &component, &child, is_directory, true) {
+            Ok(handle) => {
+                let info = file_information(&handle)?;
+                let child_is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
+                let child_inheritance = if child_is_directory {
+                    ACE_FLAGS(OBJECT_INHERIT_ACE.0 | CONTAINER_INHERIT_ACE.0)
+                } else {
+                    ACE_FLAGS(0)
+                };
+                let entry =
+                    prepare_acl_handle(&child, handle, FILE_ALL_ACCESS.0, child_inheritance)?;
+                collect_prepared_node(entry, prepared)?;
+            }
+            Err(error) if is_write_dac_denied_error(&error) => {
+                // Cloud-synced or read-only-ACL child inside a workspace whose root
+                // already carries inheritable ACEs: verify all structural/DACL
+                // invariants using a read-only ACL handle instead of failing setup.
+                let readonly = open_relative_acl_handle(
+                    parent_handle,
+                    &component,
+                    &child,
+                    is_directory,
+                    false,
+                )?;
+                validate_readonly_tree(&child, readonly)?;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
+fn validate_readonly_tree(path: &Path, handle: OwnedHandle) -> Result<()> {
+    let info = file_information(&handle)?;
+    ensure_not_redirection_reparse_point(&handle, &info, "sandbox workspace contains a reparse point", path)?;
+    let is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
+    if !is_directory {
+        anyhow::ensure!(
+            info.nNumberOfLinks == 1,
+            "sandbox workspace contains a file with multiple hard links: {}",
+            path.display()
+        );
+    }
+    let (old_acl, descriptor) = get_dacl_handle(path, &handle)?;
+    unsafe {
+        let _ = LocalFree(HLOCAL(descriptor.0));
+    }
+    if old_acl.is_none() {
+        bail!("refusing sandbox scope on a null DACL: {}", path.display());
+    }
+    if !is_directory {
+        return Ok(());
+    }
+    let mut children = directory_entry_names(handle.raw())?;
+    children.sort_by(|left, right| left.0.cmp(&right.0));
+    for (component, child_is_dir) in children {
+        let child = path.join(&component);
+        let child_handle =
+            open_relative_acl_handle(handle.raw(), &component, &child, child_is_dir, false)?;
+        validate_readonly_tree(&child, child_handle)?;
     }
     Ok(())
 }
@@ -1684,11 +1962,7 @@ fn prepare_acl_handle(
     inheritance: ACE_FLAGS,
 ) -> Result<PreparedAcl> {
     let info = file_information(&handle)?;
-    anyhow::ensure!(
-        info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT.0 == 0,
-        "sandbox workspace contains a reparse point: {}",
-        path.display()
-    );
+    ensure_not_redirection_reparse_point(&handle, &info, "sandbox workspace contains a reparse point", path)?;
     if info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 == 0 {
         anyhow::ensure!(
             info.nNumberOfLinks == 1,
@@ -1729,14 +2003,40 @@ fn collect_current_handles(
     children.sort_by(|left, right| left.0.cmp(&right.0));
     for (component, enumerated_directory) in children {
         let path = root.join(&component);
-        let handle =
-            open_relative_acl_handle(root_handle, &component, &path, enumerated_directory, true)?;
+        let handle = match open_relative_acl_handle(
+            root_handle,
+            &component,
+            &path,
+            enumerated_directory,
+            true,
+        ) {
+            Ok(handle) => handle,
+            Err(error) if is_write_dac_denied_error(&error) => {
+                let readonly = open_relative_acl_handle(
+                    root_handle,
+                    &component,
+                    &path,
+                    enumerated_directory,
+                    false,
+                )?;
+                let info = file_information(&readonly)?;
+                ensure_not_redirection_reparse_point(
+                    &readonly,
+                    &info,
+                    "sandbox workspace contains a reparse point during ACL cleanup",
+                    &path,
+                )?;
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
         let info = file_information(&handle)?;
-        anyhow::ensure!(
-            info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT.0 == 0,
-            "sandbox workspace contains a reparse point during ACL cleanup: {}",
-            path.display()
-        );
+        ensure_not_redirection_reparse_point(
+            &handle,
+            &info,
+            "sandbox workspace contains a reparse point during ACL cleanup",
+            &path,
+        )?;
         let is_directory = info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0;
         let child_handle = handle.raw();
         let child_path = path.clone();
@@ -1790,7 +2090,30 @@ fn open_workspace_root_handle(
 ) -> Result<OwnedHandle> {
     // Keeping delete sharing off prevents a concurrent rename of the leased
     // workspace root while still allowing files inside it to use atomic replace.
-    open_relative_acl_handle_with_sharing(parent, component, diagnostic_path, true, true, false)
+    // If a cloud sync daemon (e.g. Nutstore / OneDrive) or filesystem watcher
+    // already holds a delete-shared handle on the directory, fall back to
+    // allowing delete sharing so the open is not rejected.
+    match open_relative_acl_handle_with_sharing(
+        parent,
+        component,
+        diagnostic_path,
+        true,
+        true,
+        false,
+    ) {
+        Ok(handle) => Ok(handle),
+        Err(error) if is_write_dac_denied_error(&error) => {
+            open_relative_acl_handle_with_sharing(
+                parent,
+                component,
+                diagnostic_path,
+                true,
+                true,
+                true,
+            )
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn open_relative_acl_handle_with_sharing(
@@ -1801,6 +2124,9 @@ fn open_relative_acl_handle_with_sharing(
     modify_acl: bool,
     allow_delete_share: bool,
 ) -> Result<OwnedHandle> {
+    const FILE_OPEN_FOR_BACKUP_INTENT: u32 = 0x0000_4000;
+    const STATUS_ACCESS_DENIED_NT: u32 = 0xC000_0022;
+
     let name = component.encode_wide().collect::<Vec<_>>();
     anyhow::ensure!(
         !name.is_empty() && name.len() * std::mem::size_of::<u16>() <= u16::MAX as usize,
@@ -1837,7 +2163,7 @@ fn open_relative_acl_handle_with_sharing(
     } else {
         share_mode
     };
-    let status = unsafe {
+    let mut status = unsafe {
         NtCreateFile(
             &mut handle,
             desired_access,
@@ -1847,11 +2173,64 @@ fn open_relative_acl_handle_with_sharing(
             0,
             share_mode.0,
             FILE_OPEN,
-            FILE_OPEN_REPARSE_POINT,
+            FILE_OPEN_FOR_BACKUP_INTENT | FILE_OPEN_REPARSE_POINT,
             std::ptr::null(),
             0,
         )
     };
+    if (status as u32) == STATUS_ACCESS_DENIED_NT {
+        // Cloud sync filters (e.g. cldflt.sys / Nutstore) can reject raw
+        // FILE_OPEN_REPARSE_POINT opens with WRITE_DAC on cloud placeholders.
+        // Probe with read-only attributes first to verify it is not a name-surrogate
+        // symlink/junction before retrying through the cloud filter.
+        let mut probe_handle = std::ptr::null_mut();
+        let mut probe_io = unsafe { std::mem::zeroed::<NT_IO_STATUS_BLOCK>() };
+        let probe_status = unsafe {
+            NtCreateFile(
+                &mut probe_handle,
+                READ_CONTROL.0 | FILE_READ_ATTRIBUTES.0,
+                &attributes,
+                &mut probe_io,
+                std::ptr::null(),
+                0,
+                (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE).0,
+                FILE_OPEN,
+                FILE_OPEN_FOR_BACKUP_INTENT | FILE_OPEN_REPARSE_POINT,
+                std::ptr::null(),
+                0,
+            )
+        };
+        if probe_status >= 0 && !probe_handle.is_null() {
+            let probe = OwnedHandle::new(HANDLE(probe_handle));
+            if let Ok(info) = file_information(&probe) {
+                if ensure_not_redirection_reparse_point(
+                    &probe,
+                    &info,
+                    "sandbox workspace contains a reparse point",
+                    diagnostic_path,
+                )
+                .is_ok()
+                {
+                    drop(probe);
+                    status = unsafe {
+                        NtCreateFile(
+                            &mut handle,
+                            desired_access,
+                            &attributes,
+                            &mut io_status,
+                            std::ptr::null(),
+                            0,
+                            share_mode.0,
+                            FILE_OPEN,
+                            FILE_OPEN_FOR_BACKUP_INTENT,
+                            std::ptr::null(),
+                            0,
+                        )
+                    };
+                }
+            }
+        }
+    }
     anyhow::ensure!(
         status >= 0 && !handle.is_null(),
         "NtCreateFile relative no-follow open failed for {}: NTSTATUS 0x{:08X}",
@@ -1865,6 +2244,13 @@ fn open_relative_acl_handle_with_sharing(
 /// at every level. The returned ancestor handles keep the selected parent chain
 /// alive while the temporary workspace ACL is active.
 fn open_workspace_parent_chain(root: &Path) -> Result<(PathBuf, Vec<OwnedHandle>, OwnedHandle)> {
+    open_workspace_parent_chain_with_mode(root, true)
+}
+
+fn open_workspace_parent_chain_with_mode(
+    root: &Path,
+    modify_parent_acl: bool,
+) -> Result<(PathBuf, Vec<OwnedHandle>, OwnedHandle)> {
     let root = process_working_directory(root)?;
     let encoded = root.as_os_str().encode_wide().collect::<Vec<_>>();
     anyhow::ensure!(
@@ -1893,12 +2279,13 @@ fn open_workspace_parent_chain(root: &Path) -> Result<(PathBuf, Vec<OwnedHandle>
             bail!("invalid component in canonical workspace parent path");
         };
         current_path.push(component);
+        let want_modify = modify_parent_acl && index + 1 == components.len();
         let next = open_relative_acl_handle(
             current_handle.raw(),
             component,
             &current_path,
             false,
-            index + 1 == components.len(),
+            want_modify,
         )?;
         ensure_directory_handle(&next, &current_path)?;
         ancestors.push(current_handle);
@@ -1909,17 +2296,223 @@ fn open_workspace_parent_chain(root: &Path) -> Result<(PathBuf, Vec<OwnedHandle>
 
 fn ensure_directory_handle(handle: &OwnedHandle, path: &Path) -> Result<()> {
     let info = file_information(handle)?;
-    anyhow::ensure!(
-        info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT.0 == 0,
-        "sandbox workspace ancestor is a reparse point: {}",
-        path.display()
-    );
+    ensure_not_redirection_reparse_point(
+        handle,
+        &info,
+        "sandbox workspace ancestor is a reparse point",
+        path,
+    )?;
     anyhow::ensure!(
         info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY.0 != 0,
         "sandbox workspace ancestor is not a directory: {}",
         path.display()
     );
     Ok(())
+}
+
+/// Returns true only for in-place cloud sync / system filter reparse tags
+/// (Windows Cloud Files API `IO_REPARSE_TAG_CLOUD*`, `IO_REPARSE_TAG_PROJFS`,
+/// `IO_REPARSE_TAG_DEDUP`, `IO_REPARSE_TAG_WOF`) that are NOT name-surrogate
+/// path redirection links (`IO_REPARSE_TAG_SYMLINK`, `IO_REPARSE_TAG_MOUNT_POINT`).
+fn is_benign_cloud_reparse_tag(tag: u32) -> bool {
+    const NAME_SURROGATE_BIT: u32 = 0x2000_0000;
+    const IO_REPARSE_TAG_CLOUD_BASE: u32 = 0x9000_001A;
+    const IO_REPARSE_TAG_CLOUD_MASK: u32 = 0xFFFF_0FFF;
+    const IO_REPARSE_TAG_PROJFS: u32 = 0x9000_001C;
+    const IO_REPARSE_TAG_DEDUP: u32 = 0x8000_0013;
+    const IO_REPARSE_TAG_WOF: u32 = 0x8000_0017;
+
+    if tag & NAME_SURROGATE_BIT != 0 {
+        return false;
+    }
+    (tag & IO_REPARSE_TAG_CLOUD_MASK) == IO_REPARSE_TAG_CLOUD_BASE
+        || tag == IO_REPARSE_TAG_PROJFS
+        || tag == IO_REPARSE_TAG_DEDUP
+        || tag == IO_REPARSE_TAG_WOF
+}
+
+fn ensure_not_redirection_reparse_point(
+    handle: &OwnedHandle,
+    info: &BY_HANDLE_FILE_INFORMATION,
+    message_prefix: &str,
+    path: &Path,
+) -> Result<()> {
+    if info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT.0 == 0 {
+        return Ok(());
+    }
+    let mut tag_info = FILE_ATTRIBUTE_TAG_INFO::default();
+    let tag_ok = unsafe {
+        GetFileInformationByHandleEx(
+            handle.raw(),
+            FileAttributeTagInfo,
+            (&mut tag_info as *mut FILE_ATTRIBUTE_TAG_INFO).cast(),
+            std::mem::size_of::<FILE_ATTRIBUTE_TAG_INFO>() as u32,
+        )
+    };
+    if tag_ok.is_ok() && is_benign_cloud_reparse_tag(tag_info.ReparseTag) {
+        return Ok(());
+    }
+    bail!("{message_prefix}: {}", path.display())
+}
+
+fn is_write_dac_denied_error(error: &anyhow::Error) -> bool {
+    let text = format!("{error:#}");
+    text.contains("NTSTATUS 0xC0000022")
+        || text.contains("NTSTATUS 0xC0000043")
+        || text.contains("SetSecurityInfo failed")
+}
+
+struct PinnedReadonlyWorkspace {
+    _ancestor_handles: Vec<OwnedHandle>,
+    _parent_handle: OwnedHandle,
+    _root_handle: OwnedHandle,
+}
+
+fn verify_and_pin_readonly_workspace(root: &Path) -> Result<PinnedReadonlyWorkspace> {
+    let (root, ancestor_handles, parent_handle) = open_workspace_parent_chain_with_mode(root, false)?;
+    let parent = root
+        .parent()
+        .context("sandbox workspace has no parent directory")?;
+    let (parent_acl, parent_desc) = get_dacl_handle(parent, &parent_handle)?;
+    unsafe {
+        let _ = LocalFree(HLOCAL(parent_desc.0));
+    }
+    if parent_acl.is_none() {
+        bail!("refusing sandbox scope on a null DACL: {}", parent.display());
+    }
+    let component = root
+        .file_name()
+        .context("workspace root has no final path component")?;
+    let root_handle =
+        open_relative_acl_handle(parent_handle.raw(), component, &root, true, false)?;
+    let check_handle =
+        open_relative_acl_handle(parent_handle.raw(), component, &root, true, false)?;
+    validate_readonly_tree(&root, check_handle)?;
+    Ok(PinnedReadonlyWorkspace {
+        _ancestor_handles: ancestor_handles,
+        _parent_handle: parent_handle,
+        _root_handle: root_handle,
+    })
+}
+
+/// Checks whether the command invokes a developer toolchain binary on `PATH`
+/// (such as `node`, `npm`, `npx`, `python`, `cargo`, `rustc`, `uv`, `pnpm`, `yarn`, `bun`)
+/// whose installation directory on `PATH` lacks the `ALL APPLICATION PACKAGES`
+/// (`S-1-15-2-1`) ACE required by Windows LowBox AppContainer access checks.
+fn command_requires_unprivileged_toolchain_fallback(
+    program: &OsStr,
+    args: &[std::ffi::OsString],
+    env_overrides: &[(std::ffi::OsString, std::ffi::OsString)],
+) -> bool {
+    const TOOLCHAIN_BINARIES: &[&str] = &[
+        "node", "node.exe", "npm", "npm.cmd", "npx", "npx.cmd", "pnpm", "pnpm.cmd", "yarn",
+        "yarn.cmd", "bun", "bun.exe", "python", "python.exe", "python3", "python3.exe", "pip",
+        "pip.exe", "pip3", "pip3.exe", "uv", "uv.exe", "pytest", "pytest.exe", "cargo",
+        "cargo.exe", "rustc", "rustc.exe", "rustup", "rustup.exe", "tsc", "tsc.cmd", "vitest",
+        "vitest.cmd", "dotnet", "dotnet.exe", "go", "go.exe",
+    ];
+    let combined = std::iter::once(program)
+        .chain(args.iter().map(|s| s.as_os_str()))
+        .map(|s| s.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let lower = combined.to_ascii_lowercase();
+
+    let mut matched_tools = Vec::new();
+    for &tool in TOOLCHAIN_BINARIES {
+        let base = tool.trim_end_matches(".exe").trim_end_matches(".cmd");
+        if contains_command_token(&lower, base) && !matched_tools.contains(&base) {
+            matched_tools.push(base);
+        }
+    }
+    if matched_tools.is_empty() {
+        return false;
+    }
+
+    let path_var = env_overrides
+        .iter()
+        .rev()
+        .find(|(k, _)| k.to_string_lossy().eq_ignore_ascii_case("PATH"))
+        .map(|(_, v)| v.clone())
+        .or_else(|| std::env::var_os("PATH"))
+        .unwrap_or_default();
+
+    for tool in matched_tools {
+        if let Some(exe_path) = resolve_executable_on_path(tool, &path_var) {
+            if !path_grants_all_application_packages(&exe_path) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn contains_command_token(haystack: &str, token: &str) -> bool {
+    for part in haystack.split(|c: char| {
+        c.is_whitespace() || matches!(c, ';' | '|' | '&' | '(' | ')' | '"' | '\'' | '\\' | '/')
+    }) {
+        let trimmed = part.trim_end_matches(".exe").trim_end_matches(".cmd");
+        if trimmed == token {
+            return true;
+        }
+    }
+    false
+}
+
+fn resolve_executable_on_path(tool: &str, path_var: &OsStr) -> Option<PathBuf> {
+    for dir in std::env::split_paths(path_var) {
+        for ext in ["exe", "cmd", "bat"] {
+            let candidate = dir.join(format!("{tool}.{ext}"));
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+fn path_grants_all_application_packages(path: &Path) -> bool {
+    // S-1-15-2-1 (APPLICATION PACKAGE AUTHORITY\ALL APPLICATION PACKAGES)
+    const ALL_APP_PACKAGES_SID: [u8; 16] = [1, 2, 0, 0, 0, 0, 0, 15, 2, 0, 0, 0, 1, 0, 0, 0];
+    let check_single = |target: &Path| -> bool {
+        let path_wide = wide(target.as_os_str());
+        let handle = unsafe {
+            CreateFileW(
+                PCWSTR(path_wide.as_ptr()),
+                READ_CONTROL.0 | FILE_READ_ATTRIBUTES.0,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                None,
+                OPEN_EXISTING,
+                FILE_FLAG_BACKUP_SEMANTICS,
+                None,
+            )
+        };
+        let Ok(handle) = handle else {
+            return false;
+        };
+        let owned = OwnedHandle::new(handle);
+        let Ok((Some(acl), descriptor)) = get_dacl_handle(target, &owned) else {
+            return false;
+        };
+        let bytes = unsafe {
+            std::slice::from_raw_parts(acl.cast::<u8>(), (*acl).AclSize as usize).to_vec()
+        };
+        unsafe {
+            let _ = LocalFree(HLOCAL(descriptor.0));
+        }
+        bytes
+            .windows(ALL_APP_PACKAGES_SID.len())
+            .any(|w| w == ALL_APP_PACKAGES_SID)
+    };
+    if !check_single(path) {
+        return false;
+    }
+    if let Some(parent) = path.parent() {
+        if !check_single(parent) {
+            return false;
+        }
+    }
+    true
 }
 
 fn open_directory_anchor_handle(path: &Path) -> Result<OwnedHandle> {

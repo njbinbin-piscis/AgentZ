@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-10-21
+
+### Fixed
+
+- **Windows sandbox (`shell` tool) failing with `NTSTATUS 0xC0000022` on cloud-synced directories (Nutstore / OneDrive / Cloud Files API) and developer toolchain binaries (`node.exe`, `python.exe`, `cargo.exe`)**:
+  - Added `FILE_OPEN_FOR_BACKUP_INTENT` (`0x00004000`) to `NtCreateFile` relative handle opens in `proc_windows_sandbox.rs`, and allowed `open_workspace_root_handle` to fall back to `FILE_SHARE_DELETE` when a cloud sync daemon holds a delete-shared handle on the workspace root.
+  - Added `FileAttributeTagInfo` inspection (`is_benign_cloud_reparse_tag` / `ensure_not_redirection_reparse_point`) so benign cloud sync reparse tags (`IO_REPARSE_TAG_CLOUD*`, `IO_REPARSE_TAG_PROJFS`, `IO_REPARSE_TAG_DEDUP`, `IO_REPARSE_TAG_WOF`) and cloud minifilters denying `FILE_OPEN_REPARSE_POINT` are permitted while symlink and mount-point redirections continue to fail closed.
+  - Added read-only DACL workspace pinning (`verify_and_pin_readonly_workspace`) and developer toolchain ACL detection (`command_requires_unprivileged_toolchain_fallback`) so workspaces where cloud-mapped folders deny `WRITE_DAC` (`0xC0000022`) or commands invoking `PATH` toolchains lacking `ALL APPLICATION PACKAGES` (`S-1-15-2-1`) execute inside a pinned, kill-on-close Windows Job Object after validating all workspace handle-chain, reparse-point, hard-link, and non-null DACL invariants.
+- **Popups, context menus, titlebar popovers, and modals clipped or off-screen under UI font scaling (`zoom: var(--ui-font-scale, 1)`)**:
+  - Unified viewport-aware positioning via `src/utils/popupPosition.ts` (`computeFixedPopupPosition` and `computeContextMenuPosition`), converting client coordinates into CSS zoom-normalized space and anchoring from `right` / `bottom` whenever a popup or context menu overflows the right or bottom window boundary.
+  - Portaled and clamped `TagMultiSelect`, `NotificationInbox`, `ChatComposer` `@`/`/` mention popups, `Titlebar` `Aa` / Workspace / Quick Start popovers, and all right-click context menus (`FileTree`, `EditorTabs`, `Terminal`, `ExtensionsPanel`), and normalized `max-height` / `max-width` across all modal overlays under UI zoom.
+
 ## [1.0.6] - 2026-10-21
 
 ### Fixed

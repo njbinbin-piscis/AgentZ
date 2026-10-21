@@ -5,14 +5,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
   background: rgba(0, 0, 0, 0.5);
 }
 
 .agentz-collab {
   display: flex;
   flex-direction: column;
-  width: min(960px, 92vw);
-  height: min(720px, 88vh);
+  width: min(960px, calc(92vw / var(--ui-font-scale, 1)), 100%);
+  height: min(720px, calc(88vh / var(--ui-font-scale, 1)), 100%);
   background: var(--bg, #0e0e14);
   border: 1px solid var(--border, #2a2a38);
   border-radius: 12px;

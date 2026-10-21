@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getProjectScope, useProjectScope } from "../services/tauri/projectScope";
 import { listNotifications, markNotificationRead, type InboxPage, type TaskNotice } from "../services/tauri/notificationInbox";
 import { pollReminders } from "../services/tauri/automationReminder";
 import { coalesce, FOCUS_REFRESH_GAP_MS } from "../utils/coalesce";
+import { canPortalToBody, useFixedPopupPosition } from "../utils/popupPosition";
 import "./NotificationInbox.css";
 
 interface Props {
@@ -20,8 +22,34 @@ export default function NotificationInbox({ projectDir, onOpenTask }: Props) {
   const [page, setPage] = useState<InboxPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const popoverStyle = useFixedPopupPosition(open, rootRef, popoverRef, "down", "text", {
+    align: "right",
+    minWidth: 280,
+    maxWidth: 360,
+    maxHeight: 420,
+  });
   useEffect(() => { setOpen(false); setPage(null); setError(null); }, [projectDir]);
   useEffect(() => { if (!scope) { setOpen(false); setPage(null); } }, [scope]);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!rootRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
   useEffect(() => {
     if (!projectDir || !scope) return;
     const handle = scope.handle;
@@ -75,12 +103,14 @@ export default function NotificationInbox({ projectDir, onOpenTask }: Props) {
   }
 
   if (!projectDir) return null;
-  return <div className="agentz-notification-inbox">
-    <button type="button" className="agentz-titlebar-icon" aria-label="Notifications" title="Notifications" aria-expanded={open}
-      onClick={() => { setOpen((wasOpen) => !wasOpen); if (!open) void refresh(); }}>
-      <span aria-hidden="true">✉</span>{page && page.unread_count > 0 && <span className="agentz-notification-count">{page.unread_count}</span>}
-    </button>
-    {open && <div className="agentz-notification-popover" role="region" aria-label="Notifications">
+  const popoverNode = open ? (
+    <div
+      ref={popoverRef}
+      className="agentz-notification-popover is-fixed"
+      role="region"
+      aria-label="Notifications"
+      style={popoverStyle}
+    >
       <div className="agentz-notification-heading"><strong>Notifications</strong><button type="button" onClick={() => void refresh()} disabled={busy}>Refresh</button></div>
       {error && <p role="alert">{error}</p>}
       {busy && !page && <p>Loading…</p>}
@@ -90,6 +120,13 @@ export default function NotificationInbox({ projectDir, onOpenTask }: Props) {
         <span className={item.read_ms === null ? "agentz-notification-unread" : ""}>{item.summary}</span>
         <small>{new Date(item.created_ms).toLocaleString()}</small>
       </button>)}
-    </div>}
+    </div>
+  ) : null;
+  return <div ref={rootRef} className="agentz-notification-inbox">
+    <button type="button" className="agentz-titlebar-icon" aria-label="Notifications" title="Notifications" aria-expanded={open}
+      onClick={() => { setOpen((wasOpen) => !wasOpen); if (!open) void refresh(); }}>
+      <span aria-hidden="true">✉</span>{page && page.unread_count > 0 && <span className="agentz-notification-count">{page.unread_count}</span>}
+    </button>
+    {popoverNode && (canPortalToBody() ? createPortal(popoverNode, document.body) : popoverNode)}
   </div>;
 }

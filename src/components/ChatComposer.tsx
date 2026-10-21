@@ -1,8 +1,10 @@
 import { type ReactNode, type RefObject, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { ComposerChip } from "./composerChips";
 import { chipDisplayLabel } from "./composerChips";
 import type { ChatAttachment, ChatMode } from "../services/tauri/chat";
+import { canPortalToBody, useFixedPopupPosition } from "../utils/popupPosition";
 import DropdownSelect, { DropdownMultiSelect, type DropdownOption } from "./DropdownSelect";
 import "./ChatComposer.css";
 
@@ -215,6 +217,16 @@ export default function ChatComposer({
   const canSend = canSendProp ?? Boolean(value.trim() || attachment || chips.length > 0);
   const locked = inputDisabled;
   const resizeFrameRef = useRef<number | null>(null);
+  const composerBoxRef = useRef<HTMLDivElement>(null);
+  const mentionWrapRef = useRef<HTMLDivElement>(null);
+  const mentionStyle = useFixedPopupPosition(
+    Boolean(mentionPopup),
+    composerBoxRef,
+    mentionWrapRef,
+    "up",
+    "field",
+    { maxHeight: 220, matchTriggerWidth: true, gap: 4 },
+  );
 
   useEffect(() => {
     const ta = textareaRef?.current;
@@ -240,6 +252,7 @@ export default function ChatComposer({
     <div className="agentz-composer-wrap">
       {modeNotice && <div className="agentz-mode-notice">{modeNotice}</div>}
       <div
+        ref={composerBoxRef}
         className={`agentz-composer${modeSelector?.chatMode === "plan" ? " is-plan" : ""}${busy ? " is-busy" : ""}${composerClassName ? ` ${composerClassName}` : ""}`}
       >
         {chips.length > 0 && (
@@ -309,7 +322,19 @@ export default function ChatComposer({
           </div>
         )}
 
-        {mentionPopup}
+        {mentionPopup &&
+          (() => {
+            const node = (
+              <div
+                ref={mentionWrapRef}
+                className="agentz-mention-popup-portal"
+                style={mentionStyle}
+              >
+                {mentionPopup}
+              </div>
+            );
+            return canPortalToBody() ? createPortal(node, document.body) : node;
+          })()}
 
         <textarea
           ref={textareaRef}

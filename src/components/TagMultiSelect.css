@@ -74,16 +74,25 @@
   left: 0;
   right: 0;
   top: calc(100% + 4px);
-  z-index: 200;
+  z-index: 100100;
   margin: 0;
   padding: 4px;
   list-style: none;
   overflow-y: auto;
   min-height: 52px;
+  box-sizing: border-box;
   background: var(--bg-elev, #14141c);
   border: 1px solid var(--border, #2a2a38);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.agentz-tag-ms-dropdown.is-fixed {
+  position: fixed;
+  top: auto;
+  bottom: auto;
+  left: auto;
+  right: auto;
 }
 
 .agentz-tag-ms-option {
@@ -92,16 +101,16 @@
   align-items: flex-start;
   gap: 2px;
   width: 100%;
-  min-height: 44px;
+  min-height: calc(44px * var(--ui-font-scale, 1));
   text-align: left;
   border: 0;
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: calc(6px * var(--ui-font-scale, 1)) calc(8px * var(--ui-font-scale, 1));
   box-sizing: border-box;
   background: transparent;
   color: var(--text, #e8e8f0);
   cursor: pointer;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-font-scale, 1));
 }
 
 .agentz-tag-ms-option:hover,
@@ -114,7 +123,7 @@
 }
 
 .agentz-tag-ms-option-hint {
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-font-scale, 1));
   color: var(--text-dim, #9a9ab0);
   line-height: 1.35;
   display: -webkit-box;
@@ -126,6 +135,6 @@
 .agentz-tag-ms-empty,
 .agentz-tag-ms-more {
   padding: 8px 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-font-scale, 1));
   color: var(--text-dim, #9a9ab0);
 }

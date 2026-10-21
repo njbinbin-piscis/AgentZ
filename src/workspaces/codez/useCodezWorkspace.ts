@@ -1259,16 +1259,23 @@ export function useCodezWorkspace({
   useEffect(() => {
     if (!fileTreeContextMenu) return;
     const dismiss = () => setFileTreeContextMenu(null);
+    const onScroll = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && typeof target.closest === "function" && target.closest(".ide-tab-context-menu")) {
+        return;
+      }
+      dismiss();
+    };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") dismiss(); };
     window.addEventListener("click", dismiss);
     window.addEventListener("contextmenu", dismiss);
     window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       window.removeEventListener("click", dismiss);
       window.removeEventListener("contextmenu", dismiss);
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [fileTreeContextMenu]);
 
@@ -1298,16 +1305,23 @@ export function useCodezWorkspace({
   useEffect(() => {
     if (!tabContextMenu) return;
     const dismiss = () => setTabContextMenu(null);
+    const onScroll = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && typeof target.closest === "function" && target.closest(".ide-tab-context-menu")) {
+        return;
+      }
+      dismiss();
+    };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") dismiss(); };
     window.addEventListener("click", dismiss);
     window.addEventListener("contextmenu", dismiss);
     window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       window.removeEventListener("click", dismiss);
       window.removeEventListener("contextmenu", dismiss);
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [tabContextMenu]);
 
