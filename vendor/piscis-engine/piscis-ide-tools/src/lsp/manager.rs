@@ -115,9 +115,9 @@ impl LspManager {
                 language_id: "python".into(),
                 name: "Python".into(),
                 extensions: vec![".py".into(), ".pyi".into()],
-                server_command: "pyright-langserver".into(),
-                server_args: vec!["--stdio".into()],
-                available: is_on_path("pyright-langserver"),
+                server_command: python_lsp_server().map(|(c, _)| c).unwrap_or_else(|| "pyright-langserver".into()),
+                server_args: python_lsp_server().map(|(_, a)| a).unwrap_or_else(|| vec!["--stdio".into()]),
+                available: python_lsp_server().is_some(),
             },
             LanguageSupport {
                 language_id: "cpp".into(),
@@ -203,9 +203,14 @@ impl LspManager {
         }
     }
 
-    /// Resolve a server executable: project-local `node_modules/.bin` first,
-    /// then `PATH`. Returns a path usable for spawning.
+    /// Resolve a server executable: absolute existing path first, then
+    /// project-local `node_modules/.bin`, then `PATH`. Returns a path usable
+    /// for spawning.
     pub fn resolve_command(cmd: &str, project_root: &str) -> Option<String> {
+        let cmd_path = std::path::Path::new(cmd);
+        if cmd_path.is_absolute() && cmd_path.is_file() {
+            return Some(cmd.to_string());
+        }
         let bin = std::path::Path::new(project_root)
             .join("node_modules")
             .join(".bin");
@@ -306,9 +311,15 @@ impl LspManager {
         let info = Self::server_info(language)
             .ok_or_else(|| format!("No available LSP server for language: {}", language))?;
 
-        // Allocate a TCP port for the WebSocket bridge
-        let port = pick_unused_port()
-            .ok_or_else(|| "Failed to allocate a TCP port for LSP bridge".to_string())?;
+        // Bind the TCP listener before returning so the WebSocket client can
+        // connect immediately without a bind race.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(|e| format!("Failed to bind a TCP port for LSP bridge: {}", e))?;
+        let port = listener
+            .local_addr()
+            .map_err(|e| format!("Failed to read bound LSP bridge port: {}", e))?
+            .port();
 
         info!(
             "Starting LSP server '{}' for {}/{} on port {}",
@@ -347,8 +358,8 @@ impl LspManager {
         let done = Arc::new(AtomicBool::new(false));
         let done_task = done.clone();
         tokio::spawn(async move {
-            if let Err(e) = crate::lsp::bridge::run_lsp_bridge(
-                port,
+            if let Err(e) = crate::lsp::bridge::run_lsp_bridge_with_listener(
+                listener,
                 stdin,
                 stdout,
                 stderr,
@@ -547,12 +558,122 @@ fn runs_ok(cmd: &str, arg: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Try to find an unused TCP port on localhost.
-fn pick_unused_port() -> Option<u16> {
-    use std::net::TcpListener;
-    // Let the OS assign a random free port
-    TcpListener::bind("127.0.0.1:0").ok().and_then(|l| {
-        l.local_addr().ok().map(|a| a.port())
-        // listener is dropped here, freeing the port
-    })
+/// Resolve an available Python LSP server:
+/// 1. Standalone CLI servers on PATH (`pyright-langserver`, `basedpyright-langserver`, `pylsp`, `jedi-language-server`)
+/// 2. Bundled `run-jedi-language-server.py` inside an installed `ms-python.python*` VS Code extension
+fn python_lsp_server() -> Option<(String, Vec<String>)> {
+    let cli_candidates: &[(&str, &[&str])] = &[
+        ("pyright-langserver", &["--stdio"]),
+        ("basedpyright-langserver", &["--stdio"]),
+        ("pylsp", &[]),
+        ("jedi-language-server", &[]),
+    ];
+    for (cmd, args) in cli_candidates {
+        if locate_executable(cmd).is_some() {
+            return Some((
+                (*cmd).to_string(),
+                args.iter().map(|s| (*s).to_string()).collect(),
+            ));
+        }
+    }
+
+    let python = locate_python_interpreter()?;
+    let script = find_bundled_jedi_script()?;
+    Some((python, vec![script]))
+}
+
+fn locate_python_interpreter() -> Option<String> {
+    for candidate in ["python", "python3"] {
+        if let Some(exe) = locate_executable(candidate) {
+            if runs_ok(&exe, "--version") {
+                return Some(exe);
+            }
+        }
+    }
+    #[cfg(windows)]
+    if let Some(local) = std::env::var_os("LOCALAPPDATA").map(std::path::PathBuf::from) {
+        let py_root = local.join("Programs").join("Python");
+        if let Ok(entries) = std::fs::read_dir(&py_root) {
+            let mut dirs: Vec<std::path::PathBuf> = entries
+                .filter_map(|e| e.ok().map(|e| e.path()))
+                .filter(|p| p.is_dir())
+                .collect();
+            dirs.sort();
+            dirs.reverse();
+            for dir in dirs {
+                let exe = dir.join("python.exe");
+                if exe.is_file() {
+                    let s = exe.to_string_lossy().to_string();
+                    if runs_ok(&s, "--version") {
+                        return Some(s);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_bundled_jedi_script() -> Option<String> {
+    use std::path::PathBuf;
+    let mut ext_roots: Vec<PathBuf> = Vec::new();
+    if let Some(cfg) = std::env::var_os("AGENTZ_CONFIG_DIR").map(PathBuf::from) {
+        ext_roots.push(cfg.join("extensions"));
+    }
+    if let Some(appdata) = std::env::var_os("APPDATA").map(PathBuf::from) {
+        ext_roots.push(appdata.join("com.agentz.desktop").join("extensions"));
+    }
+    if let Some(local) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+        ext_roots.push(local.join("com.agentz.desktop").join("extensions"));
+    }
+    if let Some(home) = std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .map(PathBuf::from)
+    {
+        ext_roots.push(
+            home.join(".config")
+                .join("com.agentz.desktop")
+                .join("extensions"),
+        );
+        ext_roots.push(
+            home.join("Library")
+                .join("Application Support")
+                .join("com.agentz.desktop")
+                .join("extensions"),
+        );
+        ext_roots.push(home.join(".vscode").join("extensions"));
+    }
+
+    for root in ext_roots {
+        let Ok(entries) = std::fs::read_dir(&root) else {
+            continue;
+        };
+        let mut folders: Vec<PathBuf> = entries
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| {
+                p.is_dir()
+                    && p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n.starts_with("ms-python.python"))
+            })
+            .collect();
+        folders.sort();
+        folders.reverse();
+        for folder in folders {
+            for candidate in [
+                folder
+                    .join("extension")
+                    .join("python_files")
+                    .join("run-jedi-language-server.py"),
+                folder
+                    .join("python_files")
+                    .join("run-jedi-language-server.py"),
+            ] {
+                if candidate.is_file() {
+                    return Some(candidate.to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+    None
 }

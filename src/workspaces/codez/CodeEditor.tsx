@@ -588,10 +588,14 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
   useEffect(() => {
     if (!monacoReady || !projectDir) return;
     const monaco = monacoRef.current;
-    const lang = tab.language || languageForFile(tab.path);
-    if (!monaco || !lang) return;
+    const lang = languageForFile(tab.path);
+    if (!monaco || !lang) {
+      setLspHealth("idle");
+      return;
+    }
 
     const fullPath = `${projectDir}/${tab.path}`;
+    const docLangId = monacoLanguageForFile(tab.path) || tab.language || lang;
     const generation = ++lspGenerationRef.current;
     let disposed = false;
     let registration: LspProvidersRegistration | null = null;
@@ -614,12 +618,20 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
         lspClientRef.current = handle.client;
         registration = registerLspProviders(monaco, handle.client, fullPath);
         lspRef.current = registration;
-        handle.client.openDocument(fullPath, lang, tabContentRef.current);
+        handle.client.openDocument(fullPath, docLangId, tabContentRef.current);
         // Pull diagnostics where supported; push diagnostics arrive anyway.
         void handle.client.requestDiagnostics(fullPath);
       })
       .catch((e) => {
-        if (!disposed && generation === lspGenerationRef.current) setLspHealth("unavailable");
+        if (!disposed && generation === lspGenerationRef.current) {
+          const msg = String(e ?? "");
+          const notInstalled =
+            msg.includes("No available LSP server") ||
+            msg.includes("unsupported language") ||
+            msg.includes("not installed") ||
+            msg.includes("LSP executable unavailable");
+          setLspHealth(notInstalled ? "idle" : "unavailable");
+        }
         // LSP server may not be installed — degrade silently.
         console.debug("[LSP] unavailable for", lang, ":", e);
       });

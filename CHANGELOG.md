@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-10-21
+
+### Fixed
+
+- **Editor language server stayed unavailable after opening a file**:
+  - The Monaco WebSocket bridge now forwards `initialize` to the real language server and reads stdout with `Content-Length` frames, so rust-analyzer and typescript-language-server complete the handshake.
+  - The bridge listener is bound before the port is returned, removing the race where the editor connected before the socket was listening.
+  - LSP sessions start only for languages with a backend server (`rust`, `typescript`, `python`, `cpp`). JSON, Markdown, and other syntax-only files no longer show “语言服务不可用”.
+  - Python falls back to the bundled Jedi language server inside an installed `ms-python.python` extension when `pyright-langserver` is not on `PATH`.
+
 ## [1.0.4] - 2026-10-21
 
 ### Fixed
