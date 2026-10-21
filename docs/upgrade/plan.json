@@ -901,27 +901,37 @@
             "severity": "P2",
             "conclusion_proposal": "preserve historical ledger status; qualify current verification separately"
           }
+        },
+        {
+          "at": "2026-10-21T08:07:40.558Z",
+          "note": "Correct 1.0.7 release guard and AZ-063 backup limits in current documentation",
+          "reeval": {
+            "verified_state": "historical_support_matrix_corrected_for_backup_limits_current_1_0_7",
+            "severity": "P2",
+            "conclusion_proposal": "Preserve the historical task status while treating the matrix as a dated engineering baseline, not current native support acceptance."
+          }
         }
       ],
       "reviewer": "Codex证据分类自检",
       "reeval": {
         "id": "AZ-005",
-        "claimed_status": "done",
-        "verified_state": "document_complete",
+        "verified_state": "historical_support_matrix_corrected_for_backup_limits_current_1_0_7",
         "severity": "P2",
-        "conclusion_proposal": "preserve historical ledger status; qualify current verification separately",
-        "implementation_state": "document_complete",
-        "finding": "支持矩阵限制跨平台；不是macOS/Linux实测。",
+        "finding": "The 1.0.0 support matrix now points to the current 1.0.7 release procedure and narrows its AZ-063 backup claim to local fixtures and operator-asserted offline capture. Native recovery and cross-platform support remain unverified.",
+        "conclusion_proposal": "Preserve the historical task status while treating the matrix as a dated engineering baseline, not current native support acceptance.",
+        "next_action": "Reconcile current support claims with actual native Windows and macOS/Linux journey evidence before broader roadmap acceptance.",
         "remaining_work": [
-          "同步当前版本与实际支持范围"
+          "Native Windows support receipts",
+          "macOS/Linux journey and credential receipts"
         ],
         "verification_gaps": [
-          "该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。"
+          "No current native cross-platform support matrix acceptance"
         ],
-        "next_action": "同步当前版本与实际支持范围",
-        "inspected_files": [],
-        "review_file": "docs/upgrade/evidence/reassessment-2026-10-13-core.json",
-        "recorded_at": "2026-10-13T07:54:37.644Z"
+        "evidence": [
+          "docs/upgrade/evidence/AZ-005-067-2026-10-21-doc-accuracy.md",
+          "docs/upgrade/evidence/AZ-005-support-matrix.md"
+        ],
+        "recorded_at": "2026-10-21T08:07:40.558Z"
       }
     },
     {
@@ -33447,30 +33457,40 @@
             "severity": "P1",
             "conclusion_proposal": "Keep pending until final support claims, extension compatibility and unified native documentation review are verified."
           }
+        },
+        {
+          "at": "2026-10-21T08:07:40.558Z",
+          "note": "Correct 1.0.7 release guard and AZ-063 backup limits in current documentation",
+          "reeval": {
+            "verified_state": "current_1_0_7_local_docs_and_release_guard_description_consistent_native_unverified",
+            "severity": "P1",
+            "conclusion_proposal": "Retain the historical status; do not infer signed installer, native recovery or cross-platform acceptance from local documentation checks."
+          }
         }
       ],
       "reviewer": "GateAuditor (ADR-006)",
       "reeval": {
         "id": "AZ-067",
-        "verified_state": "current_0_9_15_local_docs_consistent_native_unverified",
+        "verified_state": "current_1_0_7_local_docs_and_release_guard_description_consistent_native_unverified",
         "severity": "P1",
-        "finding": "The 0.9.15 source labels and candidate documentation pass the local version check. RELEASE.md accurately lists all recorded version-specific gate waivers through 0.9.15 and states that the publishing workflow does not invoke the local release gate. This does not establish installer or platform support acceptance.",
-        "conclusion_proposal": "Keep pending until final support claims, extension compatibility and unified native documentation review are verified.",
-        "next_action": "Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the frozen candidate.",
+        "finding": "The 1.0.7 source labels and candidate docs pass the local version check. RELEASE.md now correctly describes the release-readiness dependency and its local checks. The support matrix no longer claims native backup consistency from offline fixtures.",
+        "conclusion_proposal": "Retain the historical status; do not infer signed installer, native recovery or cross-platform acceptance from local documentation checks.",
+        "next_action": "Reconcile the support matrix with actual extension and macOS/Linux journeys, review frozen candidate docs and observe the release guard in a non-publishing CI rehearsal.",
         "remaining_work": [
           "Extension compatibility evidence",
           "macOS/Linux support evidence",
-          "Unified documentation review"
+          "Frozen-candidate documentation and CI rehearsal"
         ],
         "verification_gaps": [
-          "CI workflow not dispatched for this documentation correction",
+          "No GitHub Actions run of the readiness job",
           "No installation, signature or cross-platform acceptance"
         ],
         "evidence": [
+          "docs/upgrade/evidence/AZ-005-067-2026-10-21-doc-accuracy.md",
           "RELEASE.md",
-          "docs/upgrade/evidence/AZ-064-2026-10-18-0.9.15-state.md"
+          "docs/upgrade/evidence/AZ-005-support-matrix.md"
         ],
-        "recorded_at": "2026-10-18T09:18:44.958Z"
+        "recorded_at": "2026-10-21T08:07:40.558Z"
       },
       "gui_status": "waived:ADR-006"
     },

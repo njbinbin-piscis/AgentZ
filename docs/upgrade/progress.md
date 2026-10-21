@@ -1,6 +1,6 @@
 # AgentZ 实施进度
 
-更新时间：2026/10/21 16:27:31（Asia/Tokyo）；由台账自动生成。
+更新时间：2026/10/21 17:07:40（Asia/Tokyo）；由台账自动生成。
 
 任务：83；已验收：65；执行/评审：0；阻塞：0。
 
@@ -23,7 +23,7 @@ Gate通过：M0, M1, M2, M3, M4, M5, M6, M7, M8, M9, MB。
 - AZ-002 固定任务与环境身份契约：document_complete；下一步：审阅实际迁移与重开边界。
 - AZ-003 冻结审查复现与回归夹具：historical_baseline；下一步：按当前源码重新运行确认缺陷回归集。
 - AZ-004 建立成功率成本与性能基线：historical_limited_measurement；下一步：新版本重采样；真实桌面/复杂仓库任务另验收。
-- AZ-005 制定兼容支持与发布分层：document_complete；下一步：同步当前版本与实际支持范围。
+- AZ-005 制定兼容支持与发布分层：historical_support_matrix_corrected_for_backup_limits_current_1_0_7；下一步：Reconcile current support claims with actual native Windows and macOS/Linux journey evidence before broader roadmap acceptance.。
 - AZ-006 确定容量预算和可执行排期：document_complete；下一步：按当前剩余工作量重排依赖和容量。
 - AZ-007 持久化任务环境登记：bounded_source_review；下一步：当前精确版本登记/幂等/迁移测试。
 - AZ-008 后端解析并验证执行环境：bounded_source_review；下一步：复核全部执行入口require_binding传播并测丢失绑定。
@@ -85,7 +85,7 @@ Gate通过：M0, M1, M2, M3, M4, M5, M6, M7, M8, M9, MB。
 - AZ-064 签名、公证与安装器验收：release_workflow_guard_wired_locally_native_acceptance_unverified；下一步：Observe the guard in a non-publishing workflow rehearsal, then obtain signing identities and clean platform machines for signed install, startup, uninstall and rollback receipts before accepting AZ-064.。
 - AZ-065 可信更新与失败恢复：not_started；下一步：After protected backup and trusted signing, add authenticated channel/manifest/update checks plus interrupted download/install recovery and explicit schema compatibility refusal; test locally before service deployment.。
 - AZ-066 首次成功任务引导：first_task_project_tool_connection_guidance_local_checks_passed；下一步：Review first-task UI with real tool/environment failures; run five clean signed-build first-use journeys using an authorized model after upstream dependencies are accepted.。
-- AZ-067 同步支持文档与发布说明：current_0_9_15_local_docs_consistent_native_unverified；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the frozen candidate.。
+- AZ-067 同步支持文档与发布说明：current_1_0_7_local_docs_and_release_guard_description_consistent_native_unverified；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, review frozen candidate docs and observe the release guard in a non-publishing CI rehearsal.。
 - AZ-068 运行 Beta 与支持分流：local_beta_intake_prepared；下一步：After engineering prerequisites, obtain named owner, cohort and window; run actual authorized Beta and record triage outcomes.。
 - AZ-069 完成稳定版发布决策：not_started；下一步：Assemble explicit gate matrix after engineering/backup/signing/Beta dependencies; unresolvedP0/security/recovery gates cannot be accepted by missing evidence.。
 - AZ-070 成员任务环境与集成契约：partial；下一步：Add member environment and artifact/output provenance contracts under real task binding, explicit integration owner and conflict policy; build concurrent same-file/environment fixtures before team defaults.。

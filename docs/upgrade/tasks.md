@@ -75,8 +75,8 @@ Gate：passed；前置：无。
 - 关联审查：F12；风险：基线与团队容量未知；先确认口径再承诺日期。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
 - 阻塞：无；下一步：确认入口代码与基线，按scope交付并执行verification。
-- 当前复评：document_complete；结论：preserve historical ledger status; qualify current verification separately；下一步：同步当前版本与实际支持范围。
-- 复评剩余：同步当前版本与实际支持范围；验证缺口：该分项只做源码/历史证据阅读；本轮没有逐项重跑专属验收。。
+- 当前复评：historical_support_matrix_corrected_for_backup_limits_current_1_0_7；结论：Preserve the historical task status while treating the matrix as a dated engineering baseline, not current native support acceptance.；下一步：Reconcile current support claims with actual native Windows and macOS/Linux journey evidence before broader roadmap acceptance.。
+- 复评剩余：Native Windows support receipts；macOS/Linux journey and credential receipts；验证缺口：No current native cross-platform support matrix acceptance。
 - 证据：docs/upgrade/evidence/AZ-005-support-matrix.md。
 - 完成摘要：冻结预览Beta稳定版与已验证能力分类；复盘：编译和示例测试不冒充桌面或真实扩展验收。
 
@@ -1372,8 +1372,8 @@ Gate：passed；前置：M2, M3, M4, M5, M6, M7, MB。
 - 关联审查：F12；风险：需要证书、机器和Beta用户；明确外部阻塞，保留可恢复安装。
 - 回退：停止发行或更新渠道；按验证过的安装与数据恢复流程回退。
 - 阻塞：无；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the final candidate.。
-- 当前复评：current_0_9_15_local_docs_consistent_native_unverified；结论：Keep pending until final support claims, extension compatibility and unified native documentation review are verified.；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, then review all current docs and run the CI version check on the frozen candidate.。
-- 复评剩余：Extension compatibility evidence；macOS/Linux support evidence；Unified documentation review；验证缺口：CI workflow not dispatched for this documentation correction；No installation, signature or cross-platform acceptance。
+- 当前复评：current_1_0_7_local_docs_and_release_guard_description_consistent_native_unverified；结论：Retain the historical status; do not infer signed installer, native recovery or cross-platform acceptance from local documentation checks.；下一步：Reconcile the support matrix with actual extension and macOS/Linux journeys, review frozen candidate docs and observe the release guard in a non-publishing CI rehearsal.。
+- 复评剩余：Extension compatibility evidence；macOS/Linux support evidence；Frozen-candidate documentation and CI rehearsal；验证缺口：No GitHub Actions run of the readiness job；No installation, signature or cross-platform acceptance。
 - 证据：docs/upgrade/release-decision-1.0.0.md。
 - 完成摘要：Completed and verified in AgentZ 1.0.0 engineering baseline (ADR-006).；复盘：Verified by automated 1.0.0 test, bundle, and E2E gates (ADR-006).。
 
