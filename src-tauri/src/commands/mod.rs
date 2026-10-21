@@ -4,6 +4,7 @@ pub mod agent_task;
 pub mod agents;
 pub mod app_changes;
 pub mod automation_reminder;
+pub mod background;
 pub mod browser;
 pub mod chat;
 pub mod chat_events;

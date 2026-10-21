@@ -73,6 +73,14 @@ export default function DiagnosticsSection() {
               })}
             </p>
           )}
+          {preview.background_tasks && preview.background_tasks.total > 0 && (
+            <p data-testid="diagnostics-background-summary">
+              {t("settings.diagnosticsBackground", {
+                running: preview.background_tasks.running,
+                total: preview.background_tasks.total,
+              })}
+            </p>
+          )}
           <ul className="agentz-diagnostics-files">
             {preview.files.map((file) => (
               <li key={file.name}>

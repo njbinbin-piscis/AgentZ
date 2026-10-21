@@ -291,6 +291,7 @@ async fn dispatch_pool_attention(
         Some(attention.pool_id.clone()),
         false,
         None,
+        Some(piscis_kernel::background::shared_default_registry()),
     )
     .await
     .map_err(|e| e.to_string())?;

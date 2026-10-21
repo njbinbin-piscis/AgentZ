@@ -135,6 +135,7 @@ pub async fn run_agentz_turn(
     workz_pool_id: Option<String>,
     prefer_zh: bool,
     queued_run: Option<crate::runtime::durable_run::ManagedRun>,
+    background_registry: Option<Arc<piscis_kernel::background::BackgroundRegistry>>,
 ) -> Result<HeadlessCliResponse> {
     if clear_plan {
         return Err(anyhow!(
@@ -278,6 +279,7 @@ pub async fn run_agentz_turn(
         api_connector_allowlist,
         slash_tool_allowlist.clone(),
         budget_scope.clone(),
+        background_registry,
     );
 
     register_mcp_and_connector_tools(

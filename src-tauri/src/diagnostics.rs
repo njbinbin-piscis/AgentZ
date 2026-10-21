@@ -30,6 +30,27 @@ pub struct DiagnosticContextSummary {
     pub failure_count: usize,
 }
 
+/// Background-task summary attached to diagnostic exports so a support
+/// bundle shows what was running (builds/tests/dev servers) at export time.
+/// Labels are command lines the user's own agent started; no output or
+/// secrets are included.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct BackgroundDiagSummary {
+    pub running: usize,
+    pub total: usize,
+    pub tasks: Vec<BackgroundDiagTask>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BackgroundDiagTask {
+    pub id: String,
+    pub label: String,
+    pub status: String,
+    pub session_id: String,
+    pub exit_code: Option<i32>,
+    pub elapsed_ms: u64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct DiagnosticExportPreview {
     pub schema_version: u32,
@@ -38,6 +59,7 @@ pub struct DiagnosticExportPreview {
     pub total_bytes: u64,
     pub redaction_ready: bool,
     pub context_summary: DiagnosticContextSummary,
+    pub background_tasks: BackgroundDiagSummary,
 }
 
 #[derive(Debug, Serialize)]
@@ -65,6 +87,7 @@ struct DiagnosticManifest {
     failure_locators: Vec<DiagnosticFailureLocator>,
     locators_truncated: bool,
     context_summary: DiagnosticContextSummary,
+    background_tasks: BackgroundDiagSummary,
 }
 
 fn span_field(line: &str, key: &str) -> Option<String> {
@@ -350,6 +373,14 @@ pub fn preview_redacted_logs(
     config_dir: &Path,
     settings: &Value,
 ) -> Result<DiagnosticExportPreview, String> {
+    preview_redacted_logs_with_background(config_dir, settings, BackgroundDiagSummary::default())
+}
+
+pub fn preview_redacted_logs_with_background(
+    config_dir: &Path,
+    settings: &Value,
+    background_tasks: BackgroundDiagSummary,
+) -> Result<DiagnosticExportPreview, String> {
     let files = bounded_log_files(config_dir)?;
     export_secret_values(config_dir, settings)?;
     let total_bytes = files.iter().map(|(_, file)| file.bytes).sum();
@@ -386,10 +417,19 @@ pub fn preview_redacted_logs(
             latest_environment_id,
             failure_count,
         },
+        background_tasks,
     })
 }
 
 pub fn export_redacted_logs(config_dir: &Path, settings: &Value) -> Result<PathBuf, String> {
+    export_redacted_logs_with_background(config_dir, settings, BackgroundDiagSummary::default())
+}
+
+pub fn export_redacted_logs_with_background(
+    config_dir: &Path,
+    settings: &Value,
+    background_tasks: BackgroundDiagSummary,
+) -> Result<PathBuf, String> {
     let files = bounded_log_files(config_dir)?;
 
     let secrets = export_secret_values(config_dir, settings)?;
@@ -452,6 +492,7 @@ pub fn export_redacted_logs(config_dir: &Path, settings: &Value) -> Result<PathB
             latest_environment_id,
             failure_count,
         },
+        background_tasks,
     };
     let manifest_json =
         serde_json::to_string(&manifest).map_err(|e| format!("serialize manifest: {e}"))?;

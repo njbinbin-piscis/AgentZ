@@ -17,7 +17,10 @@ use tokio::time::timeout;
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 const MAX_OUTPUT_BYTES: usize = 100 * 1024;
 
-pub struct ProcessControlTool;
+#[derive(Default)]
+pub struct ProcessControlTool {
+    pub background_registry: Option<std::sync::Arc<crate::background::BackgroundRegistry>>,
+}
 
 #[async_trait]
 impl Tool for ProcessControlTool {
@@ -98,14 +101,14 @@ impl Tool for ProcessControlTool {
         matches!(input["action"].as_str(), Some("start") | Some("kill"))
     }
 
-    async fn call(&self, input: Value, _ctx: &ToolContext) -> Result<ToolResult> {
+    async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult> {
         let action = match input["action"].as_str() {
             Some(a) => a,
             None => return Ok(ToolResult::err("Missing required parameter: action")),
         };
 
         match action {
-            "start" => self.start_process(&input).await,
+            "start" => self.start_process(&input, ctx).await,
             "kill" => self.kill_process(&input).await,
             "is_running" => self.is_running(&input).await,
             "list" => self.list_processes(&input).await,
@@ -116,7 +119,7 @@ impl Tool for ProcessControlTool {
 }
 
 impl ProcessControlTool {
-    async fn start_process(&self, input: &Value) -> Result<ToolResult> {
+    async fn start_process(&self, input: &Value, ctx: &ToolContext) -> Result<ToolResult> {
         let path = match input["path"].as_str() {
             Some(p) => p,
             None => return Ok(ToolResult::err("start requires 'path' parameter")),
@@ -178,14 +181,47 @@ impl ProcessControlTool {
                     Ok(ToolResult::ok(parts.join("\n\n")))
                 }
             }
+        } else if let Some(registry) = &self.background_registry {
+            // Managed background launch: registered, output captured, bound
+            // to this session, stoppable via process_kill. (The old bare
+            // spawn dropped the handle and lost the process entirely.)
+            let params = super::background_process::parse_bg_params(input);
+            let label = format!("{path} {}", args.join(" ")).trim().to_string();
+            let spec = super::background_process::bg_spec(
+                ctx,
+                label.chars().take(200).collect(),
+                input["cwd"].as_str().unwrap_or_default().to_string(),
+                &params,
+            );
+            match registry.create(spec) {
+                Ok(entry) => {
+                    let mut std_cmd = std::process::Command::new(path);
+                    std_cmd.args(&args);
+                    if let Some(cwd) = input["cwd"].as_str() {
+                        std_cmd.current_dir(cwd);
+                    }
+                    super::background_process::spawn_std_detached(
+                        registry,
+                        entry.clone(),
+                        std_cmd,
+                    );
+                    Ok(super::background_process::detached_result(
+                        &entry, true, &[], &[],
+                    ))
+                }
+                Err(e) => Ok(ToolResult::err(format!(
+                    "Failed to register background process: {e}"
+                ))),
+            }
         } else {
-            // Launch in background, return PID
+            // No registry configured by this host: keep the legacy bare
+            // launch (PID only, untracked) rather than failing outright.
             cmd.stdout(Stdio::null()).stderr(Stdio::null());
             match cmd.spawn() {
                 Ok(child) => {
                     let pid = child.id().unwrap_or(0);
                     Ok(ToolResult::ok(format!(
-                        "Process started in background.\nPID: {}\nPath: {}",
+                        "Process started in background (untracked: no background registry configured).\nPID: {}\nPath: {}",
                         pid, path
                     )))
                 }

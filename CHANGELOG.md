@@ -5,6 +5,23 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10] - 2026-10-22
+
+### Added
+
+- **Background long tasks**: `shell` / `code_run` accept `background=true` (plus `notify_on`, `ready_port`, `ready_log` readiness conditions). Tasks are hosted by a kernel `BackgroundProcessRegistry` (Windows keeps the existing sandbox strength and Job process-tree semantics), stream into a capped ring buffer plus `.agentz/logs/bg/<bg_id>.log`, and are driven with the new `process_wait` (host-side blocking wait for exit/readiness), `process_output` (cursor-based incremental reads) and `process_kill` (confirmed whole-tree termination) tools. When a task finishes or becomes ready, the host automatically resumes the originating session with the result (parked while busy, deduplicated, capped at 6 consecutive auto-resumes per session). CodeZ gains a background-task panel with output/kill/session-jump, session and WorkZ rows show background-running badges, the IDE status bar shows a project background count, and diagnostic exports include a background-task summary.
+- **Real parallel sessions in CodeZ**: running state, send queues and stop are now tracked per session (`sessionTurnBookkeeping`), so multiple sessions can run at once without queue or stream cross-talk, and each session row shows a live status LED.
+
+### Changed
+
+- **Foreground `shell` / `code_run` timeout now detaches to the background instead of killing the process**; the tool returns a `bg_id` and the agent decides whether to wait (`process_wait`) or continue other work.
+- **`process_control` background starts are now managed**: `start` with `wait=false` registers the process (output capture, session binding, whole-tree kill) instead of a bare untracked spawn.
+- Background tasks do not survive app restarts (Job ownership); on startup previously running tasks are marked `interrupted` while parked continuations are re-dispatched once. Per-project background concurrency defaults to 4 (`AGENTZ_BG_MAX_PER_WORKSPACE`), single-task runtime cap defaults to 3600s (`AGENTZ_BG_MAX_RUNTIME_SECS`). On non-Windows platforms foreground commands remain refused without an OS sandbox, while `background=true` runs managed via `/bin/sh -c` (setsid process group).
+
+### Fixed
+
+- WorkZ: viewing a background-running session now clears its busy state and reloads history when that session's turn finishes elsewhere.
+
 ## [1.0.9] - 2026-10-21
 
 ### Changed

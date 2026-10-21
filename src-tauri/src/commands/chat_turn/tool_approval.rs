@@ -404,6 +404,7 @@ pub(super) fn build_tool_registry(
     api_connector_allowlist: Option<Vec<String>>,
     slash_tool_allowlist: Option<Vec<String>>,
     budget_scope: crate::runtime::task_budget::BudgetScope,
+    background_registry: Option<Arc<piscis_kernel::background::BackgroundRegistry>>,
 ) -> ToolRegistry {
     let mut builtin_tool_enabled = None;
     if chat_mode == "plan" {
@@ -458,6 +459,7 @@ pub(super) fn build_tool_registry(
         pool_event_sink,
         subagent_runtime,
         coordinator_config: Default::default(),
+        background_registry,
     };
     let db_for_delegate = cfg.db.clone();
     let settings_for_delegate = cfg.settings.clone();
@@ -666,6 +668,7 @@ fn build_subagent_registry(
         None,
         None,
         crate::runtime::task_budget::BudgetScope::default(),
+        Some(piscis_kernel::background::shared_default_registry()),
     )
 }
 

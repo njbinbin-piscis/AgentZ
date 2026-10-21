@@ -5030,7 +5030,7 @@ mod tests {
             ),
         );
         let mut registry = ToolRegistry::new();
-        registry.register(Box::new(crate::tools::shell::ShellTool));
+        registry.register(Box::new(crate::tools::shell::ShellTool::default()));
         agent.registry = Arc::new(registry);
 
         let cancel = Arc::new(AtomicBool::new(false));
@@ -5087,7 +5087,7 @@ mod tests {
             ),
         );
         let mut registry = ToolRegistry::new();
-        registry.register(Box::new(crate::tools::code_run::CodeRunTool));
+        registry.register(Box::new(crate::tools::code_run::CodeRunTool::default()));
         agent.registry = Arc::new(registry);
 
         let cancel = Arc::new(AtomicBool::new(false));

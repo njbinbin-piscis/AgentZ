@@ -9,6 +9,7 @@ import WorkzSidebar from "./WorkzSidebar";
 import WorkzMessageStream from "./WorkzMessageStream";
 import WorkzComposerBar from "./WorkzComposerBar";
 import { useWorkzSessionStore, type WikiBuildAction } from "./useWorkzSessionStore";
+import { useBackgroundTasks } from "../../hooks/useBackgroundTasks";
 import type { LibraryInitialState } from "../codez/resources/types";
 import "./Agent.css";
 
@@ -41,6 +42,8 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
   } = props;
 
   const s = useWorkzSessionStore(props);
+  const bg = useBackgroundTasks(props.projectDir);
+  const mergedRunningIds = [...new Set([...s.runningIds, ...bg.runningSessionIds])];
 
   return (
     <div className="agentz-agent" ref={s.panelRef}>
@@ -59,7 +62,7 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
           groupErrors={s.groupErrors}
           collapsed={s.collapsed}
           selectedId={s.selectedId}
-          runningIds={s.runningIds}
+          runningIds={mergedRunningIds}
           onToggle={s.toggleGroup}
           onOpenSession={s.openSession}
           onNewSession={s.newSessionIn}

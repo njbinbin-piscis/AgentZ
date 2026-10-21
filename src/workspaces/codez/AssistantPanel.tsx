@@ -1,10 +1,11 @@
-import { chatCancel } from "../../services/tauri/chat";
 import type { PickedElement } from "../../services/tauri/browser";
 import type { ChatAttachment } from "../../services/tauri/chat";
 import ChatComposer from "../../components/ChatComposer";
 import TaskPanel from "../../components/TaskPanel";
 import ContextUsageRing from "../../components/ContextUsageRing";
 import AssistantMessageList from "./AssistantMessageList";
+import BackgroundTasksPanel from "./BackgroundTasksPanel";
+import { useBackgroundTasks } from "../../hooks/useBackgroundTasks";
 import { useAssistantSession } from "./useAssistantSession";
 import "./AssistantPanel.css";
 
@@ -26,6 +27,7 @@ export interface AssistantPanelProps {
 export default function AssistantPanel(props: AssistantPanelProps) {
   const { projectDir, onOpenFolder } = props;
   const s = useAssistantSession(props);
+  const bg = useBackgroundTasks(projectDir);
 
   return (
     <div className="agentz-assistant" ref={s.panelRef}>
@@ -72,6 +74,16 @@ export default function AssistantPanel(props: AssistantPanelProps) {
               className={`agentz-session-row ${sess.id === s.sessionRef.current ? "active" : ""}`}
               onClick={() => void s.switchSession(sess.id, sess.source)}
             >
+              <span
+                className={`agentz-session-dot ${
+                  s.runningIds.includes(sess.id) || bg.runningSessionIds.includes(sess.id)
+                    ? "running"
+                    : // Persisted `running` without a live turn is stale; never pulse on it.
+                      sess.status === "running"
+                      ? "idle"
+                      : sess.status
+                }`}
+              />
               <span className="agentz-session-title">
                 {sess.title || s.t("chat.untitled")}
               </span>
@@ -90,6 +102,16 @@ export default function AssistantPanel(props: AssistantPanelProps) {
           ))}
         </div>
       )}
+
+      <BackgroundTasksPanel
+        tasks={bg.tasks}
+        currentSessionId={s.sessionRef.current}
+        onKill={(id) => void bg.kill(id)}
+        onOpenSession={(id) => {
+          const meta = s.sessions.find((x) => x.id === id);
+          void s.switchSession(id, meta?.source);
+        }}
+      />
 
       <TaskPanel
         planItems={s.planItems}
@@ -180,7 +202,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         value={s.input}
         onChange={s.onInputChange}
         onSubmit={s.submit}
-        onStop={() => void chatCancel()}
+        onStop={s.stopCurrent}
         busy={s.busy}
         placeholder={s.inputPlaceholder}
         canSend={s.canSend}

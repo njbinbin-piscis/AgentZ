@@ -51,6 +51,11 @@ pub struct AppState {
     /// submissions wait here until a permit frees up, so a flood of parallel
     /// tasks degrades gracefully instead of starving the machine.
     pub agent_slots: Arc<Semaphore>,
+    /// Registered background processes (builds, tests, dev servers) shared
+    /// into every turn's tool registry; survives individual turns.
+    pub background_runs: Arc<piscis_kernel::background::BackgroundRegistry>,
+    /// Turns background-task completions into session continuations.
+    pub bg_hub: Arc<crate::runtime::background_continuation::BgContinuationHub>,
     /// Per-session plan todo list state for `plan_todo`.
     pub plan_state: PlanStore,
     /// Pending `chat_ui` / `chat_ui_listen` response channels keyed by request id.
@@ -183,6 +188,10 @@ impl AppState {
             chat_cancel: Arc::new(Mutex::new(None)),
             task_cancel: Arc::new(Mutex::new(HashMap::new())),
             agent_slots: Arc::new(Semaphore::new(agent_concurrency())),
+            background_runs: Arc::new(piscis_kernel::background::BackgroundRegistry::new()),
+            bg_hub: Arc::new(
+                crate::runtime::background_continuation::BgContinuationHub::new(),
+            ),
             plan_state: new_plan_store(),
             interactive_responses: Arc::new(Mutex::new(HashMap::new())),
             permission_responses: Arc::new(Mutex::new(HashMap::new())),

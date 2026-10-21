@@ -7,6 +7,7 @@ import { describeRemoteDir } from "../../extensions/remoteTargets";
 import { useRemotePortWatch } from "../../extensions/remotePorts";
 import { onChatEvent, type AgentEvent, type ChatEventEnvelope } from "../../services/tauri/chat";
 import { useAppSettings } from "../../hooks/useAppSettings";
+import { useBackgroundTasks } from "../../hooks/useBackgroundTasks";
 import { loadScopedModelId, saveScopedModelId } from "../../utils/modelPrefs";
 import type { BottomTab } from "./BottomPanel";
 
@@ -95,6 +96,7 @@ export function formatCompactTokens(tokens: number): string {
  */
 export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions, onOpenRemote }: IdeStatusBarProps) {
   const { t } = useTranslation();
+  const bg = useBackgroundTasks(projectDir);
   const { statusBar, running, scm, hostError } = useExtensionUi();
   const { llmProviders, defaultModelLabel } = useAppSettings();
   const [selectedModelId, setSelectedModelId] = useState<string>(() => loadScopedModelId("codez"));
@@ -227,6 +229,15 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
         <span className="ide-status-dot" />
         {running ? t("extensions.nav") : t("extensions.hostOff")}
       </button>
+
+      {bg.running.length > 0 && (
+        <span
+          className="ide-status-item"
+          title={bg.running.map((x) => x.label).join("\n")}
+        >
+          <span className="agentz-session-dot running" /> {t("chat.bgRunningCount", { count: bg.running.length })}
+        </span>
+      )}
 
       {scm.length > 0 && (
         <button className="ide-status-item" title={t("ide.sourceControl")} onClick={() => onOpenPanel("scm")}>

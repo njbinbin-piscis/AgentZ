@@ -100,7 +100,10 @@ pub fn rewrite_powershell5_chain(command: &str) -> String {
     format!("$global:LASTEXITCODE = 0; {acc}")
 }
 
-pub struct ShellTool;
+#[derive(Default)]
+pub struct ShellTool {
+    pub background_registry: Option<std::sync::Arc<crate::background::BackgroundRegistry>>,
+}
 
 #[async_trait]
 impl Tool for ShellTool {
@@ -136,7 +139,24 @@ impl Tool for ShellTool {
                 },
                 "timeout": {
                     "type": "integer",
-                    "description": "Timeout in seconds (default 120, maximum 300)."
+                    "description": "Foreground timeout in seconds (default 120, maximum 300). On timeout the still-running command is moved to the background registry instead of being killed."
+                },
+                "background": {
+                    "type": "boolean",
+                    "description": "Start in the background registry and return immediately with a bg_id. Use for builds, tests and servers that may run long. Manage it with process_wait/process_output/process_kill."
+                },
+                "notify_on": {
+                    "type": "string",
+                    "enum": ["exit", "ready"],
+                    "description": "For background tasks: notify the session on exit (default) or when the readiness condition (ready_port/ready_log) first fires."
+                },
+                "ready_port": {
+                    "type": "integer",
+                    "description": "Readiness condition: a TCP connect to 127.0.0.1 on this port succeeds (dev servers)."
+                },
+                "ready_log": {
+                    "type": "string",
+                    "description": "Readiness condition: output contains this substring (dev servers)."
                 },
                 "env": {
                     "type": "object",
@@ -164,6 +184,10 @@ impl Tool for ShellTool {
                 "elevated": { "type": "boolean" },
                 "cwd": { "type": "string" },
                 "timeout": { "type": "integer", "minimum": 1 },
+                "background": { "type": "boolean" },
+                "notify_on": { "type": "string", "enum": ["exit", "ready"] },
+                "ready_port": { "type": "integer" },
+                "ready_log": { "type": "string" },
                 "env": { "type": "object" }
             },
             "required": ["command"]
@@ -192,9 +216,84 @@ impl Tool for ShellTool {
 
         #[cfg(not(windows))]
         {
-            let _ = (command, ctx);
-            return recovery_error(
-                "Command execution refused: operating-system containment is unavailable on this platform.", ctx, false);
+            // No OS sandbox exists on this platform, so foreground execution
+            // stays refused. Explicit background work is the one exception:
+            // it runs as the current user (setsid process group) under the
+            // registry, with cwd pinned to the workspace unless the sandbox
+            // is disabled — the same scoping rule as the Windows runner.
+            let bg_params = super::background_process::parse_bg_params(&input);
+            if !bg_params.detached {
+                let _ = command;
+                return recovery_error(
+                    "Command execution refused: operating-system containment is unavailable on this platform.", ctx, false);
+            }
+            let Some(registry) = self.background_registry.clone() else {
+                return recovery_error(
+                    "Background execution is not configured by this host; run the command in the foreground instead.",
+                    ctx,
+                    false,
+                );
+            };
+            let workspace_root = match ctx.workspace_root.canonicalize() {
+                Ok(root) => root,
+                Err(error) => {
+                    return recovery_error(
+                        format!("Sandbox workspace is unavailable: {error}"),
+                        ctx,
+                        false,
+                    )
+                }
+            };
+            let requested_cwd = match input["cwd"].as_str() {
+                Some(cwd) if std::path::Path::new(cwd).is_absolute() => {
+                    std::path::PathBuf::from(cwd)
+                }
+                Some(cwd) => workspace_root.join(cwd),
+                None => workspace_root.clone(),
+            };
+            let sandbox_disabled =
+                ctx.settings.sandbox_mode == crate::agent::tool::SandboxMode::Disabled;
+            let cwd = match requested_cwd.canonicalize() {
+                Ok(cwd)
+                    if cwd.is_dir()
+                        && (sandbox_disabled || cwd.starts_with(&workspace_root)) =>
+                {
+                    cwd
+                }
+                Ok(_) => {
+                    return recovery_error(
+                        "Sandbox working directory must be an existing directory inside workspace_root.", ctx, false)
+                }
+                Err(error) => {
+                    return recovery_error(format!(
+                        "Sandbox working directory is unavailable: {error}"
+                    ), ctx, false)
+                }
+            };
+            let spec = super::background_process::bg_spec(
+                ctx,
+                command.chars().take(200).collect::<String>(),
+                cwd.to_string_lossy().into_owned(),
+                &bg_params,
+            );
+            let mut cmd = std::process::Command::new("/bin/sh");
+            cmd.arg("-c").arg(command).current_dir(&cwd);
+            if let Some(env) = input["env"].as_object() {
+                for (key, value) in env {
+                    if let Some(value) = value.as_str() {
+                        cmd.env(key, value);
+                    }
+                }
+            }
+            return match super::background_process::spawn_command_detached(&registry, spec, cmd) {
+                Ok(entry) => Ok(super::background_process::detached_result(
+                    &entry,
+                    true,
+                    &[],
+                    &[],
+                )),
+                Err(error) => recovery_error(error, ctx, false),
+            };
         }
 
         #[cfg(windows)]
@@ -310,6 +409,22 @@ impl Tool for ShellTool {
             let timeout = Duration::from_secs(timeout_secs);
             let cancel = ctx.cancel.clone();
             let sandbox_mode = ctx.settings.sandbox_mode;
+            let bg_params = super::background_process::parse_bg_params(&input);
+            let bg_registry = self.background_registry.clone();
+            if bg_params.detached && bg_registry.is_none() {
+                return recovery_error(
+                    "Background execution is not configured by this host; run the command in the foreground instead.",
+                    ctx,
+                    false,
+                );
+            }
+            let bg_spec = super::background_process::bg_spec(
+                ctx,
+                command.chars().take(200).collect::<String>(),
+                cwd.to_string_lossy().into_owned(),
+                &bg_params,
+            );
+            let bg_detached = bg_params.detached;
             let worker_workspace_root = workspace_root.clone();
             let worker_cwd = cwd.clone();
             let started = Instant::now();
@@ -323,17 +438,36 @@ impl Tool for ShellTool {
                 .stack_size(8 * 1024 * 1024)
                 .spawn(move || {
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        crate::proc::windows_sandbox::run_sandboxed_command(
-                            program.as_os_str(),
-                            &args,
-                            &worker_workspace_root,
-                            &worker_cwd,
-                            timeout,
-                            cancel,
-                            &env_overrides,
-                            MAX_OUTPUT_BYTES,
-                            sandbox_mode,
-                        )
+                        match bg_registry {
+                            Some(registry) => crate::proc::windows_sandbox::run_sandboxed_command_managed(
+                                program.as_os_str(),
+                                &args,
+                                &worker_workspace_root,
+                                &worker_cwd,
+                                timeout,
+                                cancel,
+                                &env_overrides,
+                                MAX_OUTPUT_BYTES,
+                                sandbox_mode,
+                                crate::proc::windows_sandbox::ManagedBackground {
+                                    registry,
+                                    spec: bg_spec,
+                                    detached: bg_detached,
+                                },
+                            ),
+                            None => crate::proc::windows_sandbox::run_sandboxed_command(
+                                program.as_os_str(),
+                                &args,
+                                &worker_workspace_root,
+                                &worker_cwd,
+                                timeout,
+                                cancel,
+                                &env_overrides,
+                                MAX_OUTPUT_BYTES,
+                                sandbox_mode,
+                            )
+                            .map(crate::proc::windows_sandbox::ManagedSandboxed::Completed),
+                        }
                     }))
                     .unwrap_or_else(|_| {
                         Err(anyhow::anyhow!("sandbox worker panicked unexpectedly"))
@@ -355,8 +489,24 @@ impl Tool for ShellTool {
             }
             let result = rx.await;
             let duration_ms = started.elapsed().as_millis();
+            if let Ok(Ok(crate::proc::windows_sandbox::ManagedSandboxed::Detached {
+                entry,
+                stdout_so_far,
+                stderr_so_far,
+            })) = &result
+            {
+                return Ok(super::background_process::detached_result(
+                    entry,
+                    bg_detached,
+                    stdout_so_far,
+                    stderr_so_far,
+                ));
+            }
             let output = match result {
-                Ok(Ok(output)) => output,
+                Ok(Ok(crate::proc::windows_sandbox::ManagedSandboxed::Completed(output))) => output,
+                Ok(Ok(crate::proc::windows_sandbox::ManagedSandboxed::Detached { .. })) => {
+                    unreachable!("detached handled above")
+                }
                 Ok(Err(error)) => {
                     return recovery_error(format!(
                         "Sandbox setup or cleanup failed; command was not retried outside the sandbox: {error:#}"
@@ -474,7 +624,8 @@ mod tests {
 
     #[test]
     fn shell_discloses_supported_os_sandbox_boundary() {
-        let description = ShellTool.description();
+        let tool = ShellTool::default();
+        let description = tool.description();
         if cfg!(windows) {
             assert!(description.contains("Windows AppContainer"));
             assert!(description.contains("security level in Settings"));
@@ -513,7 +664,7 @@ mod tests {
             loop_halt: None,
         };
 
-        let result = ShellTool
+        let result = ShellTool::default()
             .call(
                 json!({"command": "echo shell-appcontainer", "interpreter": "cmd", "timeout": 10}),
                 &ctx,
@@ -528,7 +679,7 @@ mod tests {
             .contains("\"termination\":\"tree_terminated\""));
 
         let outside_read = format!("type \"{}\"", outside_file.display());
-        let result = ShellTool
+        let result = ShellTool::default()
             .call(
                 json!({"command": outside_read, "interpreter": "cmd", "timeout": 10}),
                 &ctx,
@@ -541,7 +692,7 @@ mod tests {
         assert!(!result.content.contains("must-not-leak-shell"));
 
         let outside = temp.path().to_string_lossy().to_string();
-        let result = ShellTool
+        let result = ShellTool::default()
             .call(
                 json!({"command": "echo must-not-run", "cwd": outside}),
                 &ctx,
@@ -552,7 +703,7 @@ mod tests {
         assert!(result.content.contains("inside workspace_root"));
         assert!(result.content.contains("\"termination\":\"not_started\""));
 
-        let result = ShellTool
+        let result = ShellTool::default()
             .call(
                 json!({"command": "echo must-not-run", "elevated": true}),
                 &ctx,

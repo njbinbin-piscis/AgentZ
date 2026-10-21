@@ -10,6 +10,7 @@
 //! into the kernel via the [`piscis_core::host`] traits.
 
 pub mod agent;
+pub mod background;
 pub mod context;
 pub mod headless;
 pub mod llm;

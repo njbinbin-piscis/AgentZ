@@ -852,6 +852,26 @@ impl Database {
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS background_tasks (
+                bg_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                label TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'running',
+                exit_code INTEGER,
+                last_kind TEXT NOT NULL DEFAULT '',
+                updated_unix_ms INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS pending_bg_continuations (
+                bg_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                display_prompt TEXT NOT NULL,
+                session_source TEXT,
+                prefer_zh INTEGER NOT NULL DEFAULT 0,
+                created_unix_ms INTEGER NOT NULL DEFAULT 0
+            );
+
             CREATE TABLE IF NOT EXISTS scheduled_tasks (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -3582,6 +3602,107 @@ impl Database {
     // ------------------------------------------------------------------
     // Fish instances
     // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Background tasks (host-managed long-running processes)
+    // ------------------------------------------------------------------
+
+    /// Record (or update) a background task's latest known state. Rows are
+    /// written on ready/terminal events; `running` rows that survive an app
+    /// restart are reconciled to `interrupted` by the host.
+    pub fn upsert_background_task(
+        &self,
+        bg_id: &str,
+        session_id: &str,
+        label: &str,
+        status: &str,
+        exit_code: Option<i64>,
+        last_kind: &str,
+        updated_unix_ms: u64,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO background_tasks (bg_id, session_id, label, status, exit_code, last_kind, updated_unix_ms)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(bg_id) DO UPDATE SET session_id=excluded.session_id, label=excluded.label,
+               status=excluded.status, exit_code=excluded.exit_code, last_kind=excluded.last_kind,
+               updated_unix_ms=excluded.updated_unix_ms",
+            rusqlite::params![bg_id, session_id, label, status, exit_code, last_kind, updated_unix_ms as i64],
+        )?;
+        Ok(())
+    }
+
+    /// bg_ids still marked `running` (candidates for interrupted reconcile).
+    pub fn list_running_background_task_ids(&self) -> Result<Vec<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT bg_id FROM background_tasks WHERE status = 'running'")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    pub fn mark_background_task_status(&self, bg_id: &str, status: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE background_tasks SET status = ?2 WHERE bg_id = ?1",
+            rusqlite::params![bg_id, status],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_pending_bg_continuation(
+        &self,
+        bg_id: &str,
+        session_id: &str,
+        prompt: &str,
+        display_prompt: &str,
+        session_source: Option<&str>,
+        prefer_zh: bool,
+        created_unix_ms: u64,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO pending_bg_continuations (bg_id, session_id, prompt, display_prompt, session_source, prefer_zh, created_unix_ms)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(bg_id) DO UPDATE SET prompt=excluded.prompt, display_prompt=excluded.display_prompt,
+               session_source=excluded.session_source, prefer_zh=excluded.prefer_zh",
+            rusqlite::params![bg_id, session_id, prompt, display_prompt, session_source, prefer_zh as i64, created_unix_ms as i64],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_pending_bg_continuations(
+        &self,
+    ) -> Result<Vec<(String, String, String, String, Option<String>, bool)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT bg_id, session_id, prompt, display_prompt, session_source, prefer_zh \
+             FROM pending_bg_continuations ORDER BY created_unix_ms ASC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, i64>(5)? != 0,
+            ))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    pub fn delete_pending_bg_continuation(&self, bg_id: &str) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM pending_bg_continuations WHERE bg_id = ?1",
+            rusqlite::params![bg_id],
+        )?;
+        Ok(())
+    }
 
     // ------------------------------------------------------------------
     // Task States

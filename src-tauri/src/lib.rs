@@ -123,6 +123,14 @@ pub fn run() {
             commands::gateway::spawn_inbound_consumer(app.handle().clone());
             // Hydrate the persisted cloud marketplace base URL override.
             commands::marketplace::hydrate_cloud_base_override(app.handle());
+            // Background tasks: route registry completions into session
+            // continuations + UI events.
+            if let Some(state) = app.try_state::<AppState>() {
+                crate::runtime::background_continuation::install_background_listener(
+                    app.handle(),
+                    state.inner(),
+                );
+            }
             Ok(())
         })
         .manage(AppState::new())
@@ -200,6 +208,10 @@ pub fn run() {
             commands::platform::platform_software_rendering,
             // AI chat (agent turn on the piscis-engine kernel)
             commands::chat::chat_send,
+            commands::background::background_list,
+            commands::background::background_output,
+            commands::background::background_kill,
+            commands::background::background_running_count,
             commands::chat::chat_cancel,
             commands::diagnostics::diagnostics_export_logs,
             commands::diagnostics::diagnostics_preview_logs,

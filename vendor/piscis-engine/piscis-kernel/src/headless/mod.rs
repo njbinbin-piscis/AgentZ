@@ -113,6 +113,7 @@ pub fn register_default_cli_tools(
         pool_event_sink: None,
         subagent_runtime: None,
         coordinator_config: Default::default(),
+        background_registry: Some(crate::background::shared_default_registry()),
     };
     crate::tools::register_neutral_tools(handle, &cfg);
 }

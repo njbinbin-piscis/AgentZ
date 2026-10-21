@@ -418,6 +418,8 @@ export function useWorkzSessionStore({
   useEffect(() => discardStreamDelta, [discardStreamDelta]);
   const foregroundSessionRef = useRef<string | null>(null);
   const foregroundTaskKeyRef = useRef<string | null>(null);
+  const projectDirRef = useRef<string | null>(null);
+  projectDirRef.current = projectDir;
   const runningSessionsRef = useRef<Set<string>>(new Set());
   const taskKeyBySessionRef = useRef<Map<string, string>>(new Map());
   const openTaskRequestRef = useRef(0);
@@ -664,6 +666,39 @@ export function useWorkzSessionStore({
             t.id === env.sessionId ? { ...t, status: fin.ok ? "idle" : "error" } : t,
           ),
         );
+        // The user may be *viewing* this session without being live-attached
+        // to it (reopened while it ran in the background). Its stream was
+        // never applied here, so on completion the busy spinner must clear
+        // and the transcript must reload from the DB — otherwise the view
+        // stays busy and stale until the user reopens the task.
+        if (env.sessionId && fg === env.sessionId && !liveRef.current) {
+          setBusy(false);
+          if (!fin.ok && fin.error) setError(fin.error);
+          const dir = projectDirRef.current;
+          const sid = env.sessionId;
+          if (dir) {
+            void getMessages(sid, dir)
+              .then((history) => {
+                if (foregroundSessionRef.current !== sid || liveRef.current) return;
+                setSteps(
+                  history.map((m) => ({
+                    id: m.id,
+                    role: m.role,
+                    text: m.content,
+                    tools: (m.tools ?? []).map((tool) => ({
+                      id: tool.id,
+                      name: tool.name,
+                      input: tool.input,
+                      result: tool.result ?? undefined,
+                      status: tool.is_error || tool.result == null ? ("error" as const) : ("done" as const),
+                      textOffset: tool.text_offset,
+                    })),
+                  })),
+                );
+              })
+              .catch(() => {});
+          }
+        }
         return;
       }
 

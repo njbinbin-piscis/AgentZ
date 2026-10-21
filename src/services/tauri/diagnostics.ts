@@ -7,6 +7,15 @@ export interface DiagnosticContextSummary {
   failure_count?: number;
 }
 
+export interface DiagnosticBackgroundTask {
+  id: string;
+  label: string;
+  status: string;
+  session_id: string;
+  exit_code?: number | null;
+  elapsed_ms: number;
+}
+
 export interface DiagnosticExportPreview {
   schema_version: number;
   app_version: string;
@@ -14,6 +23,11 @@ export interface DiagnosticExportPreview {
   total_bytes: number;
   redaction_ready: boolean;
   context_summary?: DiagnosticContextSummary;
+  background_tasks?: {
+    running: number;
+    total: number;
+    tasks: DiagnosticBackgroundTask[];
+  };
 }
 
 export function previewDiagnosticLogs(): Promise<DiagnosticExportPreview> {

@@ -7,6 +7,8 @@
 //! out to member Koi without leaving the desktop process.
 
 pub mod approval;
+pub mod background_continuation;
+pub mod background_store;
 pub mod cancel_completion;
 pub mod chat_cancel;
 pub mod durable_plan;

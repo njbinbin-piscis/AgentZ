@@ -242,13 +242,43 @@ mod continuation_intent_tests {
     }
 }
 
+/// Parameters for one host-dispatched agent turn. `chat_send` (the Tauri
+/// command) and host-internal callers (background-task completion
+/// continuations) both build this so every turn goes through the exact same
+/// lease / activity-gate / durable-run / concurrency stack.
+#[derive(Default)]
+pub struct HostTurnParams {
+    pub prompt: String,
+    pub session_id: Option<String>,
+    pub workspace: Option<String>,
+    pub attachment: Option<FrontendAttachment>,
+    pub chat_mode: Option<String>,
+    pub model_id: Option<String>,
+    pub clear_plan: Option<bool>,
+    pub display_prompt: Option<String>,
+    pub project_dir: Option<String>,
+    pub workspace_dir: Option<String>,
+    pub require_task_environment: Option<bool>,
+    pub task_key: Option<String>,
+    pub enabled_skills: Option<Vec<String>>,
+    pub enabled_connectors: Option<Vec<String>>,
+    pub agent_id: Option<String>,
+    pub session_source: Option<String>,
+    pub team_id: Option<String>,
+    pub pool_id: Option<String>,
+    pub prefer_zh: Option<bool>,
+    pub artifact_scope_handle: Option<String>,
+    pub artifact_ref: Option<super::task_artifacts::ArtifactContinuationRef>,
+    pub user_recent_edits: Option<Vec<UserRecentEdit>>,
+}
+
 /// Run one agent turn. Streams `AgentEvent`s via `agentz:chat-event`.
 #[tauri::command]
 pub async fn chat_send(
     app: AppHandle,
     window: WebviewWindow,
     state: State<'_, AppState>,
-    mut prompt: String,
+    prompt: String,
     session_id: Option<String>,
     workspace: Option<String>,
     attachment: Option<FrontendAttachment>,
@@ -271,7 +301,82 @@ pub async fn chat_send(
     artifact_ref: Option<super::task_artifacts::ArtifactContinuationRef>,
     user_recent_edits: Option<Vec<UserRecentEdit>>,
 ) -> Result<ChatResult, String> {
+    dispatch_host_turn(
+        app,
+        Some(window),
+        state.inner(),
+        HostTurnParams {
+            prompt,
+            session_id,
+            workspace,
+            attachment,
+            chat_mode,
+            model_id,
+            clear_plan,
+            display_prompt,
+            project_dir,
+            workspace_dir,
+            require_task_environment,
+            task_key,
+            enabled_skills,
+            enabled_connectors,
+            agent_id,
+            session_source,
+            team_id,
+            pool_id,
+            prefer_zh,
+            artifact_scope_handle,
+            artifact_ref,
+            user_recent_edits,
+        },
+    )
+    .await
+}
+
+/// Shared turn dispatch used by `chat_send` and host-internal starters
+/// (background-task completion continuations). `window` is only needed for
+/// artifact continuations.
+pub async fn dispatch_host_turn(
+    app: AppHandle,
+    window: Option<WebviewWindow>,
+    state: &AppState,
+    params: HostTurnParams,
+) -> Result<ChatResult, String> {
+    let HostTurnParams {
+        mut prompt,
+        session_id,
+        workspace,
+        attachment,
+        chat_mode,
+        model_id,
+        clear_plan,
+        display_prompt,
+        project_dir,
+        workspace_dir,
+        require_task_environment,
+        task_key,
+        enabled_skills,
+        enabled_connectors,
+        agent_id,
+        session_source,
+        team_id,
+        pool_id,
+        prefer_zh,
+        artifact_scope_handle,
+        artifact_ref,
+        user_recent_edits,
+    } = params;
     let clear_plan = continuation_plan_intent(clear_plan)?;
+    // A user-initiated turn (anything not dispatched by the background hub)
+    // resets that session's automatic-continuation budget.
+    if let Some(sid) = session_id.as_deref().filter(|s| !s.is_empty()) {
+        let is_host_bg = task_key
+            .as_deref()
+            .is_some_and(|k| k.starts_with("host-bg-"));
+        if !is_host_bg {
+            state.bg_hub.note_user_turn(sid);
+        }
+    }
     // Held before queueing and through the entire turn; RAII also releases on errors.
     let _environment_lease = state.environment_access.execution().await;
     let project = require_project_dir(project_dir.as_deref().or(workspace.as_deref()))?;
@@ -404,10 +509,13 @@ pub async fn chat_send(
         let handle = artifact_scope_handle
             .as_deref()
             .ok_or("artifact continuation requires a project scope")?;
+        let window = window
+            .as_ref()
+            .ok_or("artifact continuation requires a webview window")?;
         let context = super::task_artifacts::resolve_continuation_text(
             &app,
-            &window,
-            &state,
+            window,
+            state,
             handle,
             std::path::Path::new(&project),
             session_id.as_deref().expect("host assigned session"),
@@ -478,6 +586,7 @@ pub async fn chat_send(
         pool_id.filter(|s| !s.trim().is_empty()),
         prefer_zh.unwrap_or(false),
         queued_run,
+        Some(state.background_runs.clone()),
     )
     .await;
 

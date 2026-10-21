@@ -9,6 +9,7 @@
 //! WMI/COM, browser control, call_koi/call_fish/chat_ui, etc.) remain in the
 //! host crates and are plugged in via the `HostTools` host trait.
 
+pub mod background_process;
 pub mod code_run;
 pub mod elevate;
 pub mod email;
@@ -81,6 +82,10 @@ pub struct NeutralToolsConfig {
     /// Defaults are fine for tests; hosts typically override to match
     /// user settings.
     pub coordinator_config: CoordinatorConfig,
+    /// Shared background process registry for `shell` / `code_run`
+    /// background mode and the `process_wait` family. Hosts that omit it
+    /// keep background execution disabled (clean error, never a bare spawn).
+    pub background_registry: Option<Arc<crate::background::BackgroundRegistry>>,
 }
 
 impl NeutralToolsConfig {
@@ -126,7 +131,9 @@ pub fn register_neutral_into(registry: &mut ToolRegistry, cfg: &NeutralToolsConf
         registry.register(Box::new(file_diff::FileDiffTool));
     }
     if cfg.is_enabled("code_run") {
-        registry.register(Box::new(code_run::CodeRunTool));
+        registry.register(Box::new(code_run::CodeRunTool {
+            background_registry: cfg.background_registry.clone(),
+        }));
     }
     if cfg.is_enabled("file_search") {
         registry.register(Box::new(file_search::FileSearchTool));
@@ -135,10 +142,29 @@ pub fn register_neutral_into(registry: &mut ToolRegistry, cfg: &NeutralToolsConf
         registry.register(Box::new(file_list::FileListTool));
     }
     if cfg.is_enabled("process_control") {
-        registry.register(Box::new(process_control::ProcessControlTool));
+        registry.register(Box::new(process_control::ProcessControlTool {
+            background_registry: cfg.background_registry.clone(),
+        }));
     }
     if cfg.is_enabled("shell") {
-        registry.register(Box::new(shell::ShellTool));
+        registry.register(Box::new(shell::ShellTool {
+            background_registry: cfg.background_registry.clone(),
+        }));
+    }
+    if cfg.is_enabled("process_wait") {
+        registry.register(Box::new(background_process::ProcessWaitTool {
+            background_registry: cfg.background_registry.clone(),
+        }));
+    }
+    if cfg.is_enabled("process_output") {
+        registry.register(Box::new(background_process::ProcessOutputTool {
+            background_registry: cfg.background_registry.clone(),
+        }));
+    }
+    if cfg.is_enabled("process_kill") {
+        registry.register(Box::new(background_process::ProcessKillTool {
+            background_registry: cfg.background_registry.clone(),
+        }));
     }
     if cfg.is_enabled("web_search") {
         registry.register(Box::new(web_search::WebSearchTool));

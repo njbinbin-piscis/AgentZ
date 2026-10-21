@@ -229,20 +229,234 @@ pub fn run_appcontainer_command(
 ///
 /// The mode comes from Settings via the tool context; it is never taken
 /// from tool input.
+/// A spawned sandboxed process whose Job, ACL lease, profile and capture
+/// threads are still owned by the caller. Foreground callers wait on it via
+/// [`SandboxProcess::wait_foreground`]; background callers hand it to the
+/// registry via [`SandboxProcess::wait_detached`]. Dropping it without
+/// waiting closes the Job handle, which terminates the whole tree
+/// (KILL_ON_JOB_CLOSE) — the same safety net the old inline runner had.
+pub struct SandboxProcess {
+    job: OwnedHandle,
+    process: OwnedHandle,
+    pid: u32,
+    stdout_thread: Option<thread::JoinHandle<Result<CapturedStream>>>,
+    stderr_thread: Option<thread::JoinHandle<Result<CapturedStream>>>,
+    workspace_lease: Option<WorkspaceAclLease>,
+    profile: Option<AppContainerProfile>,
+    pinned: Option<PinnedReadonlyWorkspace>,
+    stdout_shared: Arc<crate::background::SharedStream>,
+    stderr_shared: Arc<crate::background::SharedStream>,
+}
+
+// The process is created suspended, assigned to its Job, and only ever
+// driven by the single thread that waits on it; handles and the AppContainer
+// SID are never touched concurrently, so moving the whole bundle to the
+// background waiter thread is sound.
+unsafe impl Send for SandboxProcess {}
+
+/// Outcome of a foreground wait: either the process finished (and cleanup
+/// is confirmed), or the caller's timeout elapsed with the process still
+/// running — in which case ownership is handed back for background transfer
+/// instead of terminating the Job.
+pub enum ForegroundWait {
+    Finished(AppContainerOutput),
+    TimedOut(SandboxProcess),
+}
+
+impl SandboxProcess {
+    pub fn pid(&self) -> u32 {
+        self.pid
+    }
+
+    pub fn stdout_shared(&self) -> Arc<crate::background::SharedStream> {
+        self.stdout_shared.clone()
+    }
+
+    pub fn stderr_shared(&self) -> Arc<crate::background::SharedStream> {
+        self.stderr_shared.clone()
+    }
+
+    fn terminate_job(&self, code: u32) {
+        unsafe {
+            let _ = TerminateJobObject(self.job.raw(), code);
+        }
+    }
+
+    /// Terminate the Job and run the full confirmed-cleanup tail.
+    pub fn terminate_and_finish(
+        self,
+        timed_out: bool,
+        cancelled: bool,
+    ) -> Result<AppContainerOutput> {
+        self.terminate_job(if cancelled { 130 } else { 124 });
+        self.finish(timed_out, cancelled)
+    }
+
+    /// Full cleanup tail shared by every exit path: root-exit confirmation,
+    /// Job drain, capture join and ACL rollback. Consumes the process.
+    fn finish(mut self, timed_out: bool, cancelled: bool) -> Result<AppContainerOutput> {
+        let root_exit = unsafe { WaitForSingleObject(self.process.raw(), 5_000) };
+        anyhow::ensure!(
+            root_exit == WAIT_OBJECT_0,
+            "AppContainer root process did not exit after Job Object termination"
+        );
+        let mut exit_code = if timed_out {
+            124
+        } else if cancelled {
+            130
+        } else {
+            125
+        };
+        if !timed_out && !cancelled {
+            unsafe {
+                GetExitCodeProcess(self.process.raw(), &mut exit_code)?;
+            }
+        }
+        let process = std::mem::replace(
+            &mut self.process,
+            OwnedHandle::new(HANDLE(std::ptr::null_mut())),
+        );
+        drop(process);
+        wait_for_job_empty(self.job.raw(), Duration::from_secs(5))?;
+        let job = std::mem::replace(
+            &mut self.job,
+            OwnedHandle::new(HANDLE(std::ptr::null_mut())),
+        );
+        drop(job);
+        // Join both readers and attempt ACL cleanup even if one stage fails. A failed stage
+        // must not skip the other reader or be converted into confirmed cleanup.
+        let stdout = self
+            .stdout_thread
+            .take()
+            .map(|t| {
+                t.join()
+                    .map_err(|_| anyhow::anyhow!("stdout capture thread panicked"))
+                    .and_then(|result| result)
+            })
+            .transpose()?;
+        let stderr = self
+            .stderr_thread
+            .take()
+            .map(|t| {
+                t.join()
+                    .map_err(|_| anyhow::anyhow!("stderr capture thread panicked"))
+                    .and_then(|result| result)
+            })
+            .transpose()?;
+        let acl_cleanup = if let Some(ref mut workspace) = self.workspace_lease {
+            workspace.finish()
+        } else {
+            Ok(())
+        };
+        acl_cleanup?;
+        drop(self.workspace_lease.take());
+        drop(self.pinned.take());
+        drop(self.profile.take());
+        Ok(AppContainerOutput {
+            exit_code: exit_code as i32,
+            stdout: stdout.as_ref().map(|c| c.bytes.clone()).unwrap_or_default(),
+            stderr: stderr.as_ref().map(|c| c.bytes.clone()).unwrap_or_default(),
+            timed_out,
+            cancelled,
+            stdout_total_bytes: stdout.as_ref().map(|c| c.total_bytes).unwrap_or(0),
+            stderr_total_bytes: stderr.as_ref().map(|c| c.total_bytes).unwrap_or(0),
+        })
+    }
+
+    /// Foreground wait with the historic semantics, except that a timeout
+    /// returns ownership (`TimedOut`) instead of terminating the Job, so the
+    /// caller may transfer the process to the background registry.
+    pub fn wait_foreground(
+        self,
+        timeout: Duration,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<ForegroundWait> {
+        let start = Instant::now();
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                self.terminate_job(130);
+                return Ok(ForegroundWait::Finished(self.finish(false, true)?));
+            }
+            let elapsed = start.elapsed();
+            if elapsed >= timeout {
+                return Ok(ForegroundWait::TimedOut(self));
+            }
+            let wait = timeout
+                .saturating_sub(elapsed)
+                .min(Duration::from_millis(100));
+            let millis = wait.as_millis().max(1).min(u32::MAX as u128) as u32;
+            let state = unsafe { WaitForSingleObject(self.process.raw(), millis) };
+            if state == WAIT_OBJECT_0 {
+                // A command may leave background children holding the output pipes; the job must
+                // not outlive the tool result, so terminate any remaining members before draining.
+                self.terminate_job(0);
+                return Ok(ForegroundWait::Finished(self.finish(false, false)?));
+            }
+            if state != WAIT_TIMEOUT {
+                self.terminate_job(125);
+                bail!("WaitForSingleObject failed for AppContainer command");
+            }
+        }
+    }
+
+    /// Background wait driven by a registry entry: honours the entry's kill
+    /// flag and max runtime, probes readiness, and only terminates leftover
+    /// Job members once the root process has exited.
+    pub fn wait_detached(
+        self,
+        entry: &crate::background::BgEntry,
+        registry: &Arc<crate::background::BackgroundRegistry>,
+    ) -> crate::background::BgOutcome {
+        use crate::background::BgOutcome;
+        let start = Instant::now();
+        loop {
+            if entry.is_killed() {
+                self.terminate_job(130);
+                return match self.finish(false, true) {
+                    Ok(out) => BgOutcome::Exited(out.exit_code),
+                    Err(e) => BgOutcome::Failed(format!("background cleanup failed: {e:#}")),
+                };
+            }
+            if start.elapsed() >= entry.max_runtime {
+                self.terminate_job(124);
+                return match self.finish(true, false) {
+                    Ok(out) => BgOutcome::Exited(out.exit_code),
+                    Err(e) => BgOutcome::Failed(format!("background cleanup failed: {e:#}")),
+                };
+            }
+            registry.probe_ready(entry);
+            let state = unsafe { WaitForSingleObject(self.process.raw(), 100) };
+            if state == WAIT_OBJECT_0 {
+                self.terminate_job(0);
+                return match self.finish(false, false) {
+                    Ok(out) => BgOutcome::Exited(out.exit_code),
+                    Err(e) => BgOutcome::Failed(format!("background cleanup failed: {e:#}")),
+                };
+            }
+            if state != WAIT_TIMEOUT {
+                self.terminate_job(125);
+                return BgOutcome::Failed(
+                    "WaitForSingleObject failed for background command".into(),
+                );
+            }
+        }
+    }
+}
+
+/// Spawn a sandboxed command without waiting on it. Validation, AppContainer
+/// profile/ACL setup, Job creation and capture threads all happen here; the
+/// returned [`SandboxProcess`] owns every resource until it is waited on.
 #[allow(clippy::too_many_arguments)]
-pub fn run_sandboxed_command(
+pub fn spawn_sandboxed_command(
     program: &OsStr,
     args: &[std::ffi::OsString],
     workspace_root: &Path,
     cwd: &Path,
-    timeout: Duration,
-    cancel: Arc<AtomicBool>,
     env_overrides: &[(std::ffi::OsString, std::ffi::OsString)],
     max_output_bytes: usize,
     mode: crate::agent::tool::SandboxMode,
-) -> Result<AppContainerOutput> {
+) -> Result<SandboxProcess> {
     use crate::agent::tool::SandboxMode;
-    anyhow::ensure!(timeout > Duration::ZERO, "sandbox timeout must be positive");
     let workspace_root = workspace_root
         .canonicalize()
         .context("resolve sandbox workspace root")?;
@@ -281,7 +495,7 @@ pub fn run_sandboxed_command(
         }
     }
     let use_appcontainer = workspace_lease.is_some();
-    let _pinned_readonly_workspace = if !use_appcontainer && mode != SandboxMode::Disabled {
+    let pinned_readonly_workspace = if !use_appcontainer && mode != SandboxMode::Disabled {
         Some(verify_and_pin_readonly_workspace(&workspace_root)?)
     } else {
         None
@@ -374,6 +588,7 @@ pub fn run_sandboxed_command(
             &mut info,
         )?;
     }
+    let pid = info.dwProcessId;
     let process = OwnedHandle::new(info.hProcess);
     let thread_handle = OwnedHandle::new(info.hThread);
     let assign_result = unsafe { AssignProcessToJobObject(job.raw(), process.raw()) };
@@ -395,97 +610,152 @@ pub fn run_sandboxed_command(
     drop(stdin_write);
     drop(stdout_write);
     drop(stderr_write);
-    let stdout_thread = spawn_capture(stdout_read.into_file(), max_output_bytes);
-    let stderr_thread = spawn_capture(stderr_read.into_file(), max_output_bytes);
-    let start = Instant::now();
-    let mut timed_out = false;
-    let mut cancelled = false;
-    loop {
-        if cancel.load(Ordering::Relaxed) {
-            cancelled = true;
-            unsafe {
-                TerminateJobObject(job.raw(), 130)?;
-            }
-            break;
-        }
-        let elapsed = start.elapsed();
-        if elapsed >= timeout {
-            timed_out = true;
-            unsafe {
-                TerminateJobObject(job.raw(), 124)?;
-            }
-            break;
-        }
-        let wait = timeout
-            .saturating_sub(elapsed)
-            .min(Duration::from_millis(100));
-        let millis = wait.as_millis().max(1).min(u32::MAX as u128) as u32;
-        let state = unsafe { WaitForSingleObject(process.raw(), millis) };
-        if state == WAIT_OBJECT_0 {
-            // A command may leave background children holding the output pipes; the job must
-            // not outlive the tool result, so terminate any remaining members before draining.
-            unsafe {
-                TerminateJobObject(job.raw(), 0)?;
-            }
-            break;
-        }
-        if state != WAIT_TIMEOUT {
-            unsafe {
-                TerminateJobObject(job.raw(), 125)?;
-            }
-            bail!("WaitForSingleObject failed for AppContainer command");
-        }
-    }
-    let root_exit = unsafe { WaitForSingleObject(process.raw(), 5_000) };
-    anyhow::ensure!(
-        root_exit == WAIT_OBJECT_0,
-        "AppContainer root process did not exit after Job Object termination"
+    let stdout_shared = Arc::new(crate::background::SharedStream::new());
+    let stderr_shared = Arc::new(crate::background::SharedStream::new());
+    let stdout_thread = spawn_capture_shared(
+        stdout_read.into_file(),
+        max_output_bytes,
+        Some(stdout_shared.clone()),
     );
-    let mut exit_code = if timed_out {
-        124
-    } else if cancelled {
-        130
-    } else {
-        125
-    };
-    if !timed_out && !cancelled {
-        unsafe {
-            GetExitCodeProcess(process.raw(), &mut exit_code)?;
+    let stderr_thread = spawn_capture_shared(
+        stderr_read.into_file(),
+        max_output_bytes,
+        Some(stderr_shared.clone()),
+    );
+    Ok(SandboxProcess {
+        job,
+        process,
+        pid,
+        stdout_thread: Some(stdout_thread),
+        stderr_thread: Some(stderr_thread),
+        workspace_lease,
+        profile,
+        pinned: pinned_readonly_workspace,
+        stdout_shared,
+        stderr_shared,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn run_sandboxed_command(
+    program: &OsStr,
+    args: &[std::ffi::OsString],
+    workspace_root: &Path,
+    cwd: &Path,
+    timeout: Duration,
+    cancel: Arc<AtomicBool>,
+    env_overrides: &[(std::ffi::OsString, std::ffi::OsString)],
+    max_output_bytes: usize,
+    mode: crate::agent::tool::SandboxMode,
+) -> Result<AppContainerOutput> {
+    anyhow::ensure!(timeout > Duration::ZERO, "sandbox timeout must be positive");
+    let proc = spawn_sandboxed_command(
+        program,
+        args,
+        workspace_root,
+        cwd,
+        env_overrides,
+        max_output_bytes,
+        mode,
+    )?;
+    match proc.wait_foreground(timeout, cancel)? {
+        ForegroundWait::Finished(output) => Ok(output),
+        ForegroundWait::TimedOut(proc) => proc.terminate_and_finish(true, false),
+    }
+}
+
+/// Background transfer request for [`run_sandboxed_command_managed`].
+pub struct ManagedBackground {
+    pub registry: Arc<crate::background::BackgroundRegistry>,
+    pub spec: crate::background::BgSpec,
+    /// Start detached immediately instead of waiting in the foreground.
+    pub detached: bool,
+}
+
+pub enum ManagedSandboxed {
+    Completed(AppContainerOutput),
+    Detached {
+        entry: Arc<crate::background::BgEntry>,
+        stdout_so_far: Vec<u8>,
+        stderr_so_far: Vec<u8>,
+    },
+}
+
+/// Like [`run_sandboxed_command`], but a foreground timeout — or an explicit
+/// detached start — transfers the still-running process to the background
+/// registry instead of terminating its Job.
+#[allow(clippy::too_many_arguments)]
+pub fn run_sandboxed_command_managed(
+    program: &OsStr,
+    args: &[std::ffi::OsString],
+    workspace_root: &Path,
+    cwd: &Path,
+    timeout: Duration,
+    cancel: Arc<AtomicBool>,
+    env_overrides: &[(std::ffi::OsString, std::ffi::OsString)],
+    max_output_bytes: usize,
+    mode: crate::agent::tool::SandboxMode,
+    managed: ManagedBackground,
+) -> Result<ManagedSandboxed> {
+    anyhow::ensure!(timeout > Duration::ZERO, "sandbox timeout must be positive");
+    let proc = spawn_sandboxed_command(
+        program,
+        args,
+        workspace_root,
+        cwd,
+        env_overrides,
+        max_output_bytes,
+        mode,
+    )?;
+    let pid = proc.pid();
+    if managed.detached {
+        let entry = managed
+            .registry
+            .create_with_streams(
+                managed.spec,
+                Some((proc.stdout_shared(), proc.stderr_shared())),
+            )
+            .map_err(anyhow::Error::msg)?;
+        entry.set_pid(pid);
+        let registry = managed.registry.clone();
+        managed.registry.spawn_exec(entry.clone(), move |e| {
+            proc.wait_detached(&e, &registry)
+        });
+        return Ok(ManagedSandboxed::Detached {
+            stdout_so_far: Vec::new(),
+            stderr_so_far: Vec::new(),
+            entry,
+        });
+    }
+    match proc.wait_foreground(timeout, cancel)? {
+        ForegroundWait::Finished(output) => Ok(ManagedSandboxed::Completed(output)),
+        ForegroundWait::TimedOut(proc) => {
+            let stdout_so_far = proc.stdout_shared().tail(8192);
+            let stderr_so_far = proc.stderr_shared().tail(8192);
+            match managed.registry.create_with_streams(
+                managed.spec,
+                Some((proc.stdout_shared(), proc.stderr_shared())),
+            ) {
+                Ok(entry) => {
+                    entry.set_pid(pid);
+                    let registry = managed.registry.clone();
+                    managed.registry.spawn_exec(entry.clone(), move |e| {
+                        proc.wait_detached(&e, &registry)
+                    });
+                    Ok(ManagedSandboxed::Detached {
+                        entry,
+                        stdout_so_far,
+                        stderr_so_far,
+                    })
+                }
+                // Registry refused (quota): keep the historic kill-on-timeout
+                // behaviour rather than leaking an untracked process.
+                Err(_) => Ok(ManagedSandboxed::Completed(
+                    proc.terminate_and_finish(true, false)?,
+                )),
+            }
         }
     }
-    drop(process);
-    wait_for_job_empty(job.raw(), Duration::from_secs(5))?;
-    drop(job);
-    // Join both readers and attempt ACL cleanup even if one stage fails. A failed stage
-    // must not skip the other reader or be converted into confirmed cleanup.
-    let stdout = stdout_thread
-        .join()
-        .map_err(|_| anyhow::anyhow!("stdout capture thread panicked"))
-        .and_then(|result| result);
-    let stderr = stderr_thread
-        .join()
-        .map_err(|_| anyhow::anyhow!("stderr capture thread panicked"))
-        .and_then(|result| result);
-    let acl_cleanup = if let Some(ref mut workspace) = workspace_lease {
-        workspace.finish()
-    } else {
-        Ok(())
-    };
-    let stdout = stdout?;
-    let stderr = stderr?;
-    acl_cleanup?;
-    drop(workspace_lease);
-    drop(_pinned_readonly_workspace);
-    drop(profile);
-    Ok(AppContainerOutput {
-        exit_code: exit_code as i32,
-        stdout: stdout.bytes,
-        stderr: stderr.bytes,
-        timed_out,
-        cancelled,
-        stdout_total_bytes: stdout.total_bytes,
-        stderr_total_bytes: stderr.total_bytes,
-    })
 }
 
 fn create_pipe(security: &SECURITY_ATTRIBUTES) -> Result<(OwnedHandle, OwnedHandle)> {
@@ -587,7 +857,14 @@ struct CapturedStream {
     total_bytes: u64,
 }
 
-fn spawn_capture(mut file: File, limit: usize) -> thread::JoinHandle<Result<CapturedStream>> {
+/// Capture a stream into a capped buffer, mirroring every chunk into the
+/// shared stream (when given) so background readers can follow live output
+/// before the process finishes.
+fn spawn_capture_shared(
+    mut file: File,
+    limit: usize,
+    shared: Option<Arc<crate::background::SharedStream>>,
+) -> thread::JoinHandle<Result<CapturedStream>> {
     thread::spawn(move || {
         use std::io::Read;
         let mut captured = Vec::with_capacity(limit.min(64 * 1024));
@@ -601,6 +878,9 @@ fn spawn_capture(mut file: File, limit: usize) -> thread::JoinHandle<Result<Capt
             total_bytes = total_bytes
                 .checked_add(read as u64)
                 .context("sandbox captured byte count overflow")?;
+            if let Some(stream) = &shared {
+                stream.append(&buffer[..read]);
+            }
             let remaining = limit.saturating_sub(captured.len());
             captured.extend_from_slice(&buffer[..read.min(remaining)]);
         }
@@ -724,7 +1004,7 @@ mod runner_tests {
             file.write_all(input).expect("write capture fixture");
             use std::io::{Seek, SeekFrom};
             file.seek(SeekFrom::Start(0)).expect("rewind fixture");
-            let result = spawn_capture(file, limit).join().unwrap().unwrap();
+            let result = spawn_capture_shared(file, limit, None).join().unwrap().unwrap();
             assert_eq!(result.total_bytes, input.len() as u64);
             assert_eq!(result.bytes, input[..input.len().min(limit)]);
         }

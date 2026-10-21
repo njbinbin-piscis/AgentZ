@@ -903,6 +903,12 @@ pub async fn chat_delete_session(
     session_id: String,
     project_dir: Option<String>,
 ) -> Result<(), String> {
+    // Deleting a session terminates its background tasks and drops any parked
+    // continuation, so a deleted session never resurrects via auto-resume.
+    if let Some(state) = app.try_state::<crate::state::AppState>() {
+        state.bg_hub.cancel_pending_for_session(&session_id);
+        state.background_runs.kill_session(&session_id);
+    }
     with_db(&app, ProjectDirParam { project_dir }, |db| {
         db.delete_session(&session_id)
             .map_err(|e| format!("delete_session failed: {e}"))

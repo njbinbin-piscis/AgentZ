@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   chatSend,
+  chatCancel,
   onChatEvent,
   listSessions,
   SESSION_SOURCE_CODEZ,
@@ -75,6 +76,7 @@ import { useProjectScope } from "../../services/tauri/projectScope";
 import { collectArtifactsFromToolSteps, pathFromToolEvent } from "../workz/agentArtifacts";
 import "./AssistantPanel.css";
 import { isConfigured } from "../../services/tauri/settings";
+import { SessionTurnBookkeeping } from "./sessionTurnBookkeeping";
 import {
   SETTINGS_CLOSED_EVENT,
   hasFirstTaskDone,
@@ -134,6 +136,8 @@ interface QueuedTurn {
   text: string;
   attachment: ChatAttachment | null;
   clearPlan: false;
+  /** Session this turn belongs to; turns for other sessions run in parallel. */
+  sessionId: string;
   /** Bubble label when it differs from the model-facing prompt (auto-resume). */
   displayText?: string;
 }
@@ -323,10 +327,53 @@ export function useAssistantSession({
     },
     [],
   );
-  const queueRef = useRef<QueuedTurn[]>([]);
-  // Auto-resume (no-click continuation after a timeout): a bounded counter plus
-  // the localized prompt/label, kept in refs so `applyEvent` needs no new dep.
-  const autoResumeRef = useRef(0);
+  // Sessions run independently: the kernel multiplexes every conversation
+  // onto one event channel and the backend gives each turn its own task key,
+  // so running state, follow-up queues and cancel keys are kept per session
+  // instead of in panel-wide singletons. `busy` / `queuedView` below are only
+  // projections of whichever session is currently on screen.
+  const turnBookRef = useRef(new SessionTurnBookkeeping<QueuedTurn>());
+  const [runningIds, setRunningIds] = useState<string[]>([]);
+  /** Id reserved for the not-yet-sent new session in view (no DB row yet). */
+  const draftSessionIdRef = useRef<string | null>(null);
+  const taskKeyBySessionRef = useRef<Map<string, string>>(new Map());
+  const markRunning = useCallback((id: string | null, on: boolean) => {
+    turnBookRef.current.markRunning(id, on);
+    setRunningIds(turnBookRef.current.runningIds());
+  }, []);
+  /** Session key of the view on screen: the open session, else the draft. */
+  const viewSessionKey = useCallback((): string => {
+    if (sessionRef.current) return sessionRef.current;
+    draftSessionIdRef.current ??= crypto.randomUUID();
+    return draftSessionIdRef.current;
+  }, []);
+  const syncQueuedView = useCallback((key?: string | null) => {
+    const k = key ?? sessionRef.current ?? draftSessionIdRef.current;
+    setQueuedView(queuedLabels([...turnBookRef.current.queueFor(k)]));
+  }, []);
+  const syncBusyView = useCallback(() => {
+    const k = sessionRef.current ?? draftSessionIdRef.current;
+    const v = turnBookRef.current.isRunning(k);
+    busyRef.current = v;
+    setBusy(v);
+  }, []);
+  /** Drop unflushed deltas so a session switch cannot paint them elsewhere. */
+  const discardStreamDelta = useCallback(() => {
+    if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+    streamTimerRef.current = null;
+    streamPendingRef.current = "";
+    streamLenRef.current = 0;
+  }, []);
+  const enqueueTurn = useCallback((turn: QueuedTurn) => {
+    const q = turnBookRef.current.enqueue(turn);
+    if (turn.sessionId === (sessionRef.current ?? draftSessionIdRef.current)) {
+      setQueuedView(queuedLabels([...q]));
+    }
+  }, []);
+  // Auto-resume (no-click continuation after a timeout): a bounded counter per
+  // session plus the localized prompt/label, kept in refs so `applyEvent`
+  // needs no new dep.
+  const autoResumeBySessionRef = useRef<Map<string, number>>(new Map());
   const autoResumeTextRef = useRef({ prompt: "", label: "" });
   autoResumeTextRef.current = {
     prompt: t("chat.autoContinuePrompt"),
@@ -372,7 +419,11 @@ export function useAssistantSession({
     setPermissionRequest(null);
     historyCursorRef.current = { sessionId: "", offset: 0 };
     setHasMoreOlder(false);
-    queueRef.current = [];
+    turnBookRef.current.clearQueues();
+    draftSessionIdRef.current = null;
+    discardStreamDelta();
+    busyRef.current = false;
+    setBusy(false);
     setQueuedView([]);
     setMessages([]);
     setTurnDiffsByTurnId({});
@@ -390,7 +441,7 @@ export function useAssistantSession({
       revokeImageChipPreviews(cur);
       return [];
     });
-  }, [projectDir, clearCards, clearSessionArtifacts]);
+  }, [projectDir, clearCards, clearSessionArtifacts, discardStreamDelta]);
 
   useEffect(() => {
     setModelId((id) => pruneModelId(id, llmProviders));
@@ -563,43 +614,47 @@ export function useAssistantSession({
       // Terminal events must be handled even if `busy` state hasn't committed yet
       // (React batches setState; the backend can finish before re-render).
       if (env.channel === "agent_final") {
-        // Another conversation's turn ending must not resume or error this one.
-        if (env.sessionId && env.sessionId !== sessionRef.current) return;
+        const sid = env.sessionId;
+        if (!sid) return;
         const fin = env.payload as {
           ok: boolean;
           error?: string;
           timed_out?: boolean;
           open_todos?: number;
         };
+        const isViewed = sid === sessionRef.current;
         // Auto-resume: a turn-level wall-clock timeout is not a failure. Whatever
         // was streamed is already persisted, so the turn is restarted on its own
         // (no click). A user Stop ends the turn without `timed_out`, so this never
-        // fights an explicit cancellation.
-        const willResume = !!fin.timed_out && autoResumeRef.current < MAX_AUTO_RESUMES;
-        if (fin.ok) autoResumeRef.current = 0;
+        // fights an explicit cancellation. The resume is queued on its own
+        // session; the finishing turn's drain starts it, whichever session the
+        // user happens to be looking at.
+        const attempts = autoResumeBySessionRef.current.get(sid) ?? 0;
+        const willResume = !!fin.timed_out && attempts < MAX_AUTO_RESUMES;
+        if (fin.ok) autoResumeBySessionRef.current.delete(sid);
         if (willResume) {
-          setToast(t("chat.turnTimeoutResuming"));
-        } else if (!fin.ok && fin.error) {
+          autoResumeBySessionRef.current.set(sid, attempts + 1);
+          const { prompt, label } = autoResumeTextRef.current;
+          enqueueTurn({
+            text: prompt,
+            displayText: label,
+            attachment: null,
+            clearPlan: false,
+            sessionId: sid,
+          });
+          if (isViewed) setToast(t("chat.turnTimeoutResuming"));
+          composerDbg("auto-resume queued", {
+            attempt: attempts + 1,
+            openTodos: fin.open_todos,
+          });
+        } else if (!fin.ok && fin.error && isViewed) {
+          // Only the session on screen may paint its error; background
+          // failures surface through the session list status instead.
           setError(
             fin.timed_out
               ? `${fin.error} (stopped after ${MAX_AUTO_RESUMES} automatic continuations — send a message to continue.)`
               : fin.error,
           );
-        }
-        if (willResume) {
-          autoResumeRef.current += 1;
-          const { prompt, label } = autoResumeTextRef.current;
-          queueRef.current.push({
-            text: prompt,
-            displayText: label,
-            attachment: null,
-            clearPlan: false,
-          });
-          setQueuedView(queuedLabels(queueRef.current));
-          composerDbg("auto-resume queued", {
-            attempt: autoResumeRef.current,
-            openTodos: fin.open_todos,
-          });
         }
         return;
       }
@@ -688,7 +743,7 @@ export function useAssistantSession({
           break;
       }
     },
-    [handleAgentEvent],
+    [handleAgentEvent, enqueueTurn],
   );
 
   useEffect(() => {
@@ -758,22 +813,46 @@ export function useAssistantSession({
     };
   }, [applyDroppedPaths]);
 
-  const removeQueued = useCallback((index: number) => {
-    queueRef.current.splice(index, 1);
-    setQueuedView(queuedLabels(queueRef.current));
-  }, []);
+  const removeQueued = useCallback(
+    (index: number) => {
+      const key = sessionRef.current ?? draftSessionIdRef.current;
+      if (!key) return;
+      turnBookRef.current.removeAt(key, index);
+      syncQueuedView(key);
+    },
+    [syncQueuedView],
+  );
 
   runTurnRef.current = async (turn: QueuedTurn) => {
     const done = composerDbgMark("runTurn");
+    // The turn is bound to its own session from the start (the backend
+    // honours a client-provided id). Several sessions may be in flight at
+    // once, so every view-scoped side effect below is guarded by
+    // `isViewing()` — a background turn must never paint into, or rebind,
+    // the conversation currently on screen.
+    const turnSessionId = turn.sessionId;
+    const startedViewed =
+      sessionRef.current === turnSessionId ||
+      (sessionRef.current === null && draftSessionIdRef.current === turnSessionId);
+    if (startedViewed) sessionRef.current = turnSessionId;
+    // The backend echoes the client-provided id, so this normally never
+    // changes; it only moves if the backend ever assigns a different one.
+    let effectiveSessionId = turnSessionId;
+    const isViewing = () => sessionRef.current === effectiveSessionId;
     composerDbg("runTurn start", {
       promptLen: turn.text.length,
       promptPreview: promptPreview(turn.text),
       hasAttachment: Boolean(turn.attachment),
       clearPlan: turn.clearPlan,
-      sessionId: sessionRef.current,
+      sessionId: turnSessionId,
     });
-    setError(null);
-    setSetupError(false);
+    // Each turn gets a unique task key so the backend registers it in the
+    // parallel-task slot map (not the single IDE-chat slot, which rejects a
+    // second concurrent turn) and Stop can cancel just this session's turn.
+    const taskKey = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    taskKeyBySessionRef.current.set(turnSessionId, taskKey);
+    markRunning(turnSessionId, true);
+    if (isViewing()) syncBusyView();
     const displayText =
       turn.displayText ??
       (turn.attachment && !turn.text.trim()
@@ -781,23 +860,18 @@ export function useAssistantSession({
         : turn.attachment
           ? `${turn.text}${turn.text.trim() ? "\n" : ""}📎 ${turn.attachment.filename ?? turn.attachment.path ?? t("chat.attachment")}`
           : turn.text);
-    composerDbg("runTurn → setMessages (user bubble)");
-    setMessages((m) => [
-      ...m,
-      { role: "user", text: displayText },
-      { role: "assistant", text: "" },
-    ]);
-    streamLenRef.current = 0;
-    setToolSteps([]);
-    // Fix the session id before the turn starts (the backend honours a
-    // client-provided id). The kernel event channel is shared by every panel
-    // and background run, so events are matched against this id from the very
-    // first event; adopting whichever session's event arrived first let other
-    // conversations' interactive cards and text leak into this one.
-    const turnSessionId = sessionRef.current ?? crypto.randomUUID();
-    sessionRef.current = turnSessionId;
-    busyRef.current = true;
-    setBusy(true);
+    if (isViewing()) {
+      setError(null);
+      setSetupError(false);
+      composerDbg("runTurn → setMessages (user bubble)");
+      setMessages((m) => [
+        ...m,
+        { role: "user", text: displayText },
+        { role: "assistant", text: "" },
+      ]);
+      streamLenRef.current = 0;
+      setToolSteps([]);
+    }
     try {
       composerDbg("runTurn → chatSend invoke");
       const res = await chatSend({
@@ -809,6 +883,7 @@ export function useAssistantSession({
         chatMode,
         modelId: modelId || null,
         clearPlan: false,
+        taskKey,
         enabledSkills: enabledSkills.length > 0 ? enabledSkills : null,
         agentId: activeAgent || null,
         sessionSource: SESSION_SOURCE_CODEZ,
@@ -819,69 +894,97 @@ export function useAssistantSession({
         turnId: res.turn_id,
         responseLen: res.response_text.length,
       });
-      sessionRef.current = res.session_id;
-      rememberLastSession(projectDir, res.session_id);
+      if (res.session_id !== turnSessionId) {
+        taskKeyBySessionRef.current.set(res.session_id, taskKey);
+        if (turnBookRef.current.isRunning(turnSessionId)) {
+          markRunning(turnSessionId, false);
+          markRunning(res.session_id, true);
+        }
+        turnBookRef.current.rekey(turnSessionId, res.session_id, (queued) => ({
+          ...queued,
+          sessionId: res.session_id,
+        }));
+      }
+      effectiveSessionId = res.session_id;
+      const viewingNow = sessionRef.current === effectiveSessionId;
       // A turn that completed without error is the first successful task.
       markFirstTaskDone();
       setFirstTaskDone(true);
-      const turnId = res.turn_id ?? undefined;
-      setMessages((m) => {
-        const copy = m.slice();
-        const last = copy[copy.length - 1];
-        if (last?.role === "assistant" && !last.text.trim()) {
-          copy[copy.length - 1] = { ...last, text: res.response_text, turnId };
-        }
-        return copy;
-      });
-      // Surface this turn's file edits in the global edge drawer + inline diff cards.
-      if (turnId && projectDir) {
-        try {
-          const [changes, diffs] = await Promise.all([
-            journalListChanges(projectDir, res.session_id, turnId),
-            journalGetTurnDiffs(projectDir, res.session_id, turnId),
-          ]);
-          setPendingReview(
-            changes.length > 0 ? { sessionId: res.session_id, turnId, changes } : null,
-          );
-          if (diffs.length > 0) {
-            setTurnDiffsByTurnId((prev) => ({ ...prev, [turnId]: diffs }));
+      if (viewingNow) {
+        sessionRef.current = effectiveSessionId;
+        rememberLastSession(projectDir, effectiveSessionId);
+        const turnId = res.turn_id ?? undefined;
+        setMessages((m) => {
+          const copy = m.slice();
+          const last = copy[copy.length - 1];
+          if (last?.role === "assistant" && !last.text.trim()) {
+            copy[copy.length - 1] = { ...last, text: res.response_text, turnId };
           }
-        } catch {
-          // journal is best-effort; ignore listing failures
+          return copy;
+        });
+        // Surface this turn's file edits in the global edge drawer + inline diff cards.
+        if (turnId && projectDir) {
+          try {
+            const [changes, diffs] = await Promise.all([
+              journalListChanges(projectDir, effectiveSessionId, turnId),
+              journalGetTurnDiffs(projectDir, effectiveSessionId, turnId),
+            ]);
+            if (sessionRef.current === effectiveSessionId) {
+              setPendingReview(
+                changes.length > 0
+                  ? { sessionId: effectiveSessionId, turnId, changes }
+                  : null,
+              );
+              if (diffs.length > 0) {
+                setTurnDiffsByTurnId((prev) => ({ ...prev, [turnId]: diffs }));
+              }
+            }
+          } catch {
+            // journal is best-effort; ignore listing failures
+          }
         }
       }
     } catch (e) {
       const msg = String(e);
       composerDbg("runTurn ← chatSend error", { error: promptPreview(msg, 500) });
-      if (msg.includes("402") || msg.toLowerCase().includes("insufficient_balance")) {
-        setError(t("chat.llmBalanceError"));
-        setSetupError(true);
-      } else {
-        setError(msg);
-        setSetupError(isLlmSetupFailure(msg));
+      if (isViewing()) {
+        if (msg.includes("402") || msg.toLowerCase().includes("insufficient_balance")) {
+          setError(t("chat.llmBalanceError"));
+          setSetupError(true);
+        } else {
+          setError(msg);
+          setSetupError(isLlmSetupFailure(msg));
+        }
       }
     } finally {
-      busyRef.current = false;
-      setBusy(false);
-      if (sessionRef.current && queueRef.current.length === 0) {
-        try {
-          composerDbg("runTurn → syncMessagesFromDb");
-          await syncMessagesFromDb(sessionRef.current);
-          composerDbg("runTurn ← syncMessagesFromDb ok");
-        } catch (syncErr) {
-          composerDbg("runTurn ← syncMessagesFromDb failed", String(syncErr));
-          // keep in-memory messages if reload fails
-        }
-        if (projectDir) {
-          listSessions(projectDir, SESSION_SOURCES_PROJECT_SHARED)
-            .then(setSessions)
-            .catch(() => setSessions([]));
-          scheduleWorkspaceRefresh({ git: true, fileTree: true, force: true, delayMs: 0 });
+      markRunning(turnSessionId, false);
+      markRunning(effectiveSessionId, false);
+      taskKeyBySessionRef.current.delete(turnSessionId);
+      taskKeyBySessionRef.current.delete(effectiveSessionId);
+      const queue = turnBookRef.current.queueFor(effectiveSessionId);
+      if (isViewing()) {
+        syncBusyView();
+        if (queue.length === 0) {
+          try {
+            composerDbg("runTurn → syncMessagesFromDb");
+            await syncMessagesFromDb(effectiveSessionId);
+            composerDbg("runTurn ← syncMessagesFromDb ok");
+          } catch (syncErr) {
+            composerDbg("runTurn ← syncMessagesFromDb failed", String(syncErr));
+            // keep in-memory messages if reload fails
+          }
         }
       }
-      const next = queueRef.current.shift();
+      if (projectDir && queue.length === 0) {
+        listSessions(projectDir, SESSION_SOURCES_PROJECT_SHARED)
+          .then(setSessions)
+          .catch(() => setSessions([]));
+        scheduleWorkspaceRefresh({ git: true, fileTree: true, force: true, delayMs: 0 });
+      }
+      // Drain this session's own follow-up queue, foreground or background.
+      const next = turnBookRef.current.shiftNext(effectiveSessionId);
       if (next) {
-        setQueuedView(queuedLabels(queueRef.current));
+        syncQueuedView(effectiveSessionId);
         void runTurnRef.current(next);
       }
       done();
@@ -890,14 +993,18 @@ export function useAssistantSession({
 
   const doSend = useCallback(
     (text: string, att: ChatAttachment | null) => {
-      if (busy) {
-        queueRef.current.push({ text, attachment: att, clearPlan: false });
-        setQueuedView(queuedLabels(queueRef.current));
+      // The turn belongs to the session on screen. Only that session's own
+      // in-flight turn queues it; other sessions running in the background
+      // must not block (or swallow) this send.
+      const key = viewSessionKey();
+      const turn: QueuedTurn = { text, attachment: att, clearPlan: false, sessionId: key };
+      if (turnBookRef.current.isRunning(key)) {
+        enqueueTurn(turn);
       } else {
-        void runTurnRef.current({ text, attachment: att, clearPlan: false });
+        void runTurnRef.current(turn);
       }
     },
-    [busy],
+    [viewSessionKey, enqueueTurn],
   );
 
   const submit = useCallback(() => {
@@ -932,8 +1039,8 @@ export function useAssistantSession({
     }
     composerDbg("submit → clear input & chips");
     clearComposer();
-    // A fresh user request restarts the auto-resume budget.
-    autoResumeRef.current = 0;
+    // A fresh user request restarts this session's auto-resume budget.
+    autoResumeBySessionRef.current.delete(viewSessionKey());
 
     inputHistory.push(text);
     composerDbg("submit → doSend");
@@ -969,14 +1076,15 @@ export function useAssistantSession({
         defaultValue: "请按照计划文件 {{path}} 逐步执行，更新计划进度并产出验收证据。",
         path: planPath,
       });
-      if (!busy) {
-        void runTurnRef.current({ text: prompt, attachment: null, clearPlan: false });
+      const key = viewSessionKey();
+      const turn: QueuedTurn = { text: prompt, attachment: null, clearPlan: false, sessionId: key };
+      if (turnBookRef.current.isRunning(key)) {
+        enqueueTurn(turn);
       } else {
-        queueRef.current.push({ text: prompt, attachment: null, clearPlan: false });
-        setQueuedView(queuedLabels(queueRef.current));
+        void runTurnRef.current(turn);
       }
     },
-    [busy, t],
+    [t, viewSessionKey, enqueueTurn],
   );
 
   const refreshSessions = useCallback(() => {
@@ -1045,13 +1153,20 @@ export function useAssistantSession({
 
   const newSession = useCallback(() => {
     setPermissionRequest(null);
+    // Detach the view only: any turn in flight keeps running in the
+    // background under its own session, and its queue stays with it. The
+    // fresh view gets a reserved draft id so its first send (and anything
+    // queued behind it) is keyed independently from the very first event.
     sessionRef.current = null;
+    draftSessionIdRef.current = crypto.randomUUID();
+    discardStreamDelta();
+    busyRef.current = false;
+    setBusy(false);
+    setQueuedView([]);
     setSessionReadOnly(false);
     rememberLastSession(projectDir, null);
     historyCursorRef.current = { sessionId: "", offset: 0 };
     setHasMoreOlder(false);
-    queueRef.current = [];
-    setQueuedView([]);
     setMessages([]);
     setTurnDiffsByTurnId({});
     setPlanItems([]);
@@ -1063,13 +1178,26 @@ export function useAssistantSession({
     // A pending `chat_ui` card belongs to the turn that produced it, so a fresh
     // session must start empty — otherwise the stale form reappears here.
     clearCards();
-  }, [projectDir, clearSessionArtifacts, clearCards]);
+  }, [projectDir, clearSessionArtifacts, clearCards, discardStreamDelta]);
 
   const switchSession = useCallback(
     async (id: string, source?: string) => {
       setPermissionRequest(null);
+      // Re-selecting the session already on screen must not reload it from
+      // the DB — that would wipe the in-flight stream and tool trace.
+      if (id === sessionRef.current) {
+        setShowSessions(false);
+        return;
+      }
       try {
         sessionRef.current = id;
+        // The view now mirrors the target session: its own busy state (a
+        // turn may still be running in the background) and its own queue —
+        // never the previous session's. Unflushed stream deltas belong to
+        // the session being left and are dropped, not repainted here.
+        discardStreamDelta();
+        syncBusyView();
+        syncQueuedView(id);
         setSessionReadOnly(isReadOnlyInCodeZ(source));
         rememberLastSession(projectDir, id);
         historyCursorRef.current = { sessionId: id, offset: 0 };
@@ -1080,6 +1208,16 @@ export function useAssistantSession({
         // when the user scrolls up.
         stickToBottomRef.current = true;
         await syncMessagesFromDb(id);
+        if (sessionRef.current === id && turnBookRef.current.isRunning(id)) {
+          // This session is mid-turn: give the live stream a trailing
+          // assistant bubble to land in (persisted history ends at the
+          // user message until the turn completes).
+          setMessages((prev) =>
+            prev.length > 0 && prev[prev.length - 1].role === "user"
+              ? [...prev, { role: "assistant", text: "" }]
+              : prev,
+          );
+        }
         if (artifactScope?.handle) {
           void queryTaskPlan(artifactScope.handle, id)
             .then((r) => {
@@ -1103,7 +1241,17 @@ export function useAssistantSession({
         setError(String(e));
       }
     },
-    [projectDir, syncMessagesFromDb, clearSessionArtifacts, clearCards, artifactScope, applyPersistedPlan],
+    [
+      projectDir,
+      syncMessagesFromDb,
+      clearSessionArtifacts,
+      clearCards,
+      artifactScope,
+      applyPersistedPlan,
+      discardStreamDelta,
+      syncBusyView,
+      syncQueuedView,
+    ],
   );
 
   // After a restart, reopen the session that was active when the app closed.
@@ -1218,11 +1366,19 @@ export function useAssistantSession({
     }
   }, [projectDir, refreshSessions, switchSession]);
 
+  /** Stop the turn of the session on screen (other sessions keep running). */
+  const stopCurrent = useCallback(() => {
+    const sid = sessionRef.current;
+    if (!sid) return;
+    void chatCancel(taskKeyBySessionRef.current.get(sid) ?? null);
+  }, []);
+
   const removeSession = useCallback(
     async (id: string) => {
       if (!projectDir) return;
       try {
         await deleteSession(id, projectDir!);
+        turnBookRef.current.deleteSession(id);
         if (sessionRef.current === id) newSession();
         refreshSessions();
       } catch (e) {
@@ -1439,6 +1595,6 @@ export function useAssistantSession({
           : t("chat.placeholderFollowUp");
 
   return {
-    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, onModeChange, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
+    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, onModeChange, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
   };
 }
