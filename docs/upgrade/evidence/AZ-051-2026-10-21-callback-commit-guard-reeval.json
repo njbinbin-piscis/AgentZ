@@ -1,0 +1,21 @@
+[
+  {
+    "id": "AZ-051",
+    "verified_state": "local_oauth_callback_commit_guard_candidate_unreviewed",
+    "severity": "P1",
+    "finding": "The current source adds a lifecycle-locked callback commit check against the pending state, complete manifest and credential-file digest, preventing an old provider response from overwriting local changes during authorization. The browser page no longer claims token persistence succeeded before it has run. Windows OAuth flow tests passed 14/14 and the desktop library suite passed 379 with 7 ignored and 0 failed on this source.",
+    "conclusion_proposal": "Keep AZ-051 deferred under ADR-006 until independent review and real provider and native lifecycle acceptance are complete.",
+    "next_action": "During unified acceptance, review the callback and per-call MCP guards, decide provider-side revocation and in-flight call policy, and exercise real provider authorization, expiry, refresh and revocation with a controlled account.",
+    "remaining_work": [
+      "Independent review of the current OAuth callback, refresh, credential storage and MCP guards",
+      "Provider-side revocation and in-flight MCP cancellation policy",
+      "Native desktop and actual provider authorization, expiry, refresh and revoke receipts"
+    ],
+    "verification_gaps": [
+      "No external provider account or real OAuth endpoint was exercised",
+      "No native desktop callback journey, live MCP call or provider-side revoke receipt",
+      "No unified independent implementation review"
+    ],
+    "evidence": ["docs/upgrade/evidence/AZ-051-2026-10-21-callback-commit-guard.md"]
+  }
+]

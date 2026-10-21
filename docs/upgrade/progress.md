@@ -1,6 +1,6 @@
 # AgentZ 实施进度
 
-更新时间：2026/10/21 17:07:40（Asia/Tokyo）；由台账自动生成。
+更新时间：2026/10/21 17:42:17（Asia/Tokyo）；由台账自动生成。
 
 任务：83；已验收：65；执行/评审：0；阻塞：0。
 
@@ -69,7 +69,7 @@ Gate通过：M0, M1, M2, M3, M4, M5, M6, M7, M8, M9, MB。
 - AZ-048 无仓库任务独立工作目录：host_trusted_projectless_turn_and_observation_wired_local_checks_passed；下一步：Run a real first turn and continuation in separate projectless sessions, reopen after restart, verify catalog-loss refusal and legacy free-session compatibility; review final source and rollback evidence before acceptance.。
 - AZ-049 研究报告交付模板：structured_report_render_wired_to_task_bound_artifact_capture_local_checks_passed；下一步：Review one fixed research report and open each source locator, exercise native task-bound capture/read/edit/continue, then independently review the final source and acceptance criteria.。
 - AZ-050 文档产物编辑预览闭环：host_resolved_versioned_continuation_local_checks_passed；下一步：Run native create/edit/restore/continue/archive journey, verify HTML/Markdown preview and failed-send recovery, then independently review final source and upstream contracts.。
-- AZ-051 连接器授权生命周期：local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed；下一步：Review the current PKCE callback, refresh and per-call MCP guard; decide provider-side revocation support, then run one real provider authorization/expiry/revoke journey and in-flight cancellation case during unified acceptance.。
+- AZ-051 连接器授权生命周期：local_oauth_callback_commit_guard_candidate_unreviewed；下一步：During unified acceptance, review the callback and per-call MCP guards, decide provider-side revocation and in-flight call policy, and exercise real provider authorization, expiry, refresh and revocation with a controlled account.。
 - AZ-052 外部发送与发布交付流程：partial；下一步：Connect POST/PUT/DELETE and gateway.send to prepare/frozen approval/start/completion/unknown reconciliation; create sandbox-local tests before live external account receipt.。
 - AZ-053 浏览器上下文与抢占恢复：unshipped_dependency_fix_local_tests_pass；下一步：Review and pin an immutable RobotZ revision with generation-aware refs, then run AgentZ's pinned stale-ref and delayed-action takeover fixtures.。
 - AZ-054 Windows 桌面操作最小闭环：not_started；下一步：Define one supported Windows application/action set, add host focus identity and user takeover gate plus sensitive-region policy; test pure guards first and preserve native unverified label.。

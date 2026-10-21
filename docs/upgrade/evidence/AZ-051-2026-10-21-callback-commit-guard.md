@@ -1,0 +1,7 @@
+# AZ-051 callback commit guard (2026-10-21)
+
+The OAuth callback now checks the pending attempt state, complete connector manifest, and a digest of the credential file under the existing lifecycle lock before persisting exchanged tokens. A response for a replaced attempt, changed provider configuration or transport, or credentials saved during the browser journey cannot overwrite the newer local state. An unreadable credential file also fails closed. The browser completion page now says the response was received and directs the user to AgentZ for the final result; token exchange and persistence may still fail afterward.
+
+The local fixture covers an unchanged attempt and rejection after credential replacement, OAuth client replacement, connector transport replacement, or state replacement. On Windows, `cargo test -p agentz-desktop --lib commands::connectors::oauth_flow_tests --locked --offline` passed 14/14 on this source; `cargo test -p agentz-desktop --lib --locked --offline` passed 379, ignored 7, failed 0. Targeted `rustfmt --check --edition 2021 src-tauri/src/commands/connectors.rs` and `git diff --check` passed. The full repository formatting check has unrelated existing failures and was not used as acceptance evidence.
+
+This is a local source candidate. No external OAuth provider, native desktop callback journey, live MCP call, provider-side revocation, or in-flight cancellation was exercised. AZ-051 remains deferred under ADR-006 pending those decisions and unified acceptance.

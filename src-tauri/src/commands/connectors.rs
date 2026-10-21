@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tauri::AppHandle;
 use tracing::{info, warn};
 
@@ -34,7 +35,7 @@ use crate::commands::data_scope::resolve_global_config_dir;
 
 // ─── Manifest schema ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConnectorAuthField {
     pub key: String,
     #[serde(default)]
@@ -45,7 +46,7 @@ pub struct ConnectorAuthField {
     pub placeholder: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ConnectorOAuth {
     #[serde(default)]
     pub authorize_url: String,
@@ -59,7 +60,7 @@ pub struct ConnectorOAuth {
     pub redirect: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConnectorAuth {
     /// "none" | "api_key" | "token" | "oauth2"
     #[serde(default = "default_auth_method")]
@@ -84,7 +85,7 @@ impl Default for ConnectorAuth {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConnectorManifest {
     pub id: String,
     pub name: String,
@@ -480,7 +481,7 @@ use tokio::task::JoinHandle;
 pub const CONNECTOR_OAUTH_RESULT_EVENT: &str = "connectors:oauth-result";
 const OAUTH_CALLBACK_TIMEOUT_SECS: u64 = 300;
 const OAUTH_REQUEST_TIMEOUT_SECS: u64 = 30;
-const CALLBACK_DONE_PAGE: &str = "AgentZ 已完成授权，可以关闭此页面。";
+const CALLBACK_DONE_PAGE: &str = "授权响应已收到，请返回 AgentZ 查看最终结果。";
 const CALLBACK_FAILED_PAGE: &str = "AgentZ 授权失败，请回到应用查看原因。";
 
 #[derive(Debug, Clone, Serialize)]
@@ -507,6 +508,44 @@ fn pending_oauth() -> &'static std::sync::Mutex<HashMap<String, PendingOAuth>> {
 fn oauth_lifecycle() -> &'static tokio::sync::Mutex<()> {
     static LIFECYCLE: std::sync::OnceLock<tokio::sync::Mutex<()>> = std::sync::OnceLock::new();
     LIFECYCLE.get_or_init(|| tokio::sync::Mutex::new(()))
+}
+
+fn credential_file_digest(dir: &Path, id: &str) -> Result<Option<[u8; 32]>, String> {
+    match std::fs::read(credentials_path(dir, id)) {
+        Ok(bytes) => Ok(Some(Sha256::digest(bytes).into())),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err("stored connector credentials could not be read".into()),
+    }
+}
+
+// A callback may finish after the manifest or credentials were changed outside this OAuth
+// attempt. Never bind an old provider response to a replacement connector or overwrite a
+// newer credential save. The caller holds oauth_lifecycle while validating and writing.
+fn validate_callback_commit(
+    dir: &Path,
+    id: &str,
+    state: &str,
+    original_manifest: &ConnectorManifest,
+    original_credentials: Option<[u8; 32]>,
+) -> Result<(), String> {
+    let pending = pending_oauth()
+        .lock()
+        .map_err(|_| "authorization state unavailable".to_string())?;
+    if !pending
+        .get(id)
+        .is_some_and(|attempt| attempt.state == state)
+    {
+        return Err("connector authorization attempt was replaced".into());
+    }
+    drop(pending);
+    let current = ConnectorManifest::load(&dir.join(safe_id(id)).join("connector.json"))?;
+    if current.id != id || current.auth.method != "oauth2" || current != *original_manifest {
+        return Err("connector authorization changed during callback".into());
+    }
+    if credential_file_digest(dir, id)? != original_credentials {
+        return Err("connector credentials changed during callback".into());
+    }
+    Ok(())
 }
 
 async fn abort_pending_oauth(id: &str) -> Result<(), String> {
@@ -824,7 +863,11 @@ pub async fn connectors_oauth_start(app: AppHandle, id: String) -> Result<String
     let _lifecycle = oauth_lifecycle().lock().await;
     let dir = connectors_dir(&app)?;
     let manifest = ConnectorManifest::load(&dir.join(safe_id(&id)).join("connector.json"))?;
+    if safe_id(&manifest.id) != safe_id(&id) {
+        return Err("connector identity does not match its directory".into());
+    }
     let oauth = require_oauth2(&manifest)?;
+    let credentials_at_start = credential_file_digest(&dir, &manifest.id)?;
     let (bind_addr, redirect_path, redirect_uri) = loopback_redirect(&oauth.redirect)?;
     let verifier = new_pkce_verifier();
     let state = new_oauth_state();
@@ -843,6 +886,7 @@ pub async fn connectors_oauth_start(app: AppHandle, id: String) -> Result<String
     let task_app = app.clone();
     let task_dir = dir.clone();
     let task_oauth = oauth.clone();
+    let task_manifest = manifest.clone();
     let task = tokio::spawn(async move {
         let outcome = tokio::time::timeout(
             std::time::Duration::from_secs(OAUTH_CALLBACK_TIMEOUT_SECS),
@@ -859,14 +903,23 @@ pub async fn connectors_oauth_start(app: AppHandle, id: String) -> Result<String
         let result: Result<(), String> = match outcome {
             Ok(Ok(tokens)) => {
                 let _lifecycle = oauth_lifecycle().lock().await;
-                store_oauth_tokens(
+                validate_callback_commit(
                     &task_dir,
                     &id_for_task,
-                    &tokens.access_token,
-                    tokens.refresh_token.as_deref(),
-                    tokens.expires_in,
-                    unix_now(),
+                    &state_for_task,
+                    &task_manifest,
+                    credentials_at_start,
                 )
+                .and_then(|_| {
+                    store_oauth_tokens(
+                        &task_dir,
+                        &id_for_task,
+                        &tokens.access_token,
+                        tokens.refresh_token.as_deref(),
+                        tokens.expires_in,
+                        unix_now(),
+                    )
+                })
             }
             Ok(Err(reason)) => Err(reason),
             Err(_) => Err("authorization timed out before the browser redirected back".into()),
@@ -1247,6 +1300,58 @@ mod oauth_flow_tests {
             scopes: vec!["read".into(), "write".into()],
             redirect: "http://127.0.0.1:53682/callback".into(),
         }
+    }
+
+    #[tokio::test]
+    async fn callback_rejects_replaced_manifest_credentials_and_attempt() {
+        let dir = std::env::temp_dir().join(format!("agentz-callback-{}", uuid::Uuid::new_v4()));
+        let id = "callback-fixture";
+        std::fs::create_dir_all(dir.join(id)).unwrap();
+        let manifest_path = dir.join(id).join("connector.json");
+        let original_oauth = oauth();
+        let manifest = serde_json::json!({
+            "id": id,
+            "name": "Callback fixture",
+            "auth": {"method": "oauth2", "oauth": original_oauth}
+        });
+        let original_manifest: ConnectorManifest =
+            serde_json::from_value(manifest.clone()).unwrap();
+        std::fs::write(&manifest_path, manifest.to_string()).unwrap();
+        std::fs::write(credentials_path(&dir, id), r#"{"unrelated":"old"}"#).unwrap();
+        let initial = credential_file_digest(&dir, id).unwrap();
+        pending_oauth().lock().unwrap().insert(
+            id.into(),
+            PendingOAuth {
+                state: "state-1".into(),
+                task: tokio::spawn(async {}),
+            },
+        );
+
+        assert!(validate_callback_commit(&dir, id, "state-1", &original_manifest, initial).is_ok());
+        std::fs::write(credentials_path(&dir, id), r#"{"unrelated":"new"}"#).unwrap();
+        assert!(
+            validate_callback_commit(&dir, id, "state-1", &original_manifest, initial).is_err()
+        );
+        std::fs::write(credentials_path(&dir, id), r#"{"unrelated":"old"}"#).unwrap();
+        let mut replacement = manifest.clone();
+        replacement["auth"]["oauth"]["client_id"] = "different-client".into();
+        std::fs::write(&manifest_path, replacement.to_string()).unwrap();
+        assert!(
+            validate_callback_commit(&dir, id, "state-1", &original_manifest, initial).is_err()
+        );
+        replacement = manifest.clone();
+        replacement["url"] = "https://different.example.test/mcp".into();
+        std::fs::write(&manifest_path, replacement.to_string()).unwrap();
+        assert!(
+            validate_callback_commit(&dir, id, "state-1", &original_manifest, initial).is_err()
+        );
+        std::fs::write(&manifest_path, manifest.to_string()).unwrap();
+        assert!(
+            validate_callback_commit(&dir, id, "state-2", &original_manifest, initial).is_err()
+        );
+
+        pending_oauth().lock().unwrap().remove(id);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     fn creds(pairs: &[(&str, &str)]) -> HashMap<String, String> {

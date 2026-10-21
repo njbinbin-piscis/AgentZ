@@ -1072,8 +1072,8 @@ Gate：passed；前置：M2, M3, M4。
 - 关联审查：F06, F08；风险：外部副作用和前台资源；先测试账户与受控应用，独立授权。
 - 回退：优先功能开关/回退独立变更；数据schema变化先执行备份恢复检查。
 - 阻塞：waived:ADR-006：外部硬件/跨平台真机/商业证书或 1.x Beta 范围，按 ADR-006 受控豁免并移入 1.x；下一步：1.x 跨平台与商业签名扩展阶段补齐外部环境验证。
-- 当前复评：local_oauth_expiry_callback_mcp_revalidation_and_lifecycle_guard_candidate_unreviewed；结论：Keep pending until the current end-to-end authorization and revocation path is independently reviewed and exercised with a real provider account.；下一步：Review the current PKCE callback, refresh and per-call MCP guard; decide provider-side revocation support, then run one real provider authorization/expiry/revoke journey and in-flight cancellation case during unified acceptance.。
-- 复评剩余：Independent review of the current OAuth callback, refresh and storage candidate；Concurrent native lifecycle race fixture, provider revoke policy and already in-flight MCP call handling；Actual provider authorization, expiry, refresh and revoke receipts；验证缺口：No external provider account or real OAuth endpoint was exercised；No native desktop callback journey, live MCP call or provider-side revoke receipt；No unified independent implementation review。
+- 当前复评：local_oauth_callback_commit_guard_candidate_unreviewed；结论：Keep AZ-051 deferred under ADR-006 until independent review and real provider and native lifecycle acceptance are complete.；下一步：During unified acceptance, review the callback and per-call MCP guards, decide provider-side revocation and in-flight call policy, and exercise real provider authorization, expiry, refresh and revocation with a controlled account.。
+- 复评剩余：Independent review of the current OAuth callback, refresh, credential storage and MCP guards；Provider-side revocation and in-flight MCP cancellation policy；Native desktop and actual provider authorization, expiry, refresh and revoke receipts；验证缺口：No external provider account or real OAuth endpoint was exercised；No native desktop callback journey, live MCP call or provider-side revoke receipt；No unified independent implementation review。
 - 证据：待附提交/PR/测试日志/截图或报告。
 - 完成摘要：待填写；复盘：待填写。
 
