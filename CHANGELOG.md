@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Sandbox strength now follows the security level**: `strict` keeps the zero-network AppContainer, `balanced` runs shell/code_run as the current user with network, loopback and toolchain caches while the working directory stays pinned to the project, and `dev` disables the sandbox entirely (working directory may leave the project). The sandbox mode comes only from Settings, never from tool input.
 - **Settings reorganized**: a new first tab “General” holds language, the security level, the default WorkZ directory and project list, app change history, config status/path, and diagnostics export. The Models tab now only contains provider, model and MCP configuration.
+- **Settings theme styling**: the diagnostics export section now sits inside the padded settings body like every other section, and a zero-specificity base theme layer styles every bare input/textarea/select/button across all settings tabs (rounded corners, theme background and borders in light and dark themes).
 
 ## [1.0.8] - 2026-10-21
 

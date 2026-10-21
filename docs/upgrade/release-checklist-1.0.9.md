@@ -9,3 +9,4 @@
 - [x] `cargo test --manifest-path src-tauri/Cargo.toml -p piscis-kernel --lib windows_sandbox`（19 项）、`code_run`（3 项）、`shell`（6 项）、`sandbox_mode_maps`（1 项）通过。
 - [x] `cargo test --manifest-path src-tauri/Cargo.toml --lib agents`（2 项）通过。
 - [x] `npx tsc --noEmit` 与 `npx vitest run src/i18n/i18n.test.ts` 通过。
+- [x] 设置面板主题修复后 `npx vitest run src/workspaces/codez/settings/DiagnosticsSection.test.tsx` 通过；本清单随样式修复覆盖重发 1.0.9（标签已移动至包含样式修复的提交）。

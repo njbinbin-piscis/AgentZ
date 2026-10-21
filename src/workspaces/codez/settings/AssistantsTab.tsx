@@ -306,7 +306,7 @@ export default function AssistantsTab() {
             <strong>{t("assistantPanel.wechatTitle")}</strong>
             {renderStatus("wechat")}
           </label>
-          <div style={{ fontSize: 12, color: "#8b949e" }}>
+          <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
             {form.wechat_bot_id
               ? t("assistantPanel.wechatBound", { id: form.wechat_bot_id })
               : t("assistantPanel.wechatUnbound")}

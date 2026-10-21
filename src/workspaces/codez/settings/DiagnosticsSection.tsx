@@ -44,9 +44,10 @@ export default function DiagnosticsSection() {
   return (
     <section className="agentz-settings-section" aria-label={t("settings.diagnosticsTitle")}>
       <h3>{t("settings.diagnosticsTitle")}</h3>
-      <p>{t("settings.diagnosticsDescription")}</p>
+      <p className="agentz-settings-hint">{t("settings.diagnosticsDescription")}</p>
       <button
         type="button"
+        className="agentz-settings-cancel"
         data-testid="diagnostics-preview-btn"
         disabled={busy}
         onClick={() => void loadPreview()}
@@ -54,7 +55,7 @@ export default function DiagnosticsSection() {
         {t("settings.diagnosticsPreview")}
       </button>
       {preview && (
-        <div data-testid="diagnostics-preview-card">
+        <div className="agentz-diagnostics-card" data-testid="diagnostics-preview-card">
           <p>
             {t("settings.diagnosticsScope", {
               version: preview.app_version,
@@ -72,7 +73,7 @@ export default function DiagnosticsSection() {
               })}
             </p>
           )}
-          <ul>
+          <ul className="agentz-diagnostics-files">
             {preview.files.map((file) => (
               <li key={file.name}>
                 {file.name} ({file.bytes} B)
@@ -81,6 +82,7 @@ export default function DiagnosticsSection() {
           </ul>
           <button
             type="button"
+            className="agentz-settings-save"
             data-testid="diagnostics-export-btn"
             disabled={busy || !preview.redaction_ready}
             onClick={() => void exportLogs()}
@@ -89,9 +91,13 @@ export default function DiagnosticsSection() {
           </button>
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p className="agentz-diagnostics-error" role="alert">
+          {error}
+        </p>
+      )}
       {exportPath && (
-        <p data-testid="diagnostics-saved-path">
+        <p className="agentz-settings-hint" data-testid="diagnostics-saved-path">
           {t("settings.diagnosticsSaved", { path: exportPath })}
         </p>
       )}

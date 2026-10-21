@@ -545,7 +545,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     <span
                       className={`agentz-settings-status-dot ${configured ? "ok" : "missing"}`}
                     />
-                    <span style={{ color: configured ? "#4ade80" : "#f87171" }}>
+                    <span style={{ color: configured ? "var(--success)" : "var(--error)" }}>
                       {configured ? t("settings.configuredOk") : t("settings.configuredMissing")}
                     </span>
                   </div>
@@ -555,9 +555,10 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     <br />
                     {t("settings.configDirHint")}
                   </div>
+
+                  <DiagnosticsSection />
                 </div>
 
-                <DiagnosticsSection />
                 <div className="agentz-settings-footer">
                   <button type="button" className="agentz-settings-cancel" onClick={onClose}>
                     {t("common.cancel")}
