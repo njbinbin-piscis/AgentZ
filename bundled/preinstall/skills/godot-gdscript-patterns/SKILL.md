@@ -3,7 +3,7 @@ name: "godot-gdscript-patterns"
 description: "Master Godot 4 GDScript patterns including signals, scenes, state machines, and optimization. Use when building Godot games, implementing game systems, or learning GDScript best practices."
 description_zh: "Unity游戏开发与C#脚本编程，Minecraft服务器插件开发（支持Bukkit/Spigot API）"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "game-development"
 ---
 

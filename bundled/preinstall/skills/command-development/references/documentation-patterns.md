@@ -646,7 +646,7 @@ Description of advanced feature.
 
 ## Configuration
 
-Optional configuration file: `.codebuddy/command-name.local.md`
+Optional configuration file: `.AgentZ/command-name.local.md`
 
 \`\`\`markdown
 ---

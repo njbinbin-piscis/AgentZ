@@ -2,7 +2,7 @@
 name: "raffle-winner-picker"
 description: "Picks random winners from lists, spreadsheets, or Google Sheets for giveaways, raffles, and contests. Ensures fair, unbiased selection with transparency."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "raffle-winner-picker"
 ---
 

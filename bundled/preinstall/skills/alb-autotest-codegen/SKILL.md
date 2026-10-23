@@ -3,7 +3,7 @@ name: "alb-autotest-codegen"
 description: "ALB自动化测试用例代码生成工具。当用户需要为 ALB（Application Load Balancer）生成自动化测试用例、编写接口测试代码、根据 API 文档生成测试代码时触发此技能。支持通过关键词（ALB）自动拉取对应源码，严格遵循 DB 校验、接口联动、LD(nginx) 校验、数据清理（DB查询→delete接口→DB校验残留）等测试规范。支持 set 类、LD 类、listener 类等多种资源接口的测试代码生成。"
 description_zh: "AI 驱动测试用例生成与管理工作流，集成 TestBuddy 脑图可视化和 TCase 自动化测试代码生成能力"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "tsmart"
 ---
 

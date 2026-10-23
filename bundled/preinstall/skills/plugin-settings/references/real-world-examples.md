@@ -1,12 +1,12 @@
 # Real-World Plugin Settings Examples
 
-Detailed analysis of how production plugins use the `.codebuddy/plugin-name.local.md` pattern.
+Detailed analysis of how production plugins use the `.AgentZ/plugin-name.local.md` pattern.
 
 ## multi-agent-swarm Plugin
 
 ### Settings File Structure
 
-**.codebuddy/multi-agent-swarm.local.md:**
+**.AgentZ/multi-agent-swarm.local.md:**
 
 ```markdown
 ---
@@ -51,7 +51,7 @@ Report status to 'team-leader' session.
 #!/bin/bash
 set -euo pipefail
 
-SWARM_STATE_FILE=".codebuddy/multi-agent-swarm.local.md"
+SWARM_STATE_FILE=".AgentZ/multi-agent-swarm.local.md"
 
 # Quick exit if no swarm active
 if [[ ! -f "$SWARM_STATE_FILE" ]]; then
@@ -98,7 +98,7 @@ exit 0
 Settings files are created during swarm launch with:
 
 ```bash
-cat > "$WORKTREE_PATH/.codebuddy/multi-agent-swarm.local.md" <<EOF
+cat > "$WORKTREE_PATH/.AgentZ/multi-agent-swarm.local.md" <<EOF
 ---
 agent_name: $AGENT_NAME
 task_number: $TASK_ID
@@ -122,15 +122,15 @@ PR number updated after PR creation:
 ```bash
 # Update pr_number field
 sed "s/^pr_number: .*/pr_number: $PR_NUM/" \
-  ".codebuddy/multi-agent-swarm.local.md" > temp.md
-mv temp.md ".codebuddy/multi-agent-swarm.local.md"
+  ".AgentZ/multi-agent-swarm.local.md" > temp.md
+mv temp.md ".AgentZ/multi-agent-swarm.local.md"
 ```
 
 ## ralph-loop Plugin
 
 ### Settings File Structure
 
-**.codebuddy/ralph-loop.local.md:**
+**.AgentZ/ralph-loop.local.md:**
 
 ```markdown
 ---
@@ -142,14 +142,14 @@ started_at: "2025-01-15T14:30:00Z"
 
 Fix all the linting errors in the project.
 Make sure tests pass after each fix.
-Document any changes needed in CODEBUDDY.md.
+Document any changes needed in AgentZ.md.
 ```
 
 ### How It's Used
 
 **File:** `hooks/stop-hook.sh`
 
-**Purpose:** Prevent session exit and loop CodeBuddy's output back as input
+**Purpose:** Prevent session exit and loop AgentZ's output back as input
 
 **Implementation:**
 
@@ -157,7 +157,7 @@ Document any changes needed in CODEBUDDY.md.
 #!/bin/bash
 set -euo pipefail
 
-RALPH_STATE_FILE=".codebuddy/ralph-loop.local.md"
+RALPH_STATE_FILE=".AgentZ/ralph-loop.local.md"
 
 # Quick exit if no active loop
 if [[ ! -f "$RALPH_STATE_FILE" ]]; then
@@ -237,7 +237,7 @@ MAX_ITERATIONS="${2:-0}"
 COMPLETION_PROMISE="${3:-}"
 
 # Create state file
-cat > ".codebuddy/ralph-loop.local.md" <<EOF
+cat > ".AgentZ/ralph-loop.local.md" <<EOF
 ---
 iteration: 1
 max_iterations: $MAX_ITERATIONS
@@ -248,14 +248,14 @@ started_at: "$(date -Iseconds)"
 $PROMPT
 EOF
 
-echo "Ralph loop initialized: .codebuddy/ralph-loop.local.md"
+echo "Ralph loop initialized: .AgentZ/ralph-loop.local.md"
 ```
 
 ## Pattern Comparison
 
 | Feature | multi-agent-swarm | ralph-loop |
 |---------|-------------------|--------------|
-| **File** | `.codebuddy/multi-agent-swarm.local.md` | `.codebuddy/ralph-loop.local.md` |
+| **File** | `.AgentZ/multi-agent-swarm.local.md` | `.AgentZ/ralph-loop.local.md` |
 | **Purpose** | Agent coordination state | Loop iteration state |
 | **Frontmatter** | Agent metadata | Loop configuration |
 | **Body** | Task assignment | Prompt to loop |
@@ -333,10 +333,10 @@ fi
 
 ```bash
 # BAD
-FILE="/Users/alice/.codebuddy/my-plugin.local.md"
+FILE="/Users/alice/.AgentZ/my-plugin.local.md"
 
 # GOOD
-FILE=".codebuddy/my-plugin.local.md"
+FILE=".AgentZ/my-plugin.local.md"
 ```
 
 ### ❌ Unquoted Variables
@@ -385,7 +385,7 @@ awk '/^---$/{i++; next} i>=2'  # For body
 
 ## Conclusion
 
-The `.codebuddy/plugin-name.local.md` pattern provides:
+The `.AgentZ/plugin-name.local.md` pattern provides:
 - Simple, human-readable configuration
 - Version-control friendly (gitignored)
 - Per-project settings

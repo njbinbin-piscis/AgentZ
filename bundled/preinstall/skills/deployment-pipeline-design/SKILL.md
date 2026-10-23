@@ -3,7 +3,7 @@ name: "deployment-pipeline-design"
 description: "Design multi-stage CI/CD pipelines with approval gates, security checks, and deployment orchestration. Use when architecting deployment workflows, setting up continuous delivery, or implementing GitOps practices."
 description_zh: "CI/CD 流水线配置、GitHub Actions/GitLab CI 工作流设置及自动化部署流水线编排"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "cicd-automation"
 ---
 

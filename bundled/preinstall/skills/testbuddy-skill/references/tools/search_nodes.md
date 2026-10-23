@@ -24,7 +24,7 @@ python3 <script_dir>/scripts/search_node.py --design_uid <design_uid> [--namespa
 | `--no-descendant` | 可选     | 加上此标志，不返回后代节点（**默认返回后代节点**）                    |
 | `--kind`          | 可选     | 节点类型过滤，如 `CASE`、`FEATURE`、`STORY`、`TEST_POINT` 等          |
 
-- `<script_dir>`：脚本目录的绝对路径（通常为 `.codebuddy/skills/testbuddy-skill`）
+- `<script_dir>`：脚本目录的绝对路径（通常为 `.AgentZ/skills/testbuddy-skill`）
 
 ---
 

@@ -1,6 +1,6 @@
 # Plugin Structure Skill
 
-Comprehensive guidance on CodeBuddy Code plugin architecture, directory layout, and best practices.
+Comprehensive guidance on AgentZ Code plugin architecture, directory layout, and best practices.
 
 ## Overview
 
@@ -9,7 +9,7 @@ This skill provides detailed knowledge about:
 - `plugin.json` manifest configuration
 - Component organization (commands, agents, skills, hooks)
 - Auto-discovery mechanisms
-- Portable path references with `${CODEBUDDY_PLUGIN_ROOT}`
+- Portable path references with `${AgentZ_PLUGIN_ROOT}`
 - File naming conventions
 
 ## Skill Structure
@@ -20,7 +20,7 @@ Core skill content covering:
 - Directory structure overview
 - Plugin manifest (plugin.json) fields
 - Component organization patterns
-- ${CODEBUDDY_PLUGIN_ROOT} usage
+- ${AgentZ_PLUGIN_ROOT} usage
 - File naming conventions
 - Auto-discovery mechanism
 - Best practices
@@ -72,12 +72,12 @@ Three complete plugin examples:
 
 ## When This Skill Triggers
 
-CodeBuddy Code activates this skill when users:
+AgentZ Code activates this skill when users:
 - Ask to "create a plugin" or "scaffold a plugin"
 - Need to "understand plugin structure"
 - Want to "organize plugin components"
 - Need to "set up plugin.json"
-- Ask about "${CODEBUDDY_PLUGIN_ROOT}" usage
+- Ask about "${AgentZ_PLUGIN_ROOT}" usage
 - Want to "add commands/agents/skills/hooks"
 - Need "configure auto-discovery" help
 - Ask about plugin architecture or best practices
@@ -90,7 +90,7 @@ The skill uses progressive disclosure to manage context:
 2. **References** (~6000 words): Detailed field references and patterns
 3. **Examples** (~8000 words): Complete working examples
 
-CodeBuddy loads references and examples only as needed based on the task.
+AgentZ loads references and examples only as needed based on the task.
 
 ## Related Skills
 

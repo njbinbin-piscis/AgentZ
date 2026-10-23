@@ -1,9 +1,9 @@
 ---
 name: "brainstorming"
 description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
-description_zh: "Claude Code 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "superpowers"
 ---
 

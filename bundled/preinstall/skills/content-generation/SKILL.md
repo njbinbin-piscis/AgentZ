@@ -3,7 +3,7 @@ name: "PPT内容生成"
 description: "当用户需要撰写PPT演讲稿、生成演示大纲、组织演讲逻辑或丰富PPT内容时自动激活"
 description_zh: "AI驱动的PPT创作助手，支持智能内容生成、多格式导出和专业模板"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "ppt-writer"
 ---
 

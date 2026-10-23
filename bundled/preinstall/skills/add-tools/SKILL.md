@@ -3,7 +3,7 @@ name: "add-tools"
 description: "Add MCP server tools to the WeData agent configuration. Use when: (1) User wants to add, connect, or configure an MCP server for the agent, (2) User has discovered MCP servers and wants to use them, (3) User says 'add tool', 'add MCP', 'connect MCP', 'use this MCP server', '添加工具', '添加MCP', '接入MCP', '把这个MCP加上', '连接工具', (4) User provides an MCP server URL and wants the agent to use it, (5) After running discover-tools, user wants to wire up the results. If the user wants to *discover* what's available, use discover-tools instead. If the user wants to *generate local function_tool wrappers*, use wedata-local-mcp-example instead. This skill is specifically for adding MCP server URLs to the agent's runtime configuration."
 description_zh: "Wedata3.0 官方插件 —— Data+AI一体化平台，内置Wedata各种能力调用的Skills，通过DataAgents相关Skills可以快速开发调用Wedata引擎、数据、AI资源的数据智能体，并可自动部署到云端直接使用。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "wedata3"
 ---
 

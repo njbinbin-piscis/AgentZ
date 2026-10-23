@@ -1,6 +1,6 @@
 # MCP Authentication Patterns
 
-Complete guide to authentication methods for MCP servers in CodeBuddy Code plugins.
+Complete guide to authentication methods for MCP servers in AgentZ Code plugins.
 
 ## Overview
 
@@ -10,13 +10,13 @@ MCP servers support multiple authentication methods depending on the server type
 
 ### How It Works
 
-CodeBuddy Code automatically handles the complete OAuth 2.0 flow for SSE and HTTP servers:
+AgentZ Code automatically handles the complete OAuth 2.0 flow for SSE and HTTP servers:
 
 1. User attempts to use MCP tool
-2. CodeBuddy Code detects authentication needed
+2. AgentZ Code detects authentication needed
 3. Opens browser for OAuth consent
 4. User authorizes in browser
-5. Tokens stored securely by CodeBuddy Code
+5. Tokens stored securely by AgentZ Code
 6. Automatic token refresh
 
 ### Configuration
@@ -30,7 +30,7 @@ CodeBuddy Code automatically handles the complete OAuth 2.0 flow for SSE and HTT
 }
 ```
 
-No additional auth configuration needed! CodeBuddy Code handles everything.
+No additional auth configuration needed! AgentZ Code handles everything.
 
 ### Supported Services
 
@@ -56,7 +56,7 @@ This plugin requires the following Asana permissions:
 
 ### Token Storage
 
-Tokens are stored securely by CodeBuddy Code:
+Tokens are stored securely by AgentZ Code:
 - Not accessible to plugins
 - Encrypted at rest
 - Automatic refresh
@@ -74,7 +74,7 @@ Tokens are stored securely by CodeBuddy Code:
 - Check server documentation for required scopes
 
 **Token expiration:**
-- CodeBuddy Code auto-refreshes
+- AgentZ Code auto-refreshes
 - If refresh fails, prompts re-authentication
 
 ## Token-Based Authentication
@@ -235,7 +235,7 @@ For tokens that change or expire, use a helper script:
   "api": {
     "type": "sse",
     "url": "https://api.example.com",
-    "headersHelper": "${CODEBUDDY_PLUGIN_ROOT}/scripts/get-headers.sh"
+    "headersHelper": "${AgentZ_PLUGIN_ROOT}/scripts/get-headers.sh"
   }
 }
 ```
@@ -383,7 +383,7 @@ export API_TOKEN="your-token"
 
 **Enable debug mode:**
 ```bash
-codebuddy --debug
+AgentZ --debug
 ```
 
 Look for:
@@ -468,7 +468,7 @@ Some enterprise services require client certificates.
 ```json
 {
   "secure-api": {
-    "command": "${CODEBUDDY_PLUGIN_ROOT}/servers/mtls-wrapper",
+    "command": "${AgentZ_PLUGIN_ROOT}/servers/mtls-wrapper",
     "args": ["--cert", "${CLIENT_CERT}", "--key", "${CLIENT_KEY}"],
     "env": {
       "API_URL": "https://secure.example.com"
@@ -493,7 +493,7 @@ echo "{\"Authorization\": \"Bearer $JWT\"}"
 
 ```json
 {
-  "headersHelper": "${CODEBUDDY_PLUGIN_ROOT}/scripts/generate-jwt.sh"
+  "headersHelper": "${AgentZ_PLUGIN_ROOT}/scripts/generate-jwt.sh"
 }
 ```
 

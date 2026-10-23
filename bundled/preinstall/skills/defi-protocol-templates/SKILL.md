@@ -3,7 +3,7 @@ name: "defi-protocol-templates"
 description: "Implement DeFi protocols with production-ready templates for staking, AMMs, governance, and lending systems. Use when building decentralized finance applications or smart contract protocols."
 description_zh: "使用 Solidity 进行智能合约开发、DeFi 协议实现、NFT 平台和 Web3 应用架构"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "blockchain-web3"
 ---
 

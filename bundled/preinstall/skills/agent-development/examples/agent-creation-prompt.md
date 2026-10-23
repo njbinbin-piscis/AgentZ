@@ -1,6 +1,6 @@
 # AI-Assisted Agent Generation Template
 
-Use this template to generate agents using CodeBuddy with the agent creation system prompt.
+Use this template to generate agents using AgentZ with the agent creation system prompt.
 
 ## Usage Pattern
 
@@ -14,7 +14,7 @@ Think about:
 
 ### Step 2: Use the Generation Prompt
 
-Send this to CodeBuddy (with the agent-creation-system-prompt loaded):
+Send this to AgentZ (with the agent-creation-system-prompt loaded):
 
 ```
 Create an agent configuration based on this request: "[YOUR DESCRIPTION]"
@@ -24,9 +24,9 @@ Return ONLY the JSON object, no other text.
 
 **Replace [YOUR DESCRIPTION] with your agent requirements.**
 
-### Step 3: CodeBuddy Returns JSON
+### Step 3: AgentZ Returns JSON
 
-CodeBuddy will return:
+AgentZ will return:
 
 ```json
 {
@@ -59,12 +59,12 @@ tools: ["Read", "Write", "Grep"]  # Optional: restrict tools
 I need an agent that reviews code changes for quality issues, security vulnerabilities, and adherence to best practices. It should be called after code is written and provide specific feedback.
 ```
 
-**CodeBuddy generates:**
+**AgentZ generates:**
 ```json
 {
   "identifier": "code-quality-reviewer",
   "whenToUse": "Use this agent when the user has written code and needs quality review, or explicitly asks to review code changes. Examples:\n\n<example>\nContext: User just implemented a new feature\nuser: \"I've added the authentication feature\"\nassistant: \"Great! Let me review the code quality.\"\n<commentary>\nCode was written, trigger code-quality-reviewer agent for review.\n</commentary>\nassistant: \"I'll use the code-quality-reviewer agent to analyze the changes.\"\n</example>\n\n<example>\nContext: User explicitly requests review\nuser: \"Can you review my code for issues?\"\nassistant: \"I'll use the code-quality-reviewer agent to perform a thorough review.\"\n<commentary>\nExplicit review request triggers the agent.\n</commentary>\n</example>",
-  "systemPrompt": "You are an expert code quality reviewer specializing in identifying issues in software implementations.\n\n**Your Core Responsibilities:**\n1. Analyze code changes for quality issues (readability, maintainability, performance)\n2. Identify security vulnerabilities (injection, XSS, authentication issues)\n3. Check adherence to project best practices and coding standards\n4. Provide actionable, specific feedback with line numbers\n\n**Review Process:**\n1. Read the code changes using available tools\n2. Analyze for:\n   - Code quality (duplication, complexity, clarity)\n   - Security (OWASP top 10, input validation)\n   - Best practices (error handling, logging, testing)\n   - Project-specific standards (from CODEBUDDY.md)\n3. Identify issues with severity (critical/major/minor)\n4. Provide specific recommendations with examples\n\n**Output Format:**\nProvide a structured review:\n1. Summary (2-3 sentences)\n2. Critical Issues (must fix)\n3. Major Issues (should fix)\n4. Minor Issues (nice to fix)\n5. Positive observations\n6. Overall assessment\n\nInclude file names and line numbers for all findings."
+  "systemPrompt": "You are an expert code quality reviewer specializing in identifying issues in software implementations.\n\n**Your Core Responsibilities:**\n1. Analyze code changes for quality issues (readability, maintainability, performance)\n2. Identify security vulnerabilities (injection, XSS, authentication issues)\n3. Check adherence to project best practices and coding standards\n4. Provide actionable, specific feedback with line numbers\n\n**Review Process:**\n1. Read the code changes using available tools\n2. Analyze for:\n   - Code quality (duplication, complexity, clarity)\n   - Security (OWASP top 10, input validation)\n   - Best practices (error handling, logging, testing)\n   - Project-specific standards (from AgentZ.md)\n3. Identify issues with severity (critical/major/minor)\n4. Provide specific recommendations with examples\n\n**Output Format:**\nProvide a structured review:\n1. Summary (2-3 sentences)\n2. Critical Issues (must fix)\n3. Major Issues (should fix)\n4. Minor Issues (nice to fix)\n5. Positive observations\n6. Overall assessment\n\nInclude file names and line numbers for all findings."
 }
 ```
 
@@ -115,7 +115,7 @@ You are an expert code quality reviewer specializing in identifying issues in so
    - Code quality (duplication, complexity, clarity)
    - Security (OWASP top 10, input validation)
    - Best practices (error handling, logging, testing)
-   - Project-specific standards (from CODEBUDDY.md)
+   - Project-specific standards (from AgentZ.md)
 3. Identify issues with severity (critical/major/minor)
 4. Provide specific recommendations with examples
 
@@ -138,7 +138,7 @@ Include file names and line numbers for all findings.
 Create an agent that generates unit tests for code. It should analyze existing code and create comprehensive test suites following project conventions.
 ```
 
-**CodeBuddy generates:**
+**AgentZ generates:**
 ```json
 {
   "identifier": "test-generator",
@@ -174,7 +174,7 @@ Build an agent that writes and updates API documentation. It should analyze code
 
 ### Include Triggering Preferences
 
-Tell CodeBuddy when the agent should activate:
+Tell AgentZ when the agent should activate:
 
 ```
 "Create an agent that generates tests. It should be triggered proactively after code is written, not just when explicitly requested."
@@ -220,7 +220,7 @@ If generated agent needs improvement:
 
 ## Advantages of AI-Assisted Generation
 
-- **Comprehensive**: CodeBuddy includes edge cases and quality checks
+- **Comprehensive**: AgentZ includes edge cases and quality checks
 - **Consistent**: Follows proven patterns
 - **Fast**: Seconds vs manual writing
 - **Examples**: Auto-generates triggering examples

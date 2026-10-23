@@ -3,7 +3,7 @@ name: "pci-compliance"
 description: "Implement PCI DSS compliance requirements for secure handling of payment card data and payment systems. Use when securing payment processing, achieving PCI compliance, or implementing payment card security measures."
 description_zh: "支付网关集成,包含 Stripe 和 PayPal,实现结账流程、订阅计费和 PCI 合规性"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "payment-processing"
 ---
 

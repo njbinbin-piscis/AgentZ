@@ -2,7 +2,7 @@
 
 ## 基本信息
 - **插件名称**: lucide-icons
-- **来源**: /Users/laurentzhou/CodeBuddy/genie/dev-packages/skills/lucide-icons
+- **来源**: /Users/laurentzhou/AgentZ/genie/dev-packages/skills/lucide-icons
 - **类型**: Skill
 - **收录时间**: 2026-01-18
 - **License**: MIT
@@ -10,8 +10,8 @@
 ## 验证清单
 
 ### ✅ 1. 目录结构
-- [x] 目录存在: `/Users/laurentzhou/CodeBuddy/marketplace/plugins/lucide-icons`
-- [x] `.codebuddy-plugin` 目录已创建
+- [x] 目录存在: `/Users/laurentzhou/AgentZ/marketplace/plugins/lucide-icons`
+- [x] `.AgentZ-plugin` 目录已创建
 - [x] `SKILL.md` 文件存在
 - [x] `README.md` 文件存在
 - [x] `scripts/` 目录包含执行脚本
@@ -24,7 +24,7 @@
   "license": "MIT",
   "description_en": "Search, download, and customize Lucide icons (1000+ beautiful SVG icons) with React component generation support",
   "author": {
-    "name": "CodeBuddy Team"
+    "name": "AgentZ Team"
   },
   "homepage": "https://github.com/lucide-icons/lucide"
 }
@@ -36,7 +36,7 @@
 - [x] homepage 链接到原项目
 
 ### ✅ 3. marketplace.json 注册
-- [x] 已添加到 `.codebuddy-plugin/marketplace.json`
+- [x] 已添加到 `.AgentZ-plugin/marketplace.json`
 - [x] 包含所有必需字段
 - [x] category 设置为 "development"
 - [x] source 指向正确路径: `./plugins/lucide-icons`
@@ -104,9 +104,9 @@ node ./scripts/lucide.js download star --color "#ffd700" --size 32
 - ✅ **无需功能验证**（仅官方库收录插件需要）
 
 ### 术语使用
-- [x] 描述中正确使用 "CodeBuddy" 和 "CodeBuddy Code"
-- [x] README.md 中提到 CodeBuddy 集成说明
-- [x] 无 "Claude" 或 "Claude Code" 相关内容
+- [x] 描述中正确使用 "AgentZ" 和 "AgentZ Code"
+- [x] README.md 中提到 AgentZ 集成说明
+- [x] 无 "Claude" 或 "AgentZ" 相关内容
 
 ## 功能测试（可选）
 
@@ -114,7 +114,7 @@ node ./scripts/lucide.js download star --color "#ffd700" --size 32
 
 ### 依赖安装
 ```bash
-cd /Users/laurentzhou/CodeBuddy/marketplace/plugins/lucide-icons/scripts
+cd /Users/laurentzhou/AgentZ/marketplace/plugins/lucide-icons/scripts
 npm install
 ```
 
@@ -158,7 +158,7 @@ node scripts/lucide.js download star --color "#ffd700" --size 48 --stroke-width 
 
 1. **安装 npm 依赖**（如需测试）:
    ```bash
-   cd /Users/laurentzhou/CodeBuddy/marketplace/plugins/lucide-icons/scripts
+   cd /Users/laurentzhou/AgentZ/marketplace/plugins/lucide-icons/scripts
    npm install
    ```
 
@@ -175,7 +175,7 @@ node scripts/lucide.js download star --color "#ffd700" --size 48 --stroke-width 
 ## 备注
 
 - **原始来源**: Genie 项目 dev-packages/skills
-- **插件性质**: CodeBuddy 团队自研技能插件
+- **插件性质**: AgentZ 团队自研技能插件
 - **无需合规检查**: 作为自研插件，无需执行内容合规性检查和功能验证
 - **图标数据来源**: Lucide 官方项目 (MIT License)
 - **数据源**: lucide-static npm 包、GitHub Raw Content、GitHub API

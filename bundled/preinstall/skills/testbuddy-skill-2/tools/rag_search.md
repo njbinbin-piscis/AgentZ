@@ -94,7 +94,7 @@
 **⚠️ 注意**：如需使用多个关键词检索（如"登录功能"、"密码验证"、"权限管理"），需要分批调用 MCP 工具，每个关键词调用一次。
 
 ### 脚本路径
-- `<script_dir>`: 脚本目录的绝对路径（通常为 `.codebuddy/skills/testbuddy-skill`）
+- `<script_dir>`: 脚本目录的绝对路径（通常为 `.AgentZ/skills/testbuddy-skill`）
 
 ### 数据文件
 - `.testbuddy/env/session.json`: 存储 token 和 knowledge_uids 等会话信息

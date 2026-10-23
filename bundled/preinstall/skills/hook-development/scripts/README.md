@@ -28,7 +28,7 @@ cd my-plugin
 
 ## test-hook.sh
 
-Tests individual hook scripts with sample input before deploying to CodeBuddy Code.
+Tests individual hook scripts with sample input before deploying to AgentZ Code.
 
 **Usage:**
 ```bash
@@ -53,7 +53,7 @@ Tests individual hook scripts with sample input before deploying to CodeBuddy Co
 ```
 
 **Features:**
-- Sets up proper environment variables (CODEBUDDY_PROJECT_DIR, CODEBUDDY_PLUGIN_ROOT)
+- Sets up proper environment variables (AgentZ_PROJECT_DIR, AgentZ_PLUGIN_ROOT)
 - Measures execution time
 - Validates output JSON
 - Shows exit codes and their meanings
@@ -122,9 +122,9 @@ Checks hook scripts for common issues and best practices violations.
    ./validate-hook-schema.sh my-plugin/hooks/hooks.json
    ```
 
-7. **Test in CodeBuddy Code**
+7. **Test in AgentZ Code**
    ```bash
-   codebuddy --debug
+   AgentZ --debug
    ```
 
 ## Tips
@@ -142,7 +142,7 @@ Checks hook scripts for common issues and best practices violations.
 Check:
 - Script has shebang (`#!/bin/bash`)
 - Script is executable (`chmod +x`)
-- Path in hooks.json is correct (use `${CODEBUDDY_PLUGIN_ROOT}`)
+- Path in hooks.json is correct (use `${AgentZ_PLUGIN_ROOT}`)
 
 ### Hook times out
 

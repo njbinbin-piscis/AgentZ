@@ -3,7 +3,7 @@ name: "wedata-local-mcp-example"
 description: "Generate local function_tool wrappers that call the remote WeData MCP Server, and register them into the Agent. Detects user intent automatically and generates only the relevant tool — execute_sql_query for data queries, search_table_by_name only for explicit schema/metadata requests. Most '查表' or '查表详情' mean the user wants actual data, not metadata. Trigger on: '查表', '查表数据', '执行SQL', '跑SQL', 'SELECT', '生成工具', 'run query', 'execute sql', '查表结构', '表Schema', or when called from wedata-quickstart Option 2. If the user mentions tables, SQL, or querying data in the WeData context, this skill is likely what they need."
 description_zh: "Wedata3.0 官方插件 —— Data+AI一体化平台，内置Wedata各种能力调用的Skills，通过DataAgents相关Skills可以快速开发调用Wedata引擎、数据、AI资源的数据智能体，并可自动部署到云端直接使用。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "wedata3"
 ---
 

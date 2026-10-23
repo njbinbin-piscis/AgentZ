@@ -2,7 +2,7 @@
 name: "meeting-insights-analyzer"
 description: "Analyzes meeting transcripts and recordings to uncover behavioral patterns, communication insights, and actionable feedback. Identifies when you avoid conflict, use filler words, dominate conversations, or miss opportunities to listen. Perfect for professionals seeking to improve their communication and leadership skills."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "meeting-insights-analyzer"
 ---
 

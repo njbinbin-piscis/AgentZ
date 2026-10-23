@@ -3,7 +3,7 @@ name: "yottadb-function-testing"
 description: "YottaDB 分布式数据库功能测试代码生成工具。当用户需要生成 YottaDB 测试代码、根据 UUID/文本用例/节点生成测试、编写 TSDB/MEMDB/SSDKV 等模块的功能测试时触发此技能。"
 description_zh: "AI 驱动测试用例生成与管理工作流，集成 TestBuddy 脑图可视化和 TCase 自动化测试代码生成能力"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "tsmart"
 ---
 

@@ -2,13 +2,9 @@
 name: "ui-ux-pro-max"
 description: "AI-powered UI/UX design intelligence with 57 UI styles, 95+ color palettes, 56 font pairings, 25 chart types, and 100+ industry-specific reasoning rules across 12 tech stacks. Use when designing, building, creating, implementing, reviewing, fixing, or improving UI/UX code for websites, landing pages, dashboards, SaaS, e-commerce, portfolios, and mobile apps."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "ui-ux-pro-max-skill"
 ---
-
-> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
-
-> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 
 > **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 

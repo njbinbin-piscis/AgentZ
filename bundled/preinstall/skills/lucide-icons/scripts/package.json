@@ -1,7 +1,7 @@
 {
   "name": "lucide-icons-skill",
   "version": "1.0.0",
-  "description": "CodeBuddy skill for searching and downloading Lucide icons",
+  "description": "AgentZ skill for searching and downloading Lucide icons",
   "type": "module",
   "main": "lucide.js",
   "bin": {
@@ -27,7 +27,7 @@
     "icons",
     "svg",
     "react",
-    "codebuddy",
+    "AgentZ",
     "skill"
   ],
   "license": "MIT"

@@ -1,10 +1,10 @@
 ---
 name: "product-requirements"
 description: "Interactive Product Owner skill for requirements gathering, analysis, and PRD generation. Triggers when users request product requirements, feature specification, PRD creation, or need help understanding and documenting project requirements. Uses quality scoring and iterative dialogue to ensure comprehensive requirements before generating professional PRD documents."
-description_zh: "完整的 OMC (Oh My CodeBuddy) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
+description_zh: "完整的 OMC (Oh My AgentZ) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
 version: "1.0.0"
-source: codebuddy
-source_plugin: "oh-my-codebuddy"
+source: AgentZ
+source_plugin: "oh-my-agentz"
 ---
 
 # Product Requirements Skill

@@ -2,7 +2,7 @@
 name: "typography-selector"
 description: "Browse and select fonts from Google Fonts or curated pairings. Use to find the perfect typography for a design project."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "frontend-design-pro"
 ---
 

@@ -6,24 +6,24 @@ Advanced patterns for organizing plugin components effectively.
 
 ### Discovery Phase
 
-When CodeBuddy Code starts:
+When AgentZ Code starts:
 
-1. **Scan enabled plugins**: Read `.codebuddy-plugin/plugin.json` for each
+1. **Scan enabled plugins**: Read `.AgentZ-plugin/plugin.json` for each
 2. **Discover components**: Look in default and custom paths
 3. **Parse definitions**: Read YAML frontmatter and configurations
-4. **Register components**: Make available to CodeBuddy Code
+4. **Register components**: Make available to AgentZ Code
 5. **Initialize**: Start MCP servers, register hooks
 
-**Timing**: Component registration happens during CodeBuddy Code initialization, not continuously.
+**Timing**: Component registration happens during AgentZ Code initialization, not continuously.
 
 ### Activation Phase
 
 When components are used:
 
-**Commands**: User types slash command → CodeBuddy Code looks up → Executes
-**Agents**: Task arrives → CodeBuddy Code evaluates capabilities → Selects agent
-**Skills**: Task context matches description → CodeBuddy Code loads skill
-**Hooks**: Event occurs → CodeBuddy Code calls matching hooks
+**Commands**: User types slash command → AgentZ Code looks up → Executes
+**Agents**: Task arrives → AgentZ Code evaluates capabilities → Selects agent
+**Skills**: Task context matches description → AgentZ Code loads skill
+**Hooks**: Event occurs → AgentZ Code calls matching hooks
 **MCP Servers**: Tool call matches server capability → Forwards to server
 
 ## Command Organization Patterns
@@ -108,7 +108,7 @@ commands/
     └── status.md
 ```
 
-**Note**: CodeBuddy Code doesn't support nested command discovery automatically. Use custom paths:
+**Note**: AgentZ Code doesn't support nested command discovery automatically. Use custom paths:
 
 ```json
 {
@@ -345,7 +345,7 @@ hooks/
 }
 ```
 
-**Note**: Use build script to combine files, CodeBuddy Code doesn't support file references.
+**Note**: Use build script to combine files, AgentZ Code doesn't support file references.
 
 **When to use**:
 - 10+ hooks
@@ -469,7 +469,7 @@ plugin/
 **Usage in components**:
 ```bash
 #!/bin/bash
-source "${CODEBUDDY_PLUGIN_ROOT}/lib/test-utils.sh"
+source "${AgentZ_PLUGIN_ROOT}/lib/test-utils.sh"
 run_tests
 ```
 
@@ -504,7 +504,7 @@ Nested plugin structure:
 
 ```
 plugin/
-├── .codebuddy-plugin/
+├── .AgentZ-plugin/
 │   └── plugin.json
 ├── core/              # Core functionality
 │   ├── commands/

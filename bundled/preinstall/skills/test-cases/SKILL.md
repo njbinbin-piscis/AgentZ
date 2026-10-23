@@ -1,10 +1,10 @@
 ---
 name: "test-cases"
 description: "This skill should be used when generating comprehensive test cases from PRD documents or user requirements. Triggers when users request test case generation, QA planning, test scenario creation, or need structured test documentation. Produces detailed test cases covering functional, edge case, error handling, and state transition scenarios."
-description_zh: "完整的 OMC (Oh My CodeBuddy) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
+description_zh: "完整的 OMC (Oh My AgentZ) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
 version: "1.0.0"
-source: codebuddy
-source_plugin: "oh-my-codebuddy"
+source: AgentZ
+source_plugin: "oh-my-agentz"
 ---
 
 # Test Cases Generator

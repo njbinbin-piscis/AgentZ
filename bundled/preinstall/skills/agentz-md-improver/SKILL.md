@@ -1,10 +1,10 @@
 ---
-name: "codebuddy-md-improver"
-description: "Audit and improve CODEBUDDY.md files in repositories. Use when user asks to check, audit, update, improve, or fix CODEBUDDY.md files. Scans for all CODEBUDDY.md files, evaluates quality against templates, outputs quality report, then makes targeted updates. Also use when the user mentions \\\\\\\\\\\\\\\"CODEBUDDY.md maintenance\\\\\\\\\\\\\\\" or \\\\\\\\\\\\\\\"project memory optimization\\\\\\\\\\\\\\\"."
-description_zh: "用于维护和改进 CODEBUDDY.md 文件的工具 - 审核质量、捕获会话学习内容，并保持项目记忆最新。"
+name: "agentz-md-improver"
+description: "Audit and improve AgentZ.md files in repositories. Use when user asks to check, audit, update, improve, or fix AgentZ.md files. Scans for all AgentZ.md files, evaluates quality against templates, outputs quality report, then makes targeted updates. Also use when the user mentions \\\\\\\\\\\\\\\"AgentZ.md maintenance\\\\\\\\\\\\\\\" or \\\\\\\\\\\\\\\"project memory optimization\\\\\\\\\\\\\\\"."
+description_zh: "用于维护和改进 AgentZ.md 文件的工具 - 审核质量、捕获会话学习内容，并保持项目记忆最新。"
 version: "1.0.0"
-source: codebuddy
-source_plugin: "codebuddy-md-management"
+source: AgentZ
+source_plugin: "agentz-md-management"
 ---
 
 # AgentZ.md Improver

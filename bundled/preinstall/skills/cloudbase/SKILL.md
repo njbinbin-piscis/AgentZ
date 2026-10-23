@@ -3,7 +3,7 @@ name: "cloudbase"
 description: "CloudBase AI Development - Complete toolkit for building Web, Mini Program, and Native App projects with CloudBase. Includes authentication, database (NoSQL/MySQL), cloud functions, CloudRun, storage, AI models, and UI design guidelines."
 description_zh: "CloudBase AI 开发插件，提供 Web、小程序、云函数、CloudRun、数据库（NoSQL/MySQL）、云存储、AI 模型、UI 设计等全栈开发能力。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "cloudbase"
 ---
 

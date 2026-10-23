@@ -168,15 +168,15 @@ if [ "$VERBOSE" = true ]; then
 fi
 
 # Set up environment
-export CODEBUDDY_PROJECT_DIR="${CODEBUDDY_PROJECT_DIR:-/tmp/test-project}"
-export CODEBUDDY_PLUGIN_ROOT="${CODEBUDDY_PLUGIN_ROOT:-$(pwd)}"
-export CODEBUDDY_ENV_FILE="${CODEBUDDY_ENV_FILE:-/tmp/test-env-$$}"
+export AgentZ_PROJECT_DIR="${AgentZ_PROJECT_DIR:-/tmp/test-project}"
+export AgentZ_PLUGIN_ROOT="${AgentZ_PLUGIN_ROOT:-$(pwd)}"
+export AgentZ_ENV_FILE="${AgentZ_ENV_FILE:-/tmp/test-env-$$}"
 
 if [ "$VERBOSE" = true ]; then
   echo "Environment:"
-  echo "  CODEBUDDY_PROJECT_DIR=$CODEBUDDY_PROJECT_DIR"
-  echo "  CODEBUDDY_PLUGIN_ROOT=$CODEBUDDY_PLUGIN_ROOT"
-  echo "  CODEBUDDY_ENV_FILE=$CODEBUDDY_ENV_FILE"
+  echo "  AgentZ_PROJECT_DIR=$AgentZ_PROJECT_DIR"
+  echo "  AgentZ_PLUGIN_ROOT=$AgentZ_PLUGIN_ROOT"
+  echo "  AgentZ_ENV_FILE=$AgentZ_ENV_FILE"
   echo ""
 fi
 
@@ -233,11 +233,11 @@ else
 fi
 
 # Check for environment file
-if [ -f "$CODEBUDDY_ENV_FILE" ]; then
+if [ -f "$AgentZ_ENV_FILE" ]; then
   echo ""
   echo "Environment file created:"
-  cat "$CODEBUDDY_ENV_FILE"
-  rm -f "$CODEBUDDY_ENV_FILE"
+  cat "$AgentZ_ENV_FILE"
+  rm -f "$AgentZ_ENV_FILE"
 fi
 
 echo ""

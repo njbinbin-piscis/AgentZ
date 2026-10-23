@@ -1,9 +1,9 @@
 ---
 name: "workflow-patterns"
 description: "Use this skill when implementing tasks according to Conductor's TDD workflow, handling phase checkpoints, managing git commits for tasks, or understanding the verification protocol."
-description_zh: "上下文驱动开发插件，将 Claude Code 转变为项目管理工具，采用结构化工作流：上下文 → 规格与计划 → 实施"
+description_zh: "上下文驱动开发插件，将 AgentZ 转变为项目管理工具，采用结构化工作流：上下文 → 规格与计划 → 实施"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "conductor"
 ---
 

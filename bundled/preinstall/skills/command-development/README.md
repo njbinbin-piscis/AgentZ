@@ -1,6 +1,6 @@
 # Command Development Skill
 
-Comprehensive guidance on creating CodeBuddy Code slash commands, including file format, frontmatter options, dynamic arguments, and best practices.
+Comprehensive guidance on creating AgentZ Code slash commands, including file format, frontmatter options, dynamic arguments, and best practices.
 
 ## Overview
 
@@ -12,7 +12,7 @@ This skill provides knowledge about:
 - Bash execution with !` syntax
 - Command organization and namespacing
 - Best practices for command development
-- Plugin-specific features (${CODEBUDDY_PLUGIN_ROOT}, plugin patterns)
+- Plugin-specific features (${AgentZ_PLUGIN_ROOT}, plugin patterns)
 - Integration with plugin components (agents, skills, hooks)
 - Validation patterns and error handling
 
@@ -34,7 +34,7 @@ Core skill content covering:
 - Troubleshooting
 
 **Plugin-Specific:**
-- ${CODEBUDDY_PLUGIN_ROOT} environment variable
+- ${AgentZ_PLUGIN_ROOT} environment variable
 - Plugin command discovery and organization
 - Plugin command patterns (configuration, template, multi-script)
 - Integration with plugin components (agents, skills, hooks)
@@ -52,7 +52,7 @@ Detailed documentation:
 
 - **plugin-features-reference.md**: Plugin-specific command features
   - Plugin command discovery and organization
-  - ${CODEBUDDY_PLUGIN_ROOT} environment variable usage
+  - ${AgentZ_PLUGIN_ROOT} environment variable usage
   - Plugin command patterns (configuration, template, multi-script)
   - Integration with plugin agents, skills, and hooks
   - Validation patterns and error handling
@@ -81,7 +81,7 @@ Practical command examples:
 
 ## When This Skill Triggers
 
-CodeBuddy Code activates this skill when users:
+AgentZ Code activates this skill when users:
 - Ask to "create a slash command" or "add a command"
 - Need to "write a custom command"
 - Want to "define command arguments"
@@ -108,7 +108,7 @@ The skill uses progressive disclosure:
    - simple-commands.md
    - plugin-commands.md
 
-CodeBuddy loads references and examples as needed based on task.
+AgentZ loads references and examples as needed based on task.
 
 ## Command Basics Quick Reference
 
@@ -129,8 +129,8 @@ Command prompt content with:
 
 ### Locations
 
-- **Project**: `.codebuddy/commands/` (shared with team)
-- **Personal**: `~/.codebuddy/commands/` (your commands)
+- **Project**: `.AgentZ/commands/` (shared with team)
+- **Personal**: `~/.AgentZ/commands/` (your commands)
 - **Plugin**: `plugin-name/commands/` (plugin-specific)
 
 ### Key Features
@@ -243,7 +243,7 @@ Recent commits: !`git log --oneline -5`
 ## Status
 
 **Completed enhancements:**
-- ✓ Plugin command patterns (${CODEBUDDY_PLUGIN_ROOT}, discovery, organization)
+- ✓ Plugin command patterns (${AgentZ_PLUGIN_ROOT}, discovery, organization)
 - ✓ Integration patterns (agents, skills, hooks coordination)
 - ✓ Validation patterns (input, file, resource validation, error handling)
 
@@ -261,7 +261,7 @@ To update this skill:
 3. Add new examples/ for different use cases
 4. Update frontmatter when new fields added
 5. Ensure imperative/infinitive form throughout
-6. Test examples work with current CodeBuddy Code
+6. Test examples work with current AgentZ Code
 
 ## Version History
 

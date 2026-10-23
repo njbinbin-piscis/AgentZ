@@ -198,10 +198,19 @@ export function rewriteAgentZText(text) {
   if (text == null) return "";
   let out = String(text);
   out = out.replace(/# Claude Command:/gi, "# AgentZ slash command:");
+  // Drop links/URLs pointing at the vendor site before the brand swap, so
+  // attribution lines keep their text but lose the foreign link target.
+  out = out.replace(/\[([^\]]*)\]\((?:https?:)?\/\/[^)\s]*codebuddy[^)\s]*\)/gi, "$1");
+  out = out.replace(/https?:\/\/[^\s)"']*codebuddy[^\s)"']*/gi, "");
   out = out.replace(/CodeBuddy CLI/gi, "AgentZ");
   out = out.replace(/CodeBuddy/gi, "AgentZ");
   out = out.replace(/Claude Code/gi, "AgentZ");
   out = out.replace(/\$\{CODEBUDDY_PLUGIN_ROOT\}/g, "${AGENTZ_BUNDLE_ROOT}");
+  out = out.replace(/CODEBUDDY_PLUGIN_ROOT/g, "AGENTZ_BUNDLE_ROOT");
+  out = out.replace(/CODEBUDDY_PLUGIN/g, "AGENTZ_PLUGIN");
+  // Any remaining brand tokens: paths (~/.codebuddy/), env vars, ids.
+  out = out.replace(/CODEBUDDY/g, "AGENTZ");
+  out = out.replace(/codebuddy/g, "agentz");
   out = out.replace(/OpenAI Agents SDK/gi, "AgentZ agent runtime");
   out = out.replace(/agents\.mcp/gi, "AgentZ MCP settings");
   out = out.replace(/MCPServerStreamableHttpParams/gi, "MCP server configuration");
@@ -227,8 +236,27 @@ export function rewriteVendorSkillBody(slug, body, plugin) {
   return out;
 }
 
+/** Strip one level of YAML quoting, unescaping double-quoted values so a
+ *  parse → rebuild round-trip stays byte-stable instead of compounding
+ *  backslash escapes on every remediation run. */
+function unquoteFrontmatterValue(val) {
+  if (val.length >= 2 && val.startsWith('"') && val.endsWith('"')) {
+    try {
+      return JSON.parse(val);
+    } catch {
+      return val.slice(1, -1);
+    }
+  }
+  if (val.length >= 2 && val.startsWith("'") && val.endsWith("'")) {
+    return val.slice(1, -1);
+  }
+  return val;
+}
+
 export function parseSkillFrontmatter(content) {
-  const trimmed = content.trimStart();
+  // Bundled files check out as CRLF on Windows; without normalization the
+  // per-line regexes fail on the trailing \r and silently drop fields.
+  const trimmed = String(content).replace(/\r\n/g, "\n").trimStart();
   if (!trimmed.startsWith("---")) {
     return { meta: {}, body: content.trim() };
   }
@@ -252,7 +280,7 @@ export function parseSkillFrontmatter(content) {
       meta[kv[1]] = currentList;
     } else {
       currentList = null;
-      meta[kv[1]] = val.replace(/^["']|["']$/g, "");
+      meta[kv[1]] = unquoteFrontmatterValue(val);
     }
   }
   return { meta, body };

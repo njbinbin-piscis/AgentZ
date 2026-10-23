@@ -55,8 +55,8 @@ class Session(TypedDict):
 
 
 def detect_env() -> str:
-    if os.environ.get("CODEBUDDY_COPILOT_INTERNET_ENVIRONMENT"):
-        return "codebuddy"
+    if os.environ.get("AgentZ_COPILOT_INTERNET_ENVIRONMENT"):
+        return "AgentZ"
     return "other"
 
 
@@ -123,19 +123,19 @@ def load_session():
 
 def _get_testbuddy_origin() -> str:
     """根据 session.json 中的 env 字段返回 x-testbuddy-origin 值
-    codebuddy -> cb-plugin，其他 -> openclaw
+    AgentZ -> cb-plugin，其他 -> openclaw
     """
     if os.path.exists(SESSION_FILE):
         with open(SESSION_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         env = data.get("env", "other").strip()
-        if env == "codebuddy":
+        if env == "AgentZ":
             return "cb-plugin"
     return "openclaw"
 
 
 def _check_session_alive(session_id: str, token: str = None) -> bool:
-    """通过 codebuddy server /session/check 接口检查 session_id 是否存活"""
+    """通过 AgentZ server /session/check 接口检查 session_id 是否存活"""
     import ssl
     import urllib.request as urllib_request
 

@@ -3,7 +3,7 @@ name: "microservices-patterns"
 description: "Design microservices architectures with service boundaries, event-driven communication, and resilience patterns. Use when building distributed systems, decomposing monoliths, or implementing microservices."
 description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "backend-development"
 ---
 

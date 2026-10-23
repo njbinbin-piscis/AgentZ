@@ -214,7 +214,7 @@ Combine both for multi-stage validation:
       "hooks": [
         {
           "type": "command",
-          "command": "bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/quick-check.sh",
+          "command": "bash ${AgentZ_PLUGIN_ROOT}/scripts/quick-check.sh",
           "timeout": 5
         },
         {
@@ -256,7 +256,7 @@ When migrating hooks:
 
 ```
 my-plugin/
-├── .codebuddy-plugin/plugin.json
+├── .AgentZ-plugin/plugin.json
 ├── hooks/hooks.json
 └── scripts/
     ├── validate-bash.sh
@@ -268,7 +268,7 @@ my-plugin/
 
 ```
 my-plugin/
-├── .codebuddy-plugin/plugin.json
+├── .AgentZ-plugin/plugin.json
 ├── hooks/hooks.json      # Now uses prompt hooks
 └── scripts/              # Archive or delete
     └── archive/

@@ -1,17 +1,17 @@
 ---
 description: "Create plugin settings file with user preferences"
-allowed-tools: ["Write", "AskUserQuestion"]
+allowed-tools: ["Write", "chat_ui tool"]
 ---
 
 # Create Plugin Settings
 
-This command helps users create a `.codebuddy/my-plugin.local.md` settings file.
+This command helps users create a `.AgentZ/my-plugin.local.md` settings file.
 
 ## Steps
 
 ### Step 1: Ask User for Preferences
 
-Use AskUserQuestion to gather configuration:
+Use chat_ui tool to gather configuration:
 
 ```json
 {
@@ -56,14 +56,14 @@ Use AskUserQuestion to gather configuration:
 
 ### Step 2: Parse Answers
 
-Extract answers from AskUserQuestion result:
+Extract answers from chat_ui tool result:
 
 - answers["0"]: enabled (Yes/No)
 - answers["1"]: mode (Strict/Standard/Lenient)
 
 ### Step 3: Create Settings File
 
-Use Write tool to create `.codebuddy/my-plugin.local.md`:
+Use Write tool to create `.AgentZ/my-plugin.local.md`:
 
 ```markdown
 ---
@@ -77,16 +77,16 @@ notify_on_errors: true
 
 Your plugin is configured with <mode> validation mode.
 
-To modify settings, edit this file and restart CodeBuddy Code.
+To modify settings, edit this file and restart AgentZ Code.
 ```
 
 ### Step 4: Inform User
 
 Tell the user:
-- Settings file created at `.codebuddy/my-plugin.local.md`
+- Settings file created at `.AgentZ/my-plugin.local.md`
 - Current configuration summary
 - How to edit manually if needed
-- Reminder: Restart CodeBuddy Code for changes to take effect
+- Reminder: Restart AgentZ Code for changes to take effect
 - Settings file is gitignored (won't be committed)
 
 ## Implementation Notes

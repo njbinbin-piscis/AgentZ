@@ -9,7 +9,7 @@ This document provides a comprehensive template for generating high-quality prot
 A well-structured prototype prompt should contain the following sections in order:
 
 ### 1. Role Definition
-Define the expertise and perspective CodeBuddy should adopt.
+Define the expertise and perspective AgentZ should adopt.
 
 **Template:**
 ```
@@ -515,7 +515,7 @@ Single HTML file, production-ready, mobile-responsive.
 
 3. **Use Real Content**: "Insurance agent dashboard" with "14 customers, ¥1,234.56 revenue" is better than "Dashboard with metrics"
 
-4. **Reference Standards**: "Follow WeChat Work design guidelines" gives CodeBuddy a comprehensive style framework
+4. **Reference Standards**: "Follow WeChat Work design guidelines" gives AgentZ a comprehensive style framework
 
 5. **Include Edge Cases**: Mention empty states, loading states, error states, long text handling
 

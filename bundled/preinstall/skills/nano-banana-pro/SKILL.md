@@ -3,7 +3,7 @@ name: "nano-banana-pro"
 description: "Generate/edit images with Nano Banana Pro (Gemini 3 Pro Image). Use for image create/modify requests incl. edits. Supports text-to-image + image-to-image; 1K/2K/4K; use --input-image."
 description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "hot-skills"
 ---
 

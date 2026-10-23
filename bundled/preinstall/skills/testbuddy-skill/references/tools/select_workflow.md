@@ -21,7 +21,7 @@ JSON 格式：
 
 ```json
 {
-  "path": ".codebuddy/rules/用例生成工作流.mdc"
+  "path": ".AgentZ/rules/用例生成工作流.mdc"
 }
 ```
 

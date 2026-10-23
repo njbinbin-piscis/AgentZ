@@ -87,7 +87,7 @@ python3 <script_dir>/scripts/write_node_from_file.py update design-Az7SsiL3Ui /t
 **优点**：支持批量更新、多种格式（JSON/YAML/Markdown）、无命令行长度限制
 
 **参数说明**：
-- `<script_dir>`: 脚本目录的绝对路径（通常为 `.codebuddy/skills/testbuddy-skill`）
+- `<script_dir>`: 脚本目录的绝对路径（通常为 `.AgentZ/skills/testbuddy-skill`）
 - `validate`: 操作类型（校验格式，使用 validate_nodes.py 脚本）
 - `update`: 操作类型（更新节点，使用 write_node_from_file.py 脚本）
 - `<design_uid>`: 设计文件的唯一标识（如：`design-Az7SsiL3Ui`）

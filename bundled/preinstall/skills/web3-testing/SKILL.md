@@ -3,7 +3,7 @@ name: "web3-testing"
 description: "Test smart contracts comprehensively using Hardhat and Foundry with unit tests, integration tests, and mainnet forking. Use when testing Solidity contracts, setting up blockchain test suites, or validating DeFi protocols."
 description_zh: "使用 Solidity 进行智能合约开发、DeFi 协议实现、NFT 平台和 Web3 应用架构"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "blockchain-web3"
 ---
 

@@ -2,7 +2,7 @@
 name: "hybrid-search-implementation"
 description: "Combine vector and keyword search for improved retrieval. Use when implementing RAG systems, building search engines, or when neither approach alone provides sufficient recall."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "llm-application-dev"
 ---
 

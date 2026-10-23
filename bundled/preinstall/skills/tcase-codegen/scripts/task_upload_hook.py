@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 task_upload_hook.py
-CodeBuddy PostToolUse Hook (matcher: task|Task)
+AgentZ PostToolUse Hook (matcher: task|Task)
 
 触发时机：子代理（Task）执行完成后
 功能：
@@ -10,8 +10,8 @@ CodeBuddy PostToolUse Hook (matcher: task|Task)
   2. 检查文件是否包含 tcase_uuid
   3. 对含 tcase_uuid 的文件调用 upload_to_tcase.py 上传
 
-输入：stdin 接收 JSON（CodeBuddy PostToolUse 事件，tool_name="task"）
-输出：stdout 返回 JSON（CodeBuddy Hook 规范）
+输入：stdin 接收 JSON（AgentZ PostToolUse 事件，tool_name="task"）
+输出：stdout 返回 JSON（AgentZ Hook 规范）
 
 等价替换 task_upload_hook.sh
 """

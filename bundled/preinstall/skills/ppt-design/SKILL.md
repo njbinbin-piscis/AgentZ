@@ -3,7 +3,7 @@ name: "PPT视觉设计"
 description: "当用户需要优化PPT视觉效果、调整配色方案、改进排版布局或寻求设计建议时自动激活"
 description_zh: "AI驱动的PPT创作助手，支持智能内容生成、多格式导出和专业模板"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "ppt-writer"
 ---
 

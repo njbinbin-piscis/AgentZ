@@ -22,7 +22,7 @@ from scripts.utils import parse_skill_md
 def find_project_root() -> Path:
     """Find the project root by walking up from cwd looking for .claude/.
 
-    Mimics how Claude Code discovers its project root, so the command file
+    Mimics how AgentZ discovers its project root, so the command file
     we create ends up where claude -p will look for it.
     """
     current = Path.cwd()
@@ -78,7 +78,7 @@ def run_single_query(
             cmd.extend(["--model", model])
 
         # Remove CLAUDECODE env var to allow nesting claude -p inside a
-        # Claude Code session. The guard is for interactive terminal conflicts;
+        # AgentZ session. The guard is for interactive terminal conflicts;
         # programmatic subprocess usage is safe.
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 

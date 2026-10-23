@@ -1,6 +1,6 @@
 # Lucide Icons Skill
 
-A CodeBuddy skill for searching, downloading, and customizing [Lucide icons](https://lucide.dev/) - a beautiful & consistent icon library with 1000+ icons.
+A AgentZ skill for searching, downloading, and customizing [Lucide icons](https://lucide.dev/) - a beautiful & consistent icon library with 1000+ icons.
 
 ## Features
 
@@ -247,20 +247,20 @@ The skill handles common errors gracefully:
 - **Permission denied**: Shows clear error message
 - **Network errors**: Falls back to cached data or local package
 
-## Integration with CodeBuddy
+## Integration with AgentZ
 
-When using with CodeBuddy, you can ask:
+When using with AgentZ, you can ask:
 
 > "Search for heart-related icons"
 
-CodeBuddy will execute:
+AgentZ will execute:
 ```bash
 node ./scripts/lucide.js search heart
 ```
 
 > "Download the heart icon as SVG and React component to ./src/icons/"
 
-CodeBuddy will execute:
+AgentZ will execute:
 ```bash
 node ./scripts/lucide.js download heart \
   --format svg,react \
@@ -294,4 +294,4 @@ MIT
 ## Credits
 
 - Icons by [Lucide](https://lucide.dev/)
-- Skill created for [CodeBuddy](https://codebuddy.dev/)
+- Skill created for AgentZ

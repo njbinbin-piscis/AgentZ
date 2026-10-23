@@ -1,6 +1,6 @@
 #!/bin/bash
 # Deep Research Workflow Installation Script
-# Installs deep-research commands and agents to CodeBuddy and Claude Code
+# Installs deep-research commands and agents to AgentZ and AgentZ
 
 set -e
 
@@ -31,15 +31,15 @@ print_header() {
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Source files are in the codebuddy-marketplace root (parent of skills directory)
+# Source files are in the AgentZ-marketplace root (parent of skills directory)
 SOURCE_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Target directories
-CODEBUDDY_DIR="$HOME/.codebuddy"
+AgentZ_DIR="$HOME/.AgentZ"
 CLAUDE_DIR="$HOME/.claude"
 
 # Create target directories
-CODEBUDDY_SKILLS_DIR="$CODEBUDDY_DIR/skills/deep-research"
+AgentZ_SKILLS_DIR="$AgentZ_DIR/skills/deep-research"
 CLAUDE_SKILLS_DIR="$CLAUDE_DIR/skills/deep-research"
 
 print_header "📦 Deep Research Workflow 安装程序"
@@ -73,24 +73,24 @@ fi
 print_success "所有源文件检查通过"
 echo ""
 
-# Install to CodeBuddy
-print_info "安装到 CodeBuddy ($CODEBUDDY_SKILLS_DIR)..."
-mkdir -p "$CODEBUDDY_SKILLS_DIR/commands"
-mkdir -p "$CODEBUDDY_SKILLS_DIR/agents"
+# Install to AgentZ
+print_info "安装到 AgentZ ($AgentZ_SKILLS_DIR)..."
+mkdir -p "$AgentZ_SKILLS_DIR/commands"
+mkdir -p "$AgentZ_SKILLS_DIR/agents"
 
 # Copy commands
-cp "$SOURCE_DIR/omc-commands/init-research.md" "$CODEBUDDY_SKILLS_DIR/commands/"
-cp "$SOURCE_DIR/omc-commands/ralph-loop-research.md" "$CODEBUDDY_SKILLS_DIR/commands/"
-cp "$SOURCE_DIR/omc-commands/ralph-loop-wiki.md" "$CODEBUDDY_SKILLS_DIR/commands/"
+cp "$SOURCE_DIR/omc-commands/init-research.md" "$AgentZ_SKILLS_DIR/commands/"
+cp "$SOURCE_DIR/omc-commands/ralph-loop-research.md" "$AgentZ_SKILLS_DIR/commands/"
+cp "$SOURCE_DIR/omc-commands/ralph-loop-wiki.md" "$AgentZ_SKILLS_DIR/commands/"
 
 # Copy agents
-cp "$SOURCE_DIR/omc-agents/gh-repo-research.md" "$CODEBUDDY_SKILLS_DIR/agents/"
+cp "$SOURCE_DIR/omc-agents/gh-repo-research.md" "$AgentZ_SKILLS_DIR/agents/"
 
-print_success "已安装到 CodeBuddy"
+print_success "已安装到 AgentZ"
 echo ""
 
-# Install to Claude Code
-print_info "安装到 Claude Code ($CLAUDE_SKILLS_DIR)..."
+# Install to AgentZ
+print_info "安装到 AgentZ ($CLAUDE_SKILLS_DIR)..."
 mkdir -p "$CLAUDE_SKILLS_DIR/commands"
 mkdir -p "$CLAUDE_SKILLS_DIR/agents"
 
@@ -102,7 +102,7 @@ cp "$SOURCE_DIR/omc-commands/ralph-loop-wiki.md" "$CLAUDE_SKILLS_DIR/commands/"
 # Copy agents
 cp "$SOURCE_DIR/omc-agents/gh-repo-research.md" "$CLAUDE_SKILLS_DIR/agents/"
 
-print_success "已安装到 Claude Code"
+print_success "已安装到 AgentZ"
 echo ""
 
 # Create SKILL.md file
@@ -131,13 +131,13 @@ This skill provides a complete research workflow system for codebase analysis, d
 ## Installation
 
 This skill is installed to:
-- \`~/.codebuddy/skills/deep-research/\`
+- \`~/.AgentZ/skills/deep-research/\`
 - \`~/.claude/skills/deep-research/\`
 
 Run \`bash install.sh\` from the skill directory to install.
 "
 
-echo "$SKILL_MD_CONTENT" > "$CODEBUDDY_SKILLS_DIR/SKILL.md"
+echo "$SKILL_MD_CONTENT" > "$AgentZ_SKILLS_DIR/SKILL.md"
 echo "$SKILL_MD_CONTENT" > "$CLAUDE_SKILLS_DIR/SKILL.md"
 
 print_success "SKILL.md 文件已创建"
@@ -147,8 +147,8 @@ echo ""
 print_header "✅ 安装完成！"
 echo ""
 echo -e "安装位置："
-echo -e "  ${CYAN}CodeBuddy:${NC} $CODEBUDDY_SKILLS_DIR"
-echo -e "  ${CYAN}Claude Code:${NC} $CLAUDE_SKILLS_DIR"
+echo -e "  ${CYAN}AgentZ:${NC} $AgentZ_SKILLS_DIR"
+echo -e "  ${CYAN}AgentZ:${NC} $CLAUDE_SKILLS_DIR"
 echo ""
 echo -e "已安装文件："
 echo -e "  ${GREEN}命令:${NC}"
@@ -159,6 +159,6 @@ echo -e "  ${GREEN}智能体:${NC}"
 echo -e "    - gh-repo-research.md"
 echo ""
 echo -e "${BOLD}下一步：${NC}"
-echo -e "  1. 重启 CodeBuddy/Claude Code 以加载新技能"
+echo -e "  1. 重启 AgentZ/AgentZ 以加载新技能"
 echo -e "  2. 运行 ${CYAN}/init-research${NC} 开始分析代码库"
 echo ""

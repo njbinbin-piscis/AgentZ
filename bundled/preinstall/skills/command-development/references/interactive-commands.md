@@ -1,6 +1,6 @@
 # Interactive Command Patterns
 
-Comprehensive guide to creating commands that gather user feedback and make decisions through the AskUserQuestion tool.
+Comprehensive guide to creating commands that gather user feedback and make decisions through the chat_ui tool tool.
 
 ## Overview
 
@@ -10,11 +10,11 @@ Some commands need user input that doesn't work well with simple arguments. For 
 - Making decisions that require explanation
 - Gathering preferences or configuration interactively
 
-For these cases, use the **AskUserQuestion tool** within command execution rather than relying on command arguments.
+For these cases, use the **chat_ui tool tool** within command execution rather than relying on command arguments.
 
-## When to Use AskUserQuestion
+## When to Use chat_ui tool
 
-### Use AskUserQuestion When:
+### Use chat_ui tool When:
 
 1. **Multiple choice decisions** with explanations needed
 2. **Complex options** that require context to choose
@@ -29,7 +29,7 @@ For these cases, use the **AskUserQuestion tool** within command execution rathe
 3. **Scriptable workflows** that should be automatable
 4. **Fast invocations** where prompting would slow down
 
-## AskUserQuestion Basics
+## chat_ui tool Basics
 
 ### Tool Parameters
 
@@ -72,7 +72,7 @@ For these cases, use the **AskUserQuestion tool** within command execution rathe
 ```markdown
 ---
 description: Interactive setup command
-allowed-tools: AskUserQuestion, Write
+allowed-tools: chat_ui tool, Write
 ---
 
 # Interactive Plugin Setup
@@ -81,7 +81,7 @@ This command will guide you through configuring the plugin with a series of ques
 
 ## Step 1: Gather Configuration
 
-Use the AskUserQuestion tool to ask:
+Use the chat_ui tool tool to ask:
 
 **Question 1 - Deployment target:**
 - header: "Deploy to"
@@ -112,7 +112,7 @@ Use the AskUserQuestion tool to ask:
 
 ## Step 2: Process Answers
 
-Based on the answers received from AskUserQuestion:
+Based on the answers received from chat_ui tool:
 
 1. Parse the deployment target choice
 2. Set up environment-specific configuration
@@ -121,7 +121,7 @@ Based on the answers received from AskUserQuestion:
 
 ## Step 3: Generate Configuration
 
-Create `.codebuddy/plugin-name.local.md` with:
+Create `.AgentZ/plugin-name.local.md` with:
 
 \`\`\`yaml
 ---
@@ -151,7 +151,7 @@ Confirm configuration created and guide user on next steps.
 ```markdown
 ---
 description: Multi-stage interactive workflow
-allowed-tools: AskUserQuestion, Read, Write, Bash
+allowed-tools: chat_ui tool, Read, Write, Bash
 ---
 
 # Multi-Stage Deployment Setup
@@ -160,7 +160,7 @@ This command walks through deployment setup in stages, adapting based on your an
 
 ## Stage 1: Basic Configuration
 
-Use AskUserQuestion to ask about deployment basics.
+Use chat_ui tool to ask about deployment basics.
 
 Based on answers, determine which additional questions to ask.
 
@@ -168,7 +168,7 @@ Based on answers, determine which additional questions to ask.
 
 If user selected "Advanced" deployment in Stage 1:
 
-Use AskUserQuestion to ask about:
+Use chat_ui tool to ask about:
 - Load balancing strategy
 - Caching configuration
 - Security hardening options
@@ -181,7 +181,7 @@ If user selected "Simple" deployment:
 
 Show summary of all selections.
 
-Use AskUserQuestion for final confirmation:
+Use chat_ui tool for final confirmation:
 - header: "Confirm"
 - question: "Does this configuration look correct?"
 - options:
@@ -243,7 +243,7 @@ Options:
 **When to use multiSelect:**
 
 ```markdown
-Use AskUserQuestion for enabling features:
+Use chat_ui tool for enabling features:
 
 Question: "Which features do you want to enable?"
 Header: "Features"
@@ -266,21 +266,21 @@ multiSelect: false  // Only one auth method makes sense
 
 Mutually exclusive choices should not use multiSelect.
 
-## Command Patterns with AskUserQuestion
+## Command Patterns with chat_ui tool
 
 ### Pattern 1: Simple Yes/No Decision
 
 ```markdown
 ---
 description: Command with confirmation
-allowed-tools: AskUserQuestion, Bash
+allowed-tools: chat_ui tool, Bash
 ---
 
 # Destructive Operation
 
 This operation will delete all cached data.
 
-Use AskUserQuestion to confirm:
+Use chat_ui tool to confirm:
 
 Question: "This will delete all cached data. Are you sure?"
 Header: "Confirm"
@@ -302,14 +302,14 @@ If user selects "No":
 ```markdown
 ---
 description: Multi-question configuration
-allowed-tools: AskUserQuestion, Write
+allowed-tools: chat_ui tool, Write
 ---
 
 # Project Configuration Setup
 
 Gather configuration through multiple questions.
 
-Use AskUserQuestion with multiple questions in one call:
+Use chat_ui tool with multiple questions in one call:
 
 **Question 1:**
 - question: "Which programming language?"
@@ -341,14 +341,14 @@ Process all answers together to generate cohesive configuration.
 ```markdown
 ---
 description: Conditional interactive workflow
-allowed-tools: AskUserQuestion, Read, Write
+allowed-tools: chat_ui tool, Read, Write
 ---
 
 # Adaptive Configuration
 
 ## Question 1: Deployment Complexity
 
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "How complex is your deployment?"
 Header: "Complexity"
@@ -383,7 +383,7 @@ Generate configuration appropriate for selected complexity level.
 ```markdown
 ---
 description: Collect multiple items iteratively
-allowed-tools: AskUserQuestion, Write
+allowed-tools: chat_ui tool, Write
 ---
 
 # Collect Team Members
@@ -392,7 +392,7 @@ We'll collect team member information for the project.
 
 ## Question: How many team members?
 
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "How many team members should we set up?"
 Header: "Team size"
@@ -406,7 +406,7 @@ Options:
 
 For each team member (1 to N based on answer):
 
-Use AskUserQuestion for member details:
+Use chat_ui tool for member details:
 
 Question: "What role for team member [number]?"
 Header: "Role"
@@ -429,14 +429,14 @@ After collecting all N members, create team configuration file with all members 
 ```markdown
 ---
 description: Select dependencies with multi-select
-allowed-tools: AskUserQuestion
+allowed-tools: chat_ui tool
 ---
 
 # Configure Project Dependencies
 
 ## Question: Required Libraries
 
-Use AskUserQuestion with multiSelect:
+Use chat_ui tool with multiSelect:
 
 Question: "Which libraries does your project need?"
 Header: "Dependencies"
@@ -472,9 +472,9 @@ For each selected library:
 ### Error Handling
 
 ```markdown
-# Handle AskUserQuestion Responses
+# Handle chat_ui tool Responses
 
-After calling AskUserQuestion, verify answers received:
+After calling chat_ui tool, verify answers received:
 
 If answers are empty or invalid:
   Something went wrong gathering responses.
@@ -495,7 +495,7 @@ If answers look correct:
 
 ## Question 1: Setup Type
 
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "How would you like to set up?"
 Header: "Setup type"
@@ -545,14 +545,14 @@ Reason: Can only use one database engine
 ```markdown
 ---
 description: Interactive with validation
-allowed-tools: AskUserQuestion, Bash
+allowed-tools: chat_ui tool, Bash
 ---
 
 # Setup with Validation
 
 ## Gather Configuration
 
-Use AskUserQuestion to collect settings.
+Use chat_ui tool to collect settings.
 
 ## Validate Configuration
 
@@ -564,7 +564,7 @@ Check if configuration is valid:
 If validation fails:
   Show validation errors
 
-  Use AskUserQuestion to ask:
+  Use chat_ui tool to ask:
 
   Question: "Configuration has issues. What would you like to do?"
   Header: "Next step"
@@ -581,16 +581,16 @@ If validation fails:
 ```markdown
 ---
 description: Incremental configuration builder
-allowed-tools: AskUserQuestion, Write, Read
+allowed-tools: chat_ui tool, Write, Read
 ---
 
 # Incremental Setup
 
 ## Phase 1: Core Settings
 
-Use AskUserQuestion for core settings.
+Use chat_ui tool for core settings.
 
-Save to `.codebuddy/config-partial.yml`
+Save to `.AgentZ/config-partial.yml`
 
 ## Phase 2: Review Core Settings
 
@@ -604,7 +604,7 @@ Ready to continue?
 
 ## Phase 3: Detailed Settings
 
-Use AskUserQuestion for settings based on Phase 1 answers.
+Use chat_ui tool for settings based on Phase 1 answers.
 
 Merge with core settings.
 
@@ -612,7 +612,7 @@ Merge with core settings.
 
 Present complete configuration.
 
-Use AskUserQuestion for confirmation:
+Use chat_ui tool for confirmation:
 
 Question: "Is this configuration correct?"
 Options:
@@ -626,7 +626,7 @@ Options:
 ```markdown
 ---
 description: Context-aware questions
-allowed-tools: AskUserQuestion, Bash, Read
+allowed-tools: chat_ui tool, Bash, Read
 ---
 
 # Context-Aware Setup
@@ -644,7 +644,7 @@ Based on detected language, ask relevant questions.
 
 If language is TypeScript:
 
-  Use AskUserQuestion:
+  Use chat_ui tool:
 
   Question: "Which TypeScript features should we enable?"
   Options:
@@ -654,7 +654,7 @@ If language is TypeScript:
 
 If language is Python:
 
-  Use AskUserQuestion:
+  Use chat_ui tool:
 
   Question: "Which Python tools should we configure?"
   Options:
@@ -672,7 +672,7 @@ Questions adapt to project context.
 ```markdown
 ---
 description: Launch multi-agent swarm
-allowed-tools: AskUserQuestion, Read, Write, Bash
+allowed-tools: chat_ui tool, Read, Write, Bash
 ---
 
 # Launch Multi-Agent Swarm
@@ -683,7 +683,7 @@ If user didn't provide task list file, help create one interactively.
 
 ### Question 1: Agent Count
 
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "How many agents should we launch?"
 Header: "Agent count"
@@ -696,7 +696,7 @@ Options:
 
 ### Question 2: Task Definition Approach
 
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "How would you like to define tasks?"
 Header: "Task setup"
@@ -714,7 +714,7 @@ If "Guided":
 
 ### Question 3: Coordination Mode
 
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "How should agents coordinate?"
 Header: "Coordination"
@@ -816,7 +816,7 @@ After collecting all agent task details:
 ### Pattern: Feature Selection
 
 ```markdown
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "Which features do you need?"
 Header: "Features"
@@ -831,7 +831,7 @@ Options:
 ### Pattern: Environment Configuration
 
 ```markdown
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "Which environment is this?"
 Header: "Environment"
@@ -844,7 +844,7 @@ Options:
 ### Pattern: Priority Selection
 
 ```markdown
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "What's the priority for this task?"
 Header: "Priority"
@@ -858,7 +858,7 @@ Options:
 ### Pattern: Scope Selection
 
 ```markdown
-Use AskUserQuestion:
+Use chat_ui tool:
 
 Question: "What scope should we analyze?"
 Header: "Scope"
@@ -876,21 +876,21 @@ Options:
 ```markdown
 ---
 argument-hint: [project-name]
-allowed-tools: AskUserQuestion, Write
+allowed-tools: chat_ui tool, Write
 ---
 
 Setup for project: $1
 
 Now gather additional configuration...
 
-Use AskUserQuestion for options that require explanation.
+Use chat_ui tool for options that require explanation.
 ```
 
 **Questions for complex choices:**
 ```markdown
 Project name from argument: $1
 
-Now use AskUserQuestion to choose:
+Now use chat_ui tool to choose:
 - Architecture pattern
 - Technology stack
 - Deployment strategy
@@ -901,7 +901,7 @@ These require explanation, so questions work better than arguments.
 ## Troubleshooting
 
 **Questions not appearing:**
-- Verify AskUserQuestion in allowed-tools
+- Verify chat_ui tool in allowed-tools
 - Check question format is correct
 - Ensure options array has 2-4 items
 
@@ -917,4 +917,4 @@ These require explanation, so questions work better than arguments.
 - Add explanation between stages
 - Show progress through workflow
 
-With AskUserQuestion, commands become interactive wizards that guide users through complex decisions while maintaining the clarity that simple arguments provide for straightforward inputs.
+With chat_ui tool, commands become interactive wizards that guide users through complex decisions while maintaining the clarity that simple arguments provide for straightforward inputs.

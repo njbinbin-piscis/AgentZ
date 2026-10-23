@@ -2,7 +2,7 @@
 name: "trend-researcher"
 description: "Research latest UI/UX trends from Dribbble and design communities. Use when starting a design project to understand current visual trends, color palettes, and layout patterns."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "frontend-design-pro"
 ---
 

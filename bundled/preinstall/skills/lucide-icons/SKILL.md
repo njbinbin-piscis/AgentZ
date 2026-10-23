@@ -2,7 +2,7 @@
 name: "lucide-icons"
 description: ""
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "lucide-icons"
 ---
 

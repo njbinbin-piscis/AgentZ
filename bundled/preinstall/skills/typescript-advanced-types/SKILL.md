@@ -3,7 +3,7 @@ name: "typescript-advanced-types"
 description: "Master TypeScript's advanced type system including generics, conditional types, mapped types, template literals, and utility types for building type-safe applications. Use when implementing complex type logic, creating reusable type utilities, or ensuring compile-time type safety in TypeScript projects."
 description_zh: "JavaScript 和 TypeScript 开发，支持 ES6+、Node.js、React 及现代 Web 框架"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "javascript-typescript"
 ---
 

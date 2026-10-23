@@ -2,7 +2,7 @@
 name: "inspiration-analyzer"
 description: "Analyze websites for design inspiration, extracting colors, typography, layouts, and patterns. Use when you have specific URLs to analyze for a design project."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "frontend-design-pro"
 ---
 

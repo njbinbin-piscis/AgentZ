@@ -3,7 +3,7 @@ name: "data-quality-frameworks"
 description: "Implement data quality validation with Great Expectations, dbt tests, and data contracts. Use when building data quality pipelines, implementing validation rules, or establishing data contracts."
 description_zh: "ETL管道构建、数据仓库设计、批处理工作流和数据驱动的功能开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "data-engineering"
 ---
 

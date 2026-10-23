@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Lucide Icons Skill for CodeBuddy
+ * Lucide Icons Skill for AgentZ
  * Search, download and customize Lucide icons
  */
 
@@ -117,7 +117,7 @@ class MetadataManager {
       const response = await axios.get(GITHUB_API_BASE, {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'CodeBuddy-Lucide-Skill'
+          'User-Agent': 'AgentZ-Lucide-Skill'
         },
         timeout: 10000
       });
@@ -297,7 +297,7 @@ class IconDownloader {
     try {
       const response = await axios.get(url, {
         headers: {
-          'User-Agent': 'CodeBuddy-Lucide-Skill'
+          'User-Agent': 'AgentZ-Lucide-Skill'
         },
         timeout: 10000
       });

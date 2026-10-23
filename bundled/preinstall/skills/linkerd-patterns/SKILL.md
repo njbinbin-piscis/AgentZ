@@ -3,7 +3,7 @@ name: "linkerd-patterns"
 description: "Implement Linkerd service mesh patterns for lightweight, security-focused service mesh deployments. Use when setting up Linkerd, configuring traffic policies, or implementing zero-trust networking with minimal overhead."
 description_zh: "云架构设计（AWS/Azure/GCP），Kubernetes 集群配置，Terraform 基础设施即代码，混合云网络，以及多云成本优化"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "cloud-infrastructure"
 ---
 

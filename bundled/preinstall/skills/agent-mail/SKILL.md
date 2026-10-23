@@ -3,13 +3,9 @@ name: "agentmail"
 description: "Email inbox for AI agents. Check messages, send emails, and communicate via your own @agentmail.to address."
 description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "hot-skills"
 ---
-
-> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
-
-> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 
 > **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 

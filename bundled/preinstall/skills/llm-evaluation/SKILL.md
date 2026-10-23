@@ -2,7 +2,7 @@
 name: "llm-evaluation"
 description: "Implement comprehensive evaluation strategies for LLM applications using automated metrics, human feedback, and benchmarking. Use when testing LLM performance, measuring AI application quality, or establishing evaluation frameworks."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "llm-application-dev"
 ---
 

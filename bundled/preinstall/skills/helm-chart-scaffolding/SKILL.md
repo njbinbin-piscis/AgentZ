@@ -3,7 +3,7 @@ name: "helm-chart-scaffolding"
 description: "Design, organize, and manage Helm charts for templating and packaging Kubernetes applications with reusable configurations. Use when creating Helm charts, packaging Kubernetes applications, or implementing templated deployments."
 description_zh: "Kubernetes 清单生成、网络配置、安全策略、可观测性配置、GitOps 工作流和自动扩缩容"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "kubernetes-operations"
 ---
 

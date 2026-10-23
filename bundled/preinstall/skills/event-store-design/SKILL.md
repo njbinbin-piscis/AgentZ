@@ -3,7 +3,7 @@ name: "event-store-design"
 description: "Design and implement event stores for event-sourced systems. Use when building event sourcing infrastructure, choosing event store technologies, or implementing event persistence patterns."
 description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "backend-development"
 ---
 

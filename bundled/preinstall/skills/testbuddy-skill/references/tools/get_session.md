@@ -18,7 +18,7 @@ echo '<json_data>' | python3 <skills_dir>/scripts/get_session.py --write
 
 **参数说明**：
 
-- `<skills_dir>`：脚本目录的绝对路径（通常为 `.codebuddy/skills/testbuddy-skill`）
+- `<skills_dir>`：脚本目录的绝对路径（通常为 `.AgentZ/skills/testbuddy-skill`）
 - `--write`：可选，从 stdin 读取 JSON 合并写入 session.json，输出合并后的完整数据
 
 ---

@@ -1,10 +1,10 @@
 ---
 name: "skill-install"
-description: "Install CodeBuddy skills from GitHub repositories with automated security scanning. Triggers when users want to install skills from a GitHub URL, need to browse available skills in a repository, or want to safely add new skills to their CodeBuddy environment."
-description_zh: "完整的 OMC (Oh My CodeBuddy) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
+description: "Install AgentZ skills from GitHub repositories with automated security scanning. Triggers when users want to install skills from a GitHub URL, need to browse available skills in a repository, or want to safely add new skills to their AgentZ environment."
+description_zh: "完整的 OMC (Oh My AgentZ) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
 version: "1.0.0"
-source: codebuddy
-source_plugin: "oh-my-codebuddy"
+source: AgentZ
+source_plugin: "oh-my-agentz"
 ---
 
 # Skill Install

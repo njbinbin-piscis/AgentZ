@@ -1,10 +1,10 @@
 ---
 name: "prototype-prompt-generator"
 description: "This skill should be used when users need to generate detailed, structured prompts for creating UI/UX prototypes. Trigger when users request help with \\\\\\\\\\\\\\\"create a prototype prompt\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"design a mobile app\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"generate UI specifications\\\\\\\\\\\\\\\", or need comprehensive design documentation for web/mobile applications. Works with multiple design systems including WeChat Work, iOS Native, Material Design, and Ant Design Mobile."
-description_zh: "完整的 OMC (Oh My CodeBuddy) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
+description_zh: "完整的 OMC (Oh My AgentZ) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
 version: "1.0.0"
-source: codebuddy
-source_plugin: "oh-my-codebuddy"
+source: AgentZ
+source_plugin: "oh-my-agentz"
 ---
 
 # Prototype Prompt Generator

@@ -3,7 +3,7 @@ name: "bash-defensive-patterns"
 description: "Master defensive Bash programming techniques for production-grade scripts. Use when writing robust shell scripts, CI/CD pipelines, or system utilities requiring fault tolerance and safety."
 description_zh: "生产级 Bash 脚本编写，包含防御性编程、POSIX 合规性和全面测试"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "shell-scripting"
 ---
 

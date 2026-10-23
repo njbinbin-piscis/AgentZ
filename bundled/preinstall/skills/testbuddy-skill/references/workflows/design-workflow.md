@@ -61,7 +61,7 @@ Demo:
 
 - **使用工具**：`select_rule`（位于 `references/tools/select_rule`），传入关键词"需求分析"
 - **根据返回结果**：
-  - 如果返回自定义规则路径（`.codebuddy/rules/xxx`）：使用 `read_rules` 读取规则内容
+  - 如果返回自定义规则路径（`.AgentZ/rules/xxx`）：使用 `read_rules` 读取规则内容
   - 如果返回默认Generator路径（`references/generators/xxx`）：使用 `read_file` 读取 Generator 内容
 - **执行方式**：按获取到的规则/Generator定义执行需求分析
 - **标准输入参数**
@@ -98,7 +98,7 @@ Demo:
 
 - **使用工具**：`select_rule`（位于 `references/tools/select_rule`），传入关键词"框架生成"
 - **根据返回结果**：
-  - 如果返回自定义规则路径（`.codebuddy/rules/xxx`）：使用 `read_rules` 读取规则内容
+  - 如果返回自定义规则路径（`.AgentZ/rules/xxx`）：使用 `read_rules` 读取规则内容
   - 如果返回默认Generator路径（`references/generators/xxx`）：使用 `read_file` 读取 Generator 内容
 - **执行方式**：按获取到的规则/Generator定义执行框架生成
 - **标准输入参数**：
@@ -141,7 +141,7 @@ Demo:
 
 - **使用工具**：`select_rule`（位于 `references/tools/select_rule`），传入关键词"用例生成"
 - **根据返回结果**：
-  - 如果返回自定义规则路径（`.codebuddy/rules/xxx`）：使用 `read_rules` 读取规则内容
+  - 如果返回自定义规则路径（`.AgentZ/rules/xxx`）：使用 `read_rules` 读取规则内容
   - 如果返回默认Generator路径（`references/generators/xxx`）：使用 `read_file` 读取 Generator 内容
 - **执行方式**：按获取到的规则/Generator定义执行用例生成
 - **参考节点**：使用**步骤 5 生成的框架节点**（FEATURE/SCENE/TEST_POINT）作为参考节点，而不是原始的 STORY/BUG 节点

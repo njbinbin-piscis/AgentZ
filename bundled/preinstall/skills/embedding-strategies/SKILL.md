@@ -2,7 +2,7 @@
 name: "embedding-strategies"
 description: "Select and optimize embedding models for semantic search and RAG applications. Use when choosing embedding models, implementing chunking strategies, or optimizing embedding quality for specific domains."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "llm-application-dev"
 ---
 

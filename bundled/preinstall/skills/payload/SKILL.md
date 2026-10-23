@@ -1,9 +1,9 @@
 ---
 name: "payload"
 description: "Use when working with Payload CMS projects (payload.config.ts, collections, fields, hooks, access control, Payload API). Use when debugging validation errors, security issues, relationship queries, transactions, or hook behavior."
-description_zh: "为 Payload 开发提供全面指导的 Claude Code 技能，包含 TypeScript 模式、字段配置、钩子、访问控制和 API 示例。"
+description_zh: "为 Payload 开发提供全面指导的 AgentZ 技能，包含 TypeScript 模式、字段配置、钩子、访问控制和 API 示例。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "payload"
 ---
 

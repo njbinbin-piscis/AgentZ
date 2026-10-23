@@ -91,11 +91,11 @@ def get_mode():
 
 def get_source():
     """从 session 的 env 字段获取节点来源标识
-    codebuddy -> CB_PLUGIN_AGENT（枚举值 13，cb插件），其他（other 等）-> OPEN_CLAW（枚举值 15，open claw ai生成）
+    AgentZ -> CB_PLUGIN_AGENT（枚举值 13，cb插件），其他（other 等）-> OPEN_CLAW（枚举值 15，open claw ai生成）
     """
     data = _load_session_data()
     env = data.get("env", "other").strip() if data else "other"
-    if env == "codebuddy":
+    if env == "AgentZ":
         return "CB_PLUGIN_AGENT"
     return "OPEN_CLAW"
 
@@ -120,12 +120,12 @@ def get_namespace():
 
 def _get_testbuddy_origin():
     """根据 session 中的 env 字段返回 x-testbuddy-origin 值
-    codebuddy -> cb-plugin，其他 -> openclaw
+    AgentZ -> cb-plugin，其他 -> openclaw
     """
     data = _load_session_data()
     if data:
         env = data.get("env", "other").strip()
-        if env == "codebuddy":
+        if env == "AgentZ":
             return "cb-plugin"
     return "openclaw"
 
@@ -1009,8 +1009,8 @@ def handle_add(data, design_uid):
     if actual_design_uid and namespace:
         server = get_server()
         design_url = "{}/tencent/tb/workbench#/testx/{}/design/{}".format(server, namespace, actual_design_uid)
-        if env == "codebuddy":
-            # codebuddy 环境：提示使用 preview_url 工具打开页面
+        if env == "AgentZ":
+            # AgentZ 环境：提示使用 preview_url 工具打开页面
             result["design_url"] = design_url
             result["open_action"] = "preview_url"
             result["msg"] = "节点添加成功，请使用 preview_url 工具打开测试设计页面：{}".format(design_url)
@@ -1101,8 +1101,8 @@ def handle_update(data, design_uid):
     if actual_design_uid and namespace:
         server = get_server()
         design_url = "{}/tencent/tb/workbench#/testx/{}/design/{}".format(server, namespace, actual_design_uid)
-        if env == "codebuddy":
-            # codebuddy 环境：提示使用 preview_url 工具打开页面
+        if env == "AgentZ":
+            # AgentZ 环境：提示使用 preview_url 工具打开页面
             result["design_url"] = design_url
             result["open_action"] = "preview_url"
             result["msg"] = "节点更新成功，请使用 preview_url 工具打开测试设计页面：{}".format(design_url)
@@ -1182,8 +1182,8 @@ def handle_delete(data, design_uid):
     if design_uid and namespace:
         server = get_server()
         design_url = "{}/tencent/tb/workbench#/testx/{}/design/{}".format(server, namespace, design_uid)
-        if env == "codebuddy":
-            # codebuddy 环境：提示使用 preview_url 工具打开页面
+        if env == "AgentZ":
+            # AgentZ 环境：提示使用 preview_url 工具打开页面
             result["design_url"] = design_url
             result["open_action"] = "preview_url"
             result["msg"] = "节点删除成功，请使用 preview_url 工具打开测试设计页面：{}".format(design_url)

@@ -3,7 +3,7 @@ name: "discover-tools"
 description: "Discover available MCP servers and tools in the current WeData workspace. Use when: (1) User asks 'what tools are available', 'what MCP servers are configured', 'show me available tools', (2) Before configuring agent MCP connections, (3) User says 'discover', 'find tools', 'list MCP', 'MCP servers', '发现工具', '查看MCP', '有哪些工具', '可用工具', '工具列表', '查看可用的MCP', (4) User wants to know what remote MCP services are available in their workspace."
 description_zh: "Wedata3.0 官方插件 —— Data+AI一体化平台，内置Wedata各种能力调用的Skills，通过DataAgents相关Skills可以快速开发调用Wedata引擎、数据、AI资源的数据智能体，并可自动部署到云端直接使用。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "wedata3"
 ---
 

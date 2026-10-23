@@ -3,7 +3,7 @@ name: "tcase-casegen-workflow"
 description: "TCase 用例生成 spec 工作流。提供完整的5阶段测试用例生成流程：查询需求→需求分析→测试点设计→用例生成→同步到脑图。当 testbuddy-skill 检测到此技能包存在时自动使用。"
 description_zh: "AI 驱动测试用例生成与管理工作流，集成 TestBuddy 脑图可视化和 TCase 自动化测试代码生成能力"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "tsmart"
 ---
 

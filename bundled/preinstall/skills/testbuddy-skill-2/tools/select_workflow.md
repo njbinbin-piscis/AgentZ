@@ -1,7 +1,7 @@
 # 工作流选择工具 (select_workflow)
 
 ## 工具简介
-根据关键词从 `.codebuddy/rules` 目录下智能匹配以"工作流"结尾的文件，并返回工作流文件路径。
+根据关键词从 `.AgentZ/rules` 目录下智能匹配以"工作流"结尾的文件，并返回工作流文件路径。
 
 ## 使用方法
 
@@ -18,7 +18,7 @@ python3 <script_dir>/scripts/select_workflow.py <keyword>
 JSON 格式：
 ```json
 {
-  "path": ".codebuddy/rules/用例生成工作流.mdc"
+  "path": ".AgentZ/rules/用例生成工作流.mdc"
 }
 ```
 

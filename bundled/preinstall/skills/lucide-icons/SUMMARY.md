@@ -2,7 +2,7 @@
 
 ## ✅ 收录完成
 
-**lucide-icons** 已成功封装为 CodeBuddy Code 插件并加入官方 marketplace。
+**lucide-icons** 已成功封装为 AgentZ Code 插件并加入官方 marketplace。
 
 ---
 
@@ -15,7 +15,7 @@
 | **来源类型** | 自研插件 (`self_built`) |
 | **License** | MIT |
 | **收录时间** | 2026-01-18 |
-| **原始来源** | `/Users/laurentzhou/CodeBuddy/genie/dev-packages/skills/lucide-icons` |
+| **原始来源** | `/Users/laurentzhou/AgentZ/genie/dev-packages/skills/lucide-icons` |
 
 ---
 
@@ -35,8 +35,8 @@ Lucide 图标搜索和下载工具，提供：
 ## 📁 文件结构
 
 ```
-/Users/laurentzhou/CodeBuddy/marketplace/plugins/lucide-icons/
-├── .codebuddy-plugin/
+/Users/laurentzhou/AgentZ/marketplace/plugins/lucide-icons/
+├── .AgentZ-plugin/
 │   └── plugin.json          # 插件配置文件
 ├── scripts/
 │   ├── lucide.js            # 核心功能脚本
@@ -61,14 +61,14 @@ Lucide 图标搜索和下载工具，提供：
   "license": "MIT",
   "description_en": "Search, download, and customize Lucide icons (1000+ beautiful SVG icons) with React component generation support",
   "author": {
-    "name": "CodeBuddy Team"
+    "name": "AgentZ Team"
   },
   "homepage": "https://github.com/lucide-icons/lucide"
 }
 ```
 
 ### 2. marketplace.json
-已添加到 `/Users/laurentzhou/CodeBuddy/marketplace/.codebuddy-plugin/marketplace.json`:
+已添加到 `/Users/laurentzhou/AgentZ/marketplace/.AgentZ-plugin/marketplace.json`:
 ```json
 {
   "name": "lucide-icons",
@@ -79,13 +79,13 @@ Lucide 图标搜索和下载工具，提供：
   "license": "MIT",
   "homepage": "https://github.com/lucide-icons/lucide",
   "author": {
-    "name": "CodeBuddy Team"
+    "name": "AgentZ Team"
   }
 }
 ```
 
 ### 3. official_plugins_metadata.json
-已添加到 `/Users/laurentzhou/CodeBuddy/plugin_marketplace/official_plugins_metadata.json`:
+已添加到 `/Users/laurentzhou/AgentZ/plugin_marketplace/official_plugins_metadata.json`:
 ```json
 {
   "source_type": "self_built",
@@ -108,7 +108,7 @@ Lucide 图标搜索和下载工具，提供：
 
 ```bash
 # 进入插件目录
-cd /Users/laurentzhou/CodeBuddy/marketplace/plugins/lucide-icons
+cd /Users/laurentzhou/AgentZ/marketplace/plugins/lucide-icons
 
 # 安装依赖（首次使用）
 cd scripts && npm install && cd ..
@@ -126,20 +126,20 @@ node scripts/lucide.js download check-circle --format svg,react --output ./src/i
 node scripts/lucide.js download star --color "#ffd700" --size 48 --stroke-width 3
 ```
 
-### 与 CodeBuddy 集成
+### 与 AgentZ 集成
 
-用户可以通过 CodeBuddy 自然语言方式使用：
+用户可以通过 AgentZ 自然语言方式使用：
 
 > "搜索心形相关的图标"
 
-CodeBuddy 会执行：
+AgentZ 会执行：
 ```bash
 node scripts/lucide.js search heart
 ```
 
 > "下载 heart 图标并生成 React 组件到 src/icons/"
 
-CodeBuddy 会执行：
+AgentZ 会执行：
 ```bash
 node scripts/lucide.js download heart --format svg,react --output ./src/icons/
 ```
@@ -153,7 +153,7 @@ node scripts/lucide.js download heart --format svg,react --output ./src/icons/
 作为 **自研插件** (`source_type: self_built`)，根据收录文档规范：
 
 1. **✅ 无需内容合规性检查**
-   - 不需要搜索和替换 Claude/Claude Code 相关内容
+   - 不需要搜索和替换 Claude/AgentZ 相关内容
    - 原因：非来自官方库（claude-plugins-official、claude-code）
 
 2. **✅ 无需功能验证**
@@ -171,7 +171,7 @@ node scripts/lucide.js download heart --format svg,react --output ./src/icons/
 
 | 检查项 | 状态 | 说明 |
 |--------|------|------|
-| ✅ 插件目录创建 | 完成 | `/Users/laurentzhou/CodeBuddy/marketplace/plugins/lucide-icons/` |
+| ✅ 插件目录创建 | 完成 | `/Users/laurentzhou/AgentZ/marketplace/plugins/lucide-icons/` |
 | ✅ plugin.json 配置 | 完成 | 包含中英文描述、作者、License |
 | ✅ marketplace.json 注册 | 完成 | 已添加到官方 marketplace |
 | ✅ metadata.json 记录 | 完成 | 标注为 `self_built` 类型 |
@@ -187,7 +187,7 @@ node scripts/lucide.js download heart --format svg,react --output ./src/icons/
 
 ```bash
 # 1. 安装依赖
-cd /Users/laurentzhou/CodeBuddy/marketplace/plugins/lucide-icons/scripts
+cd /Users/laurentzhou/AgentZ/marketplace/plugins/lucide-icons/scripts
 npm install
 
 # 2. 测试基本功能
@@ -195,7 +195,7 @@ node lucide.js search heart
 node lucide.js download heart --output /tmp/test-icons/
 
 # 3. （可选）标记为已验证
-cd /Users/laurentzhou/CodeBuddy/plugin_marketplace
+cd /Users/laurentzhou/AgentZ/plugin_marketplace
 jq '.plugins["lucide-icons"].verified = true | 
     .plugins["lucide-icons"].verification_date = "'$(date -u +"%Y-%m-%d")'"' \
   official_plugins_metadata.json > tmp.json && mv tmp.json official_plugins_metadata.json
@@ -205,12 +205,12 @@ jq '.plugins["lucide-icons"].verified = true |
 
 ## 📚 相关文档
 
-- 原始 Skill: `/Users/laurentzhou/CodeBuddy/genie/dev-packages/skills/lucide-icons/`
-- 收录文档: `/Users/laurentzhou/CodeBuddy/plugin_marketplace/docs/capabilities/3-include/3.2-include-single.md`
+- 原始 Skill: `/Users/laurentzhou/AgentZ/genie/dev-packages/skills/lucide-icons/`
+- 收录文档: `/Users/laurentzhou/AgentZ/plugin_marketplace/docs/capabilities/3-include/3.2-include-single.md`
 - Lucide 官方: https://lucide.dev/
 - Lucide GitHub: https://github.com/lucide-icons/lucide
 
 ---
 
 **收录完成时间**: 2026-01-18  
-**收录人**: CodeBuddy Team
+**收录人**: AgentZ Team

@@ -3,7 +3,7 @@ name: "monorepo-management"
 description: "Master monorepo management with Turborepo, Nx, and pnpm workspaces to build efficient, scalable multi-package repositories with optimized builds and dependency management. Use when setting up monorepos, optimizing builds, or managing shared dependencies."
 description_zh: "包含 Git 工作流、SQL 优化、错误处理、代码审查、端到端测试、身份认证、调试和 Monorepo 管理的核心开发技能集"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "developer-essentials"
 ---
 

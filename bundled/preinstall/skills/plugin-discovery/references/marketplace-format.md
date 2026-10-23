@@ -171,7 +171,7 @@ Standard plugin categories:
 
 The `known_marketplaces.json` file tracks installed marketplaces:
 
-### CodeBuddy Format
+### AgentZ Format
 
 ```json
 {
@@ -259,22 +259,22 @@ The `~/.claude/plugins/installed_plugins.json` tracks installed plugins:
 
 **Strategy 1: From known_marketplaces.json**
 ```bash
-# CodeBuddy
-cat ~/.codebuddy/plugins/known_marketplaces.json | jq '.[] | .manifest.plugins'
+# AgentZ
+cat ~/.AgentZ/plugins/known_marketplaces.json | jq '.[] | .manifest.plugins'
 
 # Claude
 cat ~/.claude/plugins/known_marketplaces.json | jq
 ```
 
-Advantage: All data in one file (CodeBuddy), fast access.
+Advantage: All data in one file (AgentZ), fast access.
 
 **Strategy 2: From marketplace files directly**
 ```bash
 # Find marketplace.json files
-find ~/.codebuddy/plugins/marketplaces -name "marketplace.json"
+find ~/.AgentZ/plugins/marketplaces -name "marketplace.json"
 
 # Read each
-cat /path/to/marketplace/.codebuddy-plugin/marketplace.json
+cat /path/to/marketplace/.AgentZ-plugin/marketplace.json
 ```
 
 Advantage: Always current, no cache issues.
@@ -283,10 +283,10 @@ Advantage: Always current, no cache issues.
 
 **Get all plugins from all marketplaces:**
 ```bash
-for market in $(jq -r 'keys[]' ~/.codebuddy/plugins/known_marketplaces.json); do
+for market in $(jq -r 'keys[]' ~/.AgentZ/plugins/known_marketplaces.json); do
   echo "Marketplace: $market"
   jq -r ".\"$market\".manifest.plugins[] | .name + \" - \" + .description" \
-    ~/.codebuddy/plugins/known_marketplaces.json
+    ~/.AgentZ/plugins/known_marketplaces.json
 done
 ```
 
@@ -296,7 +296,7 @@ jq -r '
   .[] | .manifest.plugins[] | 
   select(.keywords // [] | contains(["keyword"])) |
   .name
-' ~/.codebuddy/plugins/known_marketplaces.json
+' ~/.AgentZ/plugins/known_marketplaces.json
 ```
 
 **Filter by category:**
@@ -305,7 +305,7 @@ jq -r '
   .[] | .manifest.plugins[] | 
   select(.category == "productivity") |
   .name + " - " + .description
-' ~/.codebuddy/plugins/known_marketplaces.json
+' ~/.AgentZ/plugins/known_marketplaces.json
 ```
 
 ## Schema Validation
@@ -418,10 +418,10 @@ Must be kebab-case, no spaces.
 
 ## Version History
 
-- **v2** (current): Added `manifest` embedding in known_marketplaces.json (CodeBuddy)
+- **v2** (current): Added `manifest` embedding in known_marketplaces.json (AgentZ)
 - **v1**: Original format, separate marketplace files
 
 ## References
 
 - Official schema: https://anthropic.com/claude-code/marketplace.schema.json
-- Plugin specification: /Users/laurentzhou/CodeBuddy/plugin_marketplace/docs/specifications/claude-code-plugin-specification-zh.md
+- Plugin specification: /Users/laurentzhou/AgentZ/plugin_marketplace/docs/specifications/claude-code-plugin-specification-zh.md

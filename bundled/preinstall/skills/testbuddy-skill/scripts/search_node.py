@@ -225,12 +225,12 @@ def search_local(design_uid, uids, ancestor=False, descendant=False, kind=None):
 # ──────────────────────────────────────────────
 def _get_testbuddy_origin():
     """根据 session 中的 env 字段返回 x-testbuddy-origin 值
-    codebuddy -> cb-plugin，其他 -> openclaw
+    AgentZ -> cb-plugin，其他 -> openclaw
     """
     data = _load_session_data()
     if data:
         env = data.get("env", "other").strip()
-        if env == "codebuddy":
+        if env == "AgentZ":
             return "cb-plugin"
     return "openclaw"
 

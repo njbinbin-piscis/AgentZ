@@ -90,7 +90,7 @@ python3 <script_dir>/scripts/write_node.py delete /tmp/nodes_delete.json --desig
 
 **参数说明**：
 
-- `<script_dir>`：脚本目录的绝对路径（通常为 `.codebuddy/skills/testbuddy-skill`）
+- `<script_dir>`：脚本目录的绝对路径（通常为 `.AgentZ/skills/testbuddy-skill`）
 - `<file_path>`：包含节点数据的文件完整路径
 - `<design_uid>`：设计文件的唯一标识（可选，如：`design-Az7SsiL3Ui`，不传则由服务端自动创建）
 

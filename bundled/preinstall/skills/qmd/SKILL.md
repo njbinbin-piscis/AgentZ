@@ -3,7 +3,7 @@ name: "qmd"
 description: "Local hybrid search for markdown notes and docs. Use when searching notes, finding related content, or retrieving documents from indexed collections."
 description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "hot-skills"
 ---
 

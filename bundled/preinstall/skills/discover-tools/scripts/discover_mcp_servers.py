@@ -290,7 +290,7 @@ def format_markdown(items: List[Dict[str, Any]]) -> str:
     lines.append("## How to Use\n")
     lines.append("Add an MCP server to your agent in `agent_server/agent.py`:\n")
     lines.append("```python")
-    lines.append("from agents.mcp import MCPServerStreamableHttp")
+    lines.append("from AgentZ MCP settings import MCPServerStreamableHttp")
     lines.append("")
     lines.append("mcp_server = MCPServerStreamableHttp(")
     if items:

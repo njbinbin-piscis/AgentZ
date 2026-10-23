@@ -2,7 +2,7 @@
 name: "route-handlers"
 description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"create an API route\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"add an endpoint\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"build a REST API\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"handle POST requests\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"create route handlers\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"stream responses\\\\\\\\\\\\\\\", or needs guidance on Next.js API development in the App Router."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "nextjs-expert"
 ---
 

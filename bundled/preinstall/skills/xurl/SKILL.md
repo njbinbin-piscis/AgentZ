@@ -3,7 +3,7 @@ name: "xurl"
 description: "A Twitter research and content intelligence skill focused on attracting WordPress and Shopify clients. Use to analyze Twitter profiles, threads, and conversations for identifying pain points, extracting content angles, and converting Twitter intelligence into business leverage."
 description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "hot-skills"
 ---
 

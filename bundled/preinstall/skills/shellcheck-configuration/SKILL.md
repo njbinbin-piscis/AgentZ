@@ -3,7 +3,7 @@ name: "shellcheck-configuration"
 description: "Master ShellCheck static analysis configuration and usage for shell script quality. Use when setting up linting infrastructure, fixing code issues, or ensuring script portability."
 description_zh: "生产级 Bash 脚本编写，包含防御性编程、POSIX 合规性和全面测试"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "shell-scripting"
 ---
 

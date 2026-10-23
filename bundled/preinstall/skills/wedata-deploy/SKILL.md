@@ -3,7 +3,7 @@ name: "wedata-deploy"
 description: "Upload code, deploy, sync, and monitor the WeData Agent App. Use when: (1) User wants to deploy, upload, publish, release, push code — '部署', '上传', '发布', '上线', '推送代码'; (2) User wants to view, search, or tail logs — 'view logs', 'check logs', '查日志', '看日志', '日志', 'logs.sh'; (3) User wants to sync or download code from the platform — 'sync code', 'update code', '同步代码', '下载代码', 'update.sh'; (4) User encounters a deploy or upload error; (5) User wants to preview deployment parameters (dry-run). Always use this skill for any deploy, log, or sync operation — even if the user doesn't say 'deploy' explicitly."
 description_zh: "Wedata3.0 官方插件 —— Data+AI一体化平台，内置Wedata各种能力调用的Skills，通过DataAgents相关Skills可以快速开发调用Wedata引擎、数据、AI资源的数据智能体，并可自动部署到云端直接使用。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "wedata3"
 ---
 

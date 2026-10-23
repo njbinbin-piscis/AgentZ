@@ -107,6 +107,7 @@ pub fn run() {
             commands::seed::seed_builtin_packs(app.handle());
             commands::seed::seed_preinstall_packs(app.handle());
             commands::seed::seed_preinstall_compat_cleanup(app.handle());
+            commands::seed::seed_preinstall_rebrand_refresh(app.handle());
             // Skill evolution: migrate flat skills + periodic curator idle check.
             let app_migrate = app.handle().clone();
             tauri::async_runtime::spawn(async move {

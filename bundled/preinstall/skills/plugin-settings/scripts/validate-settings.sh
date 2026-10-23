@@ -1,6 +1,6 @@
 #!/bin/bash
 # Settings File Validator
-# Validates .codebuddy/plugin-name.local.md structure
+# Validates .AgentZ/plugin-name.local.md structure
 
 set -euo pipefail
 
@@ -14,7 +14,7 @@ if [ $# -eq 0 ]; then
   echo "  - Required --- markers"
   echo "  - Field format"
   echo ""
-  echo "Example: $0 .codebuddy/my-plugin.local.md"
+  echo "Example: $0 .AgentZ/my-plugin.local.md"
   exit 1
 fi
 
@@ -97,5 +97,5 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Settings file structure is valid"
 echo ""
-echo "Reminder: Changes to this file require restarting CodeBuddy Code"
+echo "Reminder: Changes to this file require restarting AgentZ Code"
 exit 0

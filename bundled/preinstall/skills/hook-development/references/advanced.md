@@ -14,7 +14,7 @@ Combine command and prompt hooks for layered validation:
       "hooks": [
         {
           "type": "command",
-          "command": "bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/quick-check.sh",
+          "command": "bash ${AgentZ_PLUGIN_ROOT}/scripts/quick-check.sh",
           "timeout": 5
         },
         {
@@ -118,11 +118,11 @@ Modify hook behavior based on project configuration:
 
 ```bash
 #!/bin/bash
-cd "$CODEBUDDY_PROJECT_DIR" || exit 1
+cd "$AgentZ_PROJECT_DIR" || exit 1
 
 # Read project-specific config
-if [ -f ".codebuddy-hooks-config.json" ]; then
-  strict_mode=$(jq -r '.strict_mode' .codebuddy-hooks-config.json)
+if [ -f ".AgentZ-hooks-config.json" ]; then
+  strict_mode=$(jq -r '.strict_mode' .AgentZ-hooks-config.json)
 
   if [ "$strict_mode" = "true" ]; then
     # Apply strict validation
@@ -134,7 +134,7 @@ if [ -f ".codebuddy-hooks-config.json" ]; then
 fi
 ```
 
-**Example .codebuddy-hooks-config.json:**
+**Example .AgentZ-hooks-config.json:**
 ```json
 {
   "strict_mode": true,
@@ -355,7 +355,7 @@ tool_name=$(echo "$input" | jq -r '.tool_name')
 timestamp=$(date -Iseconds)
 
 # Append to audit log
-echo "$timestamp | $USER | $tool_name | $input" >> ~/.codebuddy/audit.log
+echo "$timestamp | $USER | $tool_name | $input" >> ~/.AgentZ/audit.log
 
 exit 0
 ```
@@ -410,9 +410,9 @@ Create test scenarios that exercise the full hook workflow:
 #!/bin/bash
 
 # Set up test environment
-export CODEBUDDY_PROJECT_DIR="/tmp/test-project"
-export CODEBUDDY_PLUGIN_ROOT="$(pwd)"
-mkdir -p "$CODEBUDDY_PROJECT_DIR"
+export AgentZ_PROJECT_DIR="/tmp/test-project"
+export AgentZ_PLUGIN_ROOT="$(pwd)"
+mkdir -p "$AgentZ_PROJECT_DIR"
 
 # Test SessionStart hook
 echo '{}' | bash hooks/session-start.sh
@@ -423,7 +423,7 @@ else
 fi
 
 # Clean up
-rm -rf "$CODEBUDDY_PROJECT_DIR"
+rm -rf "$AgentZ_PROJECT_DIR"
 ```
 
 ## Best Practices for Advanced Hooks

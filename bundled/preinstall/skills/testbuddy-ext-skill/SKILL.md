@@ -3,7 +3,7 @@ name: "testbuddy-ext-skill"
 description: "|"
 description_zh: "测试用例生成插件"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "testbuddy"
 ---
 

@@ -26,7 +26,7 @@ if SCRIPT_DIR not in sys.path:
 from get_session import _find_workspace_root  # noqa: E402
 
 # 规则目录路径（自动查找工作区根目录，避免因 cd 到错误目录导致路径错误）
-RULES_DIR = os.path.join(_find_workspace_root(), ".codebuddy/rules")
+RULES_DIR = os.path.join(_find_workspace_root(), ".AgentZ/rules")
 
 # 默认规则映射表（当没有自定义规则时使用）
 DEFAULT_RULES = {
@@ -87,7 +87,7 @@ def select_rule(keyword):
                 # 语义匹配：关键词在前缀中，或者前缀在关键词中
                 if keyword in prefix or prefix in keyword:
                     # 返回相对于工作区根目录的路径
-                    return os.path.join(".codebuddy/rules", filename)
+                    return os.path.join(".AgentZ/rules", filename)
 
         # 第二步：如果没有匹配到自定义规则，使用默认规则映射
         for intent_keyword, default_rule in DEFAULT_RULES.items():

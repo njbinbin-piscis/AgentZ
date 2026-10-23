@@ -3,7 +3,7 @@ name: "wedata-quickstart"
 description: "Smart guide for setting up, configuring, starting, and troubleshooting the WeData Agent local development environment. Trigger when the user says 'how do I run this', 'startup error', 'start.sh permission denied', 'pip install failed', 'how to fill AK/SK', 'port already in use', 'how to configure .env.local', 'just cloned the repo', 'can't start', 'local development', 'quickstart', 'how to run', 'environment setup', 'credentials config', 'SECRET_ID', 'SECRET_KEY'. Also applies when the user encounters any startup/configuration/dependency errors. When the user already has a working environment and just wants to use MCP tools, let wedata-local-mcp-example handle it instead. When in doubt, use this skill."
 description_zh: "Wedata3.0 官方插件 —— Data+AI一体化平台，内置Wedata各种能力调用的Skills，通过DataAgents相关Skills可以快速开发调用Wedata引擎、数据、AI资源的数据智能体，并可自动部署到云端直接使用。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "wedata3"
 ---
 

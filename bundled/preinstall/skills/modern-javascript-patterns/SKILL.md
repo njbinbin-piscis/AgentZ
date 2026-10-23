@@ -3,7 +3,7 @@ name: "modern-javascript-patterns"
 description: "Master ES6+ features including async/await, destructuring, spread operators, arrow functions, promises, modules, iterators, generators, and functional programming patterns for writing clean, efficient JavaScript code. Use when refactoring legacy code, implementing modern patterns, or optimizing JavaScript applications."
 description_zh: "JavaScript 和 TypeScript 开发，支持 ES6+、Node.js、React 及现代 Web 框架"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "javascript-typescript"
 ---
 

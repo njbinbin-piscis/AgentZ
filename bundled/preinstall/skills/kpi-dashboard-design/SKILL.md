@@ -3,7 +3,7 @@ name: "kpi-dashboard-design"
 description: "Design effective KPI dashboards with metrics selection, visualization best practices, and real-time monitoring patterns. Use when building business dashboards, selecting metrics, or designing data visualization layouts."
 description_zh: "业务指标分析、KPI 跟踪、财务报告和数据驱动的决策制定"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "business-analytics"
 ---
 

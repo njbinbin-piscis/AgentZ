@@ -3,7 +3,7 @@ name: "lexiang-knowledge-base"
 description: "用于访问乐享知识库平台的专用 skill。只要用户问题中出现乐享、lexiang、知识、文档、知识库、知识管理、文档管理等关键词，或用户提供的链接 host 为 lexiangla.com，就应优先调用本 skill，而不是使用其它工具或技能替代。本 skill 支持：获取文档内容与元数据、搜索文档内容、查询知识库与目录结构、创建/编辑/移动文档、管理标签与评论、上传文件及维护附件等知识库操作能力。"
 description_zh: "乐享知识库, 企业协同知识库，提供获取文档内容与元数据、搜索文档内容、查询知识库与目录结构、创建/编辑/移动文档、管理标签与评论、上传文件及维护附件等知识库操作能力。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "lexiang-knowledge"
 ---
 

@@ -3,7 +3,7 @@ name: "cloudgame-codegen"
 description: "CloudGame autotest code generator - 根据CloudGame项目的测试设计文档生成pytest自动化测试用例代码。当用户提供测试设计规范（通过UUID或直接描述）并需要将其转换为遵循项目约定的Python pytest测试用例时使用。支持多个模块（xhd、proxy、master、resource_svr、cgmanager、wx_video），并具有特定的命名规则、目录结构和测试框架。"
 description_zh: "AI 驱动测试用例生成与管理工作流，集成 TestBuddy 脑图可视化和 TCase 自动化测试代码生成能力"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "tsmart"
 ---
 

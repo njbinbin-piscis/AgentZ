@@ -3,7 +3,7 @@ name: "code-review-excellence"
 description: "Master effective code review practices to provide constructive feedback, catch bugs early, and foster knowledge sharing while maintaining team morale. Use when reviewing pull requests, establishing review standards, or mentoring developers."
 description_zh: "包含 Git 工作流、SQL 优化、错误处理、代码审查、端到端测试、身份认证、调试和 Monorepo 管理的核心开发技能集"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "developer-essentials"
 ---
 

@@ -3,7 +3,7 @@ name: "modify-agent"
 description: "Modify the WeData agent's code, configuration, model, instructions, or MCP tools. Use when: (1) User says 'modify agent', 'change model', 'edit agent', 'change instructions', '修改Agent', '换模型', '改提示词', '修改指令', (2) Adding or removing MCP tools from the agent, (3) Changing the LLM model the agent uses, (4) Customizing the agent's system prompt or behavior, (5) Understanding the agent's code structure or SDK patterns, (6) User asks 'how does the agent work' or 'what can I change'. This skill covers any modification to agent_server/agent.py. For discovering available MCP servers use discover-tools; for adding MCP URLs use add-tools; for generating local function_tool wrappers use wedata-local-mcp-example."
 description_zh: "Wedata3.0 官方插件 —— Data+AI一体化平台，内置Wedata各种能力调用的Skills，通过DataAgents相关Skills可以快速开发调用Wedata引擎、数据、AI资源的数据智能体，并可自动部署到云端直接使用。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "wedata3"
 ---
 

@@ -3,7 +3,7 @@ name: "tcase-codegen"
 description: "TCase 自动化测试代码生成技能。当用户需要生成测试代码、自动化测试、根据UUID/文本用例/节点生成测试时触发。支持 uuid、text_case、node、standard 四种模式。"
 description_zh: "AI 驱动测试用例生成与管理工作流，集成 TestBuddy 脑图可视化和 TCase 自动化测试代码生成能力"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "tsmart"
 ---
 

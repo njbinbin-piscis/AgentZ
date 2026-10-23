@@ -3,7 +3,7 @@ name: "react-modernization"
 description: "Upgrade React applications to latest versions, migrate from class components to hooks, and adopt concurrent features. Use when modernizing React codebases, migrating to React Hooks, or upgrading to latest React versions."
 description_zh: "框架升级、迁移规划与架构转型工作流"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "framework-migration"
 ---
 

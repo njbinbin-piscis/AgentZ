@@ -176,7 +176,7 @@ allowed-tools: Read, Write
 
 # First Run Check
 
-if [ ! -f ".codebuddy/command-initialized" ]; then
+if [ ! -f ".AgentZ/command-initialized" ]; then
   **Welcome to Command Name!**
 
   This appears to be your first time using this command.
@@ -359,18 +359,18 @@ Default configuration:
 - color: true
 - max_results: 10
 
-Checking for user config: .codebuddy/plugin-name.local.md
+Checking for user config: .AgentZ/plugin-name.local.md
 
-if [ -f ".codebuddy/plugin-name.local.md" ]; then
+if [ -f ".AgentZ/plugin-name.local.md" ]; then
   # Parse YAML frontmatter for settings
-  VERBOSE=$(grep "^verbose:" .codebuddy/plugin-name.local.md | cut -d: -f2 | tr -d ' ')
-  COLOR=$(grep "^color:" .codebuddy/plugin-name.local.md | cut -d: -f2 | tr -d ' ')
-  MAX_RESULTS=$(grep "^max_results:" .codebuddy/plugin-name.local.md | cut -d: -f2 | tr -d ' ')
+  VERBOSE=$(grep "^verbose:" .AgentZ/plugin-name.local.md | cut -d: -f2 | tr -d ' ')
+  COLOR=$(grep "^color:" .AgentZ/plugin-name.local.md | cut -d: -f2 | tr -d ' ')
+  MAX_RESULTS=$(grep "^max_results:" .AgentZ/plugin-name.local.md | cut -d: -f2 | tr -d ' ')
 
   echo "✓ Using user configuration"
 else
   echo "Using default configuration"
-  echo "Create .codebuddy/plugin-name.local.md to customize"
+  echo "Create .AgentZ/plugin-name.local.md to customize"
 fi
 
 [Use configuration in command...]
@@ -395,7 +395,7 @@ These defaults work for 80% of use cases.
 Override with arguments:
   /command --format yaml --output file.txt --verbose
 
-Or set in .codebuddy/plugin-name.local.md:
+Or set in .AgentZ/plugin-name.local.md:
 \`\`\`yaml
 ---
 format: yaml
@@ -667,13 +667,13 @@ description: Idempotent command
 
 Checking if operation already completed...
 
-if [ -f ".codebuddy/operation-completed.flag" ]; then
+if [ -f ".AgentZ/operation-completed.flag" ]; then
   ℹ️  Operation already completed
 
-  Completed at: $(cat .codebuddy/operation-completed.flag)
+  Completed at: $(cat .AgentZ/operation-completed.flag)
 
   To re-run:
-  1. Remove flag: rm .codebuddy/operation-completed.flag
+  1. Remove flag: rm .AgentZ/operation-completed.flag
   2. Run command again
 
   Otherwise, no action needed.
@@ -686,7 +686,7 @@ Performing operation...
 [Safe, repeatable operation...]
 
 Marking complete...
-echo "$(date)" > .codebuddy/operation-completed.flag
+echo "$(date)" > .AgentZ/operation-completed.flag
 ```
 
 **Atomic operations:**

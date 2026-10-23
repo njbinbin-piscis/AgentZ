@@ -3,7 +3,7 @@ name: "cqrs-implementation"
 description: "Implement Command Query Responsibility Segregation for scalable architectures. Use when separating read and write models, optimizing query performance, or building event-sourced systems."
 description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "backend-development"
 ---
 

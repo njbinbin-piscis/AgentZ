@@ -3,7 +3,7 @@ name: "nx-workspace-patterns"
 description: "Configure and optimize Nx monorepo workspaces. Use when setting up Nx, configuring project boundaries, optimizing build caching, or implementing affected commands."
 description_zh: "包含 Git 工作流、SQL 优化、错误处理、代码审查、端到端测试、身份认证、调试和 Monorepo 管理的核心开发技能集"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "developer-essentials"
 ---
 

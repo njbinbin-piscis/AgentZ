@@ -1,6 +1,6 @@
 # Plugin Command Examples
 
-Practical examples of commands designed for CodeBuddy Code plugins, demonstrating plugin-specific patterns and features.
+Practical examples of commands designed for AgentZ Code plugins, demonstrating plugin-specific patterns and features.
 
 ## Table of Contents
 
@@ -32,7 +32,7 @@ allowed-tools: Bash(node:*), Read
 
 Analyze @$1 using plugin's quality checker:
 
-!`node ${CODEBUDDY_PLUGIN_ROOT}/scripts/quality-check.js $1`
+!`node ${AgentZ_PLUGIN_ROOT}/scripts/quality-check.js $1`
 
 Review the analysis output and provide:
 1. Summary of findings
@@ -42,7 +42,7 @@ Review the analysis output and provide:
 ```
 
 **Key features:**
-- Uses `${CODEBUDDY_PLUGIN_ROOT}` for portable path
+- Uses `${AgentZ_PLUGIN_ROOT}` for portable path
 - Combines file reference with script execution
 - Simple single-purpose command
 
@@ -65,13 +65,13 @@ model: sonnet
 Running complete audit on $1:
 
 **Security scan:**
-!`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/security-scan.sh $1`
+!`bash ${AgentZ_PLUGIN_ROOT}/scripts/security-scan.sh $1`
 
 **Performance analysis:**
-!`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/perf-analyze.sh $1`
+!`bash ${AgentZ_PLUGIN_ROOT}/scripts/perf-analyze.sh $1`
 
 **Best practices check:**
-!`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/best-practices.sh $1`
+!`bash ${AgentZ_PLUGIN_ROOT}/scripts/best-practices.sh $1`
 
 Analyze all results and create comprehensive report including:
 - Critical issues requiring immediate attention
@@ -100,7 +100,7 @@ description: Generate API documentation from template
 argument-hint: [api-file]
 ---
 
-Template structure: @${CODEBUDDY_PLUGIN_ROOT}/templates/api-documentation.md
+Template structure: @${AgentZ_PLUGIN_ROOT}/templates/api-documentation.md
 
 API implementation: @$1
 
@@ -141,16 +141,16 @@ allowed-tools: Bash(*), Read
 Executing release workflow for version $1:
 
 **Step 1 - Pre-release validation:**
-!`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/pre-release-check.sh $1`
+!`bash ${AgentZ_PLUGIN_ROOT}/scripts/pre-release-check.sh $1`
 
 **Step 2 - Build artifacts:**
-!`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/build-release.sh $1`
+!`bash ${AgentZ_PLUGIN_ROOT}/scripts/build-release.sh $1`
 
 **Step 3 - Run test suite:**
-!`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/run-tests.sh`
+!`bash ${AgentZ_PLUGIN_ROOT}/scripts/run-tests.sh`
 
 **Step 4 - Package release:**
-!`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/package.sh $1`
+!`bash ${AgentZ_PLUGIN_ROOT}/scripts/package.sh $1`
 
 Review all step outputs and report:
 1. Any failures or warnings
@@ -181,7 +181,7 @@ argument-hint: [environment]
 allowed-tools: Read, Bash(*)
 ---
 
-Deployment configuration for $1: @${CODEBUDDY_PLUGIN_ROOT}/config/$1-deploy.json
+Deployment configuration for $1: @${AgentZ_PLUGIN_ROOT}/config/$1-deploy.json
 
 Current git state: !`git rev-parse --short HEAD`
 
@@ -231,9 +231,9 @@ The agent will perform:
 5. **Documentation check** - Verify adequate documentation
 
 The agent has access to:
-- Plugin's linting rules: ${CODEBUDDY_PLUGIN_ROOT}/config/lint-rules.json
-- Security checklist: ${CODEBUDDY_PLUGIN_ROOT}/checklists/security.md
-- Performance guidelines: ${CODEBUDDY_PLUGIN_ROOT}/docs/performance.md
+- Plugin's linting rules: ${AgentZ_PLUGIN_ROOT}/config/lint-rules.json
+- Security checklist: ${AgentZ_PLUGIN_ROOT}/checklists/security.md
+- Performance guidelines: ${AgentZ_PLUGIN_ROOT}/docs/performance.md
 
 Note: This uses the Task tool to launch the plugin's code-reviewer agent for thorough analysis.
 ```
@@ -304,7 +304,7 @@ Target file: @$1
 Execute comprehensive review workflow:
 
 **Phase 1: Automated Analysis**
-Run plugin analyzer: !`node ${CODEBUDDY_PLUGIN_ROOT}/scripts/analyze.js $1`
+Run plugin analyzer: !`node ${AgentZ_PLUGIN_ROOT}/scripts/analyze.js $1`
 
 **Phase 2: Deep Review (Agent)**
 Launch the code-quality-reviewer agent for detailed analysis.
@@ -322,7 +322,7 @@ Use the coding-standards skill to validate:
 - Framework-specific patterns
 
 **Phase 4: Report Generation**
-Template: @${CODEBUDDY_PLUGIN_ROOT}/templates/review-report.md
+Template: @${AgentZ_PLUGIN_ROOT}/templates/review-report.md
 
 Compile all findings into comprehensive report following template.
 
@@ -358,17 +358,17 @@ allowed-tools: Bash(*)
 
 Validate environment argument: !`echo "$1" | grep -E "^(dev|staging|prod)$" && echo "VALID" || echo "INVALID"`
 
-Check build script exists: !`test -x ${CODEBUDDY_PLUGIN_ROOT}/scripts/build.sh && echo "EXISTS" || echo "MISSING"`
+Check build script exists: !`test -x ${AgentZ_PLUGIN_ROOT}/scripts/build.sh && echo "EXISTS" || echo "MISSING"`
 
-Verify configuration available: !`test -f ${CODEBUDDY_PLUGIN_ROOT}/config/$1.json && echo "FOUND" || echo "NOT_FOUND"`
+Verify configuration available: !`test -f ${AgentZ_PLUGIN_ROOT}/config/$1.json && echo "FOUND" || echo "NOT_FOUND"`
 
 If all validations pass:
 
-**Configuration:** @${CODEBUDDY_PLUGIN_ROOT}/config/$1.json
+**Configuration:** @${AgentZ_PLUGIN_ROOT}/config/$1.json
 
-**Execute build:** !`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/build.sh $1 2>&1`
+**Execute build:** !`bash ${AgentZ_PLUGIN_ROOT}/scripts/build.sh $1 2>&1`
 
-**Validation results:** !`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/validate-build.sh $1 2>&1`
+**Validation results:** !`bash ${AgentZ_PLUGIN_ROOT}/scripts/validate-build.sh $1 2>&1`
 
 Report build status and any issues.
 
@@ -403,19 +403,19 @@ allowed-tools: Bash(*), Read
 
 Environment: $1
 
-Load environment configuration: @${CODEBUDDY_PLUGIN_ROOT}/config/$1-checks.json
+Load environment configuration: @${AgentZ_PLUGIN_ROOT}/config/$1-checks.json
 
 Determine check level: !`echo "$1" | grep -E "^prod$" && echo "FULL" || echo "BASIC"`
 
 **For production environment:**
-- Full test suite: !`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/test-full.sh`
-- Security scan: !`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/security-scan.sh`
-- Performance audit: !`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/perf-check.sh`
-- Compliance check: !`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/compliance.sh`
+- Full test suite: !`bash ${AgentZ_PLUGIN_ROOT}/scripts/test-full.sh`
+- Security scan: !`bash ${AgentZ_PLUGIN_ROOT}/scripts/security-scan.sh`
+- Performance audit: !`bash ${AgentZ_PLUGIN_ROOT}/scripts/perf-check.sh`
+- Compliance check: !`bash ${AgentZ_PLUGIN_ROOT}/scripts/compliance.sh`
 
 **For non-production environments:**
-- Basic tests: !`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/test-basic.sh`
-- Quick lint: !`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/lint.sh`
+- Basic tests: !`bash ${AgentZ_PLUGIN_ROOT}/scripts/test-basic.sh`
+- Quick lint: !`bash ${AgentZ_PLUGIN_ROOT}/scripts/lint.sh`
 
 Analyze results based on environment requirements:
 
@@ -438,19 +438,19 @@ Report status and recommend proceed/block decision.
 
 ### Pattern: Plugin Script Execution
 ```markdown
-!`node ${CODEBUDDY_PLUGIN_ROOT}/scripts/script-name.js $1`
+!`node ${AgentZ_PLUGIN_ROOT}/scripts/script-name.js $1`
 ```
 Use for: Running plugin-provided Node.js scripts
 
 ### Pattern: Plugin Configuration Loading
 ```markdown
-@${CODEBUDDY_PLUGIN_ROOT}/config/config-name.json
+@${AgentZ_PLUGIN_ROOT}/config/config-name.json
 ```
 Use for: Loading plugin configuration files
 
 ### Pattern: Plugin Template Usage
 ```markdown
-@${CODEBUDDY_PLUGIN_ROOT}/templates/template-name.md
+@${AgentZ_PLUGIN_ROOT}/templates/template-name.md
 ```
 Use for: Using plugin templates for generation
 
@@ -474,7 +474,7 @@ Use for: Validating command arguments
 
 ### Pattern: Resource Validation
 ```markdown
-Check exists: !`test -f ${CODEBUDDY_PLUGIN_ROOT}/path/file && echo "YES" || echo "NO"`
+Check exists: !`test -f ${AgentZ_PLUGIN_ROOT}/path/file && echo "YES" || echo "NO"`
 ```
 Use for: Verifying required plugin files exist
 
@@ -487,37 +487,37 @@ Use for: Verifying required plugin files exist
 1. **Test with plugin installed:**
    ```bash
    cd /path/to/plugin
-   codebuddy /command-name args
+   AgentZ /command-name args
    ```
 
-2. **Verify ${CODEBUDDY_PLUGIN_ROOT} expansion:**
+2. **Verify ${AgentZ_PLUGIN_ROOT} expansion:**
    ```bash
    # Add debug output to command
-   !`echo "Plugin root: ${CODEBUDDY_PLUGIN_ROOT}"`
+   !`echo "Plugin root: ${AgentZ_PLUGIN_ROOT}"`
    ```
 
 3. **Test across different working directories:**
    ```bash
-   cd /tmp && codebuddy /command-name
-   cd /other/project && codebuddy /command-name
+   cd /tmp && AgentZ /command-name
+   cd /other/project && AgentZ /command-name
    ```
 
 4. **Validate resource availability:**
    ```bash
    # Check all plugin resources exist
-   !`ls -la ${CODEBUDDY_PLUGIN_ROOT}/scripts/`
-   !`ls -la ${CODEBUDDY_PLUGIN_ROOT}/config/`
+   !`ls -la ${AgentZ_PLUGIN_ROOT}/scripts/`
+   !`ls -la ${AgentZ_PLUGIN_ROOT}/config/`
    ```
 
 ### Common Mistakes to Avoid
 
-1. **Using relative paths instead of ${CODEBUDDY_PLUGIN_ROOT}:**
+1. **Using relative paths instead of ${AgentZ_PLUGIN_ROOT}:**
    ```markdown
    # Wrong
    !`node ./scripts/analyze.js`
 
    # Correct
-   !`node ${CODEBUDDY_PLUGIN_ROOT}/scripts/analyze.js`
+   !`node ${AgentZ_PLUGIN_ROOT}/scripts/analyze.js`
    ```
 
 2. **Forgetting to allow required tools:**
@@ -529,7 +529,7 @@ Use for: Verifying required plugin files exist
    ---
    allowed-tools: Bash(*)
    ---
-   !`bash ${CODEBUDDY_PLUGIN_ROOT}/scripts/script.sh`
+   !`bash ${AgentZ_PLUGIN_ROOT}/scripts/script.sh`
    ```
 
 3. **Not validating inputs:**
@@ -545,10 +545,10 @@ Use for: Verifying required plugin files exist
 4. **Hardcoding plugin paths:**
    ```markdown
    # Wrong - breaks on different installations
-   @/home/user/.codebuddy/plugins/my-plugin/config.json
+   @/home/user/.AgentZ/plugins/my-plugin/config.json
 
    # Correct - works everywhere
-   @${CODEBUDDY_PLUGIN_ROOT}/config.json
+   @${AgentZ_PLUGIN_ROOT}/config.json
    ```
 
 ---

@@ -3,7 +3,7 @@ name: "testx-case-deacy-skill"
 description: "使用脚本和mcp工具获取智研-测试堂-测试用例-指定目录下的测试用例，并按用户给出的整改约束条件，调整用例，最终解决对测试用例资产的用例腐化。"
 description_zh: "测试用例生成插件"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "testbuddy"
 ---
 

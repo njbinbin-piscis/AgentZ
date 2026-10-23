@@ -3,7 +3,7 @@ name: "postgresql-table-design"
 description: "Design a PostgreSQL-specific schema. Covers best-practices, data types, indexing, constraints, performance patterns, and advanced features"
 description_zh: "生产系统的数据库架构设计、模式设计和 SQL 优化"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "database-design"
 ---
 

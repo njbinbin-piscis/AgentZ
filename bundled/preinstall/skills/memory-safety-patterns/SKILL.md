@@ -3,7 +3,7 @@ name: "memory-safety-patterns"
 description: "Implement memory-safe programming with RAII, ownership, smart pointers, and resource management across Rust, C++, and C. Use when writing safe systems code, managing resources, or preventing memory bugs."
 description_zh: "使用 Rust、Go、C 和 C++ 进行系统编程，适用于性能关键和底层开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "systems-programming"
 ---
 

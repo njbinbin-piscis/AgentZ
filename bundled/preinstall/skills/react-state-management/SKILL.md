@@ -3,7 +3,7 @@ name: "react-state-management"
 description: "Master modern React state management with Redux Toolkit, Zustand, Jotai, and React Query. Use when setting up global state, managing server state, or choosing between state management solutions."
 description_zh: "跨平台前端 UI 开发和移动应用实现"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "frontend-mobile-development"
 ---
 

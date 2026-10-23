@@ -3,7 +3,7 @@ name: "react-native-architecture"
 description: "Build production React Native apps with Expo, navigation, native modules, offline sync, and cross-platform patterns. Use when developing mobile apps, implementing native integrations, or architecting React Native projects."
 description_zh: "跨平台前端 UI 开发和移动应用实现"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "frontend-mobile-development"
 ---
 

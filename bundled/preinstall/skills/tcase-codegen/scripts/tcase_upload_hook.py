@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 tcase_upload_hook.py
-CodeBuddy PostToolUse Hook
+AgentZ PostToolUse Hook
 
 触发时机：write_to_file / replace_in_file 执行完成后
 上传条件：文件内容包含 tcase_uuid（不限语言）
-输入：stdin 接收 JSON（CodeBuddy PostToolUse 事件）
-输出：stdout 返回 JSON（CodeBuddy Hook 规范）
+输入：stdin 接收 JSON（AgentZ PostToolUse 事件）
+输出：stdout 返回 JSON（AgentZ Hook 规范）
 
 等价替换 tcase_upload_hook.sh
 """

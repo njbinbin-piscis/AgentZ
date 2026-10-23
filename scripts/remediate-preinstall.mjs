@@ -70,6 +70,38 @@ function rebuildSkillMd(meta, body) {
   return lines.join("\n");
 }
 
+const TEXT_EXTENSIONS = new Set([
+  ".md", ".markdown", ".txt", ".py", ".sh", ".bash", ".js", ".mjs", ".ts",
+  ".json", ".yaml", ".yml", ".toml", ".html", ".css",
+]);
+
+/** Apply the AgentZ rewrite to every text file under a skill dir except
+ *  SKILL.md itself (rebuilt separately from parsed frontmatter). */
+function scrubSkillCompanionFiles(dir) {
+  const walk = (d) => {
+    for (const ent of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, ent.name);
+      if (ent.isDirectory()) {
+        walk(p);
+        continue;
+      }
+      if (ent.name === "SKILL.md") continue;
+      const dot = ent.name.lastIndexOf(".");
+      if (dot < 0 || !TEXT_EXTENSIONS.has(ent.name.slice(dot).toLowerCase())) continue;
+      let raw;
+      try {
+        raw = readFileSync(p, "utf8");
+      } catch {
+        continue;
+      }
+      if (raw.length > 2 * 1024 * 1024 || raw.includes("\0")) continue;
+      const rewritten = rewriteAgentZText(raw);
+      if (rewritten !== raw) writeFileSync(p, rewritten);
+    }
+  };
+  walk(dir);
+}
+
 function remediateSkills(exclude) {
   const root = join(PREINSTALL, "skills");
   if (!existsSync(root)) return;
@@ -91,11 +123,23 @@ function remediateSkills(exclude) {
     let { meta, body } = parseSkillFrontmatter(raw);
     const plugin = meta.source_plugin || slug;
 
+    // Frontmatter is user/agent-visible too — scrub brand references from
+    // the name, descriptions and provenance fields, not just the body.
+    if (meta.name) meta.name = rewriteAgentZText(meta.name);
+    if (meta.description) meta.description = rewriteAgentZText(meta.description);
+    if (meta.description_zh) meta.description_zh = rewriteAgentZText(meta.description_zh);
+    if (meta.source) meta.source = rewriteAgentZText(meta.source);
+    if (meta.source_plugin) meta.source_plugin = rewriteAgentZText(meta.source_plugin);
+
+    // Companion files (references, examples, scripts) carry the same brand
+    // descriptions — rewrite every text file in the skill directory.
+    scrubSkillCompanionFiles(dir);
+
     if (isVendorPlugin(plugin) || isVendorPlugin(slug)) {
       body = rewriteVendorSkillBody(slug, body, plugin);
     } else {
       body = rewriteAgentZText(body);
-      if (/(python3 .*scripts\/|\.py template)/i.test(body)) {
+      if (/(python3 .*scripts\/|\.py template)/i.test(body) && !body.includes("AgentZ note")) {
         body =
           "> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.\n\n" +
           body;

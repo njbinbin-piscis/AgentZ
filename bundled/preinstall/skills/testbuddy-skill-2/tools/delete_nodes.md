@@ -52,7 +52,7 @@ echo '["test_point-fvcfvuh9g2", "case-cf89EaXfQ2"]' | python3 <script_dir>/scrip
 ```
 
 **参数说明**：
-- `<script_dir>`: 脚本目录的绝对路径（通常为 `.codebuddy/skills/testbuddy-skill`）
+- `<script_dir>`: 脚本目录的绝对路径（通常为 `.AgentZ/skills/testbuddy-skill`）
 - `delete`: 操作类型（删除节点）
 - `<design_uid>`: 设计文件的唯一标识（如：`design-Az7SsiL3Ui`）
 

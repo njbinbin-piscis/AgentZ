@@ -1,9 +1,9 @@
 ---
 name: "receiving-code-review"
 description: "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation"
-description_zh: "Claude Code 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "superpowers"
 ---
 

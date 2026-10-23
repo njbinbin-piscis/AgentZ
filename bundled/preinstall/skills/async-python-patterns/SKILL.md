@@ -3,7 +3,7 @@ name: "async-python-patterns"
 description: "Master Python asyncio, concurrent programming, and async/await patterns for high-performance applications. Use when building async APIs, concurrent systems, or I/O-bound applications requiring non-blocking operations."
 description_zh: "现代 Python 开发工具，支持 Python 3.12+、Django、FastAPI、异步编程模式及生产环境最佳实践"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "python-development"
 ---
 

@@ -40,5 +40,5 @@
 ### 处理流程
 1. 调用abnormal模式MCP工具, 获取Prompt字符串或者Prompt列表
 2. 如果返回的是Prompt列表, 提示用户`检测到多个Prompt，将按批次（每批{BATCH_SIZE}个）生成测试代码...`
-3. 如果返回的是Prompt列表, 对每个批次内的Prompt作为CodeBuddy的Prompt调用模型处理，切记不要再次调用MCP工具
-4. 如果返回的是Prompt字符串, 对返回的Prompt作为CodeBuddy的Prompt调用模型处理，切记不要再次调用MCP工具
+3. 如果返回的是Prompt列表, 对每个批次内的Prompt作为AgentZ的Prompt调用模型处理，切记不要再次调用MCP工具
+4. 如果返回的是Prompt字符串, 对返回的Prompt作为AgentZ的Prompt调用模型处理，切记不要再次调用MCP工具

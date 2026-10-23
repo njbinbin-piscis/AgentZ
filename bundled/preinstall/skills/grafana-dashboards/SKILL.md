@@ -3,7 +3,7 @@ name: "grafana-dashboards"
 description: "Create and manage production Grafana dashboards for real-time visualization of system and application metrics. Use when building monitoring dashboards, visualizing metrics, or creating operational observability interfaces."
 description_zh: "指标收集、日志基础设施、分布式追踪、SLO 实施和监控仪表板"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "observability-monitoring"
 ---
 

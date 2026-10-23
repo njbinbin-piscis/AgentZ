@@ -3,7 +3,7 @@ name: "changelog-automation"
 description: "Automate changelog generation from commits, PRs, and releases following Keep a Changelog format. Use when setting up release workflows, generating release notes, or standardizing commit conventions."
 description_zh: "OpenAPI规范生成、Mermaid图表创建、教程编写、API参考文档"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "documentation-generation"
 ---
 

@@ -3,7 +3,7 @@ name: "fastapi-templates"
 description: "Create production-ready FastAPI projects with async patterns, dependency injection, and comprehensive error handling. Use when building new FastAPI applications or setting up backend API projects."
 description_zh: "REST 和 GraphQL API 脚手架、框架选择、后端架构设计与 API 生成"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "api-scaffolding"
 ---
 

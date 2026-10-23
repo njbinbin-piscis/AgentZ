@@ -2,7 +2,7 @@
 name: "langchain-architecture"
 description: "Design LLM applications using the LangChain framework with agents, memory, and tool integration patterns. Use when building LangChain applications, implementing AI agents, or creating complex LLM workflows."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "llm-application-dev"
 ---
 

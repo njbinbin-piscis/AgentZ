@@ -3,7 +3,7 @@ name: "tailwind-design-system"
 description: "Build scalable design systems with Tailwind CSS, design tokens, component libraries, and responsive patterns. Use when creating component libraries, implementing design systems, or standardizing UI patterns."
 description_zh: "跨平台前端 UI 开发和移动应用实现"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "frontend-mobile-development"
 ---
 

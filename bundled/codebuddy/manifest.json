@@ -5081,12 +5081,12 @@
     }
   ],
   "compatibility": {
-    "pass": 822,
+    "pass": 823,
     "rewrite": 928,
     "delete": 143
   },
   "counts": {
-    "skills": 253,
+    "skills": 254,
     "agents": 233,
     "commands": 336
   }

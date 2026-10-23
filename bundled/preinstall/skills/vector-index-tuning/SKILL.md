@@ -2,7 +2,7 @@
 name: "vector-index-tuning"
 description: "Optimize vector index performance for latency, recall, and memory. Use when tuning HNSW parameters, selecting quantization strategies, or scaling vector search infrastructure."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "llm-application-dev"
 ---
 

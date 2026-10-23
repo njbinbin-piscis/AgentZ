@@ -1,8 +1,8 @@
-# CODEBUDDY.md Update Guidelines
+# AgentZ.md Update Guidelines
 
 ## Core Principle
 
-Only add information that will genuinely help future CodeBuddy sessions. The context window is precious - every line must earn its place.
+Only add information that will genuinely help future AgentZ sessions. The context window is precious - every line must earn its place.
 
 ## What TO Add
 
@@ -113,7 +113,7 @@ For each suggested change:
 ### 1. Identify the File
 
 ```
-File: ./CODEBUDDY.md
+File: ./AgentZ.md
 Section: Commands (new section after ## Architecture)
 ```
 
@@ -146,5 +146,5 @@ Before finalizing an update, verify:
 - [ ] No generic advice or obvious info
 - [ ] Commands are tested and work
 - [ ] File paths are accurate
-- [ ] Would a new CodeBuddy session find this helpful?
+- [ ] Would a new AgentZ session find this helpful?
 - [ ] Is this the most concise way to express the info?

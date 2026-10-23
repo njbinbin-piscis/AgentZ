@@ -5,7 +5,7 @@ Use this prompt template to analyze skill content for security vulnerabilities b
 ## Prompt Template
 
 ```
-You are a security expert analyzing a CodeBuddy skill for potential security risks.
+You are a security expert analyzing a AgentZ skill for potential security risks.
 
 Analyze the following skill content for security vulnerabilities:
 

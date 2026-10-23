@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # retrieve_knowledge.py：召回知识库
-# 调用 codebuddy server POST /knowledge/retrieve 接口
+# 调用 AgentZ server POST /knowledge/retrieve 接口
 #
 # 用法：
 #   python3 retrieve_knowledge.py --query <query> --knowledge_uids <uid1> [uid2 ...] [--top_k 5] [--score_threshold 0.6]
@@ -70,12 +70,12 @@ def get_token():
 # ──────────────────────────────────────────────
 def _get_testbuddy_origin():
     """根据 session 中的 env 字段返回 x-testbuddy-origin 值
-    codebuddy -> cb-plugin，其他 -> openclaw
+    AgentZ -> cb-plugin，其他 -> openclaw
     """
     data = _load_session_data()
     if data:
         env = data.get("env", "other").strip()
-        if env == "codebuddy":
+        if env == "AgentZ":
             return "cb-plugin"
     return "openclaw"
 

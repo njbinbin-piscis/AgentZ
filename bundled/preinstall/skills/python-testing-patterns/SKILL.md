@@ -3,7 +3,7 @@ name: "python-testing-patterns"
 description: "Implement comprehensive testing strategies with pytest, fixtures, mocking, and test-driven development. Use when writing Python tests, setting up test suites, or implementing testing best practices."
 description_zh: "现代 Python 开发工具，支持 Python 3.12+、Django、FastAPI、异步编程模式及生产环境最佳实践"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "python-development"
 ---
 

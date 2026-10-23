@@ -3,7 +3,7 @@ name: "testbuddy-skill"
 description: "TestBuddy 测试设计技能包。当用户想要：(1) 生成测试框架/模块/场景/测试点/用例；(2) 根据 TAPD 需求或缺陷链接生成测试内容；(3) 根据任意文本（PRD/接口文档/代码/表格/功能描述）生成测试用例；(4) 打开/跳转到脑图、测试设计、TestBuddy 页面；(5) 进行测试设计、需求分析、缺陷分析时，使用本技能。"
 description_zh: "测试用例生成插件"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "testbuddy"
 ---
 

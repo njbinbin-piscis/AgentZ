@@ -2,7 +2,7 @@
 
 ## Template: Basic Configuration
 
-**.codebuddy/my-plugin.local.md:**
+**.AgentZ/my-plugin.local.md:**
 
 ```markdown
 ---
@@ -17,7 +17,7 @@ Plugin is active in standard mode.
 
 ## Template: Advanced Configuration
 
-**.codebuddy/my-plugin.local.md:**
+**.AgentZ/my-plugin.local.md:**
 
 ```markdown
 ---
@@ -48,7 +48,7 @@ Contact @team-lead with questions about this configuration.
 
 ## Template: Agent State File
 
-**.codebuddy/multi-agent-swarm.local.md:**
+**.AgentZ/multi-agent-swarm.local.md:**
 
 ```markdown
 ---
@@ -90,7 +90,7 @@ Report status to coordinator session 'team-leader'.
 
 ## Template: Feature Flag Pattern
 
-**.codebuddy/experimental-features.local.md:**
+**.AgentZ/experimental-features.local.md:**
 
 ```markdown
 ---
@@ -118,12 +118,12 @@ These templates can be read by hooks:
 
 ```bash
 # Check if plugin is configured
-if [[ ! -f ".codebuddy/my-plugin.local.md" ]]; then
+if [[ ! -f ".AgentZ/my-plugin.local.md" ]]; then
   exit 0  # Not configured, skip hook
 fi
 
 # Read settings
-FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' ".codebuddy/my-plugin.local.md")
+FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' ".AgentZ/my-plugin.local.md")
 ENABLED=$(echo "$FRONTMATTER" | grep '^enabled:' | sed 's/enabled: *//')
 
 # Apply settings
@@ -139,8 +139,8 @@ Always add to project `.gitignore`:
 
 ```gitignore
 # Plugin settings (user-local, not committed)
-.codebuddy/*.local.md
-.codebuddy/*.local.json
+.AgentZ/*.local.md
+.AgentZ/*.local.json
 ```
 
 ## Editing Settings
@@ -149,11 +149,11 @@ Users can edit settings files manually:
 
 ```bash
 # Edit settings
-vim .codebuddy/my-plugin.local.md
+vim .AgentZ/my-plugin.local.md
 
 # Changes take effect after restart
-exit  # Exit CodeBuddy Code
-codebuddy  # Restart
+exit  # Exit AgentZ Code
+AgentZ  # Restart
 ```
 
-Changes require CodeBuddy Code restart - hooks can't be hot-swapped.
+Changes require AgentZ Code restart - hooks can't be hot-swapped.

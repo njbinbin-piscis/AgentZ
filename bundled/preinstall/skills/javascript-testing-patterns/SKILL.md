@@ -3,7 +3,7 @@ name: "javascript-testing-patterns"
 description: "Implement comprehensive testing strategies using Jest, Vitest, and Testing Library for unit tests, integration tests, and end-to-end testing with mocking, fixtures, and test-driven development. Use when writing JavaScript/TypeScript tests, setting up test infrastructure, or implementing TDD/BDD workflows."
 description_zh: "JavaScript 和 TypeScript 开发，支持 ES6+、Node.js、React 及现代 Web 框架"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "javascript-typescript"
 ---
 

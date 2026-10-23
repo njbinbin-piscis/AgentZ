@@ -3,7 +3,7 @@ name: "unity-ecs-patterns"
 description: "Master Unity ECS (Entity Component System) with DOTS, Jobs, and Burst for high-performance game development. Use when building data-oriented games, optimizing performance, or working with large entity counts."
 description_zh: "Unity游戏开发与C#脚本编程，Minecraft服务器插件开发（支持Bukkit/Spigot API）"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "game-development"
 ---
 

@@ -3,7 +3,7 @@ name: "paypal-integration"
 description: "Integrate PayPal payment processing with support for express checkout, subscriptions, and refund management. Use when implementing PayPal payments, processing online transactions, or building e-commerce checkout flows."
 description_zh: "支付网关集成,包含 Stripe 和 PayPal,实现结账流程、订阅计费和 PCI 合规性"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "payment-processing"
 ---
 

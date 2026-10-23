@@ -3,7 +3,7 @@ name: "dependency-upgrade"
 description: "Manage major dependency version upgrades with compatibility analysis, staged rollout, and comprehensive testing. Use when upgrading framework versions, updating major dependencies, or managing breaking changes in libraries."
 description_zh: "框架升级、迁移规划与架构转型工作流"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "framework-migration"
 ---
 

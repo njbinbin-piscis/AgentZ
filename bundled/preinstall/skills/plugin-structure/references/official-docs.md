@@ -1,15 +1,15 @@
-# CodeBuddy Code 官方文档参考
+# AgentZ Code 官方文档参考
 
-本文档提供 CodeBuddy Code 插件开发相关的官方文档链接，作为插件开发的权威参考。
+本文档提供 AgentZ Code 插件开发相关的官方文档链接，作为插件开发的权威参考。
 
 ## 官方文档列表
 
 ### 1. 插件系统概述 (plugins.md)
 
-**链接**: https://cnb.cool/codebuddy/codebuddy-code/-/git/raw/main/docs/plugins.md
+**链接**: 
 
 **内容概要**:
-- 什么是 CodeBuddy Code 插件
+- 什么是 AgentZ Code 插件
 - 插件的核心组件（Commands、Agents、Skills、Hooks、MCP Servers）
 - 快速开始指南
 - 插件安装和管理
@@ -21,7 +21,7 @@
 
 ### 2. 插件市场指南 (plugin-marketplaces.md)
 
-**链接**: https://cnb.cool/codebuddy/codebuddy-code/-/git/raw/main/docs/plugin-marketplaces.md
+**链接**: 
 
 **内容概要**:
 - 市场类型（Official、Community、Private）
@@ -36,7 +36,7 @@
 
 ### 3. 插件参考手册 (plugins-reference.md)
 
-**链接**: https://cnb.cool/codebuddy/codebuddy-code/-/git/raw/main/docs/plugins-reference.md
+**链接**: 
 
 **内容概要**:
 - Commands 详细规范（YAML frontmatter、参数、工具限制）

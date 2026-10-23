@@ -3,7 +3,7 @@ name: "postmortem-writing"
 description: "Write effective blameless postmortems with root cause analysis, timelines, and action items. Use when conducting incident reviews, writing postmortem documents, or improving incident response processes."
 description_zh: "生产事故管理、分级处理工作流和自动化事故解决方案"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "incident-response"
 ---
 

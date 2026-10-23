@@ -3,7 +3,7 @@ name: "tmap-lbs-skills"
 description: "腾讯地图位置服务，支持POI搜索、路径规划、旅游规划、周边搜索，轨迹数据可视化和地图数据可视化"
 description_zh: "腾讯地图位置服务开发插件，提供 JavaScript GL 地图开发指南和 Web 服务 API（POI搜索、路径规划、旅游规划、轨迹可视化等）能力。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "tmap-lbs-plugin"
 ---
 

@@ -25,7 +25,7 @@ python3 <script_dir>/scripts/retrieve_knowledge.py --query <query> --knowledge_u
 | `--top_k`           | 可选     | 返回结果数量（默认 5）                                            |
 | `--score_threshold` | 可选     | 相似度阈值（默认 0.6）                                            |
 
-- `<script_dir>`：脚本目录的绝对路径（通常为 `.codebuddy/skills/testbuddy-skill`）
+- `<script_dir>`：脚本目录的绝对路径（通常为 `.AgentZ/skills/testbuddy-skill`）
 - `knowledge_uids` 通过 `get_session.py` 获取，**如果没有则不调用策略 1**
 
 ### 策略 2: RAG_search 检索附加文件

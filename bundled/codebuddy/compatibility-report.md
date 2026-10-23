@@ -1,12 +1,12 @@
 # CodeBuddy Preinstall Compatibility Report
 
-Generated: 2026-07-01T15:59:10.254Z
+Generated: 2026-10-23T15:15:26.322Z
 
 ## Summary
 
 | Metric | Count |
 |--------|------:|
-| Skills | 253 |
+| Skills | 254 |
 | Agents | 233 |
 | Commands | 336 |
 | Errors | 0 |

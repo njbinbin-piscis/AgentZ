@@ -3,7 +3,7 @@ name: "multi-cloud-architecture"
 description: "Design multi-cloud architectures using a decision framework to select and integrate services across AWS, Azure, and GCP. Use when building multi-cloud systems, avoiding vendor lock-in, or leveraging best-of-breed services from multiple providers."
 description_zh: "云架构设计（AWS/Azure/GCP），Kubernetes 集群配置，Terraform 基础设施即代码，混合云网络，以及多云成本优化"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "cloud-infrastructure"
 ---
 

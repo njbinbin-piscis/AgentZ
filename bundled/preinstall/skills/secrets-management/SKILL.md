@@ -3,7 +3,7 @@ name: "secrets-management"
 description: "Implement secure secrets management for CI/CD pipelines using Vault, AWS Secrets Manager, or native platform solutions. Use when handling sensitive credentials, rotating secrets, or securing CI/CD environments."
 description_zh: "CI/CD 流水线配置、GitHub Actions/GitLab CI 工作流设置及自动化部署流水线编排"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "cicd-automation"
 ---
 

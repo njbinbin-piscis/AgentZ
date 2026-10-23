@@ -3,7 +3,7 @@ name: "go-concurrency-patterns"
 description: "Master Go concurrency with goroutines, channels, sync primitives, and context. Use when building concurrent Go applications, implementing worker pools, or debugging race conditions."
 description_zh: "使用 Rust、Go、C 和 C++ 进行系统编程，适用于性能关键和底层开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "systems-programming"
 ---
 

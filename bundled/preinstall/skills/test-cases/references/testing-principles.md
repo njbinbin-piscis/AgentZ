@@ -221,4 +221,4 @@ These principles are derived from:
 - Industry-standard QA practices
 - Game QA methodologies (Unity Test Framework, Unreal Automation, Godot GUT)
 - Pragmatic testing philosophy: "Test what matters"
-- Requirement-driven testing approach from CODEBUDDY.md context
+- Requirement-driven testing approach from AgentZ.md context

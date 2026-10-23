@@ -24,5 +24,5 @@ testbuddy-ext/
 
 ## 使用指南
 
-1. 在CodeBuddy中安装技能包
+1. 在AgentZ中安装技能包
 2. 在TestBuddy插件中，点击生成用例代码按钮，即可使用本技能包中提供的工具，对接生成用例代码的Agent

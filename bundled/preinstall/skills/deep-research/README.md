@@ -16,7 +16,7 @@
 ### 方式一：使用安装脚本（推荐）
 
 ```bash
-cd codebuddy-marketplace/skills/deep-research
+cd AgentZ-marketplace/skills/deep-research
 bash install.sh
 ```
 
@@ -24,18 +24,18 @@ bash install.sh
 
 ```bash
 # 创建目录
-mkdir -p ~/.codebuddy/skills/deep-research/{commands,agents}
+mkdir -p ~/.AgentZ/skills/deep-research/{commands,agents}
 mkdir -p ~/.claude/skills/deep-research/{commands,agents}
 
 # 复制命令
-cp omc-commands/init-research.md ~/.codebuddy/skills/deep-research/commands/
-cp omc-commands/ralph-loop-research.md ~/.codebuddy/skills/deep-research/commands/
-cp omc-commands/ralph-loop-wiki.md ~/.codebuddy/skills/deep-research/commands/
+cp omc-commands/init-research.md ~/.AgentZ/skills/deep-research/commands/
+cp omc-commands/ralph-loop-research.md ~/.AgentZ/skills/deep-research/commands/
+cp omc-commands/ralph-loop-wiki.md ~/.AgentZ/skills/deep-research/commands/
 
 # 复制智能体
-cp omc-agents/gh-repo-research.md ~/.codebuddy/skills/deep-research/agents/
+cp omc-agents/gh-repo-research.md ~/.AgentZ/skills/deep-research/agents/
 
-# 同样复制到 Claude Code 目录
+# 同样复制到 AgentZ 目录
 cp omc-commands/*.md ~/.claude/skills/deep-research/commands/
 cp omc-agents/gh-repo-research.md ~/.claude/skills/deep-research/agents/
 ```
@@ -78,7 +78,7 @@ cp omc-agents/gh-repo-research.md ~/.claude/skills/deep-research/agents/
 这将：
 - 读取 PRD 文档（如果存在）
 - 读取 `.research/` 目录下的所有调研内容
-- 结合 `init-deep` 生成的 CODEBUDDY.md 文件
+- 结合 `init-deep` 生成的 AgentZ.md 文件
 - 按照 `wiki_template.md` 的格式生成完整 wiki
 - 循环 3 次，确保内容完整
 - 生成优化建议和总结
@@ -88,7 +88,7 @@ cp omc-agents/gh-repo-research.md ~/.claude/skills/deep-research/agents/
 安装后的目录结构：
 
 ```
-~/.codebuddy/skills/deep-research/
+~/.AgentZ/skills/deep-research/
 ├── SKILL.md
 ├── README.md
 ├── commands/
@@ -106,7 +106,7 @@ cp omc-agents/gh-repo-research.md ~/.claude/skills/deep-research/agents/
 ```
 项目根目录/
 ├── deep-search.md                    # 研究文档（带 TODO 标记）
-├── CODEBUDDY.md                      # 代码库分析（来自 init-deep）
+├── AgentZ.md                      # 代码库分析（来自 init-deep）
 ├── .research/                        # 调研结果
 │   ├── research-001.md              # 调研笔记
 │   ├── research-002.md
@@ -191,7 +191,7 @@ https://github.com/owner/repo
 
 ## 注意事项
 
-1. **首次使用前**：建议先运行 `/init-deep` 生成 CODEBUDDY.md 文件
+1. **首次使用前**：建议先运行 `/init-deep` 生成 AgentZ.md 文件
 2. **PRD 文档**：如果有 PRD 文档，放在项目根目录或使用 `--prd-path` 指定
 3. **网络要求**：深度调研需要联网访问外部资源
 4. **GitHub 访问**：`gh-repo-research` 需要能够克隆 GitHub 仓库
@@ -215,7 +215,7 @@ https://github.com/owner/repo
 **解决**：
 - 确保已运行 `/ralph-loop-research` 完成所有调研
 - 检查 PRD 文档是否存在
-- 检查 CODEBUDDY.md 文件是否存在
+- 检查 AgentZ.md 文件是否存在
 
 ## 相关文档
 

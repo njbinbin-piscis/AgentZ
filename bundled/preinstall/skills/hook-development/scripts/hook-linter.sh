@@ -74,13 +74,13 @@ check_script() {
   # Check 7: Hardcoded paths
   if grep -E '^[^#]*/home/|^[^#]*/usr/|^[^#]*/opt/' "$script" | grep -q .; then
     echo "⚠️  Hardcoded absolute paths detected"
-    echo "   Use \$CODEBUDDY_PROJECT_DIR or \$CODEBUDDY_PLUGIN_ROOT"
+    echo "   Use \$AgentZ_PROJECT_DIR or \$AgentZ_PLUGIN_ROOT"
     ((warnings++))
   fi
 
-  # Check 8: Uses CODEBUDDY_PLUGIN_ROOT
-  if ! grep -q "CODEBUDDY_PLUGIN_ROOT\|CODEBUDDY_PROJECT_DIR" "$script"; then
-    echo "💡 Tip: Use \$CODEBUDDY_PLUGIN_ROOT for plugin-relative paths"
+  # Check 8: Uses AgentZ_PLUGIN_ROOT
+  if ! grep -q "AgentZ_PLUGIN_ROOT\|AgentZ_PROJECT_DIR" "$script"; then
+    echo "💡 Tip: Use \$AgentZ_PLUGIN_ROOT for plugin-relative paths"
   fi
 
   # Check 9: Exit codes

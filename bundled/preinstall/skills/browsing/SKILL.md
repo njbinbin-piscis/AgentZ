@@ -3,7 +3,7 @@ name: "browsing"
 description: "Use when you need direct browser control - teaches Chrome DevTools Protocol for controlling existing browser sessions, multi-tab management, form automation, and content extraction via use_browser MCP tool"
 description_zh: "超轻量级 Chrome DevTools Protocol MCP 服务器，支持自动捕获。通过 Chrome DevTools Protocol 实现直接浏览器控制，零依赖，API 简单易用。"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "superpowers-chrome"
 ---
 

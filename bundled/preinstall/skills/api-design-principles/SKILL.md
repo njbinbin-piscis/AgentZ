@@ -3,7 +3,7 @@ name: "api-design-principles"
 description: "Master REST and GraphQL API design principles to build intuitive, scalable, and maintainable APIs that delight developers. Use when designing new APIs, reviewing API specifications, or establishing API design standards."
 description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "backend-development"
 ---
 

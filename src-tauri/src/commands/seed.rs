@@ -25,6 +25,7 @@ use crate::commands::workflow::WorkflowGraph;
 const SEED_SENTINEL: &str = ".layered-seed-v3";
 const PREINSTALL_SENTINEL: &str = ".preinstall-codebuddy-v1";
 const PREINSTALL_COMPAT_SENTINEL: &str = ".preinstall-codebuddy-v2-compat";
+const PREINSTALL_REBRAND_SENTINEL: &str = ".preinstall-agentz-v3-rebrand";
 
 /// A demonstrable workflow team: coder ⇄ reviewer review loop that exits once
 /// the reviewer's output contains "approved" (capped at 3 iterations).
@@ -466,6 +467,113 @@ pub fn seed_preinstall_compat_cleanup(app: &AppHandle) {
         warn!("seed: cannot write compat sentinel: {}", e);
     } else {
         info!("seed: applied CodeBuddy preinstall compat cleanup");
+    }
+}
+
+/// True when `path` is a small text file that still carries the old vendor
+/// branding (case-insensitive "codebuddy"). Binary or oversized files are
+/// never considered stale content.
+fn file_still_branded(path: &Path) -> bool {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return false;
+    };
+    if !meta.is_file() || meta.len() > 2 * 1024 * 1024 {
+        return false;
+    }
+    let Ok(bytes) = std::fs::read(path) else {
+        return false;
+    };
+    if bytes.contains(&0) {
+        return false;
+    }
+    String::from_utf8_lossy(&bytes)
+        .to_lowercase()
+        .contains("codebuddy")
+}
+
+/// Refresh one installed skill directory from its bundled counterpart:
+/// overwrite files that still carry the old branding, add files the
+/// installed copy lacks, and leave anything else (user edits) untouched.
+fn refresh_skill_dir(bundle_dir: &Path, installed_dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(bundle_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let src = entry.path();
+        let dest = installed_dir.join(entry.file_name());
+        if src.is_dir() {
+            if dest.is_dir() {
+                refresh_skill_dir(&src, &dest);
+            } else {
+                copy_tree_if_absent(&src, &dest);
+            }
+        } else if !dest.exists() {
+            copy_file_if_absent(&src, &dest);
+        } else if file_still_branded(&dest) {
+            if let Err(e) = std::fs::copy(&src, &dest) {
+                warn!("seed: rebrand refresh {}: {}", dest.display(), e);
+            }
+        }
+    }
+}
+
+/// One-time refresh for installs seeded before the skill pack was
+/// rebranded: bundled preinstall skills no longer mention the old vendor,
+/// but seeded copies were written once and never updated. Overwrite only
+/// installed files that still carry the old branding; user-created or
+/// user-edited content without it is left alone. Also swaps the renamed
+/// `codebuddy-md-improver` skill for its `agentz-md-improver` successor.
+pub fn seed_preinstall_rebrand_refresh(app: &AppHandle) {
+    let config_dir = match resolve_global_config_dir(app) {
+        Ok(d) => d,
+        Err(e) => {
+            warn!("seed: rebrand refresh cannot resolve config dir: {}", e);
+            return;
+        }
+    };
+    let sentinel = config_dir.join(PREINSTALL_REBRAND_SENTINEL);
+    if sentinel.exists() {
+        return;
+    }
+    let Some(bundle) = bundled_preinstall_root(app) else {
+        return;
+    };
+    let skills_src = bundle.join("skills");
+    if !skills_src.is_dir() {
+        return;
+    }
+    let skills_root = crate::skills::service::skills_root_from_config_dir(&config_dir);
+    let skills_installed = crate::skills::provenance::installed_dir(&skills_root);
+
+    if let Ok(entries) = std::fs::read_dir(&skills_src) {
+        for entry in entries.flatten() {
+            if !entry.path().is_dir() {
+                continue;
+            }
+            let slug = entry.file_name().to_string_lossy().to_string();
+            let dest = skills_installed.join(&slug);
+            if dest.is_dir() {
+                refresh_skill_dir(&entry.path(), &dest);
+            }
+        }
+    }
+
+    // Renamed skill: install the successor only when the old one is present
+    // (never resurrect a skill the user deliberately deleted), then drop it.
+    let old_dir = skills_installed.join("codebuddy-md-improver");
+    let new_src = skills_src.join("agentz-md-improver");
+    if old_dir.is_dir() && new_src.is_dir() {
+        let new_dest = skills_installed.join("agentz-md-improver");
+        if !new_dest.exists() {
+            copy_tree_if_absent(&new_src, &new_dest);
+        }
+        let _ = std::fs::remove_dir_all(&old_dir);
+    }
+
+    if let Err(e) = std::fs::write(&sentinel, b"1") {
+        warn!("seed: cannot write rebrand sentinel: {}", e);
+    } else {
+        info!("seed: applied preinstall skill rebrand refresh");
     }
 }
 

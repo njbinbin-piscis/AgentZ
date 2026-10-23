@@ -2,7 +2,7 @@
 name: "ml-pipeline-workflow"
 description: "Build end-to-end MLOps pipelines from data preparation through model training, validation, and production deployment. Use when creating ML pipelines, implementing MLOps practices, or automating model training and deployment workflows."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "machine-learning-ops"
 ---
 

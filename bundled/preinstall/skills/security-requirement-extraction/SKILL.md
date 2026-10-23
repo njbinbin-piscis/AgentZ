@@ -3,7 +3,7 @@ name: "security-requirement-extraction"
 description: "Derive security requirements from threat models and business context. Use when translating threats into actionable requirements, creating security user stories, or building security test cases."
 description_zh: "静态应用程序安全测试（SAST）分析、依赖项漏洞扫描、OWASP Top 10 合规性检查、容器安全扫描以及自动化安全加固"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "security-scanning"
 ---
 

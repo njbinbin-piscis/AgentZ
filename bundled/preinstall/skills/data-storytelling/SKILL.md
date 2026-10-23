@@ -3,7 +3,7 @@ name: "data-storytelling"
 description: "Transform data into compelling narratives using visualization, context, and persuasive structure. Use when presenting analytics to stakeholders, creating data reports, or building executive presentations."
 description_zh: "业务指标分析、KPI 跟踪、财务报告和数据驱动的决策制定"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "business-analytics"
 ---
 

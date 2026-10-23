@@ -3,7 +3,7 @@ name: "github-actions-templates"
 description: "Create production-ready GitHub Actions workflows for automated testing, building, and deploying applications. Use when setting up CI/CD with GitHub Actions, automating development workflows, or creating reusable workflow templates."
 description_zh: "CI/CD 流水线配置、GitHub Actions/GitLab CI 工作流设置及自动化部署流水线编排"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "cicd-automation"
 ---
 

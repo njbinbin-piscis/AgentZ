@@ -3,7 +3,7 @@ name: "rust-async-patterns"
 description: "Master Rust async programming with Tokio, async traits, error handling, and concurrent patterns. Use when building async Rust applications, implementing concurrent systems, or debugging async code."
 description_zh: "使用 Rust、Go、C 和 C++ 进行系统编程，适用于性能关键和底层开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "systems-programming"
 ---
 

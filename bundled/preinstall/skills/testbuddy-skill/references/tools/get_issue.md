@@ -25,7 +25,7 @@ python3 <script_dir>/scripts/get_issue.py --workspace <workspace> --issue_id <is
 | `--issue_id`   | 二选一   | 需求/缺陷 ID，与 --link 二选一                                     |
 | `--issue_type` | 可选     | 类型：`STORY`（默认）或 `BUG`                                      |
 
-- `<script_dir>`：脚本目录的绝对路径（通常为 `.codebuddy/skills/testbuddy-skill`）
+- `<script_dir>`：脚本目录的绝对路径（通常为 `.AgentZ/skills/testbuddy-skill`）
 - token 从 `session.json` 或环境变量 `TESTBUDDY_TOKEN` 自动读取
 
 ---

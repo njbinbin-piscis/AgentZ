@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Lucide Icons Skill 安装脚本
-# 支持 Claude Code 和 CodeBuddy Code
+# 支持 AgentZ 和 AgentZ Code
 
 set -e
 
@@ -22,19 +22,19 @@ echo ""
 
 # 选择 AI 工具
 echo "请选择你使用的 AI 工具:"
-echo "  1) Claude Code"
-echo "  2) CodeBuddy Code"
+echo "  1) AgentZ"
+echo "  2) AgentZ Code"
 echo ""
 read -p "请输入选项 [1/2]: " ai_choice
 
 case $ai_choice in
     1)
-        AI_NAME="Claude Code"
+        AI_NAME="AgentZ"
         SKILLS_DIR="$HOME/.claude/skills/lucide-icons"
         ;;
     2)
-        AI_NAME="CodeBuddy Code"
-        SKILLS_DIR="$HOME/.codebuddy/skills/lucide-icons"
+        AI_NAME="AgentZ Code"
+        SKILLS_DIR="$HOME/.AgentZ/skills/lucide-icons"
         ;;
     *)
         echo -e "${RED}无效选项，退出安装${NC}"

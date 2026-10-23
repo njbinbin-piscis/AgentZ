@@ -2,7 +2,7 @@
 name: "color-curator"
 description: "Browse and select color palettes from Coolors or curated fallbacks. Use to find the perfect color palette for a design project."
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "frontend-design-pro"
 ---
 

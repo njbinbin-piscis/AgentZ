@@ -3,7 +3,7 @@ name: "bats-testing-patterns"
 description: "Master Bash Automated Testing System (Bats) for comprehensive shell script testing. Use when writing tests for shell scripts, CI/CD pipelines, or requiring test-driven development of shell utilities."
 description_zh: "生产级 Bash 脚本编写，包含防御性编程、POSIX 合规性和全面测试"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "shell-scripting"
 ---
 

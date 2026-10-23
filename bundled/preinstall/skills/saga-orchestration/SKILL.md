@@ -3,7 +3,7 @@ name: "saga-orchestration"
 description: "Implement saga patterns for distributed transactions and cross-aggregate workflows. Use when coordinating multi-step business processes, handling compensating transactions, or managing long-running workflows."
 description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "backend-development"
 ---
 

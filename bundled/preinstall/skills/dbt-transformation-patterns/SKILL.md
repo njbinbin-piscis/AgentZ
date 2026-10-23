@@ -3,7 +3,7 @@ name: "dbt-transformation-patterns"
 description: "Master dbt (data build tool) for analytics engineering with model organization, testing, documentation, and incremental strategies. Use when building data transformations, creating data models, or implementing analytics engineering best practices."
 description_zh: "ETL管道构建、数据仓库设计、批处理工作流和数据驱动的功能开发"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "data-engineering"
 ---
 

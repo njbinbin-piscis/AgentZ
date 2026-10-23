@@ -2,7 +2,7 @@
 
 Direct command-line access to Chrome DevTools Protocol via the `chrome-ws` bash tool.
 
-**Note**: For use within Claude Code, the MCP `use_browser` tool is recommended. This document is for direct command-line usage or integration with other tools.
+**Note**: For use within AgentZ, the MCP `use_browser` tool is recommended. This document is for direct command-line usage or integration with other tools.
 
 ## Setup
 

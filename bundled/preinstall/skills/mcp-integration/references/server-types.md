@@ -1,6 +1,6 @@
 # MCP Server Types: Deep Dive
 
-Complete reference for all MCP server types supported in CodeBuddy Code plugins.
+Complete reference for all MCP server types supported in AgentZ Code plugins.
 
 ## stdio (Standard Input/Output)
 
@@ -24,8 +24,8 @@ Execute local MCP servers as child processes with communication via stdin/stdout
 ```json
 {
   "my-server": {
-    "command": "${CODEBUDDY_PLUGIN_ROOT}/servers/custom-server",
-    "args": ["--config", "${CODEBUDDY_PLUGIN_ROOT}/config.json"],
+    "command": "${AgentZ_PLUGIN_ROOT}/servers/custom-server",
+    "args": ["--config", "${AgentZ_PLUGIN_ROOT}/config.json"],
     "env": {
       "API_KEY": "${MY_API_KEY}",
       "LOG_LEVEL": "debug",
@@ -37,10 +37,10 @@ Execute local MCP servers as child processes with communication via stdin/stdout
 
 ### Process Lifecycle
 
-1. **Startup**: CodeBuddy Code spawns process with `command` and `args`
+1. **Startup**: AgentZ Code spawns process with `command` and `args`
 2. **Communication**: JSON-RPC messages via stdin/stdout
-3. **Lifecycle**: Process runs for entire CodeBuddy Code session
-4. **Shutdown**: Process terminated when CodeBuddy Code exits
+3. **Lifecycle**: Process runs for entire AgentZ Code session
+4. **Shutdown**: Process terminated when AgentZ Code exits
 
 ### Use Cases
 
@@ -58,7 +58,7 @@ Execute local MCP servers as child processes with communication via stdin/stdout
 ```json
 {
   "custom": {
-    "command": "${CODEBUDDY_PLUGIN_ROOT}/servers/my-server.js",
+    "command": "${AgentZ_PLUGIN_ROOT}/servers/my-server.js",
     "args": ["--verbose"]
   }
 }
@@ -79,7 +79,7 @@ Execute local MCP servers as child processes with communication via stdin/stdout
 
 ### Best Practices
 
-1. **Use absolute paths or ${CODEBUDDY_PLUGIN_ROOT}**
+1. **Use absolute paths or ${AgentZ_PLUGIN_ROOT}**
 2. **Set PYTHONUNBUFFERED for Python servers**
 3. **Pass configuration via args or env, not stdin**
 4. **Handle server crashes gracefully**
@@ -91,7 +91,7 @@ Execute local MCP servers as child processes with communication via stdin/stdout
 - Check command exists and is executable
 - Verify file paths are correct
 - Check permissions
-- Review `codebuddy --debug` logs
+- Review `AgentZ --debug` logs
 
 **Communication fails:**
 - Ensure server uses stdin/stdout correctly
@@ -150,7 +150,7 @@ Connect to hosted MCP servers via HTTP with server-sent events for streaming. Be
 }
 ```
 
-CodeBuddy Code handles OAuth flow:
+AgentZ Code handles OAuth flow:
 1. User prompted to authenticate on first use
 2. Opens browser for OAuth flow
 3. Tokens stored securely

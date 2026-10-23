@@ -19,16 +19,16 @@ Testing commands ensures they work correctly, handle edge cases, and provide goo
 
 ```bash
 # Validate YAML frontmatter
-head -n 20 .codebuddy/commands/my-command.md | grep -A 10 "^---"
+head -n 20 .AgentZ/commands/my-command.md | grep -A 10 "^---"
 
 # Check for closing frontmatter marker
-head -n 20 .codebuddy/commands/my-command.md | grep -c "^---" # Should be 2
+head -n 20 .AgentZ/commands/my-command.md | grep -c "^---" # Should be 2
 
 # Verify file has .md extension
-ls .codebuddy/commands/*.md
+ls .AgentZ/commands/*.md
 
 # Check file is in correct location
-test -f .codebuddy/commands/my-command.md && echo "Found" || echo "Missing"
+test -f .AgentZ/commands/my-command.md && echo "Found" || echo "Missing"
 ```
 
 **Automated validation script:**
@@ -133,8 +133,8 @@ echo "✓ Frontmatter fields valid"
 **Test procedure:**
 
 ```bash
-# 1. Start CodeBuddy Code
-codebuddy --debug
+# 1. Start AgentZ Code
+AgentZ --debug
 
 # 2. Check command appears in help
 > /help
@@ -149,7 +149,7 @@ codebuddy --debug
 # Verify expected behavior
 
 # 5. Check debug logs
-tail -f ~/.codebuddy/debug-logs/latest
+tail -f ~/.AgentZ/debug-logs/latest
 # Look for errors or warnings
 ```
 
@@ -255,7 +255,7 @@ rm /tmp/test-file*.txt /tmp/large-file.bin
 
 ```bash
 # Create test command with bash execution
-cat > .codebuddy/commands/test-bash.md << 'EOF'
+cat > .AgentZ/commands/test-bash.md << 'EOF'
 ---
 description: Test bash execution
 allowed-tools: Bash(echo:*), Bash(date:*)
@@ -267,7 +267,7 @@ Test output: !`echo "Hello from bash"`
 Analysis of output above...
 EOF
 
-# Test in CodeBuddy Code
+# Test in AgentZ Code
 > /test-bash
 # Verify:
 # 1. Date appears correctly
@@ -275,7 +275,7 @@ EOF
 # 3. No errors in debug logs
 
 # Test with disallowed command (should fail or be blocked)
-cat > .codebuddy/commands/test-forbidden.md << 'EOF'
+cat > .AgentZ/commands/test-forbidden.md << 'EOF'
 ---
 description: Test forbidden command
 allowed-tools: Bash(echo:*)
@@ -304,7 +304,7 @@ EOF
 # Setup: Command that triggers a hook
 # Test: Invoke command, verify hook executes
 
-# Command: .codebuddy/commands/risky-operation.md
+# Command: .AgentZ/commands/risky-operation.md
 # Hook: PreToolUse that validates the operation
 
 > /risky-operation
@@ -348,7 +348,7 @@ Create a test suite script:
 #!/bin/bash
 # test-commands.sh - Command test suite
 
-TEST_DIR=".codebuddy/commands"
+TEST_DIR=".AgentZ/commands"
 FAILED_TESTS=0
 
 echo "Command Test Suite"
@@ -395,7 +395,7 @@ Validate commands before committing:
 
 echo "Validating commands..."
 
-COMMANDS_CHANGED=$(git diff --cached --name-only | grep "\.codebuddy/commands/.*\.md")
+COMMANDS_CHANGED=$(git diff --cached --name-only | grep "\.AgentZ/commands/.*\.md")
 
 if [ -z "$COMMANDS_CHANGED" ]; then
   echo "No commands changed"
@@ -432,20 +432,20 @@ jobs:
 
       - name: Validate command structure
         run: |
-          for cmd in .codebuddy/commands/*.md; do
+          for cmd in .AgentZ/commands/*.md; do
             echo "Testing: $cmd"
             ./scripts/validate-command.sh "$cmd"
           done
 
       - name: Validate frontmatter
         run: |
-          for cmd in .codebuddy/commands/*.md; do
+          for cmd in .AgentZ/commands/*.md; do
             ./scripts/validate-frontmatter.sh "$cmd"
           done
 
       - name: Check for TODOs
         run: |
-          if grep -r "TODO" .codebuddy/commands/; then
+          if grep -r "TODO" .AgentZ/commands/; then
             echo "ERROR: TODOs found in commands"
             exit 1
           fi
@@ -529,12 +529,12 @@ echo "  - Acceptable threshold: < 3 seconds for fast commands"
 ### Resource Usage Testing
 
 ```bash
-# Monitor CodeBuddy Code during command execution
+# Monitor AgentZ Code during command execution
 # In terminal 1:
-codebuddy --debug
+AgentZ --debug
 
 # In terminal 2:
-watch -n 1 'ps aux | grep codebuddy'
+watch -n 1 'ps aux | grep AgentZ'
 
 # Execute command and observe:
 # - Memory usage
@@ -641,37 +641,37 @@ Before releasing a command:
 
 ```bash
 # Check file location
-ls -la .codebuddy/commands/my-command.md
+ls -la .AgentZ/commands/my-command.md
 
 # Check permissions
-chmod 644 .codebuddy/commands/my-command.md
+chmod 644 .AgentZ/commands/my-command.md
 
 # Check syntax
-head -n 20 .codebuddy/commands/my-command.md
+head -n 20 .AgentZ/commands/my-command.md
 
-# Restart CodeBuddy Code
-codebuddy --debug
+# Restart AgentZ Code
+AgentZ --debug
 ```
 
 **Issue: Arguments not substituting**
 
 ```bash
 # Verify syntax
-grep '\$1' .codebuddy/commands/my-command.md
-grep '\$ARGUMENTS' .codebuddy/commands/my-command.md
+grep '\$1' .AgentZ/commands/my-command.md
+grep '\$ARGUMENTS' .AgentZ/commands/my-command.md
 
 # Test with simple command first
-echo "Test: \$1 and \$2" > .codebuddy/commands/test-args.md
+echo "Test: \$1 and \$2" > .AgentZ/commands/test-args.md
 ```
 
 **Issue: Bash commands not executing**
 
 ```bash
 # Check allowed-tools
-grep "allowed-tools" .codebuddy/commands/my-command.md
+grep "allowed-tools" .AgentZ/commands/my-command.md
 
 # Verify command syntax
-grep '!\`' .codebuddy/commands/my-command.md
+grep '!\`' .AgentZ/commands/my-command.md
 
 # Test command manually
 date
@@ -682,7 +682,7 @@ echo "test"
 
 ```bash
 # Check @ syntax
-grep '@' .codebuddy/commands/my-command.md
+grep '@' .AgentZ/commands/my-command.md
 
 # Verify file exists
 ls -la /path/to/referenced/file

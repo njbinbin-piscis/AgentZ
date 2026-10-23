@@ -2,11 +2,11 @@
 
 Basic slash command patterns for common use cases.
 
-**Important:** All examples below are written as instructions FOR CodeBuddy (agent consumption), not messages TO users. Commands tell CodeBuddy what to do, not tell users what will happen.
+**Important:** All examples below are written as instructions FOR AgentZ (agent consumption), not messages TO users. Commands tell AgentZ what to do, not tell users what will happen.
 
 ## Example 1: Code Review Command
 
-**File:** `.codebuddy/commands/review.md`
+**File:** `.AgentZ/commands/review.md`
 
 ```markdown
 ---
@@ -43,7 +43,7 @@ Provide specific feedback with file and line references.
 
 ## Example 2: Security Review Command
 
-**File:** `.codebuddy/commands/security-review.md`
+**File:** `.AgentZ/commands/security-review.md`
 
 ```markdown
 ---
@@ -86,7 +86,7 @@ Prioritize issues by severity.
 
 ## Example 3: Test Command with File Argument
 
-**File:** `.codebuddy/commands/test-file.md`
+**File:** `.AgentZ/commands/test-file.md`
 
 ```markdown
 ---
@@ -117,7 +117,7 @@ If failures found, suggest fixes based on error messages.
 
 ## Example 4: Documentation Generator
 
-**File:** `.codebuddy/commands/document.md`
+**File:** `.AgentZ/commands/document.md`
 
 ```markdown
 ---
@@ -162,7 +162,7 @@ Format as Markdown suitable for project documentation.
 
 ## Example 5: Git Status Summary
 
-**File:** `.codebuddy/commands/git-status.md`
+**File:** `.AgentZ/commands/git-status.md`
 
 ```markdown
 ---
@@ -195,7 +195,7 @@ Provide:
 
 ## Example 6: Deployment Command
 
-**File:** `.codebuddy/commands/deploy.md`
+**File:** `.AgentZ/commands/deploy.md`
 
 ```markdown
 ---
@@ -233,7 +233,7 @@ Proceed with deployment? (yes/no)
 
 ## Example 7: Comparison Command
 
-**File:** `.codebuddy/commands/compare-files.md`
+**File:** `.AgentZ/commands/compare-files.md`
 
 ```markdown
 ---
@@ -278,7 +278,7 @@ Present as structured comparison report.
 
 ## Example 8: Quick Fix Command
 
-**File:** `.codebuddy/commands/quick-fix.md`
+**File:** `.AgentZ/commands/quick-fix.md`
 
 ```markdown
 ---
@@ -314,7 +314,7 @@ Provide code changes with file paths and line numbers.
 
 ## Example 9: Research Command
 
-**File:** `.codebuddy/commands/research.md`
+**File:** `.AgentZ/commands/research.md`
 
 ```markdown
 ---
@@ -359,7 +359,7 @@ Provide actionable guidance based on research.
 
 ## Example 10: Explain Code Command
 
-**File:** `.codebuddy/commands/explain.md`
+**File:** `.AgentZ/commands/explain.md`
 
 ```markdown
 ---

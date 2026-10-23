@@ -2,7 +2,7 @@
 name: "tailored-resume-generator"
 description: "Analyzes job descriptions and generates tailored resumes that highlight relevant experience, skills, and achievements to maximize interview chances"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "tailored-resume-generator"
 ---
 

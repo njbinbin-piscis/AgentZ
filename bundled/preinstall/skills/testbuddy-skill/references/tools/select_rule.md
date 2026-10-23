@@ -2,7 +2,7 @@
 
 ## 工具简介
 
-根据关键词从 `.codebuddy/rules` 目录下智能匹配以"规则"结尾的文件，并返回规则文件路径。
+根据关键词从 `.AgentZ/rules` 目录下智能匹配以"规则"结尾的文件，并返回规则文件路径。
 
 ## 使用方法
 
@@ -21,7 +21,7 @@ JSON 格式：
 
 ```json
 {
-  "path": ".codebuddy/rules/用例生成规则.mdc"
+  "path": ".AgentZ/rules/用例生成规则.mdc"
 }
 ```
 

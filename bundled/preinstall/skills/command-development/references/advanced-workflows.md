@@ -78,7 +78,7 @@ Creating deployment tracking file...
 Current branch: !`git branch --show-current`
 Latest commit: !`git log -1 --format=%H`
 
-Deployment state saved to `.codebuddy/deployment-state.local.md`:
+Deployment state saved to `.AgentZ/deployment-state.local.md`:
 
 \`\`\`markdown
 ---
@@ -110,7 +110,7 @@ description: Run deployment tests
 allowed-tools: Read, Bash(npm:*)
 ---
 
-Reading deployment state from `.codebuddy/deployment-state.local.md`...
+Reading deployment state from `.AgentZ/deployment-state.local.md`...
 
 Running tests: !`npm test`
 
@@ -283,7 +283,7 @@ Details:
 Store workflow state in plugin-specific files:
 
 ```markdown
-.codebuddy/plugin-name-workflow.local.md:
+.AgentZ/plugin-name-workflow.local.md:
 
 ---
 workflow: deployment
@@ -320,9 +320,9 @@ description: Continue deployment workflow
 allowed-tools: Read, Write
 ---
 
-Reading workflow state from .codebuddy/plugin-name-workflow.local.md...
+Reading workflow state from .AgentZ/plugin-name-workflow.local.md...
 
-Current stage: @.codebuddy/plugin-name-workflow.local.md
+Current stage: @.AgentZ/plugin-name-workflow.local.md
 
 [Parse YAML frontmatter to determine next step]
 
@@ -343,7 +343,7 @@ allowed-tools: Read
 
 Checking for interrupted workflow...
 
-State file: @.codebuddy/plugin-name-workflow.local.md
+State file: @.AgentZ/plugin-name-workflow.local.md
 
 **Workflow found:**
 - Started: [timestamp]
@@ -374,7 +374,7 @@ allowed-tools: Write
 
 Writing completion marker...
 
-Creating: .codebuddy/feature-complete.flag
+Creating: .AgentZ/feature-complete.flag
 
 This signals other commands that feature is ready for:
 - Integration testing (/integration-test will auto-detect)
@@ -394,7 +394,7 @@ allowed-tools: Read, Bash(git:*)
 
 Checking for completed features...
 
-if [ -f .codebuddy/feature-complete.flag ]; then
+if [ -f .AgentZ/feature-complete.flag ]; then
   Feature ready for release notes
 fi
 
@@ -415,7 +415,7 @@ allowed-tools: Read, Write, Bash
 
 Checking for active deployments...
 
-if [ -f .codebuddy/deployment.lock ]; then
+if [ -f .AgentZ/deployment.lock ]; then
   ERROR: Deployment already in progress
   Started: [timestamp from lock file]
 
@@ -442,7 +442,7 @@ allowed-tools: Write, Bash
 Deployment complete.
 
 Removing deployment lock...
-rm .codebuddy/deployment.lock
+rm .AgentZ/deployment.lock
 
 Ready for next deployment.
 ```
@@ -587,15 +587,15 @@ description: Workflow with checkpoints
 
 ## Checkpoint 1: Validation
 !`validate.sh`
-echo "checkpoint:validation" >> .codebuddy/deployment-checkpoints.log
+echo "checkpoint:validation" >> .AgentZ/deployment-checkpoints.log
 
 ## Checkpoint 2: Build
 !`build.sh`
-echo "checkpoint:build" >> .codebuddy/deployment-checkpoints.log
+echo "checkpoint:build" >> .AgentZ/deployment-checkpoints.log
 
 ## Checkpoint 3: Deploy
 !`deploy.sh`
-echo "checkpoint:deploy" >> .codebuddy/deployment-checkpoints.log
+echo "checkpoint:deploy" >> .AgentZ/deployment-checkpoints.log
 
 If any step fails, resume with:
 /deployment-resume [last-successful-checkpoint]
@@ -660,7 +660,7 @@ timestamp: !`date -u +%Y-%m-%dT%H:%M:%SZ`
 ---
 \`\`\`
 
-Written to .codebuddy/deployment-state.local.md
+Written to .AgentZ/deployment-state.local.md
 
 Next: Run /deployment-validate
 ```
@@ -673,7 +673,7 @@ description: Validate deployment
 allowed-tools: Read, Bash
 ---
 
-Reading state: @.codebuddy/deployment-state.local.md
+Reading state: @.AgentZ/deployment-state.local.md
 
 Running validation...
 - Branch check: PASS
@@ -693,7 +693,7 @@ description: Execute deployment
 allowed-tools: Read, Bash, Write
 ---
 
-Reading state: @.codebuddy/deployment-state.local.md
+Reading state: @.AgentZ/deployment-state.local.md
 
 Executing deployment to [environment]...
 
@@ -714,7 +714,7 @@ allowed-tools: Bash
 ---
 
 Removing deployment state...
-rm .codebuddy/deployment-state.local.md
+rm .AgentZ/deployment-state.local.md
 
 Deployment workflow complete.
 ```

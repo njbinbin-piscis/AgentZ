@@ -3,8 +3,7 @@ name: "using-superpowers"
 description: "Use when starting any conversation - establishes how to find and use skills, requiring reading the matching SKILL.md before ANY response including clarifying questions"
 description_zh: "核心工程技能工作流：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
 version: "1.0.0"
-tools: [file_read, plan_todo]
-source: codebuddy
+source: AgentZ
 source_plugin: "superpowers"
 ---
 

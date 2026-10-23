@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # save_node.py：批量保存脑图节点（创建/更新/删除）
-# 调用 codebuddy server POST /node/batch-save 接口
+# 调用 AgentZ server POST /node/batch-save 接口
 #
 # 用法：
 #   python3 save_node.py [--namespace <ns>] --design_uid <uid> --file <file_path>
@@ -75,12 +75,12 @@ def get_token():
 # ──────────────────────────────────────────────
 def _get_testbuddy_origin():
     """根据 session 中的 env 字段返回 x-testbuddy-origin 值
-    codebuddy -> cb-plugin，其他 -> openclaw
+    AgentZ -> cb-plugin，其他 -> openclaw
     """
     data = _load_session_data()
     if data:
         env = data.get("env", "other").strip()
-        if env == "codebuddy":
+        if env == "AgentZ":
             return "cb-plugin"
     return "openclaw"
 

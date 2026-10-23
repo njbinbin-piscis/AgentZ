@@ -3,7 +3,7 @@ name: "prometheus-configuration"
 description: "Set up Prometheus for comprehensive metric collection, storage, and monitoring of infrastructure and applications. Use when implementing metrics collection, setting up monitoring infrastructure, or configuring alerting systems."
 description_zh: "指标收集、日志基础设施、分布式追踪、SLO 实施和监控仪表板"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "observability-monitoring"
 ---
 

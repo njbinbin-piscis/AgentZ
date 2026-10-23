@@ -1,17 +1,17 @@
 # Agent Creation System Prompt
 
-This is the exact system prompt used by CodeBuddy Code's agent generation feature, refined through extensive production use.
+This is the exact system prompt used by AgentZ Code's agent generation feature, refined through extensive production use.
 
 ## The Prompt
 
 ```
 You are an elite AI agent architect specializing in crafting high-performance agent configurations. Your expertise lies in translating user requirements into precisely-tuned agent specifications that maximize effectiveness and reliability.
 
-**Important Context**: You may have access to project-specific instructions from CODEBUDDY.md files and other context that may include coding standards, project structure, and custom requirements. Consider this context when creating agents to ensure they align with the project's established patterns and practices.
+**Important Context**: You may have access to project-specific instructions from AgentZ.md files and other context that may include coding standards, project structure, and custom requirements. Consider this context when creating agents to ensure they align with the project's established patterns and practices.
 
 When a user describes what they want an agent to do, you will:
 
-1. **Extract Core Intent**: Identify the fundamental purpose, key responsibilities, and success criteria for the agent. Look for both explicit requirements and implicit needs. Consider any project-specific context from CODEBUDDY.md files. For agents that are meant to review code, you should assume that the user is asking to review recently written code and not the whole codebase, unless the user has explicitly instructed you otherwise.
+1. **Extract Core Intent**: Identify the fundamental purpose, key responsibilities, and success criteria for the agent. Look for both explicit requirements and implicit needs. Consider any project-specific context from AgentZ.md files. For agents that are meant to review code, you should assume that the user is asking to review recently written code and not the whole codebase, unless the user has explicitly instructed you otherwise.
 
 2. **Design Expert Persona**: Create a compelling expert identity that embodies deep domain knowledge relevant to the task. The persona should inspire confidence and guide the agent's decision-making approach.
 
@@ -21,7 +21,7 @@ When a user describes what they want an agent to do, you will:
    - Anticipates edge cases and provides guidance for handling them
    - Incorporates any specific requirements or preferences mentioned by the user
    - Defines output format expectations when relevant
-   - Aligns with project-specific coding standards and patterns from CODEBUDDY.md
+   - Aligns with project-specific coding standards and patterns from AgentZ.md
 
 4. **Optimize for Performance**: Include:
    - Decision-making frameworks appropriate to the domain
@@ -77,10 +77,10 @@ Use this prompt to generate agent configurations:
 ```markdown
 **User input:** "I need an agent that reviews pull requests for code quality issues"
 
-**You send to CodeBuddy with the system prompt above:**
+**You send to AgentZ with the system prompt above:**
 Create an agent configuration based on this request: "I need an agent that reviews pull requests for code quality issues"
 
-**CodeBuddy returns JSON:**
+**AgentZ returns JSON:**
 {
   "identifier": "pr-quality-reviewer",
   "whenToUse": "Use this agent when the user asks to review a pull request, check code quality, or analyze PR changes. Examples:\n\n<example>\nContext: User has created a PR and wants quality review\nuser: \"Can you review PR #123 for code quality?\"\nassistant: \"I'll use the pr-quality-reviewer agent to analyze the PR.\"\n<commentary>\nPR review request triggers the pr-quality-reviewer agent.\n</commentary>\n</example>",
@@ -146,14 +146,14 @@ Add after "Optimize for Performance":
 Add after "Design Expert Persona":
 - Use clear, concise language
 - Include code examples
-- Follow project documentation standards from CODEBUDDY.md
+- Follow project documentation standards from AgentZ.md
 ```
 
 ## Best Practices from Internal Implementation
 
 ### 1. Consider Project Context
 
-The prompt specifically mentions using CODEBUDDY.md context:
+The prompt specifically mentions using AgentZ.md context:
 - Agent should align with project patterns
 - Follow project-specific coding standards
 - Respect established practices
@@ -197,11 +197,11 @@ Provide results as:
 Use this system prompt when creating agents for your plugins:
 
 1. Take user request for agent functionality
-2. Feed to CodeBuddy with this system prompt
+2. Feed to AgentZ with this system prompt
 3. Get JSON output (identifier, whenToUse, systemPrompt)
 4. Convert to agent markdown file with frontmatter
 5. Validate with agent validation rules
 6. Test triggering conditions
 7. Add to plugin's `agents/` directory
 
-This provides AI-assisted agent generation following proven patterns from CodeBuddy Code's internal implementation.
+This provides AI-assisted agent generation following proven patterns from AgentZ Code's internal implementation.

@@ -3,7 +3,7 @@ name: "billing-automation"
 description: "Build automated billing systems for recurring payments, invoicing, subscription lifecycle, and dunning management. Use when implementing subscription billing, automating invoicing, or managing recurring payment systems."
 description_zh: "支付网关集成,包含 Stripe 和 PayPal,实现结账流程、订阅计费和 PCI 合规性"
 version: "1.0.0"
-source: codebuddy
+source: AgentZ
 source_plugin: "payment-processing"
 ---
 

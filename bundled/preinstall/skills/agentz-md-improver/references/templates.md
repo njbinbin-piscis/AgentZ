@@ -1,4 +1,4 @@
-# CODEBUDDY.md Templates
+# AgentZ.md Templates
 
 ## Key Principles
 
@@ -31,7 +31,7 @@ Document the essential commands for working with the project.
 
 ### Architecture
 
-Describe the project structure so CodeBuddy understands where things live.
+Describe the project structure so AgentZ understands where things live.
 
 ```markdown
 ## Architecture
@@ -46,7 +46,7 @@ Describe the project structure so CodeBuddy understands where things live.
 
 ### Key Files
 
-List important files that CodeBuddy should know about.
+List important files that AgentZ should know about.
 
 ```markdown
 ## Key Files
@@ -245,9 +245,9 @@ For packages within a monorepo or distinct modules.
 
 ## Update Principles
 
-When updating any CODEBUDDY.md:
+When updating any AgentZ.md:
 
 1. **Be specific**: Use actual file paths, real commands from this project
 2. **Be current**: Verify info against the actual codebase
 3. **Be brief**: One line per concept when possible
-4. **Be useful**: Would this help a new CodeBuddy session understand the project?
+4. **Be useful**: Would this help a new AgentZ session understand the project?
