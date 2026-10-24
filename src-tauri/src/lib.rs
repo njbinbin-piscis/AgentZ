@@ -183,6 +183,7 @@ pub fn run() {
             commands::ide::ide_git_commit,
             commands::ide::ide_git_checkout,
             commands::ide::ide_git_create_branch,
+            commands::ide::ide_git_init,
             // terminal (PTY)
             commands::ide::ide_terminal_create,
             commands::ide::ide_terminal_write,

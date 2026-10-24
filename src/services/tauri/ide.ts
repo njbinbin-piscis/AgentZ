@@ -107,6 +107,8 @@ export const ideApi = {
   gitCreateBranch: (projectDir: string, branch: string, gitRoot?: string | null) =>
     invoke<string>("ide_git_create_branch", { projectDir, branch, gitRoot: gitRoot ?? null }),
 
+  gitInit: (projectDir: string) => invoke<void>("ide_git_init", { projectDir }),
+
   // ─── Terminal ────────────────────────────────────────────────────────
 
   terminalCreate: (

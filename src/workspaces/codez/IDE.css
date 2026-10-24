@@ -1067,10 +1067,42 @@
 }
 
 .git-panel-empty {
-  opacity: 0.55;
-  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   padding: 12px;
+  font-size: 12px;
   line-height: 1.5;
+}
+
+.git-panel-empty p {
+  margin: 0;
+  opacity: 0.55;
+}
+
+.git-init-btn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.git-init-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.git-init-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.git-init-error {
+  color: var(--error, #f87171);
+  opacity: 1;
 }
 
 .git-repo-section {

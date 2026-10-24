@@ -552,6 +552,10 @@ const en = {
       'Git user.name / user.email is not configured. Run in a terminal:\n  git config --global user.name "Your Name"\n  git config --global user.email "you@example.com"',
     assistantBranches: "Assistant branches",
     noGitRepos: "No git repositories found in this folder.",
+    initRepo: "Initialize Repository",
+    initRepoBusy: "Initializing…",
+    initRepoFailed: "Could not initialize the repository: {{error}}",
+    initRepoInside: "This folder is already inside a Git repository: {{path}}",
     unsavedConfirm: '"{{name}}" has unsaved changes. Save before closing?',
     unsavedBulkConfirm: "{{count}} file(s) have unsaved changes. Save before closing?",
     externalChangeConflict:

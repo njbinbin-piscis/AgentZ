@@ -542,6 +542,10 @@ const zh = {
       '尚未配置 Git 用户信息。请在终端执行：\n  git config --global user.name "您的姓名"\n  git config --global user.email "you@example.com"',
     assistantBranches: "助理分支",
     noGitRepos: "此文件夹中未找到 Git 仓库。",
+    initRepo: "初始化新仓库",
+    initRepoBusy: "正在初始化…",
+    initRepoFailed: "初始化失败：{{error}}",
+    initRepoInside: "此文件夹已位于 Git 仓库内：{{path}}",
     unsavedConfirm: "「{{name}}」有未保存的更改。保存后关闭？",
     unsavedBulkConfirm: "{{count}} 个文件有未保存的更改。保存后关闭？",
     externalChangeConflict:

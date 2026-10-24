@@ -405,6 +405,8 @@ export default function GitPanel({
   const { t } = useTranslation();
   const [repos, setRepos] = useState<GitRepoSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!projectDir) return;
@@ -429,6 +431,27 @@ export default function GitPanel({
     await onRefresh();
   }, [refresh, onRefresh]);
 
+  const handleInit = useCallback(async () => {
+    if (!projectDir || initializing) return;
+    setInitializing(true);
+    setInitError(null);
+    try {
+      await ideApi.gitInit(projectDir);
+      await handleMutate();
+    } catch (e) {
+      const msg = String(e);
+      const marker = "GIT_ALREADY_INSIDE:";
+      const idx = msg.indexOf(marker);
+      setInitError(
+        idx >= 0
+          ? t("ide.initRepoInside", { path: msg.slice(idx + marker.length).trim() })
+          : t("ide.initRepoFailed", { error: msg }),
+      );
+    } finally {
+      setInitializing(false);
+    }
+  }, [projectDir, initializing, handleMutate, t]);
+
   return (
     <div className="git-panel">
       <div className="ide-sidebar-header">
@@ -444,7 +467,16 @@ export default function GitPanel({
 
       {repos.length === 0 && !loading && (
         <div className="git-panel-empty">
-          {t("ide.noGitRepos") || "No git repositories found in this folder."}
+          <p>{t("ide.noGitRepos") || "No git repositories found in this folder."}</p>
+          <button
+            type="button"
+            className="git-init-btn"
+            disabled={!projectDir || initializing}
+            onClick={() => void handleInit()}
+          >
+            {initializing ? t("ide.initRepoBusy") : t("ide.initRepo")}
+          </button>
+          {initError && <p className="git-init-error">{initError}</p>}
         </div>
       )}
 

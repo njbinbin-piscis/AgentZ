@@ -1522,6 +1522,63 @@ pub async fn ide_git_create_branch(
     Ok(output)
 }
 
+/// Create a Git repository in the workspace root (`git init`).
+/// Refuses when the folder is already inside a repository, including a parent
+/// one that the panel does not list because discovery does not walk upward.
+#[tauri::command]
+pub async fn ide_git_init(project_dir: String) -> Result<(), String> {
+    let workspace = PathBuf::from(&project_dir);
+    if !workspace.is_dir() {
+        return Err("project directory does not exist".into());
+    }
+    if let Ok(top) = run_git_cmd(&workspace, &["rev-parse", "--show-toplevel"]).await {
+        let top = top.trim();
+        if !top.is_empty() {
+            return Err(format!("GIT_ALREADY_INSIDE:{top}"));
+        }
+    }
+    run_git_cmd(&workspace, &["init"])
+        .await
+        .map_err(|e| format!("git init failed: {}", e))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod git_init_tests {
+    use super::ide_git_init;
+
+    fn scratch() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "agentz-git-init-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[tokio::test]
+    async fn init_creates_a_repo_and_refuses_to_nest_another() {
+        let root = scratch();
+        let root_s = root.to_string_lossy().to_string();
+        ide_git_init(root_s).await.expect("init workspace");
+        assert!(root.join(".git").is_dir());
+
+        let child = root.join("nested");
+        std::fs::create_dir_all(&child).unwrap();
+        let err = ide_git_init(child.to_string_lossy().to_string())
+            .await
+            .expect_err("nested init");
+        assert!(err.starts_with("GIT_ALREADY_INSIDE:"), "{err}");
+        assert!(!child.join(".git").exists());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}
+
 // ─── Terminal (PTY) ────────────────────────────────────────────────────────
 
 pub use crate::terminal_log::TerminalOutputLog;
