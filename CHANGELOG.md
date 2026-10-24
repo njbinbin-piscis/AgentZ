@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.14] - 2026-10-24
+
+### Added
+
+- **Initialize a Git repository from Source Control.** When the open folder has no repository, the panel offers a button that runs `git init` there. If the folder is already inside a parent repository, initialization is refused and the parent path is shown.
+
+### Fixed
+
+- **Agent turns no longer stop with `run store: database is locked`.** Execution history, budgets, and reservations share `.agentz/runs.db`. Rollback-journal mode let a reader block a writer until the 5 second busy timeout aborted the turn. The database now uses WAL so readers and writers proceed together, and the busy wait is 15 seconds. Existing databases switch the next time they are opened.
+
 ## [1.0.13] - 2026-10-24
 
 ### Fixed
