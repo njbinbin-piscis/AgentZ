@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.13] - 2026-10-24
+
+### Fixed
+
+- **Editor tabs no longer shrink to a few letters.** Tabs size to the full filename instead of sharing a 72–200px slot. When they no longer fit, the tab strip scrolls horizontally with the mouse wheel and a thin scrollbar. The tooltip still shows the full path.
+
 ## [1.0.12] - 2026-10-24
 
 ### Changed
