@@ -12,7 +12,7 @@ import {
   forkSession,
   deleteSession,
   restoreCheckpoint,
-  journalListChanges,
+  journalListPending,
   journalGetTurnDiffs,
   journalUndoTurn,
   type AgentEvent,
@@ -410,7 +410,7 @@ export function useAssistantSession({
       ...sessionArtifactsRef.current.filter((p) => !incomingSet.has(p)),
     ];
     sessionArtifactsRef.current = merged;
-    setArtifacts(merged);
+    setArtifacts(merged, sessionRef.current);
   }, [toolSteps, setArtifacts, projectDir]);
 
   useEffect(() => {
@@ -926,15 +926,11 @@ export function useAssistantSession({
         if (turnId && projectDir) {
           try {
             const [changes, diffs] = await Promise.all([
-              journalListChanges(projectDir, effectiveSessionId, turnId),
+              journalListPending(projectDir, effectiveSessionId),
               journalGetTurnDiffs(projectDir, effectiveSessionId, turnId),
             ]);
             if (sessionRef.current === effectiveSessionId) {
-              setPendingReview(
-                changes.length > 0
-                  ? { sessionId: effectiveSessionId, turnId, changes }
-                  : null,
-              );
+              setPendingReview({ sessionId: effectiveSessionId, changes });
               if (diffs.length > 0) {
                 setTurnDiffsByTurnId((prev) => ({ ...prev, [turnId]: diffs }));
               }

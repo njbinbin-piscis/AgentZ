@@ -445,6 +445,10 @@ pub fn run() {
             commands::journal::journal_list_changes,
             commands::journal::journal_get_turn_diffs,
             commands::journal::journal_undo_turn,
+            commands::journal::journal_list_pending,
+            commands::journal::journal_keep,
+            commands::journal::journal_undo,
+            commands::journal::workspace_existing_files,
             // Workspace session restore (hot exit)
             commands::workspace::workspace_load,
             commands::workspace::workspace_save,

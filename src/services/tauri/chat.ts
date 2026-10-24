@@ -70,6 +70,9 @@ export interface JournalChange {
   tool_name: string;
   existed: boolean;
   applied: boolean;
+  /** Net state vs. the pre-edit baseline, reconciled against disk. */
+  status: "added" | "modified" | "deleted";
+  turn_id: string;
 }
 
 /** Before/after contents for inline diff cards. */
@@ -401,6 +404,41 @@ export function journalGetTurnDiffs(
     sessionId,
     turnId,
   });
+}
+
+/** Agent edits awaiting review across the whole session (net vs. disk). */
+export function journalListPending(
+  projectDir: string,
+  sessionId: string,
+): Promise<JournalChange[]> {
+  return invoke<JournalChange[]>("journal_list_pending", { projectDir, sessionId });
+}
+
+/** Accept pending edits; omit `paths` to keep all. */
+export function journalKeep(
+  projectDir: string,
+  sessionId: string,
+  paths?: string[],
+): Promise<number> {
+  return invoke<number>("journal_keep", { projectDir, sessionId, paths: paths ?? null });
+}
+
+/** Revert pending edits to their baseline; omit `paths` to undo all. */
+export function journalUndo(
+  projectDir: string,
+  sessionId: string,
+  paths?: string[],
+): Promise<string[]> {
+  return invoke<string[]>("journal_undo", { projectDir, sessionId, paths: paths ?? null });
+}
+
+/** Subset of `paths` that currently exist as regular files. */
+export function workspaceExistingFiles(
+  projectDir: string,
+  sessionId: string | null,
+  paths: string[],
+): Promise<string[]> {
+  return invoke<string[]>("workspace_existing_files", { projectDir, sessionId, paths });
 }
 
 /** Undo every change in a turn, restoring pre-edit content. Returns paths. */

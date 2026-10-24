@@ -125,4 +125,37 @@ describe("ProjectEdgePanel artifacts", () => {
     expect(after).toHaveLength(1);
     expect(after[0].props.title).toBe("MODULE_DEPENDENCY_GRAPH.md");
   });
+
+  it("changes tab lists only pending agent edits, with per-file keep/undo", async () => {
+    const onUndo = vi.fn(async () => {});
+    const onKeep = vi.fn(async () => {});
+    await act(async () => {
+      root = create(
+        <ProjectEdgeProvider>
+          <CaptureActions />
+          <ProjectEdgePanel projectDir="/repo" onUndo={onUndo} onKeep={onKeep} />
+        </ProjectEdgeProvider>,
+      );
+    });
+    await act(async () => {
+      actionsRef?.setGitChanges([{ path: "untracked.txt", status: "untracked", staged: false }]);
+      actionsRef?.setPendingReview({
+        sessionId: "s",
+        changes: [
+          { id: 2, rel_path: "src/a.ts", tool_name: "file_edit", existed: true, applied: true, status: "modified", turn_id: "t" },
+          { id: 1, rel_path: "old.md", tool_name: "file_write", existed: true, applied: true, status: "deleted", turn_id: "t" },
+        ],
+      });
+    });
+    const json = JSON.stringify(root!.toJSON());
+    expect(json).not.toContain("untracked.txt");
+    const rows = root!.root.findAllByProps({ className: "agentz-edge-change" });
+    expect(rows.map((r) => r.props.title)).toEqual(["src/a.ts", "old.md (agent.changeDeleted)"]);
+    expect(rows[1].props.disabled).toBe(true);
+    const acts = root!.root.findAllByProps({ className: "agentz-edge-change-act" });
+    await act(async () => acts[0].props.onClick());
+    await act(async () => acts[1].props.onClick());
+    expect(onUndo).toHaveBeenCalledWith(["src/a.ts"]);
+    expect(onKeep).toHaveBeenCalledWith(["src/a.ts"]);
+  });
 });

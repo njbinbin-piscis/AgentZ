@@ -55,6 +55,15 @@ export function normalizeArtifactPath(
   return relativizeArtifactPath(raw, roots);
 }
 
+const READ_ONLY_TOOL = /read|list|search|diff|fetch|grep|glob|view|stat/;
+const WRITE_TOOL = /write|edit|create|save|export|generate|patch|append|render/;
+
+/** Only tools that produce or change files yield artifacts; reads and listings never do. */
+export function isArtifactProducingTool(name: string): boolean {
+  const n = name.toLowerCase();
+  return WRITE_TOOL.test(n) && !READ_ONLY_TOOL.test(n);
+}
+
 export interface ToolStepLike {
   name: string;
   input?: unknown;
@@ -81,6 +90,7 @@ export function collectArtifactsFromToolSteps(
 ): string[] {
   const entries: string[] = [];
   for (const step of toolSteps) {
+    if (!isArtifactProducingTool(step.name)) continue;
     const p = pathFromToolEvent(step.name, step.input, step.result, roots);
     if (p) entries.push(p);
   }
@@ -95,6 +105,7 @@ export function collectArtifactsFromSteps(
   const entries: string[] = [];
   for (const step of steps) {
     for (const tool of step.tools) {
+      if (tool.status === "error" || !isArtifactProducingTool(tool.name)) continue;
       const p =
         tool.path != null
           ? normalizeArtifactPath(tool.path, roots)

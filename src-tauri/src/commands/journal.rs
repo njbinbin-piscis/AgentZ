@@ -57,6 +57,71 @@ pub async fn journal_get_turn_diffs(
         .map_err(|e| e.to_string())
 }
 
+/// Agent edits awaiting review across the whole session, reconciled with disk.
+#[tauri::command]
+pub async fn journal_list_pending(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_dir: Option<String>,
+    session_id: String,
+) -> Result<Vec<JournalChange>, String> {
+    let _lease = state.environment_access.execution().await;
+    let journal = open_task_journal(project_dir.as_deref(), &session_id).await?;
+    journal.list_pending(&session_id).map_err(|e| e.to_string())
+}
+
+/// Accept pending edits (`paths = None` keeps all).
+#[tauri::command]
+pub async fn journal_keep(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_dir: Option<String>,
+    session_id: String,
+    paths: Option<Vec<String>>,
+) -> Result<usize, String> {
+    let _lease = state.environment_access.execution().await;
+    let journal = open_task_journal(project_dir.as_deref(), &session_id).await?;
+    journal
+        .keep_paths(&session_id, paths.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+/// Revert pending edits (`paths = None` reverts all). Returns restored paths.
+#[tauri::command]
+pub async fn journal_undo(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_dir: Option<String>,
+    session_id: String,
+    paths: Option<Vec<String>>,
+) -> Result<Vec<String>, String> {
+    let _lease = state.environment_access.execution().await;
+    let journal = open_task_journal(project_dir.as_deref(), &session_id).await?;
+    journal
+        .undo_paths(&session_id, paths.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+/// Subset of `paths` that are existing regular files. Relative paths resolve
+/// against the session's task workspace (or the project when no session).
+#[tauri::command]
+pub async fn workspace_existing_files(
+    project_dir: Option<String>,
+    session_id: Option<String>,
+    paths: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let root = match session_id.as_deref() {
+        Some(sid) if !sid.is_empty() => task_journal_root(project_dir.as_deref(), sid).await?,
+        _ => require_project_dir(project_dir.as_deref())?,
+    };
+    let root = std::path::PathBuf::from(root);
+    Ok(paths
+        .into_iter()
+        .filter(|p| {
+            let path = std::path::Path::new(p);
+            let abs = if path.is_absolute() { path.to_path_buf() } else { root.join(path) };
+            abs.is_file()
+        })
+        .collect())
+}
+
 /// Undo every applied change in a turn, restoring pre-edit file content.
 /// Returns the restored relative paths.
 #[tauri::command]

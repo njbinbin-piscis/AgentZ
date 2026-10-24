@@ -1,4 +1,4 @@
-.agentz-project-edge-panel {
+﻿.agentz-project-edge-panel {
   position: fixed;
   top: 40px;
   right: 0;
@@ -209,6 +209,8 @@
 /* ── Changes toolbar ────────────────────────────────────────────────── */
 .agentz-edge-changes-toolbar {
   display: flex;
+  align-items: center;
+  gap: 6px;
   justify-content: flex-end;
   padding: 4px 8px 0;
 }
@@ -235,8 +237,51 @@
   padding: 6px 8px 8px;
 }
 
-.agentz-edge-changes-list.journal {
-  border-top: 1px dashed var(--border, #2a2a38);
+.agentz-edge-changes-toolbar .agentz-edge-review-title {
+  margin-right: auto;
+}
+
+.agentz-edge-changes-toolbar .agentz-edge-review-btn {
+  flex: 0 0 auto;
+}
+
+.agentz-edge-change-row {
+  display: flex;
+  align-items: center;
+}
+
+.agentz-edge-change-row .agentz-edge-change {
+  flex: 1;
+  min-width: 0;
+}
+
+.agentz-edge-change:disabled {
+  cursor: default;
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.agentz-edge-change-actions {
+  display: none;
+  gap: 2px;
+}
+
+.agentz-edge-change-row:hover .agentz-edge-change-actions {
+  display: flex;
+}
+
+.agentz-edge-change-act {
+  background: transparent;
+  border: none;
+  color: var(--text-dim, #9a9ab0);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+.agentz-edge-change-act:hover {
+  background: var(--bg-elev-2, #1b1b26);
+  color: inherit;
 }
 
 .agentz-edge-change {
@@ -271,7 +316,8 @@
   background: rgba(124, 106, 247, 0.25);
 }
 
-.agentz-edge-change-badge.new {
+.agentz-edge-change-badge.new,
+.agentz-edge-change-badge.added {
   background: rgba(34, 197, 94, 0.25);
 }
 
@@ -280,6 +326,9 @@
   background: rgba(250, 204, 21, 0.2);
 }
 
+.agentz-edge-change-badge.deleted {
+  background: rgba(239, 68, 68, 0.25);
+}
 .agentz-edge-change-path {
   overflow: hidden;
   text-overflow: ellipsis;

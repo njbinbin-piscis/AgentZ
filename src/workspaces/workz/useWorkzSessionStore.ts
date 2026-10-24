@@ -10,7 +10,7 @@ import {
   SESSION_SOURCES_PROJECT_SHARED,
   getMessages,
   deleteSession,
-  journalListChanges,
+  journalListPending,
   type AgentEvent,
   type ChatAttachment,
   type ChatEventEnvelope,
@@ -616,6 +616,7 @@ export function useWorkzSessionStore({
         freeTaskWorkspace,
         projectDir,
       ]),
+      sessionRef.current,
     );
   }, [steps, setArtifacts, worktree?.worktree_path, freeTaskWorkspace, projectDir]);
 
@@ -989,20 +990,8 @@ export function useWorkzSessionStore({
         });
         if (res.turn_id && projectDir) {
           try {
-            const journalChanges = await journalListChanges(
-              projectDir,
-              res.session_id,
-              res.turn_id,
-            );
-            setPendingReview(
-              journalChanges.length > 0
-                ? {
-                    sessionId: res.session_id,
-                    turnId: res.turn_id,
-                    changes: journalChanges,
-                  }
-                : null,
-            );
+            const journalChanges = await journalListPending(projectDir, res.session_id);
+            setPendingReview({ sessionId: res.session_id, changes: journalChanges });
           } catch {
             /* journal is best-effort */
           }

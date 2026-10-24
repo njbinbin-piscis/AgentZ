@@ -38,6 +38,24 @@ pub struct JournalChange {
     pub existed: bool,
     /// Whether the edit actually applied (tool returned success).
     pub applied: bool,
+    /// Net state vs. the pre-edit baseline, reconciled against disk:
+    /// `added` | `modified` | `deleted`.
+    pub status: String,
+    pub turn_id: String,
+}
+
+/// Net status of a path relative to its baseline; `None` means no net change
+/// (e.g. a temp file the agent created and later removed).
+fn net_status(existed: bool, before: Option<&[u8]>, abs: &Path) -> Option<&'static str> {
+    match (existed, abs.is_file()) {
+        (false, false) => None,
+        (false, true) => Some("added"),
+        (true, false) => Some("deleted"),
+        (true, true) => match (before, std::fs::read(abs)) {
+            (Some(b), Ok(now)) if b == now.as_slice() => None,
+            _ => Some("modified"),
+        },
+    }
 }
 
 /// Before/after file contents for inline diff cards in the chat stream.
@@ -89,6 +107,11 @@ impl FileJournal {
                 ON file_snapshots(session_id, turn_id);",
         )
         .context("journal migrate failed")?;
+        // Older DBs predate Keep; the column add is a no-op error when present.
+        let _ = conn.execute(
+            "ALTER TABLE file_snapshots ADD COLUMN kept INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
         Ok(Self {
             conn: Mutex::new(conn),
             workspace_root,
@@ -190,34 +213,168 @@ impl FileJournal {
         Ok(id)
     }
 
-    /// List applied, not-yet-undone changes for a turn (most recent first,
-    /// deduped by path so each file appears once).
-    pub fn list_changes(&self, session_id: &str, turn_id: &str) -> Result<Vec<JournalChange>> {
-        let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, rel_path, tool_name, existed, applied
-             FROM file_snapshots
-             WHERE session_id = ?1 AND turn_id = ?2 AND applied = 1 AND undone = 0
-             ORDER BY id DESC",
-        )?;
-        let rows = stmt.query_map(params![session_id, turn_id], |r| {
-            Ok(JournalChange {
-                id: r.get(0)?,
-                rel_path: r.get(1)?,
-                tool_name: r.get(2)?,
-                existed: r.get::<_, i64>(3)? != 0,
-                applied: r.get::<_, i64>(4)? != 0,
-            })
-        })?;
-        let mut seen = std::collections::HashSet::new();
-        let mut out = Vec::new();
+    /// Net per-path changes from the snapshots matching `filter`. The earliest
+    /// snapshot per path is the baseline; paths with no net change on disk are
+    /// dropped. Newest-touched first.
+    fn net_changes(&self, filter: &str, args: &[&dyn rusqlite::ToSql]) -> Result<Vec<JournalChange>> {
+        struct Row {
+            id: i64,
+            rel: String,
+            tool: String,
+            existed: bool,
+            before: Option<Vec<u8>>,
+            turn: String,
+        }
+        let rows: Vec<Row> = {
+            let conn = self.conn.lock().unwrap();
+            let sql = format!(
+                "SELECT id, rel_path, tool_name, existed, before_content, turn_id
+                 FROM file_snapshots WHERE applied = 1 AND undone = 0 AND {filter}
+                 ORDER BY id ASC"
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let mapped = stmt.query_map(args, |r| {
+                Ok(Row {
+                    id: r.get(0)?,
+                    rel: r.get(1)?,
+                    tool: r.get(2)?,
+                    existed: r.get::<_, i64>(3)? != 0,
+                    before: r.get(4)?,
+                    turn: r.get(5)?,
+                })
+            })?;
+            mapped.collect::<rusqlite::Result<_>>()?
+        };
+        let mut order: Vec<String> = Vec::new();
+        let mut by_path: std::collections::HashMap<String, (Row, i64, String)> =
+            std::collections::HashMap::new();
         for row in rows {
-            let c = row?;
-            if seen.insert(c.rel_path.clone()) {
-                out.push(c);
+            match by_path.get_mut(&row.rel) {
+                Some(entry) => {
+                    entry.1 = row.id;
+                    entry.2 = row.tool;
+                }
+                None => {
+                    order.push(row.rel.clone());
+                    let (last, tool) = (row.id, row.tool.clone());
+                    by_path.insert(row.rel.clone(), (row, last, tool));
+                }
             }
         }
+        let mut out = Vec::new();
+        for rel in order {
+            let (base, last_id, last_tool) = by_path.remove(&rel).unwrap();
+            let Some(status) = net_status(base.existed, base.before.as_deref(), &self.abs_path(&rel))
+            else {
+                continue;
+            };
+            out.push(JournalChange {
+                id: last_id,
+                rel_path: rel,
+                tool_name: last_tool,
+                existed: base.existed,
+                applied: true,
+                status: status.to_string(),
+                turn_id: base.turn,
+            });
+        }
+        out.sort_by(|a, b| b.id.cmp(&a.id));
         Ok(out)
+    }
+
+    /// Net changes for one turn (most recent first, one entry per path).
+    pub fn list_changes(&self, session_id: &str, turn_id: &str) -> Result<Vec<JournalChange>> {
+        self.net_changes("session_id = ?1 AND turn_id = ?2", &[&session_id, &turn_id])
+    }
+
+    /// Changes awaiting review across every turn of a session: applied, not
+    /// undone, not kept — reconciled against disk.
+    pub fn list_pending(&self, session_id: &str) -> Result<Vec<JournalChange>> {
+        self.net_changes("session_id = ?1 AND kept = 0", &[&session_id])
+    }
+
+    /// Accept pending changes (`None` = all) so they leave the review list.
+    pub fn keep_paths(&self, session_id: &str, paths: Option<&[String]>) -> Result<usize> {
+        let conn = self.conn.lock().unwrap();
+        let n = match paths {
+            None => conn.execute(
+                "UPDATE file_snapshots SET kept = 1
+                 WHERE session_id = ?1 AND applied = 1 AND undone = 0 AND kept = 0",
+                params![session_id],
+            )?,
+            Some(list) => {
+                let mut n = 0;
+                for p in list {
+                    n += conn.execute(
+                        "UPDATE file_snapshots SET kept = 1
+                         WHERE session_id = ?1 AND rel_path = ?2
+                           AND applied = 1 AND undone = 0 AND kept = 0",
+                        params![session_id, p],
+                    )?;
+                }
+                n
+            }
+        };
+        Ok(n)
+    }
+
+    /// Revert pending changes (`None` = all) to their pre-review baseline.
+    /// Returns the restored relative paths.
+    pub fn undo_paths(&self, session_id: &str, paths: Option<&[String]>) -> Result<Vec<String>> {
+        let targets: Vec<(String, bool, Option<Vec<u8>>)> = {
+            let conn = self.conn.lock().unwrap();
+            let mut stmt = conn.prepare(
+                "SELECT rel_path, existed, before_content FROM file_snapshots
+                 WHERE session_id = ?1 AND applied = 1 AND undone = 0 AND kept = 0
+                 ORDER BY id ASC",
+            )?;
+            let rows = stmt.query_map(params![session_id], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, i64>(1)? != 0,
+                    r.get::<_, Option<Vec<u8>>>(2)?,
+                ))
+            })?;
+            let mut seen = std::collections::HashSet::new();
+            let mut v = Vec::new();
+            for row in rows {
+                let row = row?;
+                let wanted = paths.map_or(true, |l| l.iter().any(|p| p == &row.0));
+                if wanted && seen.insert(row.0.clone()) {
+                    v.push(row);
+                }
+            }
+            v
+        };
+        let mut restored = Vec::new();
+        for (rel, existed, before) in &targets {
+            self.restore(rel, *existed, before.as_deref())?;
+            restored.push(rel.clone());
+        }
+        let conn = self.conn.lock().unwrap();
+        for rel in &restored {
+            conn.execute(
+                "UPDATE file_snapshots SET undone = 1
+                 WHERE session_id = ?1 AND rel_path = ?2 AND applied = 1 AND kept = 0",
+                params![session_id, rel],
+            )?;
+        }
+        Ok(restored)
+    }
+
+    fn restore(&self, rel: &str, existed: bool, before: Option<&[u8]>) -> Result<()> {
+        let abs = self.abs_path(rel);
+        if existed {
+            if let Some(bytes) = before {
+                if let Some(parent) = abs.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                std::fs::write(&abs, bytes).with_context(|| format!("restore {rel} failed"))?;
+            }
+        } else {
+            let _ = std::fs::remove_file(&abs);
+        }
+        Ok(())
     }
 
     /// Load before/after text for each applied change in a turn (for inline diffs).
@@ -290,18 +447,7 @@ impl FileJournal {
             if !restored_paths.insert(rel.clone()) {
                 continue;
             }
-            let abs = self.abs_path(rel);
-            if *existed {
-                if let Some(bytes) = before {
-                    if let Some(parent) = abs.parent() {
-                        let _ = std::fs::create_dir_all(parent);
-                    }
-                    std::fs::write(&abs, bytes).with_context(|| format!("restore {rel} failed"))?;
-                }
-            } else {
-                // File was created by the agent — remove it to undo.
-                let _ = std::fs::remove_file(&abs);
-            }
+            self.restore(rel, *existed, before.as_deref())?;
             restored.push(rel.clone());
         }
 
@@ -414,6 +560,44 @@ mod undo_tests {
             std::fs::read(dir.path().join("b.txt")).unwrap(),
             b"other-session"
         );
+    }
+    #[test]
+    fn pending_reconciles_with_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
+        std::fs::write(dir.path().join("same.txt"), b"x").unwrap();
+        std::fs::write(dir.path().join("gone.txt"), b"keep me").unwrap();
+        journal.begin_turn("a");
+        change(&journal, "a", "1", "tmp_test.py", b"print(1)", true);
+        std::fs::remove_file(dir.path().join("tmp_test.py")).unwrap();
+        change(&journal, "a", "2", "same.txt", b"y", true);
+        change(&journal, "a", "3", "same.txt", b"x", true);
+        change(&journal, "a", "4", "gone.txt", b"edited", true);
+        std::fs::remove_file(dir.path().join("gone.txt")).unwrap();
+        journal.begin_turn("a");
+        change(&journal, "a", "5", "new.txt", b"n", true);
+        let pending = journal.list_pending("a").unwrap();
+        let got: Vec<(&str, &str)> = pending
+            .iter()
+            .map(|c| (c.rel_path.as_str(), c.status.as_str()))
+            .collect();
+        assert_eq!(got, vec![("new.txt", "added"), ("gone.txt", "deleted")]);
+    }
+    #[test]
+    fn keep_and_undo_by_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
+        std::fs::write(dir.path().join("a.txt"), b"orig").unwrap();
+        journal.begin_turn("s");
+        change(&journal, "s", "1", "a.txt", b"one", true);
+        change(&journal, "s", "2", "b.txt", b"new", true);
+        journal.keep_paths("s", Some(&["a.txt".to_string()])).unwrap();
+        journal.begin_turn("s");
+        change(&journal, "s", "3", "a.txt", b"two", true);
+        assert_eq!(journal.undo_paths("s", None).unwrap().len(), 2);
+        assert_eq!(std::fs::read(dir.path().join("a.txt")).unwrap(), b"one");
+        assert!(!dir.path().join("b.txt").exists());
+        assert!(journal.list_pending("s").unwrap().is_empty());
     }
 }
 

@@ -11,9 +11,9 @@ import type { GitFileStatus } from "../workspaces/codez/types";
 import type { JournalChange } from "../services/tauri/chat";
 import { perfCounters } from "../utils/perfCounters";
 
+/** Agent edits awaiting Keep/Undo for a session (independent of git). */
 export interface PendingReview {
   sessionId: string;
-  turnId: string;
   changes: JournalChange[];
 }
 
@@ -24,6 +24,8 @@ type RefreshHandler = () => void | Promise<unknown>;
 export interface ProjectEdgeState {
   gitChanges: GitFileStatus[];
   artifacts: string[];
+  /** Session the artifact paths belong to (resolves relative paths). */
+  artifactsSessionId: string | null;
   pendingReview: PendingReview | null;
   previewPath: string | null;
   agentTurnBusy: boolean;
@@ -44,7 +46,7 @@ export interface ProjectEdgeActions {
     force?: boolean;
   }) => void;
   setAgentTurnBusy: (busy: boolean) => void;
-  setArtifacts: (paths: string[]) => void;
+  setArtifacts: (paths: string[], sessionId?: string | null) => void;
   setPendingReview: (review: PendingReview | null) => void;
   setPreviewPath: (path: string | null) => void;
   onSelectPath: (path: string) => void;
@@ -76,6 +78,7 @@ export function ProjectEdgeProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef<ProjectEdgeState>({
     gitChanges: [],
     artifacts: [],
+    artifactsSessionId: null,
     pendingReview: null,
     previewPath: null,
     agentTurnBusy: false,
@@ -164,8 +167,11 @@ export function ProjectEdgeProvider({ children }: { children: ReactNode }) {
       setAgentTurnBusy: (busy) => {
         if (stateRef.current.agentTurnBusy !== busy) update({ agentTurnBusy: busy });
       },
-      setArtifacts: (paths) => {
-        if (!sameStrings(stateRef.current.artifacts, paths)) update({ artifacts: paths });
+      setArtifacts: (paths, sessionId = null) => {
+        const cur = stateRef.current;
+        if (!sameStrings(cur.artifacts, paths) || cur.artifactsSessionId !== sessionId) {
+          update({ artifacts: paths, artifactsSessionId: sessionId });
+        }
       },
       setPendingReview: (review) => {
         if (stateRef.current.pendingReview !== review) update({ pendingReview: review });

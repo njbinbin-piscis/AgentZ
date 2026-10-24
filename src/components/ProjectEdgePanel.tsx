@@ -12,10 +12,17 @@ import "./ProjectEdgePanel.css";
 
 interface ProjectEdgePanelProps {
   projectDir: string | null;
-  onRefreshGit?: () => void;
-  onUndoReview?: () => Promise<void>;
+  /** Disk-verified artifact paths; falls back to the raw store list. */
+  artifacts?: string[];
+  onRefresh?: () => void;
+  /** Revert pending agent edits; no paths = all. */
+  onUndo?: (paths?: string[]) => Promise<void>;
+  /** Accept pending agent edits; no paths = all. */
+  onKeep?: (paths?: string[]) => Promise<void>;
   undoing?: boolean;
 }
+
+const STATUS_BADGE: Record<string, string> = { added: "A", modified: "M", deleted: "D" };
 
 type EdgeTabId = "changes" | "artifacts";
 
@@ -32,14 +39,16 @@ function dirname(p: string): string {
 
 export default function ProjectEdgePanel({
   projectDir,
-  onRefreshGit,
-  onUndoReview,
+  artifacts: verifiedArtifacts,
+  onRefresh,
+  onUndo,
+  onKeep,
   undoing = false,
 }: ProjectEdgePanelProps) {
   const { t } = useTranslation();
-  const { onSelectPath, setPendingReview, setPreviewPath } = useProjectEdgeActions();
-  const gitChanges = useProjectEdgeState((s) => s.gitChanges);
-  const artifacts = useProjectEdgeState((s) => s.artifacts);
+  const { onSelectPath, setPreviewPath } = useProjectEdgeActions();
+  const storeArtifacts = useProjectEdgeState((s) => s.artifacts);
+  const artifacts = verifiedArtifacts ?? storeArtifacts;
   const pendingReview = useProjectEdgeState((s) => s.pendingReview);
   const previewPath = useProjectEdgeState((s) => s.previewPath);
 
@@ -50,27 +59,21 @@ export default function ProjectEdgePanel({
   // the collectors, so time-desc is just the incoming order.
   const [artifactSort, setArtifactSort] = useState<ArtifactSortMode>("time-desc");
 
-  const hasChanges = gitChanges.length > 0 || pendingReview != null;
+  const pendingChanges = pendingReview?.changes ?? [];
+  const changesCount = pendingChanges.length;
+  const hasChanges = changesCount > 0;
   const hasArtifacts = artifacts.length > 0;
-
-  const changesCount = useMemo(() => {
-    const paths = new Set<string>();
-    for (const c of gitChanges) paths.add(c.path);
-    for (const c of pendingReview?.changes ?? []) paths.add(c.rel_path);
-    return paths.size;
-  }, [gitChanges, pendingReview]);
 
   const artifactsCount = artifacts.length;
 
   const badgeCount = useMemo(() => {
     const paths = new Set<string>();
-    for (const c of gitChanges) paths.add(c.path);
-    for (const c of pendingReview?.changes ?? []) paths.add(c.rel_path);
+    for (const c of pendingChanges) paths.add(c.rel_path);
     for (const p of artifacts) paths.add(p);
     return paths.size;
-  }, [gitChanges, pendingReview, artifacts]);
+  }, [pendingChanges, artifacts]);
 
-  const isPinned = pendingReview != null && !forceDismissed;
+  const isPinned = hasChanges && !forceDismissed;
   const isHidden = !hasChanges && !hasArtifacts;
 
   // Deduped in arrival order (newest first); no alphabetical re-sort here —
@@ -103,14 +106,14 @@ export default function ProjectEdgePanel({
   }, [setPreviewPath]);
 
   useEffect(() => {
-    if (!pendingReview && !hasChanges && !hasArtifacts) {
+    if (!hasChanges && !hasArtifacts) {
       setForceDismissed(false);
     }
-  }, [pendingReview, hasChanges, hasArtifacts]);
+  }, [hasChanges, hasArtifacts]);
 
   useEffect(() => {
-    if (pendingReview) setActiveTab("changes");
-  }, [pendingReview]);
+    if (hasChanges) setActiveTab("changes");
+  }, [hasChanges, pendingReview]);
 
   // If the changes tab has nothing to show but artifacts exist, land on artifacts.
   useEffect(() => {
@@ -144,17 +147,17 @@ export default function ProjectEdgePanel({
       >
         {activeTab === "changes" && (
           <>
-            {pendingReview && (
-              <div className="agentz-edge-review">
-                <span className="agentz-edge-review-title">
-                  {t("chat.reviewChanges", { count: pendingReview.changes.length })}
-                </span>
-                <div className="agentz-edge-review-actions">
+            <div className="agentz-edge-changes-toolbar">
+              {hasChanges && (
+                <>
+                  <span className="agentz-edge-review-title">
+                    {t("chat.reviewChanges", { count: changesCount })}
+                  </span>
                   <button
                     type="button"
                     className="agentz-edge-review-btn danger"
                     disabled={undoing}
-                    onClick={() => void onUndoReview?.()}
+                    onClick={() => void onUndo?.()}
                   >
                     {undoing ? t("chat.undoing") : t("chat.undoAll")}
                   </button>
@@ -162,62 +165,65 @@ export default function ProjectEdgePanel({
                     type="button"
                     className="agentz-edge-review-btn"
                     disabled={undoing}
-                    onClick={() => setPendingReview(null)}
+                    onClick={() => void onKeep?.()}
                   >
                     {t("chat.keepAll")}
                   </button>
-                </div>
-              </div>
-            )}
-            <div className="agentz-edge-changes-toolbar">
+                </>
+              )}
               <button
                 type="button"
                 className="agentz-edge-refresh"
-                onClick={() => onRefreshGit?.()}
-                title={t("agent.refreshGit")}
+                onClick={() => onRefresh?.()}
+                title={t("agent.refreshChanges")}
               >
-                ⟳
+                ?
               </button>
             </div>
-            {gitChanges.length > 0 ? (
-              <ul className="agentz-edge-changes-list">
-                {gitChanges.map((c) => (
-                  <li key={c.path}>
-                    <button
-                      type="button"
-                      className="agentz-edge-change"
-                      onClick={() => onSelectPath(c.path)}
-                      title={c.path}
-                    >
-                      <span className={`agentz-edge-change-badge ${c.status}`}>
-                        {c.status.slice(0, 1).toUpperCase()}
+            {hasChanges ? (
+              <ul className="agentz-edge-changes-list journal">
+                {pendingChanges.map((c) => {
+                  const deleted = c.status === "deleted";
+                  return (
+                    <li key={c.rel_path} className="agentz-edge-change-row">
+                      <button
+                        type="button"
+                        className="agentz-edge-change"
+                        disabled={deleted}
+                        onClick={() => onSelectPath(c.rel_path)}
+                        title={deleted ? `${c.rel_path} (${t("agent.changeDeleted")})` : c.rel_path}
+                      >
+                        <span className={`agentz-edge-change-badge ${c.status}`}>
+                          {STATUS_BADGE[c.status] ?? "M"}
+                        </span>
+                        <span className="agentz-edge-change-path">{basename(c.rel_path)}</span>
+                      </button>
+                      <span className="agentz-edge-change-actions">
+                        <button
+                          type="button"
+                          className="agentz-edge-change-act"
+                          disabled={undoing}
+                          title={t("chat.undo")}
+                          onClick={() => void onUndo?.([c.rel_path])}
+                        >
+                          ?
+                        </button>
+                        <button
+                          type="button"
+                          className="agentz-edge-change-act"
+                          disabled={undoing}
+                          title={t("chat.keep")}
+                          onClick={() => void onKeep?.([c.rel_path])}
+                        >
+                          ?
+                        </button>
                       </span>
-                      <span className="agentz-edge-change-path">{basename(c.path)}</span>
-                    </button>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <div className="agentz-edge-empty">{t("agent.noChanges")}</div>
-            )}
-            {pendingReview && pendingReview.changes.length > 0 && (
-              <ul className="agentz-edge-changes-list journal">
-                {pendingReview.changes.map((c) => (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      className="agentz-edge-change"
-                      onClick={() => onSelectPath(c.rel_path)}
-                      title={c.rel_path}
-                    >
-                      <span className={`agentz-edge-change-badge ${c.existed ? "edit" : "new"}`}>
-                        {c.existed ? "M" : "A"}
-                      </span>
-                      <span className="agentz-edge-change-path">{basename(c.rel_path)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
             )}
           </>
         )}
