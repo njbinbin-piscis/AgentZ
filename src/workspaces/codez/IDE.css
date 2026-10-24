@@ -476,8 +476,20 @@
   flex-wrap: nowrap;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   min-height: 34px;
+  scrollbar-width: thin;
+}
+
+.ide-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.ide-tabs::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
 }
 
 .ide-tab.browser-tab .tab-name::before {
@@ -489,11 +501,8 @@
 .ide-tab {
   display: flex;
   align-items: center;
-  flex: 1 1 0;
-  width: 0;
+  flex: 0 0 auto;
   padding: 0 12px;
-  min-width: 72px;
-  max-width: 200px;
   font-size: 13px;
   cursor: pointer;
   border-right: 1px solid var(--border);
@@ -528,11 +537,8 @@
 }
 
 .ide-tab .tab-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 auto;
 }
 
 .ide-tab .tab-dirty {
