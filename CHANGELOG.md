@@ -5,6 +5,20 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.12] - 2026-10-24
+
+### Changed
+
+- **Changes panel is an agent-edit review, separate from git.** It lists journaled `file_write` / `file_edit` changes still awaiting Keep or Undo across the whole session, netted against the pre-edit baseline and reconciled with disk. A file the agent created and later deleted, or edited back to its original bytes, no longer appears. Git status stays in the source-control view.
+- **Keep and Undo persist.** Per-file and keep-all / undo-all write a `kept` or `undone` mark in the file journal (older journal databases gain the column on open), so a refresh or restart does not bring accepted edits back.
+- **Artifacts only come from write-type tools** (`file_write`, `file_edit`, and similarly named producers). Reads, listings, and searches no longer add a directory or file. Refresh drops paths that are no longer regular files, and deleted change entries cannot be opened.
+
+### Fixed
+
+- Reading a project subdirectory no longer lists that directory as an artifact.
+- Temporary test files the agent wrote and then deleted stayed in both Changes and Artifacts, and Refresh did not clear them.
+- Clicking a change whose file was already gone opened the editor and reported that the file could not be found.
+
 ## [1.0.11] - 2026-10-22
 
 ### Added
