@@ -4,7 +4,7 @@ use rusqlite::{
     params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::Path, time::Duration};
+use std::{collections::BTreeMap, path::Path};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -411,7 +411,7 @@ impl BudgetStore {
             },
         )
         .map_err(error)?;
-        conn.busy_timeout(Duration::from_secs(5)).map_err(error)?;
+        crate::run::prepare_runs_connection(&conn, !readonly)?;
         {
             let tx = conn.transaction().map_err(error)?;
             run::validate_budget_store(&tx)?;

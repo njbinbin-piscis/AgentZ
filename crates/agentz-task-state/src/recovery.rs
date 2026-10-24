@@ -5,7 +5,7 @@ use crate::{
     run::{self, Execution},
 };
 use rusqlite::{params, Connection, OpenFlags, TransactionBehavior};
-use std::{path::Path, time::Duration};
+use std::path::Path;
 
 /// Trusted host assertion, never renderer/model supplied. The host must independently
 /// prove the captured execution owner cannot still execute. This crate cannot do so:
@@ -49,7 +49,7 @@ impl RecoveryStore {
             OpenFlags::SQLITE_OPEN_READ_WRITE,
         )
         .map_err(error)?;
-        conn.busy_timeout(Duration::from_secs(5)).map_err(error)?;
+        crate::run::prepare_runs_connection(&conn, true)?;
         {
             let tx = conn.transaction().map_err(error)?;
             run::validate_budget_store(&tx)?;

@@ -930,6 +930,43 @@ mod tests {
             .unwrap();
         assert_eq!(version, 99);
     }
+
+    #[test]
+    fn open_reader_does_not_block_event_append() {
+        let project = fixture();
+        let binding = agent_binding(&project.0);
+        let mut store = RunStore::open(&project.0).unwrap();
+        store.create("run", "task", "environment", "a1", 1).unwrap();
+        store
+            .transition("run", "a1", Execution::Queued, Execution::Running, 2)
+            .unwrap();
+        drop(store);
+        let mut reader = Connection::open_with_flags(
+            project.0.join(".agentz/runs.db"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        prepare_runs_connection(&reader, false).unwrap();
+        let tx = reader.transaction().unwrap();
+        let _: i64 = tx
+            .query_row("SELECT COUNT(*) FROM runs", [], |row| row.get(0))
+            .unwrap();
+        let mut writer = RunStore::open_existing_readwrite(&project.0).unwrap();
+        let started = std::time::Instant::now();
+        writer
+            .append_agent_event(
+                &binding,
+                "while-reading",
+                &serde_json::json!({"type":"text_delta","delta":"a"}),
+                3,
+            )
+            .unwrap();
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "event append waited on an open reader"
+        );
+        drop(tx);
+    }
 }
 impl Execution {
     fn terminal(self) -> bool {
@@ -1027,6 +1064,23 @@ pub struct Attempt {
 fn err(error: impl std::fmt::Display) -> String {
     format!("run store: {error}")
 }
+
+/// Events, budget and reservations share `runs.db` for a whole turn. Rollback
+/// journal mode lets one of those connections hold the file until
+/// `busy_timeout` expires, which surfaces as "database is locked" and aborts
+/// the turn. WAL lets a writer proceed while another connection is reading.
+pub(crate) fn prepare_runs_connection(conn: &Connection, writable: bool) -> Result<(), String> {
+    conn.busy_timeout(Duration::from_secs(15)).map_err(err)?;
+    if writable {
+        let mode: String = conn
+            .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))
+            .unwrap_or_default();
+        if mode.eq_ignore_ascii_case("wal") {
+            let _ = conn.pragma_update(None, "synchronous", "NORMAL");
+        }
+    }
+    Ok(())
+}
 fn id(value: &str) -> Result<(), String> {
     if value.is_empty()
         || value.len() > 256
@@ -1056,7 +1110,7 @@ impl RunStore {
         let project = PathBuf::from(super::canonical_root(project)?);
         let mut conn =
             Connection::open_with_flags(project.join(".agentz/runs.db"), flags).map_err(err)?;
-        conn.busy_timeout(Duration::from_secs(5)).map_err(err)?;
+        prepare_runs_connection(&conn, !flags.contains(rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY))?;
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(err)?;
@@ -1080,7 +1134,7 @@ impl RunStore {
         let directory = project.join(".agentz");
         std::fs::create_dir_all(&directory).map_err(err)?;
         let mut conn = Connection::open(directory.join("runs.db")).map_err(err)?;
-        conn.busy_timeout(Duration::from_secs(5)).map_err(err)?;
+        prepare_runs_connection(&conn, true)?;
         conn.pragma_update(None, "foreign_keys", true)
             .map_err(err)?;
         let version: i64 = conn

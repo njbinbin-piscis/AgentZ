@@ -9,7 +9,7 @@ use rusqlite::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{path::Path, time::Duration};
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -568,7 +568,7 @@ impl ReservationStore {
             },
         )
         .map_err(error)?;
-        conn.busy_timeout(Duration::from_secs(5)).map_err(error)?;
+        crate::run::prepare_runs_connection(&conn, !readonly)?;
         {
             let tx = conn.transaction().map_err(error)?;
             run::validate_budget_store(&tx)?;

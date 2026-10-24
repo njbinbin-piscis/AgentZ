@@ -5,7 +5,7 @@ use rusqlite::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{path::Path, time::Duration};
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -372,17 +372,21 @@ mod tests {
         assert_eq!(s.query("task", "send-1").unwrap().unwrap(), a);
         c.execute_batch("DROP TABLE durable_events;DROP TABLE durable_event_schema;")
             .unwrap();
-        let before = std::fs::read(f.path.join(".agentz/runs.db")).unwrap();
+        let db = f.path.join(".agentz/runs.db");
+        c.execute_batch("PRAGMA wal_checkpoint(FULL);").unwrap();
+        let before = std::fs::read(&db).unwrap();
         let mut other = Fixture::scope();
         other.action_key = "send-2".into();
         assert!(s.prepare(other, &f.binding, 4).is_err());
         assert!(s.query("task", "send-2").unwrap().is_none());
         drop(c);
         drop(s);
-        assert_eq!(
-            std::fs::read(f.path.join(".agentz/runs.db")).unwrap(),
-            before
-        );
+        let checkpoint = Connection::open(&db).unwrap();
+        checkpoint
+            .execute_batch("PRAGMA wal_checkpoint(FULL);")
+            .unwrap();
+        drop(checkpoint);
+        assert_eq!(std::fs::read(&db).unwrap(), before);
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -615,7 +619,10 @@ impl ExternalActionStore {
         let mut conn =
             Connection::open_with_flags(Path::new(&project).join(".agentz/runs.db"), flags)
                 .map_err(err)?;
-        conn.busy_timeout(Duration::from_secs(5)).map_err(err)?;
+        crate::run::prepare_runs_connection(
+            &conn,
+            !flags.contains(OpenFlags::SQLITE_OPEN_READ_ONLY),
+        )?;
         {
             let tx = conn.transaction().map_err(err)?;
             layout(&tx)?;
