@@ -22,6 +22,7 @@ import WorkzDirSection from "./settings/WorkzDirSection";
 import AppChangesSection from "./settings/AppChangesSection";
 import RemoteSection from "./settings/RemoteSection";
 import DiagnosticsSection from "./settings/DiagnosticsSection";
+import DelegationSection from "./settings/DelegationSection";
 import DropdownSelect from "../../components/DropdownSelect";
 import "./SettingsPanel.css";
 
@@ -556,6 +557,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     {t("settings.configDirHint")}
                   </div>
 
+                  <DelegationSection />
                   <DiagnosticsSection />
                 </div>
 

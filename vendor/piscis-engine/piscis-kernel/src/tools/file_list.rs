@@ -1,6 +1,7 @@
 /// File list tool — structured directory listing returned as JSON.
 /// Unlike `shell cmd dir`, this returns machine-readable structured data the LLM can parse directly.
 use crate::agent::tool::{Tool, ToolContext, ToolResult};
+use crate::path_text::{display_path, display_path_under, os_text};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -76,13 +77,13 @@ impl Tool for FileListTool {
         if !path.exists() {
             return Ok(ToolResult::err(format!(
                 "Path does not exist: {}",
-                path.display()
+                display_path(&path)
             )));
         }
         if !path.is_dir() {
             return Ok(ToolResult::err(format!(
                 "Not a directory: {}",
-                path.display()
+                display_path(&path)
             )));
         }
 
@@ -105,7 +106,7 @@ impl Tool for FileListTool {
         if entries.is_empty() {
             return Ok(ToolResult::ok(format!(
                 "Directory is empty: {}",
-                path.display()
+                display_path(&path)
             )));
         }
 
@@ -118,7 +119,7 @@ impl Tool for FileListTool {
         };
 
         let result = json!({
-            "path": path.display().to_string(),
+            "path": display_path(&path),
             "total_entries": total,
             "truncated": truncated,
             "entries": entries
@@ -166,7 +167,7 @@ fn collect_entries(
         }
 
         let path = entry.path();
-        let name = entry.file_name().to_string_lossy().to_string();
+        let name = os_text(&entry.file_name());
 
         // Skip hidden files unless requested
         if !include_hidden && name.starts_with('.') {
@@ -196,13 +197,10 @@ fn collect_entries(
                 dt.format("%Y-%m-%d %H:%M").to_string()
             });
 
-        let rel_path = path.strip_prefix(root).unwrap_or(&path);
-        let rel_str = rel_path.to_string_lossy().replace('\\', "/");
-
         let mut entry_json = json!({
             "name": name,
-            "path": path.display().to_string(),
-            "relative_path": rel_str,
+            "path": display_path(&path),
+            "relative_path": display_path_under(&path, root),
             "type": if is_dir { "directory" } else { "file" },
         });
 

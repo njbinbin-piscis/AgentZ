@@ -29,8 +29,9 @@ describe("modeShortcutTarget", () => {
     expect(modeShortcutTarget(ev({ key: "m", ctrlKey: true, shiftKey: true }))).toBeNull();
   });
 
-  it("ignores ambiguous combinations with both Shift and Alt", () => {
-    expect(modeShortcutTarget(ev({ ctrlKey: true, shiftKey: true, altKey: true }))).toBeNull();
+  it("Ctrl+Shift+Alt+N opens the Bots window (botz)", () => {
+    expect(modeShortcutTarget(ev({ ctrlKey: true, shiftKey: true, altKey: true }))).toBe("botz");
+    expect(modeShortcutTarget(ev({ key: "˜", code: "KeyN", metaKey: true, shiftKey: true, altKey: true }))).toBe("botz");
   });
 });
 
@@ -40,5 +41,6 @@ describe("modeShortcutLabel", () => {
     expect(modeShortcutLabel("workz", false)).toBe("Ctrl+Alt+N");
     expect(modeShortcutLabel("codez", true)).toBe("⌘⇧N");
     expect(modeShortcutLabel("workz", true)).toBe("⌘⌥N");
+    expect(modeShortcutLabel("botz", false)).toBe("Ctrl+Shift+Alt+N");
   });
 });

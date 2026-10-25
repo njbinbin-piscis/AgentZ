@@ -115,7 +115,10 @@ impl Tool for CodeRunTool {
 
         if !cwd.exists() {
             return recovery_error(
-                format!("Working directory does not exist: {}", cwd.display()),
+                format!(
+                    "Working directory does not exist: {}",
+                    crate::path_text::display_path(&cwd)
+                ),
                 ctx,
                 false,
             );
@@ -378,7 +381,7 @@ impl Tool for CodeRunTool {
                 exit_code,
                 status_label,
                 duration_ms,
-                cwd.display()
+                crate::path_text::display_path(&cwd)
             )];
             if !stdout.is_empty() {
                 parts.push(format!("--- stdout ---\n{}", stdout));
@@ -398,7 +401,7 @@ impl Tool for CodeRunTool {
                 ) {
                     parts.push(format!(
                         "Full output saved to {} — inspect omitted parts with file_read (offset/limit) or file_search instead of re-running.",
-                        path.display()
+                        crate::path_text::display_path(&path)
                     ));
                 }
             }

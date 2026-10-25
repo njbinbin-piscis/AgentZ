@@ -104,6 +104,9 @@ fn agent(
         max_iterations: 0,
         task_timeout_secs: 0,
         koi_id: None,
+        tool_allowlist: Vec::new(),
+        permission_mode: String::new(),
+        delegable: false,
     }
 }
 

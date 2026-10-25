@@ -20,8 +20,8 @@ import type {
 // ─── File operations ─────────────────────────────────────────────────────
 
 export const ideApi = {
-  listFiles: (projectDir: string, depth?: number) =>
-    invoke<FileNode[]>("ide_list_files", { projectDir, depth }),
+  listFiles: (projectDir: string, depth?: number, showHidden?: boolean) =>
+    invoke<FileNode[]>("ide_list_files", { projectDir, depth, showHidden }),
 
   readFile: (path: string) => invoke<FileContent>("ide_read_file", { path }),
 

@@ -174,7 +174,7 @@ impl ProcessControlTool {
                         ) {
                             parts.push(format!(
                                 "Full output saved to {} — inspect omitted parts with file_read (offset/limit) or file_search instead of re-running.",
-                                path.display()
+                                crate::path_text::display_path(&path)
                             ));
                         }
                     }

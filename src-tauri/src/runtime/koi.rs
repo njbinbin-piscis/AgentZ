@@ -21,7 +21,7 @@ use uuid::Uuid;
 
 use piscis_core::host::{
     EventSink, HeadlessCliMode, HeadlessCliRequest, KoiTurnExit, KoiTurnHandle, KoiTurnOutcome,
-    KoiTurnRequest, PoolEvent, PoolEventSink, SubagentRuntime,
+    KoiTurnRequest, PoolEvent, PoolEventSink, SubagentRuntime, TodoChangeAction,
 };
 use piscis_core::koi_prompt::build_koi_task_system_prompt;
 use piscis_kernel::agent::tool::ToolRegistry;
@@ -57,6 +57,11 @@ impl TauriPoolEventSink {
 
 impl PoolEventSink for TauriPoolEventSink {
     fn emit_pool(&self, event: &PoolEvent) {
+        if let PoolEvent::TodoChanged { action, .. } = event {
+            if matches!(action, TodoChangeAction::Completed | TodoChangeAction::Cancelled) {
+                crate::runtime::patrol::kick_pool_patrols();
+            }
+        }
         let payload = serde_json::to_value(event).unwrap_or(Value::Null);
         let _ = self.app.emit(POOL_EVENT_CHANNEL, payload);
     }

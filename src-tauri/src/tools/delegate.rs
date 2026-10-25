@@ -98,8 +98,13 @@ impl Tool for DelegateTool {
             Ok(text) if text.trim().is_empty() => Ok(ToolResult::ok(
                 "[sub-agent returned no findings]".to_string(),
             )),
-            Ok(text) => Ok(ToolResult::ok(format!("Sub-agent findings:\n\n{text}"))),
-            Err(e) => Ok(ToolResult::err(format!("delegate failed: {e}"))),
+            Ok(text) => Ok(ToolResult::ok(format!(
+                "Sub-agent findings:\n\n{}",
+                crate::runtime::subagent_policy::cap_report(&text, 12_000)
+            ))),
+            Err(e) => Ok(ToolResult::err(crate::commands::delegation::explain_failure(
+                &e.to_string(),
+            ))),
         }
     }
 }

@@ -67,6 +67,15 @@ fn parse_tool_calls(message: &Value) -> Result<Vec<ToolCall>> {
     for tc in tcs {
         let id = tc["id"].as_str().unwrap_or("").to_string();
         let name = tc["function"]["name"].as_str().unwrap_or("").to_string();
+        if name.trim().is_empty() {
+            tracing::warn!("dropping tool call with empty name (id={})", id);
+            continue;
+        }
+        let id = if id.is_empty() {
+            format!("call_synth_{}", tool_calls.len())
+        } else {
+            id
+        };
         let args_str = tc["function"]["arguments"].as_str().unwrap_or("");
         match serde_json::from_str::<Value>(args_str) {
             Ok(input) => tool_calls.push(ToolCall { id, name, input }),
@@ -194,7 +203,24 @@ async fn emit_buffered_tool_calls(
     tool_bufs: &mut std::collections::HashMap<usize, (String, String, String)>,
     tx: &Sender<LlmChunk>,
 ) {
-    for (_, (id, name, args_buf)) in tool_bufs.drain() {
+    // Deterministic order (HashMap drain is random).
+    let mut entries: Vec<_> = tool_bufs.drain().collect();
+    entries.sort_by_key(|(idx, _)| *idx);
+    for (idx, (id, name, args_buf)) in entries {
+        if name.trim().is_empty() {
+            tracing::warn!(
+                "dropping streamed tool call with empty name (index={} id={} args_len={})",
+                idx,
+                id,
+                args_buf.len()
+            );
+            continue;
+        }
+        let id = if id.is_empty() {
+            format!("call_synth_{idx}")
+        } else {
+            id
+        };
         let _ = tx.send(parse_streamed_tool_call(id, name, args_buf)).await;
     }
 }
@@ -736,6 +762,17 @@ impl OpenAiClient {
                             match block {
                                 ContentBlock::Text { text } => text_content.push_str(text),
                                 ContentBlock::ToolUse { id, name, input } => {
+                                    // Providers (e.g. mimo) reject tool_calls with an
+                                    // empty function name (400 "missing a function name").
+                                    // Such calls come from malformed model output; drop
+                                    // them (their orphaned results are dropped below).
+                                    if name.trim().is_empty() {
+                                        tracing::warn!(
+                                            "convert_messages: dropping tool_call with empty name (id={})",
+                                            id
+                                        );
+                                        continue;
+                                    }
                                     pending_tool_ids.insert(id.clone());
                                     tool_calls.push(json!({
                                         "id": id,
@@ -752,15 +789,25 @@ impl OpenAiClient {
                             }
                         }
 
-                        let mut msg = json!({
-                            "role": "assistant",
-                            "tool_calls": tool_calls,
-                            "content": Value::Null
-                        });
-                        if !text_content.is_empty() {
-                            msg["content"] = json!(text_content);
+                        if tool_calls.is_empty() {
+                            // Every call was dropped as invalid; keep only the text.
+                            if !text_content.is_empty() {
+                                result.push(json!({
+                                    "role": "assistant",
+                                    "content": text_content
+                                }));
+                            }
+                        } else {
+                            let mut msg = json!({
+                                "role": "assistant",
+                                "tool_calls": tool_calls,
+                                "content": Value::Null
+                            });
+                            if !text_content.is_empty() {
+                                msg["content"] = json!(text_content);
+                            }
+                            result.push(msg);
                         }
-                        result.push(msg);
                     } else {
                         // Regular user/assistant message — may contain text + images.
                         let mut parts: Vec<Value> = Vec::new();
@@ -1055,14 +1102,20 @@ impl LlmClient for OpenAiClient {
                                     for tc in tool_calls {
                                         any_output_sent = true;
                                         let idx = tc["index"].as_u64().unwrap_or(0) as usize;
-                                        let entry = tool_bufs.entry(idx).or_insert_with(|| {
-                                            let id = tc["id"].as_str().unwrap_or("").to_string();
-                                            let name = tc["function"]["name"]
-                                                .as_str()
-                                                .unwrap_or("")
-                                                .to_string();
-                                            (id, name, String::new())
-                                        });
+                                        let entry = tool_bufs
+                                            .entry(idx)
+                                            .or_insert_with(|| (String::new(), String::new(), String::new()));
+                                        // id/name may arrive in a later delta than the first.
+                                        if entry.0.is_empty() {
+                                            if let Some(id) = tc["id"].as_str() {
+                                                entry.0 = id.to_string();
+                                            }
+                                        }
+                                        if entry.1.is_empty() {
+                                            if let Some(n) = tc["function"]["name"].as_str() {
+                                                entry.1 = n.to_string();
+                                            }
+                                        }
                                         if let Some(args) = tc["function"]["arguments"].as_str() {
                                             entry.2.push_str(args);
                                         }
@@ -1486,6 +1539,38 @@ mod tests {
         });
         let err = parse_tool_calls(&message).expect_err("missing arguments must error");
         assert!(err.to_string().contains("tool_args_invalid"));
+    }
+
+    #[test]
+    fn parse_tool_calls_drops_empty_name_and_synthesizes_id() {
+        let message = json!({
+            "tool_calls": [
+                {"id": "a", "function": {"name": "", "arguments": "{}"}},
+                {"function": {"name": "search", "arguments": "{}"}}
+            ]
+        });
+        let calls = parse_tool_calls(&message).expect("ok");
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].name, "search");
+        assert!(!calls[0].id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn emit_buffered_drops_empty_name_and_orders_by_index() {
+        let mut bufs = std::collections::HashMap::new();
+        bufs.insert(1usize, ("b".into(), "t2".into(), "{}".into()));
+        bufs.insert(0usize, ("a".into(), "t1".into(), "{}".into()));
+        bufs.insert(2usize, ("c".into(), "".into(), "{}".into()));
+        let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+        emit_buffered_tool_calls(&mut bufs, &tx).await;
+        drop(tx);
+        let mut names = Vec::new();
+        while let Some(c) = rx.recv().await {
+            if let LlmChunk::ToolUse { name, .. } = c {
+                names.push(name);
+            }
+        }
+        assert_eq!(names, vec!["t1", "t2"]);
     }
 
     #[test]

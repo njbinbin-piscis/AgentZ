@@ -63,6 +63,17 @@ pub struct AgentManifest {
     /// reference for team membership.
     #[serde(default)]
     pub koi_id: Option<String>,
+    /// Real tool allowlist applied when this agent runs as a delegated
+    /// sub-agent. Empty means the manifest imposes no restriction (unlike
+    /// `tools`, which only adds tools).
+    #[serde(default)]
+    pub tool_allowlist: Vec<String>,
+    /// `read_only` (default), `ask`, or `inherit`. Used when delegated.
+    #[serde(default)]
+    pub permission_mode: String,
+    /// Whether the main agent may delegate to this agent. Default false.
+    #[serde(default)]
+    pub delegable: bool,
 }
 
 impl AgentManifest {
@@ -146,7 +157,7 @@ fn list_manifest_dirs(dir: &Path) -> Vec<PathBuf> {
     dirs
 }
 
-fn load_all_manifests(dir: &Path) -> Vec<AgentManifest> {
+pub(crate) fn load_all_manifests(dir: &Path) -> Vec<AgentManifest> {
     let mut out = Vec::new();
     for mdir in list_manifest_dirs(dir) {
         match AgentManifest::load(&mdir.join("agent.json")) {
@@ -463,6 +474,33 @@ fn command_sandbox_catalog_hint() -> &'static str {
 #[tauri::command]
 pub fn agents_list_builtin_tools() -> Vec<BuiltinToolInfo> {
     builtin_tool_catalog()
+}
+
+#[cfg(test)]
+mod delegation_manifest_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_manifest_loads_with_safe_delegation_defaults() {
+        let m: AgentManifest =
+            serde_json::from_str(r#"{"id":"a","name":"A","tools":["file_read"]}"#).unwrap();
+        assert!(m.tool_allowlist.is_empty());
+        assert!(m.permission_mode.is_empty());
+        assert!(!m.delegable);
+        assert_eq!(m.tools, vec!["file_read".to_string()], "`tools` stays additive");
+    }
+
+    #[test]
+    fn delegation_fields_round_trip() {
+        let m: AgentManifest = serde_json::from_str(
+            r#"{"id":"a","name":"A","tool_allowlist":["file_read"],"permission_mode":"ask","delegable":true}"#,
+        )
+        .unwrap();
+        let back: AgentManifest = serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
+        assert_eq!(back.tool_allowlist, vec!["file_read".to_string()]);
+        assert_eq!(back.permission_mode, "ask");
+        assert!(back.delegable);
+    }
 }
 
 #[cfg(test)]

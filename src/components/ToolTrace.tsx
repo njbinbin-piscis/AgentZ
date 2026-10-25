@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toolIcon, toolSummary } from "./toolDisplay";
 import { fileEditDiff, type FileEditDiff } from "./fileEditDiff";
+import { isSubagentCall, parseSubagent } from "./subagentCard";
 import "./ToolTrace.css";
+import "./SubagentCard.css";
 
 /** Normalized tool-call record shared by the CodeZ and WorkZ event streams. */
 export interface ToolTraceItem {
@@ -258,17 +260,88 @@ export function FileEditCard({ item, diff }: { item: ToolTraceItem; diff: FileEd
  * text segment leaves this block in place and starts a new one. Successful
  * or running file edits are shown as separate edit cards below the batch.
  */
+/** Delegated sub-agent run: its steps stay out of the main context; only the report returns. */
+export function SubagentCard({ item }: { item: ToolTraceItem }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const view = parseSubagent(item);
+  const statusText =
+    item.status === "running"
+      ? t("chat.subagentRunning")
+      : item.status === "error"
+        ? t("chat.subagentFailed")
+        : t("chat.subagentDone");
+  return (
+    <div className={`agentz-subagent-card is-${item.status}`} data-testid="subagent-card">
+      <button
+        type="button"
+        className="agentz-subagent-head"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span className="agentz-tool-trace-status">
+          {item.status === "running" ? (
+            <span className="agentz-tool-trace-spinner" />
+          ) : item.status === "error" ? (
+            "✕"
+          ) : (
+            "✓"
+          )}
+        </span>
+        <span className="agentz-subagent-name">{view.agent || item.name}</span>
+        <span className="agentz-subagent-brief" title={view.brief}>
+          {view.brief}
+        </span>
+        <span className="agentz-subagent-meta">
+          {statusText}
+          {view.toolCalls !== null && ` · ${t("chat.subagentToolCalls", { count: view.toolCalls })}`}
+          {view.tokens !== null && ` · ${t("chat.subagentTokens", { count: view.tokens })}`}
+          {view.cached && ` · ${t("chat.subagentCached")}`}
+          {view.fallback && ` · ${t("chat.subagentFallback")}`}
+        </span>
+        <span className="agentz-tool-trace-chevron" aria-hidden>
+          {expanded ? "▾" : "▸"}
+        </span>
+      </button>
+      {expanded && (
+        <div className="agentz-subagent-body">
+          <span className="agentz-tool-trace-label">{t("chat.subagentBrief")}</span>
+          <pre className="agentz-tool-trace-pre">{view.brief}</pre>
+          {item.status !== "running" && view.report && (
+            <>
+              <span
+                className={`agentz-tool-trace-label${item.status === "error" ? " is-error" : ""}`}
+              >
+                {t("chat.subagentReport")}
+              </span>
+              <pre className={`agentz-tool-trace-pre${item.status === "error" ? " is-error" : ""}`}>
+                {view.report}
+              </pre>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ToolTrace({ items }: { items: ToolTraceItem[] }) {
-  const edits = items.flatMap((item) => {
+  const subagents = items.filter((item) => isSubagentCall(item));
+  const subagentIds = new Set(subagents.map((s) => s.id));
+  const rest = items.filter((item) => !subagentIds.has(item.id));
+  const edits = rest.flatMap((item) => {
     if (item.status === "error") return [];
     const diff = fileEditDiff(item.name, item.input);
     return diff ? [{ item, diff }] : [];
   });
   const editIds = new Set(edits.map((e) => e.item.id));
-  const others = items.filter((item) => !editIds.has(item.id));
+  const others = rest.filter((item) => !editIds.has(item.id));
   return (
     <>
       {others.length > 0 && <ToolBatch items={others} />}
+      {subagents.map((item) => (
+        <SubagentCard key={item.id} item={item} />
+      ))}
       {edits.map(({ item, diff }) => (
         <FileEditCard key={item.id} item={item} diff={diff} />
       ))}

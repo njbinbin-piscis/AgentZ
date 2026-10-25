@@ -116,6 +116,45 @@ created: "{date}"
     )
 }
 
+/// Canonical step skeleton quoted in validation errors so the model can fix
+/// the format in one retry instead of guessing.
+pub const STEP_FORMAT_HINT: &str = "每个步骤必须是行首恰为两个 # 的标题，形如 `## Step 1: step-id — 标题`（不是 `### Step`、不是 `Step 1.`），\
+标题下用加粗字段行：`- **状态**: pending` / `- **描述**: …` / `- **依赖**: …` / `- **预期产物**: …` / `- **验收证据**: …` / `- **执行记录**: …`。";
+
+fn step_heading_level(line: &str) -> Option<usize> {
+    let hashes = line.chars().take_while(|c| *c == '#').count();
+    if !(2..=6).contains(&hashes) {
+        return None;
+    }
+    let rest = line[hashes..].trim_start();
+    let rest = rest.strip_prefix("Step").or_else(|| rest.strip_prefix("步骤"))?;
+    rest.trim_start().chars().next().filter(|c| c.is_ascii_digit())?;
+    Some(hashes)
+}
+
+/// Normalize near-miss step headings (`### Step 1`, `## 步骤 1`, `##Step 1`) to
+/// the canonical `## Step N` form. Fenced code blocks are left untouched.
+pub fn normalize_plan_content(content: &str) -> String {
+    let mut out = String::with_capacity(content.len());
+    let mut in_fence = false;
+    for line in content.lines() {
+        if line.trim_start().starts_with("```") {
+            in_fence = !in_fence;
+        }
+        if !in_fence && step_heading_level(line).is_some() {
+            let hashes = line.chars().take_while(|c| *c == '#').count();
+            let rest = line[hashes..].trim_start();
+            let rest = rest.strip_prefix("步骤").map(|r| format!("Step{r}")).unwrap_or_else(|| rest.to_string());
+            out.push_str("## ");
+            out.push_str(&rest);
+        } else {
+            out.push_str(line);
+        }
+        out.push('\n');
+    }
+    out
+}
+
 /// Lightweight structural validation for plan markdown before write.
 pub fn validate_plan_content(content: &str) -> Result<(), String> {
     let trimmed = content.trim();
@@ -123,11 +162,11 @@ pub fn validate_plan_content(content: &str) -> Result<(), String> {
         return Err("计划内容过短，请按模板填写完整计划".into());
     }
     if !trimmed.contains("# 执行步骤") && !trimmed.contains("## Step") {
-        return Err("计划必须包含「# 执行步骤」章节，且每步以 `## Step N:` 标题组织".into());
+        return Err(format!("计划必须包含「# 执行步骤」章节。{STEP_FORMAT_HINT}"));
     }
     let step_count = trimmed.lines().filter(|l| l.starts_with("## Step")).count();
     if step_count == 0 {
-        return Err("至少定义 1 个原子步骤（`## Step N: id — 标题`）".into());
+        return Err(format!("至少定义 1 个原子步骤。{STEP_FORMAT_HINT}"));
     }
     for (i, block) in split_step_blocks(trimmed).iter().enumerate() {
         let n = i + 1;
@@ -184,6 +223,16 @@ mod tests {
     fn validate_rejects_missing_steps() {
         let body = "# 任务概述\n\nx\n\n# 前置调研\n\ny\n\n# 执行步骤\n\n(no steps yet)";
         assert!(validate_plan_content(body).is_err());
+    }
+
+    #[test]
+    fn normalize_fixes_h3_step_headings_but_not_code_fences() {
+        let body = "# 执行步骤\n\n### Step 1: a — 标题\n- **状态**: x\n- **描述**: d\n- **预期产物**: p\n- **验收证据**: e\n\n```\n### Step 9: keep\n```\n\n## 步骤 2: b — 二\n- **状态**: x\n- **描述**: d\n- **预期产物**: p\n- **验收证据**: e\n";
+        let n = normalize_plan_content(body);
+        assert!(n.contains("\n## Step 1: a"));
+        assert!(n.contains("\n### Step 9: keep"));
+        assert!(n.contains("\n## Step 2: b"));
+        validate_plan_content(&n).expect("normalized plan validates");
     }
 
     #[test]

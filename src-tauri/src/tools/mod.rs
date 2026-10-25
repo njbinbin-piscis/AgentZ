@@ -9,6 +9,7 @@ pub mod chat_ui_patch;
 pub mod chat_ui_schema;
 pub mod codebase_search;
 pub mod delegate;
+pub mod task;
 pub mod devenv;
 pub mod durable_plan_todo;
 pub mod graph_explore;

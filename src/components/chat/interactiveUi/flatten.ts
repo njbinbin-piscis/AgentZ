@@ -8,6 +8,7 @@ export function flattenBlocks(blocks: UiBlock[]): UiBlock[] {
       case "row":
       case "column":
       case "card":
+      case "section":
         if (block.blocks?.length) out.push(...flattenBlocks(block.blocks));
         break;
       default:

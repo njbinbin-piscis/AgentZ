@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getProjectScope, pickProjectScope, restoreProjectScope, revokeProjectScope } from "./services/tauri/projectScope";
 import { isRemoteDir, OPEN_PROJECT_EVENT } from "./extensions/remoteTargets";
+import LocationBadge, { RemoteBoundaryBanner } from "./components/LocationBadge";
 import { preflightWorkspaceNavigation } from "./services/workspaceNavigation";
 import {
   workspaceLoad,
@@ -48,6 +49,8 @@ import {
 import { syncEditorThemeWithAppearance } from "./workspaces/codez/themeStore";
 import CodeZWorkspace from "./workspaces/codez";
 import WorkZWorkspace, { type WikiBuildAction } from "./workspaces/workz";
+import BotZWorkspace from "./workspaces/botz";
+import BotRoutineRunner from "./workspaces/botz/BotRoutineRunner";
 import SettingsPanel from "./workspaces/codez/SettingsPanel";
 import { OPEN_SETTINGS_EVENT, SETTINGS_CLOSED_EVENT } from "./workspaces/codez/firstRun";
 import { modeShortcutLabel, modeShortcutTarget } from "./utils/modeShortcut";
@@ -93,7 +96,7 @@ const CodeMapPanel = lazy(() =>
   import("./workspaces/codez/CodeMap").then(({ CodeMapPanel }) => ({ default: CodeMapPanel })),
 );
 
-type Mode = "codez" | "workz";
+type Mode = "codez" | "workz" | "botz";
 
 /** Normalize folder paths before comparing (slashes, trailing slash). */
 function normProjectPath(p: string): string {
@@ -103,6 +106,11 @@ function normProjectPath(p: string): string {
 export default function App() {
   const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("workz");
+  // Rooms start pools and listeners, so BotZ mounts on first visit and then stays alive.
+  const [botzMounted, setBotzMounted] = useState(false);
+  useEffect(() => {
+    if (mode === "botz") setBotzMounted(true);
+  }, [mode]);
   // Cursor-style window switch: Ctrl/Cmd+Shift+N -> IDE (CodeZ), Ctrl/Cmd+Alt+N -> Agents (WorkZ).
   // Both views share the current project, so switching keeps the workspace context.
   useEffect(() => {
@@ -318,7 +326,7 @@ export default function App() {
           return;
         }
         const layout = snap.layout ?? ({} as LayoutSnapshot);
-        if (layout.mode === "codez" || layout.mode === "workz") setMode(layout.mode);
+        if (layout.mode === "codez" || layout.mode === "workz" || layout.mode === "botz") setMode(layout.mode);
         if (typeof layout.chat_open === "boolean") setChatOpen(layout.chat_open);
         if (layout.chat_width && layout.chat_width >= 340) setChatWidth(layout.chat_width);
         if (layout.browser_open) setBrowserOpen(true);
@@ -1273,7 +1281,15 @@ export default function App() {
           >
             {t("app.modeCodeZ")}
           </button>
+          <button
+            className={mode === "botz" ? "active" : ""}
+            onClick={() => setMode("botz")}
+            title={`${t("app.modeBotZTitle")} (${modeShortcutLabel("botz", isMac)})`}
+          >
+            {t("app.modeBotZ")}
+          </button>
         </div>
+        <LocationBadge dir={projectDir} />
       </header>
 
       {codeMapOpen && projectDir && (
@@ -1370,6 +1386,12 @@ export default function App() {
           </div>
         </div>
         <div className="agentz-pane" hidden={mode !== "workz"}>
+          <RemoteBoundaryBanner
+            dir={projectDir}
+            feature="teams"
+            onOpenLocal={pickFolder}
+            onBackToCodeZ={() => setMode("codez")}
+          />
           <WorkZWorkspace
             projectDir={projectDir}
             openTaskRequest={inboxTaskRoute}
@@ -1385,6 +1407,18 @@ export default function App() {
             }}
           />
         </div>
+        <BotRoutineRunner />
+        {botzMounted && (
+          <div className="agentz-pane" hidden={mode !== "botz"}>
+            <RemoteBoundaryBanner
+              dir={projectDir}
+              feature="rooms"
+              onOpenLocal={pickFolder}
+              onBackToCodeZ={() => setMode("codez")}
+            />
+            <BotZWorkspace projectDir={isRemoteDir(projectDir) ? null : projectDir} />
+          </div>
+        )}
       </main>
 
       {settingsOpen && (

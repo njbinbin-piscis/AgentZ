@@ -1,4 +1,4 @@
-//! Teams (Phase 3) — installable Pool templates.
+﻿//! Teams (Phase 3) — installable Pool templates.
 //!
 //! A team manifest (`{config}/teams/<id>/team.json`) bundles an organization
 //! contract (`org_spec`) with its member agents and a workflow. Creating a Pool
@@ -152,8 +152,19 @@ fn write_manifest(dir: &Path, manifest: &TeamManifest) -> Result<(), String> {
 #[tauri::command]
 pub async fn teams_list(app: AppHandle) -> Result<Vec<TeamInfo>, String> {
     let dir = teams_dir(&app)?;
-    Ok(load_all(&dir).into_iter().map(Into::into).collect())
+    Ok(load_all(&dir)
+        .into_iter()
+        .filter(|m| !is_room_team_id(&m.id))
+        .map(Into::into)
+        .collect())
 }
+
+/// BotZ Rooms own a private team manifest; it stays out of the template list.
+pub fn is_room_team_id(id: &str) -> bool {
+    id.starts_with(ROOM_TEAM_PREFIX)
+}
+
+pub const ROOM_TEAM_PREFIX: &str = "botz-room-";
 
 #[tauri::command]
 pub async fn teams_get(app: AppHandle, id: String) -> Result<TeamManifest, String> {
@@ -248,13 +259,43 @@ pub async fn teams_create_pool(
     project_dir: String,
     team_id: String,
 ) -> Result<PoolCreated, String> {
-    let config_dir = resolve_global_config_dir(&app)?;
     let team = TeamManifest::load(&teams_dir(&app)?.join(safe_id(&team_id)).join("team.json"))?;
-    let (db, _settings) = open_project_kernel_state(&app, &project_dir)?;
+    Ok(sync_pool_from_manifest(&app, &project_dir, &team, None, false)
+        .await?
+        .created)
+}
 
+pub struct PoolSync {
+    pub created: PoolCreated,
+    /// Agent slugs that were dropped from the manifest but still own active
+    /// todos, so they stay in the pool until their work settles.
+    pub kept_busy: Vec<String>,
+}
+
+/// Write a team manifest into the global teams dir.
+pub fn save_team_manifest(app: &AppHandle, manifest: &TeamManifest) -> Result<(), String> {
+    write_manifest(&teams_dir(app)?, manifest)
+}
+
+/// Shared pool materialisation. `preferred_pool_id` reuses that pool when it
+/// still exists in this project (Rooms keep their pool across member edits);
+/// `prune` removes pool members no longer listed in the manifest.
+pub async fn sync_pool_from_manifest(
+    app: &AppHandle,
+    project_dir: &str,
+    team: &TeamManifest,
+    preferred_pool_id: Option<&str>,
+    prune: bool,
+) -> Result<PoolSync, String> {
+    if crate::remote::is_remote(project_dir) {
+        return Err(
+            "team pools need local git worktrees; open a local project to use team mode".into(),
+        );
+    }
+    let config_dir = resolve_global_config_dir(app)?;
+    let (db, _settings) = open_project_kernel_state(app, project_dir)?;
     let db = db.lock().await;
 
-    // Ensure member agents exist as kois and resolve their koi ids.
     let synced = sync_agents_to_kois(&db, &config_dir);
     let mut member_koi_ids: Vec<String> = Vec::new();
     let mut missing_members: Vec<String> = Vec::new();
@@ -278,17 +319,23 @@ pub async fn teams_create_pool(
         ));
     }
 
-    // Reuse an active pool for this team + project, else create one.
-    let existing = db
-        .find_active_pool(&project_dir, &team.id, &team.name)
-        .ok()
-        .flatten();
+    let preferred = preferred_pool_id
+        .filter(|id| !id.trim().is_empty())
+        .and_then(|id| db.get_pool_session(id).ok().flatten())
+        .filter(|p| p.status != "archived");
+    let existing = match preferred {
+        Some(p) => Some(p),
+        None => db
+            .find_active_pool(project_dir, &team.id, &team.name)
+            .ok()
+            .flatten(),
+    };
     let pool = match existing {
         Some(p) => p,
         None => db
             .create_pool_session_with_meta(
                 &team.name,
-                Some(&project_dir),
+                Some(project_dir),
                 team.task_timeout_secs,
                 Some(&team.id),
                 None,
@@ -301,12 +348,28 @@ pub async fn teams_create_pool(
     if team.task_timeout_secs > 0 {
         let _ = db.update_pool_session_config(&pool.id, Some(team.task_timeout_secs));
     }
-    let _ = db.update_pool_session_dir(&pool.id, &project_dir);
+    let _ = db.update_pool_session_dir(&pool.id, project_dir);
 
     for koi_id in &member_koi_ids {
         if !db.is_pool_member(&pool.id, koi_id).unwrap_or(false) {
             if let Err(e) = db.add_pool_member(&pool.id, koi_id) {
                 warn!("failed to add member {} to pool {}: {}", koi_id, pool.id, e);
+            }
+        }
+    }
+
+    let mut kept_busy = Vec::new();
+    if prune {
+        for koi in db.list_pool_members(&pool.id).unwrap_or_default() {
+            if member_koi_ids.contains(&koi.id) {
+                continue;
+            }
+            if db.count_active_todos_for_member(&pool.id, &koi.id).unwrap_or(0) > 0 {
+                kept_busy.push(koi.name.clone());
+                continue;
+            }
+            if let Err(e) = db.remove_pool_member(&pool.id, &koi.id) {
+                warn!("failed to remove member {} from pool {}: {}", koi.id, pool.id, e);
             }
         }
     }
@@ -322,13 +385,16 @@ pub async fn teams_create_pool(
     // crashed/timed-out Koi turns and idle-owner pending todos get re-driven.
     drop(db);
     if team.mode == "swarm" {
-        crate::runtime::patrol::ensure_pool_patrol(&app, &project_dir);
-        crate::runtime::heartbeat::ensure_pool_heartbeat(&app, &project_dir);
+        crate::runtime::patrol::ensure_pool_patrol(app, project_dir);
+        crate::runtime::heartbeat::ensure_pool_heartbeat(app, project_dir);
     }
 
-    Ok(PoolCreated {
-        pool_id: pool.id,
-        name: team.name,
-        member_koi_ids,
+    Ok(PoolSync {
+        created: PoolCreated {
+            pool_id: pool.id,
+            name: team.name.clone(),
+            member_koi_ids,
+        },
+        kept_busy,
     })
 }

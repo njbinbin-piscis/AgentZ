@@ -295,7 +295,13 @@ export default function InteractiveCard({
         case "text":
           return <TextBlock key={key} block={block} />;
         case "section":
-          return <SectionBlock key={key} block={block} />;
+          return (
+            <SectionBlock
+              key={key}
+              block={block}
+              renderChild={(child, i) => renderBlock(child, i)}
+            />
+          );
         case "divider":
           return <hr key={key} className="ic-divider" />;
         case "row":

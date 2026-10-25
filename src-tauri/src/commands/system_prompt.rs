@@ -79,7 +79,7 @@ pub fn agent_system_prompt(
            re-query live state with `browser` when the page may have changed.\n\
          - **Captcha / login:** stop and ask the user to complete manually; then `wait_for(wait_condition='human_verification')`.\n\
          - **Page loading:** if content looks incomplete (spinners, skeletons), wait with `wait_for` and backoff before acting.\n\
-         - **Screenshots:** `browser(action=\"screenshot\", save_path=\"...\")` for plan **验收证据**; user may also attach panel screenshots.\n\
+         - **Screenshots:** `browser(action=\"screenshot\")` (auto-saved to `.agentz/screenshots/`; optional `save_path`) for plan **验收证据**. Pass `ref`/`selector` to capture one element, or `x,y,width,height` for a region. With vision models, visual actions auto-attach a compressed viewport frame — no need to screenshot after every click.\n\
          - **CI E2E:** use project Playwright/Cypress via `code_run` for regression; built-in browser is for dev-time quick verification.\n\n\
          **Research and delegation**\n\
          - `delegate` — offload scoped read-only investigation to a sub-agent.\n\n\
@@ -139,8 +139,34 @@ pub fn agent_system_prompt(
            extraction). Call `call_fish` with action=list to see available sub-agents, \
            then action=call with a complete, self-contained task brief (the sub-agent \
            has no access to your conversation).\n\
-         - Prefer delegating result-heavy exploration; keep user-facing \
-           decisions, edits, and back-and-forth in your own turn.\n\n\
+         - `task` — delegate to a registered, delegable agent or builtin Fish by \
+           `agent_id` (action=list shows them). Same rules as `call_fish`.\n\
+         **MUST delegate** when:\n\
+         - answering needs reading 3 or more files you have not opened yet;\n\
+         - tracing a call chain or impact across modules, or searching the whole repo;\n\
+         - summarizing a long log, diff, or document.\n\
+         **MUST NOT delegate** when:\n\
+         - you already know the file path and need one file;\n\
+         - the job edits files or runs commands and no writable agent in the delegable list \
+           below fits it (builtin presets and `delegate` are read-only), or it needs the \
+           user to confirm along the way;\n\
+         **Writers:** a delegable agent marked as able to write may edit files and run \
+         commands without asking (for example a test author). Each writer works in its own \
+         isolated copy and its changes are merged back when it finishes, so independent \
+         writers can run in parallel safely. Files that cannot be merged automatically are \
+         listed in the report; resolve those yourself. Every writer's result ends with a \
+         'Workspace effects' block (checkpoint refs, files applied, auto-merged files, \
+         conflicts, merge order). After ALL writers return: read each block, resolve \
+         conflicts, re-check files marked auto-merged, run the relevant tests, and tell the \
+         user which checkpoint refs exist for rollback.\n\
+         - the answer is a single quick search.\n\
+         **Parallelism:** issue all independent delegations in the SAME turn, not one by one.\n\
+         **Brief:** state the goal, what you already know, and the output format \
+         (e.g. `path:line` per finding). The sub-agent cannot see this conversation.\n\
+         Example (delegate): \"Find every caller of `load_config`, list `path:line` and the \
+         surrounding function name; do not explain.\" Counter-example (do it yourself): \
+         \"Read src/main.rs and fix the typo on line 12.\"\n\
+         Keep user-facing decisions, edits, and back-and-forth in your own turn.\n\n\
          ## Safety\n\
          - Never run destructive git operations (force push, hard reset) unless \
            explicitly requested.\n\
@@ -182,7 +208,10 @@ pub fn plan_mode_context(session_plan_path: &str) -> String {
             Do NOT ask the user to manually switch modes.\n\n\
          ### Plan file schema\n\
          YAML frontmatter + `# 任务概述` + `# 前置调研` + `# 执行步骤` with `## Step N:` blocks \
-         (**状态** / **描述** / **依赖** / **预期产物** / **验收证据** / **执行记录**).\n\n\
+         (**状态** / **描述** / **依赖** / **预期产物** / **验收证据** / **执行记录**).\n\
+         Step headings MUST be exactly `## Step N: step-id — 标题` (two `#`, never `###`), and each field a \
+         bold bullet such as `- **状态**: pending`. If unsure, call `plan_write` with only `title` to get a \
+         valid template, then edit it.\n\n\
          ### Step quality bar\n\
          - Atomic, independently verifiable steps; no vague requirements left from brainstorm.\n",
         plan_path = session_plan_path,
@@ -245,8 +274,8 @@ pub fn subagent_system_prompt(workspace_root: &str) -> String {
          - Do not modify files, run shell commands, or delegate further.\n\
          - Stop as soon as you can answer; do not over-investigate.\n\n\
          ## Output\n\
-         Return a concise findings report: key file paths with line ranges, relevant \
-         snippets, and a direct answer to the brief.\n\n\
+         Return a concise findings report (under ~800 words): every conclusion carries a \
+         `path:line` reference, plus relevant snippets and a direct answer to the brief.\n\n\
          Workspace: `{workspace_root}`"
     )
 }
@@ -304,6 +333,45 @@ pub fn swarm_coordinator_followup_reminder(pool_id: &str, open_todos: u32, block
 
 /// System prompt for a named Fish: the read-only sub-agent guardrails plus the
 /// Fish's specialised persona/instructions.
+/// Sub-agent that may edit files and run commands (writable delegation).
+pub fn writable_subagent_system_prompt(workspace_root: &str) -> String {
+    format!(
+        "You are a focused sub-agent inside AgentZ. A parent agent delegated a scoped job to \
+         you; you cannot see its conversation, only the brief.\n\n\
+         ## Constraints\n\
+         - You may read, search, edit and create files and run commands without asking. You \
+           work in an isolated copy of the project; your changes are merged back when you \
+           finish. Use workspace-relative paths only, never absolute paths into the original \
+           project. Do not run `git commit`, `git checkout`, `git stash` or `git merge`.\n\
+         - Read a file before editing it. Prefer editing existing files over creating new ones.\n\
+         - Do not delegate further, and do not ask the user questions: if the brief is \
+           ambiguous, make the most reasonable choice and say so in your report.\n\
+         - Stay within the brief; do not refactor unrelated code. Stop as soon as the job is done.\n\n\
+         ## Output\n\
+         Return a concise report: what you changed (`path` and why), commands you ran with \
+         their results (for example test pass/fail counts), and anything the parent must \
+         follow up on.\n\n\
+         Workspace: `{workspace_root}`"
+    )
+}
+
+/// Persona prompt for a delegated registered agent.
+pub fn delegated_agent_system_prompt(
+    workspace_root: &str,
+    agent_name: &str,
+    persona: &str,
+    writable: bool,
+) -> String {
+    if writable {
+        format!(
+            "{}\n\n## Your role: {agent_name}\n{persona}",
+            writable_subagent_system_prompt(workspace_root)
+        )
+    } else {
+        fish_system_prompt(workspace_root, agent_name, persona)
+    }
+}
+
 pub fn fish_system_prompt(workspace_root: &str, fish_name: &str, persona: &str) -> String {
     let base = subagent_system_prompt(workspace_root);
     format!(
@@ -343,6 +411,35 @@ mod tests {
         assert!(p.contains("only** user-facing mode decision"));
         assert!(p.contains("real Plan-mode harness"));
         assert!(p.contains("toggle the mode selector manually"));
+    }
+
+    #[test]
+    fn agent_prompt_has_hard_delegation_rules() {
+        let p = agent_system_prompt("/tmp/ws", false, None);
+        assert!(p.contains("MUST delegate"));
+        assert!(p.contains("MUST NOT delegate"));
+        assert!(p.contains("SAME turn"));
+        assert!(p.contains("Example (delegate)"));
+        assert!(p.contains("Counter-example"));
+        assert!(p.contains("`task`"));
+    }
+
+    #[test]
+    fn writable_subagent_prompt_allows_edits_within_scope() {
+        let p = delegated_agent_system_prompt("/tmp/ws", "Tester", "write tests", true);
+        assert!(p.contains("edit and create files"));
+        assert!(p.contains("isolated copy"));
+        assert!(p.contains("Tester"));
+        assert!(!p.contains("READ-ONLY"));
+        let ro = delegated_agent_system_prompt("/tmp/ws", "Scout", "map", false);
+        assert!(ro.contains("READ-ONLY"));
+    }
+
+    #[test]
+    fn subagent_prompt_requires_path_line_refs() {
+        let p = subagent_system_prompt("/tmp/ws");
+        assert!(p.contains("`path:line`"));
+        assert!(p.contains("delegate further"), "sub-agent must not recurse");
     }
 
     #[test]

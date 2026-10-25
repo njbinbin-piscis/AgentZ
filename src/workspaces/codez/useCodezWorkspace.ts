@@ -488,15 +488,40 @@ export function useCodezWorkspace({
   }, [sidebarTab, sidebarCollapsed]);
 
   // ─── Load file tree ──────────────────────────────────────────────
+  const [showHiddenFiles, setShowHiddenFiles] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("agentz.explorer.showHidden") === "1";
+    } catch {
+      return false;
+    }
+  });
   const loadFileTree = useCallback(async () => {
     if (!projectDir) return;
     try {
-      const nodes = await ideApi.listFiles(projectDir, 8);
+      const nodes = await ideApi.listFiles(projectDir, 8, showHiddenFiles);
       setFileTree(nodes);
     } catch (e) {
       console.error("Failed to load file tree:", e);
     }
-  }, [projectDir]);
+  }, [projectDir, showHiddenFiles]);
+  const toggleShowHiddenFiles = useCallback(() => {
+    setShowHiddenFiles((v) => {
+      try {
+        localStorage.setItem("agentz.explorer.showHidden", v ? "0" : "1");
+      } catch {
+        /* ignore */
+      }
+      return !v;
+    });
+  }, []);
+  const firstHiddenRenderRef = useRef(true);
+  useEffect(() => {
+    if (firstHiddenRenderRef.current) {
+      firstHiddenRenderRef.current = false;
+      return;
+    }
+    void loadFileTree();
+  }, [loadFileTree]);
 
   useEffect(() => {
     if (fileTree.length === 0 || explorerExpandedInitRef.current) return;
@@ -833,7 +858,10 @@ export function useCodezWorkspace({
         ? relativizeArtifactPath(rawPath, [projectDir])
         : rawPath;
       const existing = tabsRef.current.find((t) => t.path === path);
+      // Agent-written plan documents open as a rendered preview.
+      const isPlanDoc = /^\.agentz\/plans\/.+\.md$/i.test(path.replace(/\\/g, "/"));
       if (existing) {
+        if (isPlanDoc) setTabs((prev) => prev.map((t) => (t.path === path ? { ...t, viewMode: "preview" } : t)));
         setActiveTabPath(path);
         return;
       }
@@ -876,7 +904,7 @@ export function useCodezWorkspace({
           content: fc.content,
           isDirty: false,
           isReadOnly: readOnly,
-          viewMode: "editor",
+          viewMode: isPlanDoc ? "preview" : "editor",
           fileSize: fc.size,
         };
         setTabs((prev) => [...prev, newTab]);
@@ -1422,6 +1450,6 @@ export function useCodezWorkspace({
   ]);
 
   return {
-    t, ideRef, sidebarTab, sidebarCollapsed, switchSidebarTab, gitModified, gitAdded, bottomOpen, setBottomOpen, sidebarWidth, fileTree, fileTreeFocusPath, fileTreeSelection, openFile, scheduleWorkspaceRefresh, handleFileTreeSelect, handleFileTreeContextMenu, fileTreeRef, explorerExpanded, setExplorerExpanded, revealInFile, openDiff, startSidebarResize, headerTabs, activeTabPath, setActiveTabPath, handleTabClose, saveFile, handleTabContextMenu, closeAllTabs, closeSavedTabs, closeOtherTabs, reloadTabFromDisk, tabContextMenu, setTabContextMenu, setRemoteDialogOpen, fileLoading, fileLoadError, setFileLoadError, browserRefreshSignal, agentBrowserAction, requestBrowserClose, activeTab, reveal, handleEditorChange, setTabViewMode, activeTabPathRef, diskConflicts, handleViewConflictDiff, handleAcceptDiskConflict, handleKeepMineConflict, startBottomResize, bottomTab, setBottomTab, bottomHeight, openBottomPanel, openExtensionsSidebar, remoteDialogOpen, paletteOpen, setPaletteOpen, paletteMode, tabs, paletteCommands, fileTreeContextMenu, setFileTreeContextMenu, projectDirRef,
+    t, ideRef, sidebarTab, sidebarCollapsed, switchSidebarTab, gitModified, gitAdded, bottomOpen, setBottomOpen, sidebarWidth, fileTree, showHiddenFiles, toggleShowHiddenFiles, fileTreeFocusPath, fileTreeSelection, openFile, scheduleWorkspaceRefresh, handleFileTreeSelect, handleFileTreeContextMenu, fileTreeRef, explorerExpanded, setExplorerExpanded, revealInFile, openDiff, startSidebarResize, headerTabs, activeTabPath, setActiveTabPath, handleTabClose, saveFile, handleTabContextMenu, closeAllTabs, closeSavedTabs, closeOtherTabs, reloadTabFromDisk, tabContextMenu, setTabContextMenu, setRemoteDialogOpen, fileLoading, fileLoadError, setFileLoadError, browserRefreshSignal, agentBrowserAction, requestBrowserClose, activeTab, reveal, handleEditorChange, setTabViewMode, activeTabPathRef, diskConflicts, handleViewConflictDiff, handleAcceptDiskConflict, handleKeepMineConflict, startBottomResize, bottomTab, setBottomTab, bottomHeight, openBottomPanel, openExtensionsSidebar, remoteDialogOpen, paletteOpen, setPaletteOpen, paletteMode, tabs, paletteCommands, fileTreeContextMenu, setFileTreeContextMenu, projectDirRef,
   };
 }

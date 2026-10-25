@@ -1,3 +1,4 @@
+use crate::path_text::display_path;
 use once_cell::sync::Lazy;
 /// Policy Gate — host-side security layer.
 /// Validates file paths, shell commands, browser URLs, UIA actions, and COM operations.
@@ -228,14 +229,14 @@ impl PolicyGate {
             PolicyDecision::Warn(format!(
                 "⚠️ Path '{}' is outside the workspace root '{}' — proceeding because \"Allow outside workspace\" is enabled.",
                 path,
-                ws.display()
+                display_path(&ws)
             ))
         } else {
             PolicyDecision::Deny(format!(
                 "Path '{}' is outside the workspace root '{}'. \
                  Enable \"Allow outside workspace\" in Settings to access files outside the workspace.",
                 path,
-                ws.display()
+                display_path(&ws)
             ))
         }
     }

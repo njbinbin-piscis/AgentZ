@@ -8,7 +8,7 @@ export type OnboardingStep = 1 | 2 | 3;
 export interface OnboardingModalProps {
   open: boolean;
   hasConfiguredModel: boolean;
-  currentMode: "workz" | "codez";
+  currentMode: "workz" | "codez" | "botz";
   onOpenSettings: () => void;
   onSelectMode: (mode: "workz" | "codez") => void;
   onFinish: () => void;

@@ -1,4 +1,5 @@
 use crate::agent::tool::{Tool, ToolContext, ToolResult};
+use crate::path_text::display_path_for_tool;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -73,15 +74,15 @@ impl Tool for FileDiffTool {
                 if !path.exists() {
                     return Ok(ToolResult::err(format!(
                         "File not found: {}",
-                        path.display()
+                        display_path_for_tool(&path, &ctx.workspace_root)
                     )));
                 }
                 let current = std::fs::read_to_string(&path)?;
                 let proposed = input["new_content"].as_str().unwrap().to_string();
                 (
-                    format!("{} (current)", path.display()),
+                    format!("{} (current)", display_path_for_tool(&path, &ctx.workspace_root)),
                     current,
-                    format!("{} (proposed)", path.display()),
+                    format!("{} (proposed)", display_path_for_tool(&path, &ctx.workspace_root)),
                     proposed,
                 )
             } else if input["path_a"].is_string() && input["path_b"].is_string() {
@@ -98,18 +99,23 @@ impl Tool for FileDiffTool {
                 if !pa.exists() {
                     return Ok(ToolResult::err(format!(
                         "path_a not found: {}",
-                        pa.display()
+                        display_path_for_tool(&pa, &ctx.workspace_root)
                     )));
                 }
                 if !pb.exists() {
                     return Ok(ToolResult::err(format!(
                         "path_b not found: {}",
-                        pb.display()
+                        display_path_for_tool(&pb, &ctx.workspace_root)
                     )));
                 }
                 let ca = std::fs::read_to_string(&pa)?;
                 let cb = std::fs::read_to_string(&pb)?;
-                (pa.display().to_string(), ca, pb.display().to_string(), cb)
+                (
+                    display_path_for_tool(&pa, &ctx.workspace_root),
+                    ca,
+                    display_path_for_tool(&pb, &ctx.workspace_root),
+                    cb,
+                )
             } else {
                 return Ok(ToolResult::err(
                     "Provide either (path + new_content) for preview mode, \

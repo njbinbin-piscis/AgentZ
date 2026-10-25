@@ -1,4 +1,5 @@
 use crate::agent::tool::{Tool, ToolContext, ToolResult};
+use crate::path_text::display_path_for_tool;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -265,7 +266,7 @@ impl Tool for FileWriteTool {
         Ok(ToolResult::ok(format!(
             "{} file: {} ({} bytes)",
             action,
-            path.display(),
+            display_path_for_tool(&path, &ctx.workspace_root),
             content.len()
         )))
     }
@@ -467,7 +468,7 @@ impl Tool for FileEditTool {
         if !path.exists() {
             return Ok(ToolResult::err(format_err(
                 ToolErrorCode::FileNotFound,
-                &format!("File not found: {}", path.display()),
+                &format!("File not found: {}", display_path_for_tool(&path, &ctx.workspace_root)),
                 "Verify the path with file_list or file_search.",
             )));
         }
@@ -548,7 +549,7 @@ impl Tool for FileEditTool {
                 let hint = find_closest_context_hint(&content, old);
                 return Ok(ToolResult::err(format_err(
                     ToolErrorCode::MatchNotFound,
-                    &format!("{} not found in file: {}", label, path.display()),
+                    &format!("{} not found in file: {}", label, display_path_for_tool(&path, &ctx.workspace_root)),
                     &hint,
                 )));
             }
@@ -574,7 +575,7 @@ impl Tool for FileEditTool {
                         "{} appears {} times in file (must appear exactly once): {}",
                         label,
                         count,
-                        path.display()
+                        display_path_for_tool(&path, &ctx.workspace_root)
                     ),
                     &hint,
                 )));
@@ -618,7 +619,7 @@ impl Tool for FileEditTool {
         if pairs.len() == 1 {
             Ok(ToolResult::ok(format!(
                 "Edited file: {} ({} chars → {} chars, {} lines {}, encoding: {})",
-                path.display(),
+                display_path_for_tool(&path, &ctx.workspace_root),
                 pairs[0].0.len(),
                 pairs[0].1.len(),
                 lines_after,
@@ -628,7 +629,7 @@ impl Tool for FileEditTool {
         } else {
             Ok(ToolResult::ok(format!(
                 "Edited file: {} ({} replacements applied, {} lines {}, encoding: {})",
-                path.display(),
+                display_path_for_tool(&path, &ctx.workspace_root),
                 pairs.len(),
                 lines_after,
                 delta_str,

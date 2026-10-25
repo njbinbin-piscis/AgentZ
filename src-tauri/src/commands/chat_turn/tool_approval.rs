@@ -405,7 +405,9 @@ pub(super) fn build_tool_registry(
     slash_tool_allowlist: Option<Vec<String>>,
     budget_scope: crate::runtime::task_budget::BudgetScope,
     background_registry: Option<Arc<piscis_kernel::background::BackgroundRegistry>>,
+    bridge_slot: crate::runtime::subagent_bridge::BridgeSlot,
 ) -> ToolRegistry {
+    let delegation_mode = crate::commands::delegation::load_config(&config_dir).mode;
     let mut builtin_tool_enabled = None;
     if chat_mode == "plan" {
         let mut map = HashMap::new();
@@ -498,7 +500,7 @@ pub(super) fn build_tool_registry(
             app: app.clone(),
             loop_halt,
         }));
-        if chat_mode == "plan" {
+        if chat_mode == "plan" && delegation_mode.allows_research() {
             if let (Some(db), Some(settings), Some(plan)) = (
                 db_for_delegate.clone(),
                 settings_for_delegate.clone(),
@@ -518,22 +520,35 @@ pub(super) fn build_tool_registry(
             if let (Some(db), Some(settings), Some(plan)) =
                 (db_for_delegate, settings_for_delegate, plan_for_delegate)
             {
-                registry.register(Box::new(crate::tools::delegate::DelegateTool {
-                    budget: budget_scope.clone(),
-                    db: db.clone(),
-                    settings: settings.clone(),
-                    plan_store: plan.clone(),
-                    lsp_manager: lsp_manager.clone(),
-                    app: app.clone(),
-                }));
-                registry.register(Box::new(crate::tools::call_fish::CallFishTool {
-                    budget: budget_scope.clone(),
-                    db,
-                    settings,
-                    plan_store: plan,
-                    lsp_manager,
-                    app: app.clone(),
-                }));
+                if delegation_mode.allows_research() {
+                    registry.register(Box::new(crate::tools::delegate::DelegateTool {
+                        budget: budget_scope.clone(),
+                        db: db.clone(),
+                        settings: settings.clone(),
+                        plan_store: plan.clone(),
+                        lsp_manager: lsp_manager.clone(),
+                        app: app.clone(),
+                    }));
+                    registry.register(Box::new(crate::tools::call_fish::CallFishTool {
+                        budget: budget_scope.clone(),
+                        db: db.clone(),
+                        settings: settings.clone(),
+                        plan_store: plan.clone(),
+                        lsp_manager: lsp_manager.clone(),
+                        app: app.clone(),
+                    }));
+                }
+                if delegation_mode.allows_task() {
+                    registry.register(Box::new(crate::tools::task::TaskTool {
+                        budget: budget_scope.clone(),
+                        db,
+                        settings,
+                        plan_store: plan,
+                        lsp_manager,
+                        app: app.clone(),
+                        bridge: bridge_slot.clone(),
+                    }));
+                }
             }
             {
                 let guarded_browser = app.state::<crate::state::AppState>().browser.guarded_tool();
@@ -643,6 +658,7 @@ fn build_subagent_registry(
     event_sink: Arc<dyn EventSink>,
     plan_store: PlanStore,
     lsp_manager: Arc<LspManager>,
+    writable: bool,
 ) -> ToolRegistry {
     let config_dir = resolve_global_config_dir(&app).unwrap_or_else(|_| PathBuf::from("."));
     let skills_root = crate::skills::service::skills_root_from_config_dir(&config_dir);
@@ -658,7 +674,7 @@ fn build_subagent_registry(
         settings,
         event_sink,
         plan_store,
-        "plan",
+        if writable { "agent" } else { "plan" },
         lsp_manager,
         None,
         &[],
@@ -669,6 +685,7 @@ fn build_subagent_registry(
         None,
         crate::runtime::task_budget::BudgetScope::default(),
         Some(piscis_kernel::background::shared_default_registry()),
+        Default::default(),
     )
 }
 
@@ -713,13 +730,82 @@ pub(crate) async fn run_subagent_with_prompt(
     cancel: Arc<AtomicBool>,
     budget: crate::runtime::task_budget::BudgetScope,
 ) -> Result<String> {
+    run_subagent_with_options(
+        app,
+        db,
+        settings,
+        plan_store,
+        lsp_manager,
+        workspace_root,
+        system_prompt,
+        task,
+        cancel,
+        budget,
+        SubagentOptions::default(),
+    )
+    .await
+    .map(|o| o.text)
+}
+
+/// Per-run overrides resolved from a registered agent manifest.
+#[derive(Default, Clone)]
+pub(crate) struct SubagentOptions {
+    /// Agent-specific provider id; wins over the global flash model.
+    pub provider_id: Option<String>,
+    /// Effective capability set; `None` applies the default (read-only, no
+    /// delegation, no team-pool tools).
+    pub caps: Option<crate::runtime::subagent_policy::EffectiveCaps>,
+    pub max_iterations: Option<u32>,
+    pub timeout_secs: Option<u64>,
+    /// Build the agent-mode registry (write tools) instead of the read-only one.
+    pub writable: bool,
+    /// Hook chain for the sub-agent's tool calls. Writable runs must pass the
+    /// parent's approval/journal chain (see `runtime::subagent_bridge`).
+    pub hooks: Option<Arc<dyn piscis_kernel::agent::hooks::AgentHooks>>,
+}
+
+pub(crate) struct SubagentOutcome {
+    /// Distinct workspace paths the sub-agent wrote or edited.
+    pub edited_paths: Vec<String>,
+    pub text: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub tool_calls: u32,
+    pub timed_out: bool,
+    pub model_fallback: bool,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn run_subagent_with_options(
+    app: tauri::AppHandle,
+    db: Arc<Mutex<piscis_kernel::store::db::Database>>,
+    settings: Arc<Mutex<Settings>>,
+    plan_store: PlanStore,
+    lsp_manager: Arc<LspManager>,
+    workspace_root: String,
+    system_prompt: String,
+    task: String,
+    cancel: Arc<AtomicBool>,
+    budget: crate::runtime::task_budget::BudgetScope,
+    options: SubagentOptions,
+) -> Result<SubagentOutcome> {
+    let max_concurrent = crate::commands::data_scope::resolve_global_config_dir(&app)
+        .map(|d| crate::commands::delegation::load_config(&d).max_concurrent)
+        .unwrap_or(crate::commands::delegation::DEFAULT_MAX_CONCURRENT);
+    let _slot = crate::commands::delegation::try_acquire(max_concurrent)
+        .map_err(|e| anyhow!(e))?;
     let flash_id = crate::commands::data_scope::resolve_global_config_dir(&app)
         .ok()
         .and_then(|dir| crate::commands::flash::load_flash_provider_id(&dir));
-    let runtime = {
+    let (runtime, model_fallback) = {
         let s = settings.lock().await;
-        let flash = flash_id.filter(|id| s.find_llm_provider(id).is_some());
-        resolve_llm_runtime(&s, flash.as_deref())?
+        let preferred = options
+            .provider_id
+            .clone()
+            .filter(|id| s.find_llm_provider(id).is_some())
+            .or_else(|| flash_id.filter(|id| s.find_llm_provider(id).is_some()));
+        let fallback = preferred.is_none();
+        (resolve_llm_runtime(&s, preferred.as_deref())?, fallback)
     };
 
     let mut registry = build_subagent_registry(
@@ -729,13 +815,27 @@ pub(crate) async fn run_subagent_with_prompt(
         Arc::new(NullEventSink),
         plan_store,
         lsp_manager,
+        options.writable,
     );
     crate::tools::remote_fs::install_if_remote(&mut registry, &workspace_root);
 
-    crate::runtime::approval::restrict_background_with_read_roots(
-        &mut registry,
-        dependency_source_roots(),
-    );
+    // Capability enforcement: the default set strips delegation (depth stays
+    // at 1) and team-pool tools; manifest allowlists only ever narrow further.
+    let caps = options.caps.clone().unwrap_or_else(|| {
+        crate::runtime::subagent_policy::resolve(
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+        )
+    });
+    registry.retain(|t| caps.permits(t.name()));
+
+    if !options.writable {
+        crate::runtime::approval::restrict_background_with_read_roots(
+            &mut registry,
+            dependency_source_roots(),
+        );
+    }
     let (
         context_window,
         read_timeout,
@@ -778,7 +878,7 @@ pub(crate) async fn run_subagent_with_prompt(
             .with_extra_read_roots(dependency_source_roots()),
     );
 
-    let harness = HarnessConfig::for_scheduler(
+    let mut harness = HarnessConfig::for_scheduler(
         runtime.model.clone(),
         fallback,
         Arc::new(registry),
@@ -791,6 +891,9 @@ pub(crate) async fn run_subagent_with_prompt(
         compaction,
         db.clone(),
     );
+    if let Some(hooks) = options.hooks.clone() {
+        harness = harness.with_hooks(hooks);
+    }
     let agent = harness.into_agent_loop(client, None, None);
 
     let session_id = format!(
@@ -802,7 +905,7 @@ pub(crate) async fn run_subagent_with_prompt(
         workspace_root: PathBuf::from(&workspace_root),
         bypass_permissions: false,
         settings: tool_settings,
-        max_iterations: Some(10),
+        max_iterations: Some(options.max_iterations.filter(|n| *n > 0).unwrap_or(10)),
         memory_owner_id: "piscis".to_string(),
         pool_session_id: None,
         tool_use_id: None,
@@ -818,26 +921,71 @@ pub(crate) async fn run_subagent_with_prompt(
     let (tx, mut rx) = mpsc::channel::<AgentEvent>(256);
     let collector = tokio::spawn(async move {
         let mut text = String::new();
+        let mut tool_calls = 0u32;
+        let mut tokens = (0u32, 0u32);
+        let mut edited: Vec<String> = Vec::new();
         while let Some(event) = rx.recv().await {
             match event {
                 AgentEvent::TextDelta { delta } => text.push_str(&delta),
-                AgentEvent::Done { .. } => break,
+                AgentEvent::ToolStart { name, input, .. } => {
+                    tool_calls += 1;
+                    if matches!(name.as_str(), "file_write" | "file_edit") {
+                        if let Some(p) = input.get("path").and_then(|v| v.as_str()) {
+                            if !edited.iter().any(|e| e == p) {
+                                edited.push(p.to_string());
+                            }
+                        }
+                    }
+                }
+                AgentEvent::Done {
+                    total_input_tokens,
+                    total_output_tokens,
+                } => {
+                    tokens = (total_input_tokens, total_output_tokens);
+                    break;
+                }
                 _ => {}
             }
         }
-        text
+        (text, tool_calls, tokens, edited)
     });
 
+    let timeout_secs = options.timeout_secs.filter(|n| *n > 0).unwrap_or(240);
     let run_fut = agent.run(messages, tx, cancel.clone(), ctx);
-    let run_res = tokio::time::timeout(Duration::from_secs(240), run_fut).await;
-    let text = collector.await.unwrap_or_default();
+    let run_res = tokio::time::timeout(Duration::from_secs(timeout_secs), run_fut).await;
+    let (text, tool_calls, (input_tokens, output_tokens), edited_paths) =
+        collector.await.unwrap_or_default();
+
+    crate::runtime::subagent_policy::record_run(
+        matches!(run_res, Ok(Ok(_))),
+        input_tokens,
+        output_tokens,
+        tool_calls,
+        model_fallback,
+    );
 
     match run_res {
-        Ok(Ok(_)) => Ok(text),
+        Ok(Ok(_)) => Ok(SubagentOutcome {
+            edited_paths,
+            text,
+            input_tokens,
+            output_tokens,
+            tool_calls,
+            timed_out: false,
+            model_fallback,
+        }),
         Ok(Err(e)) => Err(anyhow!("sub-agent failed: {e}")),
-        Err(_) => Ok(format!(
-            "{text}\n\n[sub-agent timed out after 240s — partial findings above]"
-        )),
+        Err(_) => Ok(SubagentOutcome {
+            edited_paths,
+            text: format!(
+                "{text}\n\n[sub-agent timed out after {timeout_secs}s — partial findings above]"
+            ),
+            input_tokens,
+            output_tokens,
+            tool_calls,
+            timed_out: true,
+            model_fallback,
+        }),
     }
 }
 

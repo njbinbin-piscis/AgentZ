@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "agentz-desktop"
-version = "1.0.16"
+version = "1.0.17"
 dependencies = [
  "aes",
  "agentz-task-state",
@@ -4919,8 +4919,8 @@ dependencies = [
 
 [[package]]
 name = "robotz-browser"
-version = "0.1.13"
-source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.13#cdff2c947f812648050a550b8e9d8a887bf01e01"
+version = "0.1.14"
+source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.14#b0d7df65147b9cc56da1e5e193d7a1ba5657a1dd"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4943,8 +4943,8 @@ dependencies = [
 
 [[package]]
 name = "robotz-core"
-version = "0.1.13"
-source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.13#cdff2c947f812648050a550b8e9d8a887bf01e01"
+version = "0.1.14"
+source = "git+https://github.com/njbinbin-piscis/RobotZ.git?rev=v0.1.14#b0d7df65147b9cc56da1e5e193d7a1ba5657a1dd"
 dependencies = [
  "anyhow",
  "async-trait",

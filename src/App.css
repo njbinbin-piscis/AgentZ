@@ -237,6 +237,37 @@
   color: var(--error, #f87171);
 }
 
+.agentz-location-badge {
+  flex-shrink: 0;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary, inherit);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.agentz-location-badge.remote {
+  border-color: var(--accent, #7c6af7);
+  color: var(--accent, #7c6af7);
+}
+
+.agentz-remote-boundary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--warning, #f5a524) 14%, transparent);
+}
+
+.agentz-remote-boundary span {
+  flex: 1;
+}
+
 .agentz-mode-switch {
   display: flex;
   flex-shrink: 0;

@@ -352,6 +352,48 @@ export default function AgentsSection({ view, editId, onEditDone, onGoDiscover }
           </div>
 
           <div className="agentz-settings-field">
+            <label>
+              <input
+                type="checkbox"
+                data-testid="agent-delegable"
+                checked={agentForm.delegable ?? false}
+                onChange={(e) => setAgentForm({ ...agentForm, delegable: e.target.checked })}
+              />{" "}
+              {t("studio.fieldDelegable")}
+            </label>
+            <p className="agentz-settings-hint">{t("studio.delegableHint")}</p>
+          </div>
+
+          {agentForm.delegable && (
+            <>
+              <div className="agentz-settings-field">
+                <label>{t("studio.fieldPermissionMode")}</label>
+                <DropdownSelect
+                  variant="field"
+                  value={agentForm.permission_mode || "read_only"}
+                  options={[
+                    { id: "read_only", label: t("studio.permReadOnly") },
+                    { id: "ask", label: t("studio.permAsk") },
+                    { id: "inherit", label: t("studio.permInherit") },
+                  ]}
+                  onChange={(v) => setAgentForm({ ...agentForm, permission_mode: v })}
+                />
+                <p className="agentz-settings-hint">{t("studio.permHint")}</p>
+              </div>
+              <div className="agentz-settings-field">
+                <label>{t("studio.fieldDelegateAllowlist")}</label>
+                <TagMultiSelect
+                  values={agentForm.tool_allowlist ?? []}
+                  options={toolOptions}
+                  onChange={(tool_allowlist) => setAgentForm({ ...agentForm, tool_allowlist })}
+                  placeholder={t("studio.toolsSearchPlaceholder")}
+                />
+                <p className="agentz-settings-hint">{t("studio.delegateAllowlistHint")}</p>
+              </div>
+            </>
+          )}
+
+          <div className="agentz-settings-field">
             <label>{t("studio.fieldConnectors")}</label>
             <TagMultiSelect
               values={agentForm.connectors ?? []}

@@ -1,6 +1,7 @@
 /// File search tool — glob (find files by name pattern) and grep (search file contents).
 /// Equivalent to Cursor's Glob and Grep tools.
 use crate::agent::tool::{Tool, ToolContext, ToolResult};
+use crate::path_text::{display_path_for_tool, display_path_under, os_text};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -171,11 +172,17 @@ impl Tool for FileSearchTool {
         };
 
         let include_ignored = input["include_ignored"].as_bool().unwrap_or(false);
+        let anchor = if ctx.workspace_root.as_os_str().is_empty() {
+            root.clone()
+        } else {
+            ctx.workspace_root.clone()
+        };
 
         match action {
             "glob" => self.do_glob(
                 pattern,
                 &root,
+                &anchor,
                 max_results,
                 max_depth,
                 ext_filter,
@@ -188,6 +195,7 @@ impl Tool for FileSearchTool {
                 self.do_grep(
                     pattern,
                     &root,
+                    &anchor,
                     include,
                     ext_filter,
                     max_results,
@@ -208,6 +216,7 @@ impl FileSearchTool {
         &self,
         pattern: &str,
         root: &Path,
+        workspace: &Path,
         max_results: usize,
         max_depth: usize,
         ext_filter: Option<&[String]>,
@@ -239,20 +248,15 @@ impl FileSearchTool {
                 if path.is_file() {
                     // Apply extension filter
                     if let Some(exts) = ext_filter {
-                        let file_ext = path
-                            .extension()
-                            .and_then(|e| e.to_str())
-                            .map(|e| e.to_lowercase())
-                            .unwrap_or_default();
+                        let file_ext = extension_text(path);
                         if !exts.iter().any(|e| e == &file_ext) {
                             return true;
                         }
                     }
-                    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                    let rel = path.strip_prefix(root).unwrap_or(path);
-                    let rel_str = rel.to_string_lossy().replace('\\', "/");
-                    if re.is_match(&rel_str) || re.is_match(file_name) {
-                        matches.push(path.to_string_lossy().to_string());
+                    let file_name = file_name_text(path);
+                    let rel_str = display_path_under(path, root);
+                    if re.is_match(&rel_str) || re.is_match(&file_name) {
+                        matches.push(display_path_for_tool(path, workspace));
                     }
                 }
                 true
@@ -266,7 +270,7 @@ impl FileSearchTool {
             return Ok(ToolResult::ok(format!(
                 "No files found matching '{}' under {}{}",
                 pattern,
-                root.display(),
+                display_path_for_tool(root, workspace),
                 ignored_note
             )));
         }
@@ -275,7 +279,7 @@ impl FileSearchTool {
             "Found {} file(s) matching '{}' under {}:\n{}",
             matches.len(),
             pattern,
-            root.display(),
+            display_path_for_tool(root, workspace),
             matches.join("\n")
         )))
     }
@@ -285,6 +289,7 @@ impl FileSearchTool {
         &self,
         pattern: &str,
         root: &Path,
+        workspace: &Path,
         include: Option<&str>,
         ext_filter: Option<&[String]>,
         max_results: usize,
@@ -335,21 +340,17 @@ impl FileSearchTool {
                     return true;
                 }
 
-                let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                let fname = file_name_text(path);
 
                 // Apply extension filter (takes priority over include pattern)
                 if let Some(exts) = ext_filter {
-                    let file_ext = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .map(|e| e.to_lowercase())
-                        .unwrap_or_default();
+                    let file_ext = extension_text(path);
                     if !exts.iter().any(|e| e == &file_ext) {
                         return true;
                     }
                 } else if let Some(ref inc_re) = include_re {
                     // Fall back to include glob pattern
-                    if !inc_re.is_match(fname) {
+                    if !inc_re.is_match(&fname) {
                         return true;
                     }
                 }
@@ -361,7 +362,7 @@ impl FileSearchTool {
                 if meta.len() > MAX_CONTENT_BYTES as u64 * 4 {
                     skipped.push(format!(
                         "[skipped: {} ({:.0}KB)]",
-                        path.display(),
+                        display_path_for_tool(path, workspace),
                         meta.len() as f64 / 1024.0
                     ));
                     return true;
@@ -384,11 +385,10 @@ impl FileSearchTool {
                     }
                     if re.is_match(line) {
                         let line_num = i + 1;
+                        let shown = display_path_for_tool(path, workspace);
                         if context_lines == 0 {
                             file_matches.push(format!(
-                                "  {}:{}:{}",
-                                path.display(),
-                                line_num,
+                                "  {shown}:{line_num}:{}",
                                 line.trim_end()
                             ));
                         } else {
@@ -398,10 +398,7 @@ impl FileSearchTool {
                                 let actual_line = start + j + 1;
                                 let marker = if actual_line == line_num { ">" } else { " " };
                                 file_matches.push(format!(
-                                    "  {}:{}{}: {}",
-                                    path.display(),
-                                    marker,
-                                    actual_line,
+                                    "  {shown}:{marker}{actual_line}: {}",
                                     ctx_line.trim_end()
                                 ));
                             }
@@ -412,8 +409,7 @@ impl FileSearchTool {
 
                 if !file_matches.is_empty() {
                     total_matches += file_matches.len();
-                    let rel = path.to_string_lossy();
-                    results.push(format!("{}:", rel));
+                    results.push(format!("{}:", display_path_for_tool(path, workspace)));
                     results.extend(file_matches);
                 }
 
@@ -431,7 +427,7 @@ impl FileSearchTool {
             return Ok(ToolResult::ok(format!(
                 "No matches found for '{}' under {}{}{}",
                 pattern,
-                root.display(),
+                display_path_for_tool(root, workspace),
                 filter_note,
                 ignored_note
             )));
@@ -441,7 +437,7 @@ impl FileSearchTool {
             "Found {} match(es) for '{}' under {}:\n{}",
             total_matches,
             pattern,
-            root.display(),
+            display_path_for_tool(root, workspace),
             results.join("\n")
         );
         if !skipped.is_empty() {
@@ -450,6 +446,17 @@ impl FileSearchTool {
         }
         Ok(ToolResult::ok(body))
     }
+}
+
+fn file_name_text(path: &Path) -> String {
+    path.file_name().map(os_text).unwrap_or_default()
+}
+
+fn extension_text(path: &Path) -> String {
+    path.extension()
+        .map(os_text)
+        .unwrap_or_default()
+        .to_lowercase()
 }
 
 fn format_skipped_dirs_note(skipped_dirs: &[String]) -> String {
@@ -490,7 +497,8 @@ fn walk_dir_opts<F: FnMut(&Path) -> bool>(
         let path = entry.path();
         let is_dir = path.is_dir();
         if is_dir {
-            if let Some(dir_name) = path.file_name().and_then(|name| name.to_str()) {
+            if let Some(dir_name) = path.file_name().map(os_text) {
+                let dir_name = dir_name.as_str();
                 if dir_name.eq_ignore_ascii_case(".git") {
                     continue;
                 }
@@ -613,13 +621,13 @@ mod tests {
 
         let tool = FileSearchTool;
         let res_default = tool
-            .do_grep("export type Foo", &root, None, None, 10, 5, false, 0, false)
+            .do_grep("export type Foo", &root, &root, None, None, 10, 5, false, 0, false)
             .unwrap();
         assert!(res_default.content.contains("No matches found"));
         assert!(res_default.content.contains("skipped excluded directories: node_modules"));
 
         let res_ignored = tool
-            .do_grep("export type Foo", &root, None, None, 10, 5, false, 0, true)
+            .do_grep("export type Foo", &root, &root, None, None, 10, 5, false, 0, true)
             .unwrap();
         assert!(res_ignored.content.contains("Found 1 match"));
         assert!(res_ignored.content.contains("index.d.ts"));

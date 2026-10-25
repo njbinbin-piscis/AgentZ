@@ -11,7 +11,7 @@ export interface LayoutSnapshot {
   chat_open: boolean;
   chat_width: number;
   browser_open: boolean;
-  mode: "codez" | "workz";
+  mode: "codez" | "workz" | "botz";
   sidebar_tab: string;
   sidebar_collapsed: boolean;
   sidebar_width: number;

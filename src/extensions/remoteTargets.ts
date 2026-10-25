@@ -93,6 +93,19 @@ export function targetForAuthority(authority: string): RemoteTarget | null {
   return null;
 }
 
+export type Capability = "ide" | "chat" | "teams" | "rooms";
+
+export const CAPABILITIES: Capability[] = ["ide", "chat", "teams", "rooms"];
+
+/**
+ * What a project can do given where it runs. Team pools and BotZ rooms need
+ * local git worktrees, so they stay local-only until the remote host runs them.
+ */
+export function capabilitiesFor(dir: string | null | undefined): Record<Capability, boolean> {
+  const remote = isRemoteDir(dir);
+  return { ide: true, chat: true, teams: !remote, rooms: !remote };
+}
+
 /** Short label for status bars / titles. */
 export function describeRemoteDir(dir: string): string | null {
   const parsed = parseRemoteDir(dir);

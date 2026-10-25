@@ -152,8 +152,14 @@ impl Tool for CallFishTool {
                 "[{} returned no findings]",
                 fish.name
             ))),
-            Ok(text) => Ok(ToolResult::ok(format!("{} report:\n\n{text}", fish.name))),
-            Err(e) => Ok(ToolResult::err(format!("call_fish failed: {e}"))),
+            Ok(text) => Ok(ToolResult::ok(format!(
+                "{} report:\n\n{}",
+                fish.name,
+                crate::runtime::subagent_policy::cap_report(&text, 12_000)
+            ))),
+            Err(e) => Ok(ToolResult::err(crate::commands::delegation::explain_failure(
+                &e.to_string(),
+            ))),
         }
     }
 }

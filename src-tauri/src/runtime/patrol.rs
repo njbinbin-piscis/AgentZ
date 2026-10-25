@@ -34,6 +34,27 @@ const PATROL_INTERVAL: Duration = Duration::from_secs(30);
 /// Consecutive empty rounds (no non-archived pools) before a patrol retires.
 const EMPTY_ROUNDS_BEFORE_EXIT: u32 = 3;
 
+fn kick() -> &'static tokio::sync::Notify {
+    static KICK: OnceLock<tokio::sync::Notify> = OnceLock::new();
+    KICK.get_or_init(tokio::sync::Notify::new)
+}
+
+/// Run the next patrol round of every live patrol now, e.g. after a todo
+/// completes so its dependents start without waiting for the interval.
+pub fn kick_pool_patrols() {
+    kick().notify_waiters();
+}
+
+/// Upper bound on concurrently running member turns per pool, from
+/// `AGENTZ_POOL_MAX_CONCURRENCY` (default 3, min 1).
+pub fn pool_max_concurrency() -> usize {
+    std::env::var("AGENTZ_POOL_MAX_CONCURRENCY")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(3)
+}
+
 fn registry() -> &'static Mutex<HashSet<String>> {
     static REG: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
     REG.get_or_init(|| Mutex::new(HashSet::new()))
@@ -73,7 +94,13 @@ async fn run_patrol(app: AppHandle, project_dir: String) {
 
     let mut empty_rounds = 0u32;
     loop {
-        tokio::time::sleep(PATROL_INTERVAL).await;
+        tokio::select! {
+            _ = tokio::time::sleep(PATROL_INTERVAL) => {}
+            _ = kick().notified() => {
+                // Let the completing turn finish its bookkeeping first.
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        }
         match run_round_isolated(&app, &project_dir, STALE_BUSY_SECS).await {
             Some(0) => {
                 empty_rounds += 1;
@@ -164,7 +191,18 @@ async fn run_round(app: &AppHandle, project_dir: &str, max_busy_secs: i64) -> Op
 
     let (subagent, sink) = pool_wiring(app);
     let cfg = CoordinatorConfig::default();
+    let max_running = pool_max_concurrency();
     for pool in pools.iter().filter(|p| p.status == "active") {
+        let running = {
+            let guard = db.lock().await;
+            guard
+                .list_active_todos_by_pool(&pool.id)
+                .map(|v| v.iter().filter(|t| t.status == "in_progress").count())
+                .unwrap_or(0)
+        };
+        if running >= max_running {
+            continue;
+        }
         match coordinator::activate_pending_todos(
             &store,
             sink.clone(),

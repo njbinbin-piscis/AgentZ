@@ -1301,9 +1301,25 @@ pub async fn claim_todo(
 
     let id = todo.id.clone();
     let claimed_by = caller.memory_owner_id.to_string();
-    store
-        .write(move |db| db.claim_koi_todo(&id, &claimed_by))
+    let won = store
+        .write(move |db| db.try_claim_koi_todo(&id, &claimed_by))
         .await?;
+    if !won {
+        let current = store
+            .read({
+                let id = todo.id.clone();
+                move |db| db.get_koi_todo(&id)
+            })
+            .await?;
+        let holder = current.as_ref().and_then(|t| t.claimed_by.clone());
+        if holder.as_deref() != Some(caller.memory_owner_id) {
+            anyhow::bail!(
+                "Todo '{}' is already in progress (claimed by '{}'). Do not retry; pick another todo.",
+                short(&todo.id),
+                holder.as_deref().unwrap_or("unknown")
+            );
+        }
+    }
 
     if let Some(ref psid) = todo.pool_session_id {
         let psid = psid.clone();

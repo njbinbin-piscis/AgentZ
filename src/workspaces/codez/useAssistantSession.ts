@@ -143,6 +143,8 @@ interface QueuedTurn {
   sessionId: string;
   /** Bubble label when it differs from the model-facing prompt (auto-resume). */
   displayText?: string;
+  /** Mode for this turn when React state has not yet caught up (mode switch + immediate send). */
+  chatModeOverride?: ChatMode;
 }
 
 /**
@@ -260,6 +262,10 @@ export function useAssistantSession({
     const saved = localStorage.getItem("agentz-chat-mode");
     return saved === "plan" ? "plan" : "agent";
   });
+  // Synchronously-updated mirror of `chatMode`: a mode switch followed by an
+  // immediate send (Build, accepted Plan suggestion) must not read the stale
+  // render-time closure value, or the turn runs with the old tool registry.
+  const chatModeRef = useRef<ChatMode>(chatMode);
   const [modelId, setModelId] = useState(() => loadScopedModelId("codez"));
   const { appSettings, llmProviders, defaultModelLabel, defaultModelHint } = useAppSettings();
   const inputHistory = useInputHistory("agentz-input-history-codez");
@@ -722,6 +728,12 @@ export function useAssistantSession({
                   : step,
             );
             const ended = next.find((step) => step.id === evt.id);
+            if (ended && ended.name === "plan_mode_ui" && !evt.is_error) {
+              // plan_ready: the plan is final and the Build card is shown, so open
+              // it in the editor as a rendered preview for the user to review.
+              const m = /plan_path=(\S+?\.md)/.exec(String(evt.result ?? ""));
+              if (m) window.setTimeout(() => onSelectPath(m[1]), 0);
+            }
             if (ended) {
               const p = pathFromToolEvent(ended.name, ended.input, evt.result, [projectDir]);
               if (p) {
@@ -877,13 +889,16 @@ export function useAssistantSession({
     }
     try {
       composerDbg("runTurn → chatSend invoke");
-      const res = await chatSend({
+      // Backend-originated turns (background-task continuation, heartbeat) hold
+      // the session gate without the UI knowing. Treat that as "queued behind
+      // it" and retry instead of surfacing a hard error.
+      const sendOnce = () => chatSend({
         prompt: turn.text,
         displayPrompt: displayText,
         sessionId: turnSessionId,
         projectDir: projectDir!,
         attachment: turn.attachment,
-        chatMode,
+        chatMode: turn.chatModeOverride ?? chatModeRef.current,
         modelId: modelId || null,
         clearPlan: false,
         taskKey,
@@ -892,6 +907,19 @@ export function useAssistantSession({
         sessionSource: SESSION_SOURCE_CODEZ,
         preferZh: i18n.language.startsWith("zh"),
       });
+      let res = await sendOnce().catch((e) => e);
+      for (
+        let attempt = 0;
+        attempt < 150 &&
+        !(res && typeof res === "object" && "session_id" in res) &&
+        String(res).includes("task queued/running");
+        attempt++
+      ) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if (taskKeyBySessionRef.current.get(turnSessionId) !== taskKey) break;
+        res = await sendOnce().catch((e) => e);
+      }
+      if (!res || typeof res !== "object" || !("session_id" in res)) throw res;
       composerDbg("runTurn ← chatSend ok", {
         sessionId: res.session_id,
         turnId: res.turn_id,
@@ -1061,6 +1089,7 @@ export function useAssistantSession({
 
   const onModeChange = useCallback(
     (mode: ChatMode) => {
+      chatModeRef.current = mode;
       setChatMode(mode);
       setModeNotice(mode === "plan" ? t("chat.modePlanHint") : t("chat.modeAgentHint"));
       window.setTimeout(() => setModeNotice(null), 4000);
@@ -1076,14 +1105,46 @@ export function useAssistantSession({
         path: planPath,
       });
       const key = viewSessionKey();
-      const turn: QueuedTurn = { text: prompt, attachment: null, clearPlan: false, sessionId: key };
+      const turn: QueuedTurn = {
+        text: prompt,
+        attachment: null,
+        clearPlan: false,
+        sessionId: key,
+        chatModeOverride: "agent",
+      };
       if (turnBookRef.current.isRunning(key)) {
         enqueueTurn(turn);
       } else {
         void runTurnRef.current(turn);
       }
     },
-    [t, viewSessionKey, enqueueTurn],
+    [t, viewSessionKey, enqueueTurn, onModeChange],
+  );
+
+  /** plan_mode_suggest result: the backend halts the Agent turn on enter_plan,
+   *  so start the Plan-mode turn automatically instead of leaving the user idle. */
+  const onPlanDecision = useCallback(
+    (mode: ChatMode) => {
+      onModeChange(mode);
+      if (mode !== "plan") return;
+      const key = viewSessionKey();
+      const turn: QueuedTurn = {
+        text: t("chat.planEnterPrompt", {
+          defaultValue: "已进入 Plan 模式，请继续：澄清需求并编写执行计划。",
+        }),
+        attachment: null,
+        clearPlan: false,
+        sessionId: key,
+        chatModeOverride: "plan",
+      };
+      // The halted turn may still be winding down; queue if so.
+      if (turnBookRef.current.isRunning(key)) {
+        enqueueTurn(turn);
+      } else {
+        void runTurnRef.current(turn);
+      }
+    },
+    [t, viewSessionKey, enqueueTurn, onModeChange],
   );
 
   const refreshSessions = useCallback(() => {
@@ -1635,6 +1696,6 @@ export function useAssistantSession({
           : t("chat.placeholderFollowUp");
 
   return {
-    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, exportCurrent, importFromFile, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, onModeChange, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
+    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, exportCurrent, importFromFile, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, onModeChange, onPlanDecision, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
   };
 }

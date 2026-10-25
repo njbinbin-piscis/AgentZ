@@ -79,6 +79,24 @@ async fn grep_finds_cjk_text_in_every_common_encoding_under_cjk_path() {
         .await
         .unwrap();
     assert!(r.content.contains("utf8.txt"), "{}", r.content);
+
+    let canonical = root.canonicalize().unwrap();
+    let c = ctx(canonical, SandboxMode::default());
+    let r = FileSearchTool
+        .call(
+            json!({"action": "grep", "pattern": NEEDLE, "path": "源码"}),
+            &c,
+        )
+        .await
+        .unwrap();
+    assert!(!r.is_error, "{}", r.content);
+    assert!(
+        !r.content.contains(r"\\?\"),
+        "verbatim prefix leaked:\n{}",
+        r.content
+    );
+    assert!(r.content.contains("源码/utf8.txt"), "{}", r.content);
+    assert!(r.content.contains("源码/中文文件名.rs"), "{}", r.content);
 }
 
 #[tokio::test]

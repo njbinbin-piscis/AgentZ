@@ -1,0 +1,1011 @@
+.botz {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg, #0e0e14);
+  color: var(--text, #ddd);
+}
+
+.botz-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border, #2a2a38);
+  background: var(--bg-secondary, #15151d);
+  min-height: 36px;
+}
+
+.botz-nav > button,
+.botz-room-toolbar button,
+.botz-newroom button,
+.botz-composer button,
+.botz-bot-rooms button {
+  background: transparent;
+  border: 1px solid var(--border, #2a2a38);
+  color: inherit;
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.botz-nav > button.active,
+.botz-room-toolbar button.active,
+.botz-newroom button.primary {
+  background: var(--accent, #7c6af7);
+  border-color: var(--accent, #7c6af7);
+  color: #fff;
+}
+
+.botz-room-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.botz-room-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.botz-room-tab.active {
+  border-color: var(--border, #2a2a38);
+  background: var(--bg, #0e0e14);
+}
+
+.botz-room-tab-del {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.botz-room-tab:hover .botz-room-tab-del {
+  opacity: 0.6;
+}
+
+.botz-room-add {
+  background: none;
+  border: 1px dashed var(--border, #2a2a38);
+  color: inherit;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 2px 8px;
+}
+
+.botz-badge {
+  font-size: 10px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #2d6cdf;
+  color: #fff;
+  text-align: center;
+}
+
+.botz-badge.warn {
+  background: #e0a100;
+}
+
+.botz-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.botz-rooms {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.botz-rooms[hidden],
+.botz-room[hidden] {
+  display: none;
+}
+
+.botz-rooms-empty {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  opacity: 0.95;
+}
+
+.botz-empty {
+  opacity: 0.55;
+  font-size: 12px;
+}
+
+.botz-error {
+  margin: 6px 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(224, 72, 72, 0.15);
+  color: #f08a8a;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: pre-wrap;
+}
+
+/* ── New room form ── */
+.botz-newroom {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(460px, 100%);
+  padding: 16px;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 10px;
+  background: var(--bg-secondary, #15151d);
+}
+
+.botz-newroom label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.botz-newroom input,
+.botz-newroom select,
+.botz-composer textarea {
+  background: var(--bg, #0e0e14);
+  color: inherit;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+}
+
+.botz-newroom-dir {
+  display: flex;
+  gap: 6px;
+}
+
+.botz-newroom-dir input {
+  flex: 1;
+}
+
+.botz-newroom-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.botz-newroom textarea {
+  background: var(--bg, #0e0e14);
+  color: inherit;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.botz-field-label {
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.botz-field-label select {
+  max-width: 55%;
+}
+
+/* ── Bot picker ── */
+.botz-bot-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.botz-bot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #2a2a38);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.botz-bot-chip.on {
+  opacity: 1;
+  border-color: var(--accent, #7c6af7);
+  background: color-mix(in srgb, var(--accent, #7c6af7) 18%, transparent);
+}
+
+.botz-bot-chip .botz-avatar {
+  width: 24px;
+  height: 22px;
+}
+
+.botz-room-members-anchor {
+  position: relative;
+}
+
+.botz-member-editor {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 10px;
+  background: var(--bg-secondary, #15151d);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.botz-join-room {
+  font-size: 11px;
+  background: transparent;
+  color: inherit;
+  border: 1px dashed var(--border, #2a2a38);
+  border-radius: 6px;
+  padding: 1px 4px;
+}
+
+/* ── Room ── */
+.botz-room {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.botz-room-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.botz-room-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border, #2a2a38);
+}
+
+.botz-room-dir {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.botz-room-toolbar button {
+  margin-left: auto;
+}
+
+.botz-floor {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px) 0 0 / 40px 40px,
+    var(--bg, #0e0e14);
+}
+
+.botz-desks {
+  display: grid;
+  gap: 18px 22px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.botz-desk {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 6px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.botz-desk:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.botz-desk.selected {
+  border-color: var(--accent, #7c6af7);
+  background: rgba(124, 106, 247, 0.08);
+}
+
+.botz-desk.boss {
+  width: 180px;
+}
+
+.botz-nameplate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.botz-desk-task {
+  font-size: 11px;
+  opacity: 0.6;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.botz-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #666;
+}
+
+.botz-dot.act-thinking,
+.botz-dot.act-reading { background: #4fc3f7; }
+.botz-dot.act-typing,
+.botz-dot.act-running { background: #4caf50; animation: botz-pulse 1s infinite; }
+.botz-dot.act-waiting { background: #e0a100; animation: botz-pulse 0.7s infinite; }
+.botz-dot.act-error { background: #e04848; }
+
+.botz-bubble {
+  position: absolute;
+  bottom: calc(100% - 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  max-width: 200px;
+  padding: 5px 9px;
+  border-radius: 10px;
+  background: #f4f4f8;
+  color: #222;
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  animation: botz-pop 0.2s ease-out;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.botz-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border: 5px solid transparent;
+  border-top-color: #f4f4f8;
+}
+
+.botz-alert {
+  position: absolute;
+  top: 2px;
+  right: 18px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e0a100;
+  color: #222;
+  font-weight: 800;
+  text-align: center;
+  line-height: 20px;
+  animation: botz-bounce 0.8s infinite;
+  z-index: 2;
+}
+
+/* ── Avatar animation ── */
+.botz-avatar {
+  width: 120px;
+  height: 110px;
+}
+
+.botz-avatar-body {
+  transform-origin: 60px 92px;
+}
+
+.botz-avatar.act-thinking .botz-avatar-body {
+  animation: botz-sway 2.4s ease-in-out infinite;
+}
+
+.botz-avatar.act-typing .botz-avatar-hands circle {
+  animation: botz-type 0.25s infinite alternate;
+}
+
+.botz-avatar.act-typing .botz-avatar-hands circle:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.botz-avatar.act-running .botz-monitor-screen {
+  animation: botz-flicker 0.6s infinite;
+}
+
+.botz-avatar.act-reading .botz-avatar-eyes {
+  transform: translateY(1.5px);
+}
+
+.botz-avatar.act-idle .botz-steam {
+  animation: botz-steam 2s infinite;
+}
+
+.botz-avatar.act-waiting .botz-avatar-body {
+  animation: botz-bounce 1.2s infinite;
+}
+
+.botz-avatar.act-error .botz-monitor-screen {
+  fill: #e04848;
+}
+
+@keyframes botz-type { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@keyframes botz-sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+@keyframes botz-flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes botz-steam { 0% { opacity: 0; transform: translateY(2px); } 50% { opacity: 0.8; } 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes botz-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes botz-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes botz-pop { from { transform: translateX(-50%) scale(0.8); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .botz-avatar *,
+  .botz-dot,
+  .botz-alert,
+  .botz-bubble {
+    animation: none !important;
+  }
+}
+
+/* ── Board ── */
+.botz-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 12px 12px;
+  max-height: 34%;
+  min-height: 120px;
+  overflow: auto;
+  border-top: 1px solid var(--border, #2a2a38);
+  background: var(--bg-secondary, #15151d);
+}
+
+.botz-board-col {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.botz-board-head {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+
+.botz-board-head span {
+  opacity: 0.6;
+  margin-left: 4px;
+}
+
+.botz-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #2a2a38);
+  background: var(--bg, #0e0e14);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.botz-card.in_progress { border-left: 3px solid #4caf50; }
+.botz-card.blocked { border-left: 3px solid #e0a100; }
+.botz-card.done,
+.botz-card.completed { opacity: 0.6; }
+
+.botz-card-owner {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.botz-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Drawer ── */
+.botz-drawer {
+  width: min(440px, 42%);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border, #2a2a38);
+  background: var(--bg-secondary, #15151d);
+  min-height: 0;
+}
+
+.botz-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border, #2a2a38);
+}
+
+.botz-drawer-head button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.botz-drawer-role {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.botz-drawer-todos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border, #2a2a38);
+}
+
+.botz-drawer-todos button {
+  font-size: 11px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--bg, #0e0e14);
+  border: 1px solid var(--border, #2a2a38);
+  color: inherit;
+  border-radius: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.botz-drawer-todos button.active {
+  border-color: var(--accent, #7c6af7);
+}
+
+.botz-drawer-todos button.in_progress::before {
+  content: "● ";
+  color: #4caf50;
+}
+
+.botz-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.botz-msg {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.botz-msg.user {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(124, 106, 247, 0.16);
+}
+
+.botz-msg-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
+  opacity: 0.6;
+  font-family: var(--font-mono, monospace);
+}
+
+.botz-msg-tools .err {
+  color: #f08a8a;
+}
+
+.botz-live {
+  margin: 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+  opacity: 0.8;
+  font-family: var(--font-mono, monospace);
+}
+
+.botz-composer {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border, #2a2a38);
+}
+
+.botz-composer textarea {
+  flex: 1;
+  min-height: 54px;
+  resize: vertical;
+}
+
+.botz-drawer-hint {
+  padding: 8px 12px;
+  font-size: 11px;
+  opacity: 0.55;
+  border-top: 1px solid var(--border, #2a2a38);
+}
+
+/* ── Bots roster ── */
+.botz-bots {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.botz-bot-card {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px 8px 4px;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 10px;
+  background: var(--bg-secondary, #15151d);
+}
+
+.botz-bot-card .botz-avatar {
+  width: 96px;
+  height: 88px;
+  flex: none;
+}
+
+.botz-bot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.botz-bot-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.botz-bot-state {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.botz-bot-role {
+  font-size: 12px;
+  opacity: 0.7;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.botz-bot-rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.botz-bot-rooms button {
+  font-size: 11px;
+  padding: 1px 8px;
+}
+
+.botz-bot-card {
+  cursor: pointer;
+}
+
+.botz-bot-card:hover {
+  border-color: var(--accent, #7c6af7);
+}
+
+.botz-board-col.droppable {
+  outline: 1px dashed var(--accent, #7c6af7);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.botz-card.needs_review { border-left: 3px solid #4fc3f7; }
+.botz-card[draggable="true"] { cursor: grab; }
+
+.botz-notice {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #2d6cdf;
+  color: #fff;
+  font-size: 12px;
+  z-index: 5;
+}
+
+.botz-room {
+  position: relative;
+}
+
+/* ── Review ── */
+.botz-review-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 16px;
+}
+
+.botz-review {
+  display: flex;
+  flex-direction: column;
+  width: min(1000px, 100%);
+  height: min(780px, 100%);
+  background: var(--bg, #0e0e14);
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.botz-review-desc {
+  padding: 8px 12px;
+  font-size: 12px;
+  opacity: 0.75;
+  white-space: pre-wrap;
+  max-height: 90px;
+  overflow: auto;
+  border-bottom: 1px solid var(--border, #2a2a38);
+}
+
+.botz-review-diff {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  padding: 6px 0;
+}
+
+.botz-diff-line {
+  display: flex;
+  white-space: pre;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.botz-diff-line:hover { outline: 1px solid rgba(255, 255, 255, 0.12); }
+.botz-diff-line.add { background: rgba(76, 175, 80, 0.16); }
+.botz-diff-line.remove { background: rgba(224, 72, 72, 0.16); }
+.botz-diff-line.hunk { color: #4fc3f7; opacity: 0.8; }
+.botz-diff-line.meta { display: none; }
+.botz-diff-line.file {
+  margin-top: 8px;
+  padding: 4px 10px;
+  font-weight: 600;
+  background: var(--bg-secondary, #15151d);
+  cursor: default;
+}
+
+.botz-diff-no {
+  width: 44px;
+  flex: none;
+  text-align: right;
+  padding-right: 10px;
+  opacity: 0.45;
+}
+
+.botz-review-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border, #2a2a38);
+}
+
+.botz-review-actions textarea {
+  flex: 1;
+  min-height: 60px;
+  resize: vertical;
+  background: var(--bg-secondary, #15151d);
+  color: inherit;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.botz-review-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.botz-review-buttons button,
+.botz-home-head button,
+.botz-home-side button {
+  background: transparent;
+  border: 1px solid var(--border, #2a2a38);
+  color: inherit;
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.botz-review-buttons button.primary {
+  background: var(--accent, #7c6af7);
+  border-color: var(--accent, #7c6af7);
+  color: #fff;
+}
+
+/* ── Bot home ── */
+.botz-home {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.botz-home-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.botz-home-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border, #2a2a38);
+}
+
+.botz-home-head .botz-avatar {
+  width: 72px;
+  height: 66px;
+}
+
+.botz-home-side {
+  width: min(360px, 38%);
+  overflow: auto;
+  border-left: 1px solid var(--border, #2a2a38);
+  background: var(--bg-secondary, #15151d);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.botz-home-side h4 {
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.botz-home-side textarea,
+.botz-home-side input,
+.botz-home-side select {
+  background: var(--bg, #0e0e14);
+  color: inherit;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.botz-memory {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+}
+
+.botz-budget {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.botz-budget input {
+  width: 110px;
+}
+
+.botz-routine {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.botz-routine textarea {
+  min-height: 48px;
+  resize: vertical;
+}
+
+.botz-routine-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.botz-routine-row .grow {
+  flex: 1;
+}
+
+.botz-routine-row input[type="number"] {
+  width: 64px;
+}
+
+.botz-routine-row .botz-empty {
+  flex: 1;
+}

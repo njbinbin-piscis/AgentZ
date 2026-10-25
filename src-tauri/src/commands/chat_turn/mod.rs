@@ -37,7 +37,7 @@ pub use post_turn::{model_supports_vision, resolve_attachment};
 pub(crate) use prompt_assembly::{load_installed_skills, SkillManifest};
 pub(crate) use tool_approval::{
     apply_llm_provider, materialize_headless_llm_settings, resolve_koi_llm_provider_for_turn,
-    run_subagent_research, run_subagent_with_prompt,
+    run_subagent_research, run_subagent_with_options, run_subagent_with_prompt, SubagentOptions,
 };
 
 use post_turn::{
@@ -259,6 +259,7 @@ pub async fn run_agentz_turn(
 
     let loop_halt = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let budget_scope = crate::runtime::task_budget::BudgetScope::default();
+    let delegation_bridge = crate::runtime::subagent_bridge::BridgeSlot::default();
     let api_connector_allowlist = enabled_connectors.clone();
     let mut registry = build_tool_registry(
         app.clone(),
@@ -280,6 +281,7 @@ pub async fn run_agentz_turn(
         slash_tool_allowlist.clone(),
         budget_scope.clone(),
         background_registry,
+        delegation_bridge.clone(),
     );
 
     register_mcp_and_connector_tools(
@@ -709,6 +711,10 @@ pub async fn run_agentz_turn(
     ));
 
     let vision_override = vision_capable || vision_enabled_setting;
+    // Vision models get a compressed screenshot after each visual browser action.
+    app.state::<crate::state::AppState>()
+        .browser
+        .set_auto_screenshot(vision_override);
     let registry = Arc::new(registry);
     let hooks: Arc<dyn piscis_kernel::agent::hooks::AgentHooks> =
         Arc::new(crate::runtime::journal_hooks::JournalWithIdeNotify::new(
@@ -759,6 +765,9 @@ pub async fn run_agentz_turn(
         ));
     }
     let hooks: Arc<dyn piscis_kernel::agent::hooks::AgentHooks> = approval_hooks;
+    let _ = delegation_bridge.set(crate::runtime::subagent_bridge::ParentBridge {
+        read_only: chat_mode == "plan",
+    });
     let confirm_flags = piscis_kernel::agent::loop_::confirm_flags_handle(
         confirm_shell_commands,
         confirm_file_writes,

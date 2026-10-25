@@ -222,7 +222,7 @@ fn read_text(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
 
@@ -268,7 +268,7 @@ fn read_text(input: &Value, workspace: &Path) -> Result<ToolResult> {
 
     Ok(ToolResult::ok(format!(
         "PDF: {} — extracted {} characters{}\n\n{}",
-        path.display(),
+        crate::path_text::display_path(&path),
         char_count,
         note,
         output
@@ -284,7 +284,7 @@ fn get_info(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
 
@@ -341,7 +341,7 @@ fn get_info(input: &Value, workspace: &Path) -> Result<ToolResult> {
          Creator:       {}\n\
          Producer:      {}\n\
          Creation date: {}",
-        path.display(),
+        crate::path_text::display_path(&path),
         page_count,
         file_size,
         encrypted,
@@ -379,7 +379,7 @@ fn extract_images(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let out_dir = match input["output_dir"].as_str() {
@@ -438,7 +438,7 @@ fn extract_images(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if count == 0 {
         Ok(ToolResult::ok(format!(
             "No embedded images found in {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )))
     } else {
         Ok(ToolResult::ok(format!(
@@ -563,7 +563,7 @@ fn split(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let out_dir = match input["output_dir"].as_str() {
@@ -621,7 +621,7 @@ fn split(input: &Value, workspace: &Path) -> Result<ToolResult> {
 
     Ok(ToolResult::ok(format!(
         "Split {} into {} part(s) in {}:\n{}",
-        path.display(),
+        crate::path_text::display_path(&path),
         saved.len(),
         out_dir.display(),
         saved.join("\n")
@@ -637,7 +637,7 @@ fn add_watermark(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let output = try_tr!(require_output(input, workspace));
@@ -721,7 +721,7 @@ fn encrypt(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let output = try_tr!(require_output(input, workspace));
@@ -757,7 +757,7 @@ fn decrypt(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let output = try_tr!(require_output(input, workspace));
@@ -794,7 +794,7 @@ fn fill_form(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let output = try_tr!(require_output(input, workspace));
@@ -873,7 +873,7 @@ fn add_annotation(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let output = try_tr!(require_output(input, workspace));
@@ -968,7 +968,7 @@ fn to_images(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let out_dir = match input["output_dir"].as_str() {
@@ -1071,7 +1071,7 @@ fn render_page_image(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let page = input["page"].as_u64().unwrap_or(1) as u32;
@@ -1097,7 +1097,7 @@ fn render_page_image(input: &Value, workspace: &Path) -> Result<ToolResult> {
     Ok(ToolResult::ok(format!(
         "Rendered page {} from {} at {} DPI as an inline image ({}x{} px).",
         page,
-        path.display(),
+        crate::path_text::display_path(&path),
         dpi,
         width,
         height
@@ -1110,7 +1110,7 @@ fn render_region_image(input: &Value, workspace: &Path) -> Result<ToolResult> {
     if !path.exists() {
         return Ok(ToolResult::err(format!(
             "File not found: {}",
-            path.display()
+            crate::path_text::display_path(&path)
         )));
     }
     let page = input["page"].as_u64().unwrap_or(1) as u32;
@@ -1175,7 +1175,7 @@ fn render_region_image(input: &Value, workspace: &Path) -> Result<ToolResult> {
     Ok(ToolResult::ok(format!(
         "Rendered page {} from {} at {} DPI and cropped region [{}, {}, {}, {}] into an inline image.",
         page,
-        path.display(),
+        crate::path_text::display_path(&path),
         dpi,
         left,
         top,

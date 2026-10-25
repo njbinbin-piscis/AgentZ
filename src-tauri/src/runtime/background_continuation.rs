@@ -275,32 +275,48 @@ impl BgContinuationHub {
             }
             tokio::time::sleep(Duration::from_secs(2)).await;
         }
-        self.pending.lock().unwrap().remove(&bg_id);
-        crate::runtime::background_store::delete_pending(
-            &app,
-            &pending.project_dir,
-            &bg_id,
-        )
-        .await;
-        let result = dispatch_host_turn(
-            app,
-            None,
-            &state,
-            HostTurnParams {
-                prompt: pending.prompt.clone(),
-                display_prompt: Some(pending.display_prompt.clone()),
-                session_id: Some(pending.session_id.clone()),
-                project_dir: Some(pending.project_dir.clone()),
-                chat_mode: Some("agent".to_string()),
-                task_key: Some(format!("host-bg-{bg_id}")),
-                session_source: pending.session_source.clone(),
-                prefer_zh: Some(pending.prefer_zh),
-                ..Default::default()
-            },
-        )
-        .await;
-        if let Err(error) = result {
-            tracing::warn!(bg_id = %bg_id, "background continuation turn failed: {error}");
+        // A user turn can grab the task gate between the idle check and dispatch;
+        // re-park on that error instead of failing the continuation.
+        loop {
+            let result = dispatch_host_turn(
+                app.clone(),
+                None,
+                &state,
+                HostTurnParams {
+                    prompt: pending.prompt.clone(),
+                    display_prompt: Some(pending.display_prompt.clone()),
+                    session_id: Some(pending.session_id.clone()),
+                    project_dir: Some(pending.project_dir.clone()),
+                    chat_mode: Some("agent".to_string()),
+                    task_key: Some(format!("host-bg-{bg_id}")),
+                    session_source: pending.session_source.clone(),
+                    prefer_zh: Some(pending.prefer_zh),
+                    ..Default::default()
+                },
+            )
+            .await;
+            match result {
+                Err(e)
+                    if e.contains("task queued/running")
+                        && std::time::Instant::now() < deadline
+                        && self.pending.lock().unwrap().contains_key(&bg_id) =>
+                {
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                }
+                other => {
+                    self.pending.lock().unwrap().remove(&bg_id);
+                    crate::runtime::background_store::delete_pending(
+                        &app,
+                        &pending.project_dir,
+                        &bg_id,
+                    )
+                    .await;
+                    if let Err(error) = other {
+                        tracing::warn!(bg_id = %bg_id, "background continuation turn failed: {error}");
+                    }
+                    return;
+                }
+            }
         }
     }
 

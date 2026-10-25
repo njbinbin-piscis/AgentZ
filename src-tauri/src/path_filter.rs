@@ -95,8 +95,31 @@ pub fn is_ignored_rel_path(rel_norm: &str) -> bool {
     false
 }
 
+/// Entries that stay hidden even when the explorer's "show hidden files" is on
+/// (VCS internals and dependency/build trees that would flood the tree).
+pub fn is_always_hidden_tree_entry(name: &str) -> bool {
+    matches!(
+        name,
+        ".git"
+            | "node_modules"
+            | "__pycache__"
+            | "target"
+            | ".koi-worktrees"
+            | ".agentz-worktrees"
+            | ".DS_Store"
+    )
+}
+
 /// File-tree helper: combine built-in dir ignores with optional `.gitignore` patterns.
 pub fn is_ignored_tree_entry(name: &str, rel_path: &str, gitignore_patterns: &[String]) -> bool {
+    // `.agentz` holds user-editable rules/hooks/plans: always visible in the explorer
+    // (even when .gitignore lists it). Only its internal databases stay hidden.
+    if name == ".agentz" {
+        return false;
+    }
+    if rel_path.contains("/.agentz/") {
+        return IGNORED_FILE_SUFFIXES.iter().any(|s| name.ends_with(s));
+    }
     if IGNORED_DIR_NAMES.contains(&name) {
         return true;
     }
@@ -121,6 +144,17 @@ pub fn is_ignored_tree_entry(name: &str, rel_path: &str, gitignore_patterns: &[S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tree_shows_agentz_but_hides_its_databases() {
+        let pats = vec![".agentz/".to_string()];
+        assert!(!is_ignored_tree_entry(".agentz", "/p/.agentz", &pats));
+        assert!(!is_ignored_tree_entry("rules", "/p/.agentz/rules", &pats));
+        assert!(!is_ignored_tree_entry("hooks.json", "/p/.agentz/hooks.json", &pats));
+        assert!(is_ignored_tree_entry("piscis.db", "/p/.agentz/piscis.db", &pats));
+        assert!(is_ignored_tree_entry("piscis.db-wal", "/p/.agentz/piscis.db-wal", &pats));
+        assert!(is_ignored_tree_entry("node_modules", "/p/node_modules", &pats));
+    }
 
     #[test]
     fn ignores_agentz_sqlite_and_wal() {

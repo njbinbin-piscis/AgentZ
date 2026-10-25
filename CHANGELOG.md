@@ -5,6 +5,25 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.17] - 2026-10-26
+
+### Added
+
+- **Sub-agent delegation.** The main agent can hand work to sub-agents through the `delegate`, `call_fish` and `task` tools. Settings has a new *Sub-agent delegation* section (Off / Research only / Auto, max concurrency 1–16); registered agents can opt in to being delegated to. Chat shows sub-agent cards with live activity. Write-capable tasks run in isolated worktrees and are reviewed before merging.
+- **BotZ workspace (preview).** A new workspace for running routine bots with rooms, avatars and a review panel. See `docs/botz-design-2026-10-25.md`.
+- **Rooms own their members.** A new room is created by picking bots directly; a team template only pre-fills the selection. Existing rooms add or remove members from the toolbar, and bot cards have a *Join room* action. Members who still own active todos stay until their work settles. Rooms created from a template take over its members and contract on first open and keep their pool.
+- **Run location and remote boundary.** The title bar shows where the current project runs (💻 local, 🔌 SSH / container / WSL) with a capability table on hover. Remote projects support the editor, terminal, LSP, debugging, extensions and single-agent chat; WorkZ team pools and BotZ rooms are local-only for now. Those modes show a banner with *Open a local project* and *Back to CodeZ* for remote projects, and the backend rejects remote directories for pools and rooms.
+- **Show hidden files in the explorer.** A toggle in the Explorer header lists dotfiles, `.agentz` and gitignored entries; `.git`, `node_modules`, `target` and similar stay hidden. The choice is remembered.
+- **Browser tool for vision models (RobotZ 0.1.14).** Visual actions (navigate, click, type, scroll…) automatically attach a compressed viewport screenshot when the model supports images; identical consecutive frames are skipped. `screenshot` can capture a single element (`ref`/`selector`) or an `x,y,width,height` region, is downscaled to at most 1568 px (2000 px for full page, capped at 6000 CSS px tall), and is saved to `.agentz/screenshots/` by default.
+
+### Changed
+
+- `.agentz` is now always visible in the explorer (only its internal databases are hidden), even when `.gitignore` lists it.
+- Vision-model detection is table-driven and provider-independent (GPT-5, Gemini, Grok, GLM-4.5V, Kimi K2.5/K3, Qwen3-VL, …). Extra patterns can be added with the `AGENTZ_VISION_MODELS` environment variable.
+- Windows UI-automation `type_text` fails loudly instead of silently injecting nothing when the target cannot accept keyboard input.
+- Kernel file tools print paths through one locale-independent helper (`path_text`), so Chinese paths stay intact on non-Chinese Windows locales and `\\?\` prefixes no longer leak into tool output.
+- OpenAI-compatible streaming drops tool calls with an empty name, synthesizes missing call ids, and assembles streamed calls in a deterministic order.
+
 ## [1.0.16] - 2026-10-25
 
 ### Added

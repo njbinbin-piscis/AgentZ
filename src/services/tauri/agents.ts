@@ -36,6 +36,12 @@ export interface AgentManifest {
   max_iterations?: number;
   task_timeout_secs?: number;
   koi_id?: string | null;
+  /** Real allowlist applied only when this agent runs as a delegated sub-agent. */
+  tool_allowlist?: string[];
+  /** "read_only" (default) | "ask" | "inherit". */
+  permission_mode?: string;
+  /** Whether the main agent may delegate to this agent. */
+  delegable?: boolean;
 }
 
 export interface BuiltinToolInfo {

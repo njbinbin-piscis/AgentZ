@@ -1,6 +1,6 @@
 [package]
 name = "agentz-desktop"
-version = "1.0.16"
+version = "1.0.17"
 description = "AgentZ — Cursor-like AI IDE desktop host"
 authors = ["AgentZ"]
 license = "Apache-2.0"
@@ -32,7 +32,7 @@ piscis-kernel = { workspace = true }
 piscis-ide-tools = { workspace = true }
 
 # RobotZ browser tool
-robotz-browser = { git = "https://github.com/njbinbin-piscis/RobotZ.git", package = "robotz-browser", rev = "v0.1.13", features = ["piscis-kernel"] }
+robotz-browser = { git = "https://github.com/njbinbin-piscis/RobotZ.git", package = "robotz-browser", rev = "v0.1.14", features = ["piscis-kernel"] }
 
 # Tauri runtime + the plugins the IDE workspace needs.
 tauri = { version = "2", features = [] }

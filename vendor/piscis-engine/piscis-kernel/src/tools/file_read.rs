@@ -1,4 +1,5 @@
 use crate::agent::tool::{Tool, ToolContext, ToolResult};
+use crate::path_text::{display_path_for_tool, os_text};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -190,7 +191,7 @@ impl Tool for FileReadTool {
         if !path.exists() {
             return Ok(ToolResult::err(crate::tools::output::format_err(
                 crate::tools::output::ToolErrorCode::FileNotFound,
-                &format!("File not found: {}", path.display()),
+                &format!("File not found: {}", display_path_for_tool(&path, &ctx.workspace_root)),
                 "Use file_list or file_search glob to verify the path.",
             )));
         }
@@ -200,8 +201,8 @@ impl Tool for FileReadTool {
         // Determine file type by extension
         let ext = path
             .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
+            .map(os_text)
+            .unwrap_or_default()
             .to_lowercase();
 
         let is_image = matches!(
@@ -227,7 +228,7 @@ impl Tool for FileReadTool {
             };
             return Ok(ToolResult::ok(format!(
                 "Image file: {} ({} bytes)\nbase64:{};{}",
-                path.display(),
+                display_path_for_tool(&path, &ctx.workspace_root),
                 bytes.len(),
                 media_type,
                 b64
@@ -245,7 +246,7 @@ impl Tool for FileReadTool {
                      提示：该文件受系统权限保护，无法直接读取。\
                      请改用 shell 工具（如 `Get-Content` 或 `type`）以当前用户权限读取，\
                      或确认文件路径是否正确。",
-                    path.display()
+                    display_path_for_tool(&path, &ctx.workspace_root)
                 )
             } else {
                 format!("Failed to read file: {}", e)
@@ -264,7 +265,7 @@ impl Tool for FileReadTool {
             let outline = build_file_outline(&content);
             return Ok(ToolResult::ok(format!(
                 "Outline: {}{} ({} bytes)\n\n{}",
-                path.display(),
+                display_path_for_tool(&path, &ctx.workspace_root),
                 encoding_note,
                 metadata.len(),
                 outline
@@ -331,7 +332,7 @@ impl Tool for FileReadTool {
 
         let body = format!(
             "File: {}{} ({} lines total, showing lines {}-{})\n\n{}",
-            path.display(),
+            display_path_for_tool(&path, &ctx.workspace_root),
             encoding_note,
             total,
             start + 1,

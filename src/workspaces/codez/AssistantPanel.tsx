@@ -152,7 +152,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         onUndoTurn={s.undoTurnChanges}
         onCardSubmitted={s.markSubmitted}
         onCardActionSent={s.markActionSent}
-        onPlanModeChange={s.onModeChange}
+        onPlanModeChange={s.onPlanDecision}
         onPlanBuild={s.onPlanBuild}
         permissionRequest={s.permissionRequest}
         onPermissionResolved={s.handlePermissionResolved}

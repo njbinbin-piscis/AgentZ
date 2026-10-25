@@ -14,7 +14,13 @@ export function TextBlock({ block }: { block: UiBlock }) {
   );
 }
 
-export function SectionBlock({ block }: { block: UiBlock }) {
+export function SectionBlock({
+  block,
+  renderChild,
+}: {
+  block: UiBlock;
+  renderChild?: (child: UiBlock, index: number) => React.ReactNode;
+}) {
   return (
     <div className="ic-section">
       {block.label && <div className="ic-section-title">{block.label}</div>}
@@ -23,6 +29,7 @@ export function SectionBlock({ block }: { block: UiBlock }) {
           <Markdown content={block.description} compact />
         </div>
       )}
+      {renderChild && block.blocks?.map((child, i) => renderChild(child, i))}
     </div>
   );
 }

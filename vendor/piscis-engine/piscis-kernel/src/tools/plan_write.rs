@@ -25,7 +25,15 @@ impl Tool for PlanWriteTool {
          then persist the full plan here. Each step must be atomic and list expected \
          artifacts plus verifiable evidence. Agent mode: update the same file to track \
          step status and execution records as you work. \
-         Paths must be relative like `.agentz/plans/<name>.md`."
+         Paths must be relative like `.agentz/plans/<name>.md`.\n\
+         REQUIRED FORMAT: steps are level-2 headings `## Step N: step-id — title` (exactly two `#`, \
+         NOT `###`), followed by bold-field bullets: `- **状态**: pending`, `- **描述**: …`, \
+         `- **依赖**: …`, `- **预期产物**: …`, `- **验收证据**: …`, `- **执行记录**: …`. \
+         Example:\n\
+         # 执行步骤\n\n\
+         ## Step 1: add-parser — 实现解析器\n\
+         - **状态**: pending\n- **描述**: …\n- **依赖**: 无\n- **预期产物**: …\n- **验收证据**: …\n- **执行记录**:\n\
+         Omit `content` and pass `title` to get a valid starter template."
     }
 
     fn input_schema(&self) -> Value {
@@ -38,7 +46,7 @@ impl Tool for PlanWriteTool {
                 },
                 "content": {
                     "type": "string",
-                    "description": "Full markdown plan body. Must include `# 执行步骤` with `## Step N:` blocks, each having 状态/描述/预期产物/验收证据/执行记录 fields."
+                    "description": "Full markdown plan body. Must include a `# 执行步骤` section whose steps are headings of EXACTLY the form `## Step N: step-id — title` (two #, not three), each followed by `- **状态**:`, `- **描述**:`, `- **依赖**:`, `- **预期产物**:`, `- **验收证据**:`, `- **执行记录**:` bullets."
                 },
                 "title": {
                     "type": "string",
@@ -91,6 +99,7 @@ impl Tool for PlanWriteTool {
             }
         };
 
+        let content = crate::agent::plan_doc::normalize_plan_content(&content);
         if let Err(e) = validate_plan_content(&content) {
             return Ok(ToolResult::err(format!("计划格式校验失败: {e}")));
         }

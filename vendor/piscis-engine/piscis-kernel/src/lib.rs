@@ -16,6 +16,7 @@ pub mod headless;
 pub mod llm;
 pub mod memory;
 pub mod notify;
+pub mod path_text;
 pub mod policy;
 pub mod pool;
 pub mod proc;

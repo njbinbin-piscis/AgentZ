@@ -1,4 +1,4 @@
-//! IDE-domain commands — file tree, file I/O, git integration, terminal PTY,
+﻿//! IDE-domain commands — file tree, file I/O, git integration, terminal PTY,
 //! and file-change event bridge for the embedded Monaco Editor IDE.
 //!
 //! All commands are registered as Tauri commands by `app::bootstrap`.
@@ -107,7 +107,9 @@ pub struct BranchInfo {
 pub async fn ide_list_files(
     project_dir: String,
     depth: Option<usize>,
+    show_hidden: Option<bool>,
 ) -> Result<Vec<FileNode>, String> {
+    let show_hidden = show_hidden.unwrap_or(false);
     if crate::remote::is_remote(&project_dir) {
         let session = crate::remote::bind(&project_dir).await?;
         let v = session
@@ -127,7 +129,7 @@ pub async fn ide_list_files(
     let max_depth = depth.unwrap_or(10);
     tokio::task::spawn_blocking(move || {
         let ignore_patterns = load_gitignore_patterns(&root);
-        let mut nodes = build_file_tree(&root, &root, 0, max_depth, &ignore_patterns)
+        let mut nodes = build_file_tree(&root, &root, 0, max_depth, &ignore_patterns, show_hidden)
             .map_err(|e| format!("Failed to list files: {}", e))?;
         sort_file_nodes(&mut nodes);
         Ok(nodes)
@@ -150,7 +152,10 @@ fn load_gitignore_patterns(root: &Path) -> Vec<String> {
     }
 }
 
-fn is_ignored(name: &str, path: &Path, patterns: &[String]) -> bool {
+fn is_ignored(name: &str, path: &Path, patterns: &[String], show_hidden: bool) -> bool {
+    if show_hidden {
+        return crate::path_filter::is_always_hidden_tree_entry(name);
+    }
     let rel = path.to_string_lossy().replace('\\', "/");
     crate::path_filter::is_ignored_tree_entry(name, &rel, patterns)
 }
@@ -161,6 +166,7 @@ fn build_file_tree(
     current_depth: usize,
     max_depth: usize,
     patterns: &[String],
+    show_hidden: bool,
 ) -> std::io::Result<Vec<FileNode>> {
     if current_depth >= max_depth {
         return Ok(vec![]);
@@ -180,7 +186,7 @@ fn build_file_tree(
         let name = entry.file_name().to_string_lossy().to_string();
         let path = entry.path();
 
-        if is_ignored(&name, &path, patterns) {
+        if is_ignored(&name, &path, patterns, show_hidden) {
             continue;
         }
 
@@ -201,7 +207,7 @@ fn build_file_tree(
         });
 
         if metadata.is_dir() {
-            let children = build_file_tree(&path, root, current_depth + 1, max_depth, patterns)?;
+            let children = build_file_tree(&path, root, current_depth + 1, max_depth, patterns, show_hidden)?;
             nodes.push(FileNode {
                 name,
                 path: relative,

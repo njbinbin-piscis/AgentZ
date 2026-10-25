@@ -22,44 +22,68 @@ use super::tool_approval::{
 };
 use super::SessionRunningGuard;
 
-pub fn model_supports_vision(provider: &str, model: &str) -> bool {
+/// Model-name fragments known to accept image input (matched on the lowercase model id,
+/// provider-agnostic so gateways/proxies such as OpenRouter work too).
+const VISION_MODEL_PATTERNS: &[&str] = &[
+    "gpt-4o", "gpt-4-vision", "gpt-4-turbo", "gpt-4.1", "gpt-4.5", "gpt-5", "chatgpt-4o",
+    "claude-3", "claude-4", "claude-5", "claude-opus", "claude-sonnet", "claude-haiku",
+    "gemini", "gemma-3", "grok-4", "grok-2-vision", "grok-vision",
+    "llama-4", "llama-3.2-11b", "llama-3.2-90b", "pixtral", "mistral-medium-3",
+    "mistral-small-3", "mistral-large-3",
+    "qwen-vl", "qwen2-vl", "qwen2.5-vl", "qwen3-vl", "qwen3.5", "qvq", "qwen-omni",
+    "glm-4v", "glm-4.5v", "glm-4.6v", "glm-5", "kimi-k2.5", "kimi-k3", "kimi-vl",
+    "moonshot-v1-vision", "doubao-seed", "doubao-vision", "deepseek-vl", "internvl",
+    "minicpm-v", "step-1v", "hunyuan-vision", "ernie-4.5-vl", "muse-wonder",
+    "vision", "-vl", "-vl-", "multimodal",
+];
+
+/// Models that look like vision matches above but are text-only.
+const TEXT_ONLY_EXCEPTIONS: &[&str] = &["o1-mini", "o1-preview", "gpt-3.5", "gpt-4-32k", "embedding"];
+
+fn extra_vision_patterns() -> Vec<String> {
+    std::env::var("AGENTZ_VISION_MODELS")
+        .ok()
+        .map(|v| {
+            v.split(',')
+                .map(|p| p.trim().to_lowercase())
+                .filter(|p| !p.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+pub fn model_supports_vision(_provider: &str, model: &str) -> bool {
     let m = model.to_lowercase();
-    let p = provider.to_lowercase();
-    if p == "openai" || p.contains("openai") {
-        return m.contains("gpt-4o")
-            || m.contains("gpt-4-vision")
-            || m.contains("gpt-4-turbo")
-            || m.contains("o1")
-            || m.contains("o3")
-            || m.contains("o4");
+    if extra_vision_patterns().iter().any(|p| m.contains(p.as_str())) {
+        return true;
     }
-    if p == "anthropic" || p.contains("claude") || m.contains("claude") {
-        return m.contains("claude-3")
-            || m.contains("claude-4")
-            || m.contains("claude-opus")
-            || m.contains("claude-sonnet")
-            || m.contains("claude-haiku");
+    if TEXT_ONLY_EXCEPTIONS.iter().any(|p| m.contains(p)) {
+        return false;
     }
-    if p == "qwen" || p == "tongyi" || p.contains("qwen") {
-        return m.contains("qwen-vl")
-            || m.contains("qwen2-vl")
-            || m.contains("qwen2.5-vl")
-            || m.contains("qwen3-vl")
-            || m.contains("qvq")
-            || m.contains("qwen-omni")
-            || m.contains("vl")
-            || m.contains("vision");
+    let id = m.rsplit('/').next().unwrap_or(&m);
+    if id.starts_with("o1") || id.starts_with("o3") || id.starts_with("o4") {
+        return true;
     }
-    if p == "kimi" || p == "moonshot" {
-        return m.contains("vision") || m.contains("vl");
+    VISION_MODEL_PATTERNS.iter().any(|p| m.contains(p))
+}
+
+#[cfg(test)]
+mod vision_table_tests {
+    use super::model_supports_vision;
+
+    #[test]
+    fn recognizes_modern_vision_families() {
+        for m in ["gpt-5", "claude-sonnet-4", "gemini-2.5-pro", "qwen3-vl-plus", "glm-4.5v", "kimi-k2.5"] {
+            assert!(model_supports_vision("", m), "{m}");
+        }
     }
-    if p == "zhipu" {
-        return m.contains("vision") || m.contains("vl") || m.contains("glm-4v");
+
+    #[test]
+    fn text_only_models_stay_text_only() {
+        for m in ["o1-mini", "deepseek-chat", "gpt-3.5-turbo", "glm-4-flash"] {
+            assert!(!model_supports_vision("", m), "{m}");
+        }
     }
-    if p == "minimax" {
-        return m.contains("vision") || m.contains("vl");
-    }
-    false
 }
 
 pub fn resolve_attachment(

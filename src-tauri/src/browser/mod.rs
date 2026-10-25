@@ -100,13 +100,20 @@ impl BrowserGenerationTracker {
 pub struct GuardedBrowserTool {
     inner: robotz_browser::BrowserTool,
     generations: BrowserGenerationTracker,
+    /// When set (vision-capable model), visual actions request an auto screenshot.
+    auto_screenshot: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl GuardedBrowserTool {
-    pub fn new(manager: SharedBrowserManager, generations: BrowserGenerationTracker) -> Self {
+    pub fn new(
+        manager: SharedBrowserManager,
+        generations: BrowserGenerationTracker,
+        auto_screenshot: Arc<std::sync::atomic::AtomicBool>,
+    ) -> Self {
         Self {
             inner: robotz_browser::BrowserTool::new(manager),
             generations,
+            auto_screenshot,
         }
     }
 }
@@ -153,6 +160,11 @@ impl Tool for GuardedBrowserTool {
             }
         }
 
+        if self.auto_screenshot.load(std::sync::atomic::Ordering::Relaxed) {
+            if let Some(obj) = input.as_object_mut() {
+                obj.entry("auto_screenshot").or_insert(serde_json::Value::Bool(true));
+            }
+        }
         let mut res = self.inner.call(input, ctx).await?;
         if action == "snapshot" && !res.is_error {
             let gen = self.generations.record_snapshot();
@@ -217,6 +229,7 @@ pub struct BrowserManager {
     inner: SharedBrowserManager,
     viewport: Arc<Mutex<(u32, u32)>>,
     generations: BrowserGenerationTracker,
+    auto_screenshot: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Default for BrowserManager {
@@ -229,6 +242,7 @@ impl Default for BrowserManager {
             inner: create_browser_manager(options),
             viewport: Arc::new(Mutex::new((1280, 800))),
             generations: BrowserGenerationTracker::new(),
+            auto_screenshot: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 }
@@ -250,7 +264,17 @@ impl BrowserManager {
 
     /// Builds a generation-guarded [`GuardedBrowserTool`] bound to this manager.
     pub fn guarded_tool(&self) -> GuardedBrowserTool {
-        GuardedBrowserTool::new(self.inner.clone(), self.generations.clone())
+        GuardedBrowserTool::new(
+            self.inner.clone(),
+            self.generations.clone(),
+            self.auto_screenshot.clone(),
+        )
+    }
+
+    /// Enable per-turn auto screenshots after visual actions (vision-capable models only).
+    pub fn set_auto_screenshot(&self, on: bool) {
+        self.auto_screenshot
+            .store(on, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Run a closure with the active page, launching Chrome first if needed.

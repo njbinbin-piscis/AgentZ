@@ -188,6 +188,8 @@ export default function CodeZWorkspace(props: IDEProps) {
                     onRefresh={() =>
                       s.scheduleWorkspaceRefresh({ git: true, fileTree: true, force: true, delayMs: 0 })
                     }
+                    showHidden={s.showHiddenFiles}
+                    onToggleShowHidden={s.toggleShowHiddenFiles}
                     onSelect={s.handleFileTreeSelect}
                     onContextMenu={s.handleFileTreeContextMenu}
                     containerRef={s.fileTreeRef}

@@ -7,10 +7,18 @@ use std::{
 use tokio::sync::{Mutex, OwnedMutexGuard};
 type Key = (String, String);
 type Entries = HashMap<Key, Weak<Mutex<()>>>;
+fn holders() -> &'static MapMutex<HashMap<Key, (String, std::time::Instant)>> {
+    static H: std::sync::OnceLock<MapMutex<HashMap<Key, (String, std::time::Instant)>>> =
+        std::sync::OnceLock::new();
+    H.get_or_init(Default::default)
+}
 #[derive(Clone, Default)]
 pub struct TaskActivity(Arc<MapMutex<Entries>>);
 impl TaskActivity {
+    #[track_caller]
     pub fn try_enter(&self, project: &Path, task: &str) -> Result<OwnedMutexGuard<()>, String> {
+        let loc = std::panic::Location::caller();
+        let caller = format!("{}:{}", loc.file(), loc.line());
         if task.trim().is_empty() {
             return Err("task activity requires a task identity".into());
         }
@@ -22,12 +30,29 @@ impl TaskActivity {
                 lock
             } else {
                 let lock = Arc::new(Mutex::new(()));
-                entries.insert(key, Arc::downgrade(&lock));
+                entries.insert(key.clone(), Arc::downgrade(&lock));
                 lock
             }
         };
-        lock.try_lock_owned()
-            .map_err(|_| "task queued/running or goal mutation active".into())
+        match lock.try_lock_owned() {
+            Ok(guard) => {
+                if let Ok(mut h) = holders().lock() {
+                    h.insert(key, (caller, std::time::Instant::now()));
+                }
+                Ok(guard)
+            }
+            Err(_) => {
+                // Diagnostic: say who holds the gate and for how long, so a
+                // leaked gate (UI idle, nothing running) is identifiable.
+                let who = holders()
+                    .lock()
+                    .ok()
+                    .and_then(|h| h.get(&key).map(|(c, t)| format!("{c}, {}s", t.elapsed().as_secs())))
+                    .unwrap_or_else(|| "unknown".into());
+                tracing::warn!(task = %task, holder = %who, "task gate busy");
+                Err(format!("task queued/running or goal mutation active (held by {who})"))
+            }
+        }
     }
 
     /// True while a host turn (or goal mutation) still holds the task gate.

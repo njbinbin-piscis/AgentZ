@@ -77,6 +77,9 @@ interface FileTreeProps {
   projectDir: string | null;
   onFileClick: (node: FileNode) => void;
   onRefresh: () => void;
+  /** Whether hidden/ignored entries (dot dirs, .gitignore'd, build dirs) are listed. */
+  showHidden?: boolean;
+  onToggleShowHidden?: () => void;
   onSelect: (path: string, opts: { multi: boolean }) => void;
   onContextMenu: (menu: FileTreeContextMenu) => void;
   /** Optional ref to the scrollable tree root (for context-menu actions). */
@@ -366,6 +369,8 @@ export default function FileTree({
   projectDir,
   onFileClick,
   onRefresh,
+  showHidden = false,
+  onToggleShowHidden,
   onSelect,
   onContextMenu,
   containerRef,
@@ -629,6 +634,19 @@ export default function FileTree({
           >
             📁+
           </button>
+          {onToggleShowHidden && (
+            <button
+              type="button"
+              className={showHidden ? "active" : undefined}
+              aria-pressed={showHidden}
+              onClick={onToggleShowHidden}
+              disabled={!projectDir}
+              title={t("ide.showHidden") || "Show hidden files"}
+              aria-label={t("ide.showHidden") || "Show hidden files"}
+            >
+              {showHidden ? "👁" : "🙈"}
+            </button>
+          )}
           <button
             type="button"
             onClick={onRefresh}

@@ -293,7 +293,11 @@ pub fn load_user_tools(user_tools_dir: &Path) -> Vec<UserTool> {
                 tools.push(UserTool::new(manifest, path));
             }
             Err(e) => {
-                warn!("Skipping user tool at '{}': {}", path.display(), e);
+                warn!(
+                    "Skipping user tool at '{}': {}",
+                    crate::path_text::display_path(&path),
+                    e
+                );
             }
         }
     }

@@ -731,6 +731,11 @@ pub(super) async fn build_turn_system_prompt(
     if let Some(skills) = skills_context(config_dir, enabled_skills) {
         extra_sections.push(skills);
     }
+    if chat_mode != "plan" {
+        if let Some(delegable) = crate::commands::delegation::delegable_agents_context(config_dir) {
+            extra_sections.push(delegable);
+        }
+    }
     if let Some(ids) = enabled_connectors {
         if let Some(connectors) =
             crate::commands::connectors::connectors_prompt_context(config_dir, ids)
@@ -764,6 +769,21 @@ pub(super) async fn build_turn_system_prompt(
         extra_sections.push(plan_mode_context(&plan_path));
     } else if let Some((plan_path, excerpt)) = active_plan_excerpt(workspace_root, session_id) {
         extra_sections.push(agent_active_plan_context(&plan_path, Some(&excerpt)));
+    }
+    if chat_mode == "agent" && !durable_plan_enabled {
+        // The static Agent prompt tells the model to maintain `plan_todo`. When the
+        // durable plan tool was not registered for this turn (non-interactive run,
+        // remote workspace, restricted slash-command tool list) that instruction
+        // would send the model calling a tool that does not exist.
+        extra_sections.push(
+            "## Task tracking in this turn\n\
+             The `plan_todo` tool is NOT available in this turn. Ignore every instruction about \
+             creating or maintaining `plan_todo` / Todos, including the rule that a text-only reply is \
+             final only when all Todos are completed. Do not call `plan_todo`. Track progress in the \
+             plan file instead (update **状态** and **执行记录** with `plan_write` or `file_edit`) and \
+             keep working until the task is done."
+                .to_string(),
+        );
     }
     if chat_mode == "agent" {
         if let Some(hint) =
