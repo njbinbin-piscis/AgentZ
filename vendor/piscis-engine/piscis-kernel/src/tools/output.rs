@@ -355,16 +355,72 @@ pub fn extract_error_lines(stdout: &str, stderr: &str) -> Vec<String> {
     out
 }
 
+/// Makes tool output safe and compact for the model: removes ANSI escape
+/// sequences, NUL and other control characters (several OpenAI-compatible
+/// endpoints reject `\u0000` with HTTP 400), and keeps only the final state
+/// of `\r`-redrawn progress lines.
+pub fn sanitize_tool_text(s: &str) -> std::borrow::Cow<'_, str> {
+    let mut prev_cr = false;
+    let needs = s.chars().any(|c| {
+        let lone_cr = prev_cr && c != '\n';
+        prev_cr = c == '\r';
+        lone_cr || (c < ' ' && !matches!(c, '\n' | '\t' | '\r')) || c == '\u{7f}'
+    }) || s.ends_with('\r');
+    if !needs {
+        return std::borrow::Cow::Borrowed(s);
+    }
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\u{1b}' => match chars.peek() {
+                Some('[') => {
+                    chars.next();
+                    while let Some(n) = chars.next() {
+                        if ('@'..='~').contains(&n) {
+                            break;
+                        }
+                    }
+                }
+                Some(']') => {
+                    chars.next();
+                    while let Some(n) = chars.next() {
+                        if n == '\u{7}' || (n == '\u{1b}' && chars.next_if_eq(&'\\').is_some()) {
+                            break;
+                        }
+                    }
+                }
+                _ => {
+                    chars.next();
+                }
+            },
+            '\r' if chars.peek() == Some(&'\n') => out.push(c),
+            '\r' => {
+                let line_start = out.rfind('\n').map_or(0, |i| i + 1);
+                if chars.peek().is_some() {
+                    out.truncate(line_start);
+                }
+            }
+            '\n' | '\t' => out.push(c),
+            c if c < ' ' || c == '\u{7f}' => {}
+            c => out.push(c),
+        }
+    }
+    std::borrow::Cow::Owned(out)
+}
+
 /// Decodes captured child-process output. A multi-byte UTF-8 sequence cut by
 /// a capture cap is dropped. cmd built-ins write the ANSI code page even
 /// after `chcp 65001` while UTF-8-aware programs share the same pipe, so
 /// each line that is not valid UTF-8 is decoded with the ANSI code page.
 pub fn decode_process_output(bytes: &[u8]) -> String {
-    let bytes = trim_partial_utf8_tail(bytes);
-    if let Ok(s) = std::str::from_utf8(bytes) {
+    decode_with_ansi(bytes, ansi_encoding())
+}
+
+fn decode_with_ansi(bytes: &[u8], ansi: Option<&'static encoding_rs::Encoding>) -> String {
+    if let Ok(s) = std::str::from_utf8(trim_partial_utf8_tail(bytes)) {
         return s.to_owned();
     }
-    let ansi = ansi_encoding();
     let mut out = String::with_capacity(bytes.len());
     for line in bytes.split_inclusive(|&b| b == b'\n') {
         match std::str::from_utf8(line) {
@@ -576,6 +632,27 @@ mod tests {
         assert_eq!(decode_process_output(&b), "ab");
         assert_eq!(decode_process_output("ab中".as_bytes()), "ab中");
         assert_eq!(decode_process_output(b"plain"), "plain");
+    }
+
+    #[test]
+    fn sanitize_tool_text_strips_escapes_nul_and_progress_redraws() {
+        assert!(matches!(sanitize_tool_text("a\r\nb\t\"c\"\\"), std::borrow::Cow::Borrowed(_)));
+        let s = "\u{1b}[32mok\u{1b}[0m\r\n\u{1b}]0;title\u{7}y\0\u{1}\n10%\r50%\r100%\ndone\r";
+        assert_eq!(sanitize_tool_text(s), "ok\r\ny\n100%\ndone");
+        let utf16 = "t\0y\0p\0e\0";
+        assert_eq!(sanitize_tool_text(utf16), "type");
+    }
+
+    #[test]
+    fn chinese_locale_mixes_gbk_builtins_with_utf8_programs() {
+        let (gbk, _, _) = encoding_rs::GBK.encode("系统找不到指定的路径。\r\n");
+        let mut b = gbk.into_owned();
+        b.extend_from_slice("中文 utf8 输出\n".as_bytes());
+        b.extend_from_slice(&encoding_rs::GBK.encode("驱动器 C 中的卷").0);
+        assert_eq!(
+            decode_with_ansi(&b, Some(encoding_rs::GB18030)),
+            "系统找不到指定的路径。\r\n中文 utf8 输出\n驱动器 C 中的卷"
+        );
     }
 
     #[test]

@@ -299,12 +299,14 @@ impl LlmClient for ClaudeClient {
                                 "content_block_stop" => {
                                     if let Some(idx) = event.index {
                                         if let Some((id, name, json_buf)) = tool_bufs.remove(&idx) {
-                                            let input = serde_json::from_str(&json_buf).unwrap_or(
-                                                serde_json::Value::Object(serde_json::Map::new()),
-                                            );
-                                            let _ = tx
-                                                .send(LlmChunk::ToolUse { id, name, input })
-                                                .await;
+                                            let chunk = match super::json_repair::parse_tool_arguments(&json_buf) {
+                                                Ok(input) => LlmChunk::ToolUse { id, name, input },
+                                                Err(e) => LlmChunk::Error(format!(
+                                                    "tool_args_invalid: failed to parse arguments for tool \"{name}\" (id={id}, args_len={}): {e}",
+                                                    json_buf.len()
+                                                )),
+                                            };
+                                            let _ = tx.send(chunk).await;
                                         }
                                     }
                                 }

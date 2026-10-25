@@ -174,3 +174,127 @@
 .agentz-tool-trace-more:hover {
   text-decoration: underline;
 }
+
+/* ── File edit card (name, +/- counts, foldable diff) ─────────────────── */
+
+.agentz-edit-card {
+  margin: 2px 0 8px;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 8px;
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.02));
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.agentz-edit-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+
+.agentz-edit-card.is-done .agentz-tool-trace-status {
+  color: #4ade80;
+}
+
+.agentz-edit-card-file {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text, #e8e8f0);
+  cursor: pointer;
+  text-align: left;
+}
+
+.agentz-edit-card-name {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.agentz-edit-card-file:hover .agentz-edit-card-name {
+  color: var(--accent, #7c6af7);
+  text-decoration: underline;
+}
+
+.agentz-edit-card-dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim, #9a9ab0);
+  font-size: 11px;
+}
+
+.agentz-edit-card-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-dim, #9a9ab0);
+  font-family: var(--mono, ui-monospace, Consolas, monospace);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.agentz-edit-card-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.agentz-edit-card-add {
+  color: #4ade80;
+}
+
+.agentz-edit-card-del {
+  color: #f87171;
+}
+
+.agentz-edit-card-diff {
+  max-height: 320px;
+  overflow: auto;
+  border-top: 1px solid var(--border, #2a2a38);
+  background: var(--bg, #0e0e14);
+  font-family: var(--mono, ui-monospace, Consolas, monospace);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.agentz-edit-line {
+  display: flex;
+  min-width: max-content;
+  white-space: pre;
+}
+
+.agentz-edit-line.is-add {
+  background: rgba(74, 222, 128, 0.13);
+  color: #bbf7d0;
+}
+
+.agentz-edit-line.is-remove {
+  background: rgba(248, 113, 113, 0.13);
+  color: #fecaca;
+}
+
+.agentz-edit-line.is-equal {
+  color: var(--text-dim, #9a9ab0);
+}
+
+.agentz-edit-sign {
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+  user-select: none;
+  opacity: 0.8;
+}
+
+.agentz-edit-text {
+  padding-right: 10px;
+}

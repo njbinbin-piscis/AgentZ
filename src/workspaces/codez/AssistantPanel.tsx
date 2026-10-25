@@ -52,6 +52,20 @@ export default function AssistantPanel(props: AssistantPanelProps) {
           >
             ⑂
           </button>
+          <button
+            onClick={() => void s.exportCurrent()}
+            disabled={!s.sessionRef.current}
+            title={s.t("chat.exportSession")}
+          >
+            ⇪
+          </button>
+          <button
+            onClick={() => void s.importFromFile()}
+            disabled={!projectDir}
+            title={s.t("chat.importSession")}
+          >
+            ⇩
+          </button>
         </div>
       </div>
 

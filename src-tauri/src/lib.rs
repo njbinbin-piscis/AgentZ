@@ -314,6 +314,8 @@ pub fn run() {
             commands::session::chat_get_messages,
             commands::session::chat_get_messages_page,
             commands::session::chat_fork_session,
+            commands::session::chat_export_session,
+            commands::session::chat_import_session,
             commands::session::chat_restore_checkpoint,
             commands::session::chat_delete_session,
             // LLM / kernel settings

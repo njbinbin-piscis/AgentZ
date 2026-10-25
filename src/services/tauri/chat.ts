@@ -355,6 +355,16 @@ export function forkSession(
   });
 }
 
+/** Write a session to a portable JSON file; resolves to the number of messages written. */
+export function exportSession(sessionId: string, projectDir: string, destPath: string): Promise<number> {
+  return invoke<number>("chat_export_session", { sessionId, projectDir, destPath });
+}
+
+/** Create a new session from a file written by `exportSession`. */
+export function importSession(projectDir: string, srcPath: string): Promise<SessionMeta> {
+  return invoke<SessionMeta>("chat_import_session", { projectDir, srcPath });
+}
+
 export function restoreCheckpoint(
   sessionId: string,
   messageId: string,

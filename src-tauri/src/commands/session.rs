@@ -816,6 +816,203 @@ pub async fn chat_fork_session(
     .await
 }
 
+pub const SESSION_EXPORT_FORMAT: &str = "agentz-session";
+pub const SESSION_EXPORT_VERSION: u32 = 1;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExportedMessage {
+    pub role: String,
+    pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls_json: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_results_json: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_index: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachments_json: Option<String>,
+    #[serde(default)]
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExportedSession {
+    pub format: String,
+    pub version: u32,
+    pub title: Option<String>,
+    pub source: String,
+    /// Project root on the exporting machine; used to rebase absolute paths on import.
+    #[serde(default)]
+    pub project_dir: Option<String>,
+    pub exported_at: String,
+    pub messages: Vec<ExportedMessage>,
+}
+
+pub fn export_session_data(
+    db: &Database,
+    session_id: &str,
+    project_dir: Option<&str>,
+) -> Result<ExportedSession, String> {
+    let session = db
+        .get_session(session_id)
+        .map_err(|e| format!("get_session failed: {e}"))?
+        .ok_or_else(|| format!("session '{session_id}' not found"))?;
+    let title = if is_codez_source(&session.source) {
+        resolve_codez_list_title(db, &session).or(session.title.clone())
+    } else {
+        session.title.clone()
+    };
+    let mut messages = Vec::new();
+    let page = 500;
+    let mut offset = 0;
+    loop {
+        let batch = db
+            .get_messages(session_id, page, offset)
+            .map_err(|e| format!("get_messages failed: {e}"))?;
+        let n = batch.len() as i64;
+        messages.extend(batch.into_iter().map(|m| ExportedMessage {
+            role: m.role,
+            content: m.content,
+            tool_calls_json: m.tool_calls_json,
+            tool_results_json: m.tool_results_json,
+            turn_index: m.turn_index,
+            attachments_json: m.attachments_json,
+            created_at: m.created_at.to_rfc3339(),
+        }));
+        if n < page {
+            break;
+        }
+        offset += n;
+    }
+    Ok(ExportedSession {
+        format: SESSION_EXPORT_FORMAT.to_string(),
+        version: SESSION_EXPORT_VERSION,
+        title,
+        source: normalize_source(&session.source).to_string(),
+        project_dir: project_dir.map(str::to_string),
+        exported_at: chrono::Utc::now().to_rfc3339(),
+        messages,
+    })
+}
+
+/// Variants of a path as they may appear in stored text: native, forward-slash,
+/// and JSON-escaped backslashes. Longest first so escaped forms win.
+fn path_spellings(p: &str) -> [String; 3] {
+    let trimmed = p.trim_end_matches(['/', '\\']);
+    let back = trimmed.replace('/', "\\");
+    [back.replace('\\', "\\\\"), back, trimmed.replace('\\', "/")]
+}
+
+pub fn rebase_project_paths(text: &str, from: &str, to: &str) -> String {
+    if from.trim().is_empty() || to.trim().is_empty() {
+        return text.to_string();
+    }
+    let froms = path_spellings(from);
+    let mut tos = path_spellings(to);
+    if !to.contains('\\') && !to.contains(':') {
+        // POSIX target: every source spelling maps to the plain forward-slash path.
+        tos = [tos[2].clone(), tos[2].clone(), tos[2].clone()];
+    }
+    let mut out = text.to_string();
+    for (f, t) in froms.iter().zip(tos.iter()) {
+        if f != t && out.contains(f.as_str()) {
+            out = out.replace(f.as_str(), t);
+        }
+    }
+    out
+}
+
+pub fn import_session_data(
+    db: &Database,
+    data: &ExportedSession,
+    project_dir: Option<&str>,
+) -> Result<Session, String> {
+    if data.format != SESSION_EXPORT_FORMAT {
+        return Err(format!("not an AgentZ session file (format '{}')", data.format));
+    }
+    if data.version > SESSION_EXPORT_VERSION {
+        return Err(format!(
+            "session file version {} is newer than supported ({SESSION_EXPORT_VERSION}); please upgrade AgentZ",
+            data.version
+        ));
+    }
+    let rebase = |s: &str| match (data.project_dir.as_deref(), project_dir) {
+        (Some(from), Some(to)) => rebase_project_paths(s, from, to),
+        _ => s.to_string(),
+    };
+    let title = data.title.clone().unwrap_or_else(|| "Imported".to_string());
+    let created = db
+        .create_session_with_source(Some(&title), normalize_source(&data.source))
+        .map_err(|e| format!("create_session failed: {e}"))?;
+    for m in &data.messages {
+        db.append_message_full_with_attachments(
+            &created.id,
+            &m.role,
+            &rebase(&m.content),
+            m.tool_calls_json.as_deref().map(|s| rebase(s)).as_deref(),
+            m.tool_results_json.as_deref().map(|s| rebase(s)).as_deref(),
+            m.turn_index,
+            m.attachments_json.as_deref().map(|s| rebase(s)).as_deref(),
+        )
+        .map_err(|e| format!("append_message failed: {e}"))?;
+    }
+    Ok(db
+        .get_session(&created.id)
+        .map_err(|e| format!("get_session failed: {e}"))?
+        .unwrap_or(created))
+}
+
+/// Export a session to a portable JSON file so it can be resumed on another machine.
+#[tauri::command]
+pub async fn chat_export_session(
+    app: AppHandle,
+    session_id: String,
+    dest_path: String,
+    project_dir: Option<String>,
+) -> Result<usize, String> {
+    let pd = project_dir.clone();
+    let data = with_db(&app, ProjectDirParam { project_dir }, move |db| {
+        export_session_data(db, &session_id, pd.as_deref())
+    })
+    .await?;
+    let count = data.messages.len();
+    let json = serde_json::to_string_pretty(&data).map_err(|e| format!("serialize failed: {e}"))?;
+    let dest = Path::new(&dest_path);
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("create dir failed: {e}"))?;
+    }
+    std::fs::write(dest, json).map_err(|e| format!("write {dest_path} failed: {e}"))?;
+    Ok(count)
+}
+
+/// Import a session file written by `chat_export_session` as a new session.
+#[tauri::command]
+pub async fn chat_import_session(
+    app: AppHandle,
+    src_path: String,
+    project_dir: Option<String>,
+) -> Result<SessionMeta, String> {
+    let raw = std::fs::read_to_string(&src_path).map_err(|e| format!("read {src_path} failed: {e}"))?;
+    let data: ExportedSession = serde_json::from_str(raw.trim_start_matches('\u{feff}'))
+        .map_err(|e| format!("invalid session file: {e}"))?;
+    let pd = project_dir.clone();
+    with_db(&app, ProjectDirParam { project_dir }, move |db| {
+        let s = import_session_data(db, &data, pd.as_deref())?;
+        Ok(SessionMeta {
+            id: s.id,
+            title: s.title,
+            status: s.status,
+            message_count: s.message_count,
+            updated_at: s.updated_at.to_rfc3339(),
+            source: s.source,
+            team_id: None,
+            pool_id: None,
+            cwd: None,
+        })
+    })
+    .await
+}
+
 /// Remember the working directory of a (plain) session. `None` clears it.
 #[tauri::command]
 pub async fn chat_set_session_cwd(
@@ -919,6 +1116,53 @@ pub async fn chat_delete_session(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn export_import_round_trip_rebases_project_paths() {
+        let a = Database::open_in_memory().unwrap();
+        let s = a.create_session_with_source(Some("修复 bug"), "codez").unwrap();
+        a.append_message(&s.id, "user", r"look at C:\work\proj\src\main.rs").unwrap();
+        a.append_message_full(
+            &s.id,
+            "assistant",
+            "ok",
+            Some(r#"[{"input":{"path":"C:\\work\\proj\\src\\main.rs"}}]"#),
+            None,
+            Some(1),
+        )
+        .unwrap();
+
+        let data = export_session_data(&a, &s.id, Some(r"C:\work\proj")).unwrap();
+        let json = serde_json::to_string(&data).unwrap();
+        let back: ExportedSession = serde_json::from_str(&json).unwrap();
+
+        let b = Database::open_in_memory().unwrap();
+        let imported = import_session_data(&b, &back, Some("/home/me/proj")).unwrap();
+        assert_eq!(imported.title.as_deref(), Some("修复 bug"));
+        let msgs = b.get_messages(&imported.id, 10, 0).unwrap();
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0].content, r"look at /home/me/proj\src\main.rs");
+        assert_eq!(
+            msgs[1].tool_calls_json.as_deref(),
+            Some(r#"[{"input":{"path":"/home/me/proj\\src\\main.rs"}}]"#)
+        );
+        assert_eq!(msgs[1].turn_index, Some(1));
+    }
+
+    #[test]
+    fn import_rejects_foreign_format() {
+        let db = Database::open_in_memory().unwrap();
+        let data = ExportedSession {
+            format: "other".into(),
+            version: 1,
+            title: None,
+            source: "codez".into(),
+            project_dir: None,
+            exported_at: String::new(),
+            messages: vec![],
+        };
+        assert!(import_session_data(&db, &data, None).is_err());
+    }
 
     #[test]
     fn fork_title_numbers_increment_and_strip_nested_affixes() {

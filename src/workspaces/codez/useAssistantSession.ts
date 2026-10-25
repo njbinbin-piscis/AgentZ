@@ -10,6 +10,8 @@ import {
   isReadOnlyInCodeZ,
   getMessagesPage,
   forkSession,
+  exportSession,
+  importSession,
   deleteSession,
   restoreCheckpoint,
   journalListPending,
@@ -32,6 +34,7 @@ import { listInstalledSkills, type InstalledSkill } from "../../services/tauri/w
 import { listAgents, type AgentInfo } from "../../services/tauri/agents";
 import { ideApi } from "../../services/tauri/ide";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import type { ComposerMenuOption } from "../../components/ChatComposer";
 import {
   composePromptWithChips,
@@ -1362,6 +1365,47 @@ export function useAssistantSession({
     }
   }, [projectDir, refreshSessions, switchSession]);
 
+  const exportCurrent = useCallback(async () => {
+    const sid = sessionRef.current;
+    if (!sid || !projectDir) return;
+    const title = sessions.find((x) => x.id === sid)?.title || "session";
+    const safe = title.replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 60) || "session";
+    const sep = projectDir.includes("\\") ? "\\" : "/";
+    try {
+      const dest = await saveDialog({
+        title: t("chat.exportSession"),
+        defaultPath: `${projectDir}${sep}.agentz-sessions${sep}${safe}.agentz-session.json`,
+        filters: [{ name: "AgentZ session", extensions: ["json"] }],
+      });
+      if (!dest) return;
+      const count = await exportSession(sid, projectDir, dest);
+      setToast(t("chat.exportSessionOk", { count, path: dest }));
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [projectDir, sessions, t]);
+
+  const importFromFile = useCallback(async () => {
+    if (!projectDir) return;
+    const sep = projectDir.includes("\\") ? "\\" : "/";
+    try {
+      const picked = await openDialog({
+        title: t("chat.importSession"),
+        defaultPath: `${projectDir}${sep}.agentz-sessions`,
+        multiple: false,
+        directory: false,
+        filters: [{ name: "AgentZ session", extensions: ["json"] }],
+      });
+      if (!picked || Array.isArray(picked)) return;
+      const meta = await importSession(projectDir, picked);
+      refreshSessions();
+      await switchSession(meta.id, meta.source);
+      setToast(t("chat.importSessionOk", { count: meta.message_count }));
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [projectDir, refreshSessions, switchSession, t]);
+
   /** Stop the turn of the session on screen (other sessions keep running). */
   const stopCurrent = useCallback(() => {
     const sid = sessionRef.current;
@@ -1591,6 +1635,6 @@ export function useAssistantSession({
           : t("chat.placeholderFollowUp");
 
   return {
-    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, onModeChange, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
+    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, exportCurrent, importFromFile, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, onModeChange, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
   };
 }

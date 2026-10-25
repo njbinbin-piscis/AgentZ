@@ -30,7 +30,7 @@ impl Tool for CodeRunTool {
 
     fn description(&self) -> &str {
         #[cfg(windows)]
-        return "Run commands inside a Windows AppContainer with access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled. Other platforms do not execute this tool because an OS sandbox is unavailable.";
+        return "Run commands inside a Windows AppContainer with access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled. The command is cmd.exe syntax, passed through unchanged with UTF-8 output: double quotes work as usual (python -c \"print('hi')\", node -e \"console.log(1)\"), && / || / & / | / > chain and redirect, %VAR% expands, ! is literal. For PowerShell syntax use the shell tool. Other platforms do not execute this tool because an OS sandbox is unavailable.";
 
         #[cfg(not(windows))]
         return "Unavailable: this platform does not have an enabled operating-system command sandbox. Commands are not executed.";
@@ -215,6 +215,7 @@ impl Tool for CodeRunTool {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
+            super::shell::add_utf8_env_defaults(&mut env_overrides);
             env_overrides.push((
                 OsString::from(super::shell::CMD_LINE_ENV),
                 OsString::from(command),

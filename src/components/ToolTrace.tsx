@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toolIcon, toolSummary } from "./toolDisplay";
+import { fileEditDiff, type FileEditDiff } from "./fileEditDiff";
 import "./ToolTrace.css";
 
 /** Normalized tool-call record shared by the CodeZ and WorkZ event streams. */
@@ -186,12 +187,96 @@ function ToolTraceRow({
   );
 }
 
+const MAX_DIFF_ROWS = 400;
+
+/** Cursor-style edit card: file name, +/- counts, foldable colored diff. */
+export function FileEditCard({ item, diff }: { item: ToolTraceItem; diff: FileEditDiff }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const parts = diff.path.split(/[\\/]/);
+  const base = parts.pop() ?? diff.path;
+  const dir = parts.join("/");
+  const rows = diff.ops.slice(0, MAX_DIFF_ROWS);
+  return (
+    <div className={`agentz-edit-card is-${item.status}`}>
+      <div className="agentz-edit-card-head">
+        <span className="agentz-tool-trace-status">
+          {item.status === "running" ? <span className="agentz-tool-trace-spinner" /> : "✓"}
+        </span>
+        <button
+          type="button"
+          className="agentz-edit-card-file"
+          title={t("chat.fileEditOpen", { path: diff.path })}
+          onClick={() =>
+            window.dispatchEvent(new CustomEvent("agentz-open-file", { detail: { path: diff.path } }))
+          }
+        >
+          <span className="agentz-edit-card-name">{base}</span>
+          {dir && <span className="agentz-edit-card-dir">{dir}</span>}
+        </button>
+        <button
+          type="button"
+          className="agentz-edit-card-toggle"
+          aria-expanded={expanded}
+          title={t(expanded ? "chat.fileEditHideDiff" : "chat.fileEditShowDiff")}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          <span className="agentz-edit-card-add">+{diff.added}</span>
+          <span className="agentz-edit-card-del">-{diff.removed}</span>
+          <span className="agentz-tool-trace-chevron" aria-hidden>
+            {expanded ? "▾" : "▸"}
+          </span>
+        </button>
+      </div>
+      {expanded && (
+        <div className="agentz-edit-card-diff" role="region" aria-label={diff.path}>
+          {rows.map((op, n) => (
+            <div key={n} className={`agentz-edit-line is-${op.type}`}>
+              <span className="agentz-edit-sign" aria-hidden>
+                {op.type === "add" ? "+" : op.type === "remove" ? "-" : " "}
+              </span>
+              <span className="agentz-edit-text">{op.text || " "}</span>
+            </div>
+          ))}
+          {diff.ops.length > rows.length && (
+            <div className="agentz-edit-line is-equal">
+              <span className="agentz-edit-sign" />
+              <span className="agentz-edit-text">
+                {t("chat.fileEditMoreLines", { count: diff.ops.length - rows.length })}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * One batch of tool calls that happened before the next assistant text.
  * Collapsed to the current call; expanded into a 5-line scroller. The next
- * text segment leaves this block in place and starts a new one.
+ * text segment leaves this block in place and starts a new one. Successful
+ * or running file edits are shown as separate edit cards below the batch.
  */
 export default function ToolTrace({ items }: { items: ToolTraceItem[] }) {
+  const edits = items.flatMap((item) => {
+    if (item.status === "error") return [];
+    const diff = fileEditDiff(item.name, item.input);
+    return diff ? [{ item, diff }] : [];
+  });
+  const editIds = new Set(edits.map((e) => e.item.id));
+  const others = items.filter((item) => !editIds.has(item.id));
+  return (
+    <>
+      {others.length > 0 && <ToolBatch items={others} />}
+      {edits.map(({ item, diff }) => (
+        <FileEditCard key={item.id} item={item} diff={diff} />
+      ))}
+    </>
+  );
+}
+
+function ToolBatch({ items }: { items: ToolTraceItem[] }) {
   const [open, setOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const lastId = items[items.length - 1]?.id;

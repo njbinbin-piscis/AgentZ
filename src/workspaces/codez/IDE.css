@@ -481,6 +481,11 @@
   overscroll-behavior-x: contain;
   min-height: 34px;
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.ide-tabs:hover {
+  scrollbar-color: var(--border) transparent;
 }
 
 .ide-tabs::-webkit-scrollbar {
@@ -488,8 +493,12 @@
 }
 
 .ide-tabs::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: transparent;
   border-radius: 2px;
+}
+
+.ide-tabs:hover::-webkit-scrollbar-thumb {
+  background: var(--border);
 }
 
 .ide-tab.browser-tab .tab-name::before {

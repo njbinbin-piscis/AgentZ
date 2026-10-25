@@ -236,6 +236,74 @@ mod windows_shell {
         }
     }
 
+    async fn code_run(mode: SandboxMode, command: &str) -> String {
+        let (_t, root) = fixture();
+        let r = piscis_kernel::tools::code_run::CodeRunTool::default()
+            .call(json!({"command": command, "timeout_secs": 60}), &ctx(root, mode))
+            .await
+            .unwrap();
+        if let Ok(dir) = std::env::var("CJK_PROBE_DIR") {
+            use std::io::Write;
+            let mut f = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(std::path::Path::new(&dir).join("code_run.txt"))
+                .unwrap();
+            writeln!(f, "##### {mode:?} code_run `{command}`\n{}\n", r.content).unwrap();
+        }
+        r.content
+    }
+
+    const CODE_RUN_CASES: &[(&str, &[&str])] = &[
+        (
+            r#"python -c "import sys; print('中文 py', sys.argv[1:])" "a b" 'c'"#,
+            &["中文 py", r#"['a b', "'c'"]"#],
+        ),
+        (
+            r#"node -e "console.log(JSON.stringify({q:'\"x\"', s:process.argv.slice(1)}))" "x y" 中文"#,
+            &[r#"{"q":"\"x\"","s":["x y","中文"]}"#],
+        ),
+        (r#"python -c "print('<>|&^%~!')""#, &["<>|&^%~!"]),
+        (
+            r#"python -c "import os; print(sorted(os.listdir('源码')))""#,
+            &["中文文件名.rs"],
+        ),
+        (
+            r#"echo a^&b && echo ok> "out 文件.txt" & type "out 文件.txt""#,
+            &["a&b", "ok"],
+        ),
+        (r#"cd 源码 && git --version && type utf8.txt"#, &["git version", "查找目标Needle utf8"]),
+        (r#"python -c "print(1/0)" || echo fallback-ran"#, &["ZeroDivisionError", "fallback-ran"]),
+    ];
+
+    #[tokio::test]
+    async fn code_run_passes_quotes_specials_and_cjk_unchanged() {
+        let mut failures = Vec::new();
+        for mode in USER_MODES {
+            for (command, expect) in CODE_RUN_CASES {
+                let out = code_run(mode, command).await;
+                let missing: Vec<_> = expect.iter().filter(|e| !out.contains(**e)).collect();
+                if !missing.is_empty() || out.contains('\u{FFFD}') {
+                    failures.push(format!("== {mode:?} `{command}` missing {missing:?}\n{out}"));
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[tokio::test]
+    async fn powershell_passes_quotes_to_native_programs() {
+        in_modes(
+            &USER_MODES,
+            "powershell",
+            // Windows PowerShell 5.1 drops bare `"` inside native arguments;
+            // the documented workaround is `\"`.
+            r#"python -c "print('ps 中文', 'x y')"; python -c 'import sys; print(sys.argv[1:])' 'a b' '\"q\"'; node -e 'console.log(JSON.stringify(process.argv.slice(1)))' '{\"k\":\"v\"}'"#,
+            &["ps 中文 x y", r#"['a b', '"q"']"#, r#"["{\"k\":\"v\"}"]"#],
+        )
+        .await;
+    }
+
     #[tokio::test]
     async fn single_huge_line_is_elided() {
         let out = run(SandboxMode::Networked, "powershell", "'汉' * 200000").await;

@@ -43,7 +43,12 @@ async fn call_with_completion(
         .map_err(anyhow::Error::msg)?;
     let result = tool.call(input, ctx).await;
     receipt.complete(Ok(()));
-    result
+    result.map(|mut r| {
+        if let std::borrow::Cow::Owned(clean) = crate::tools::output::sanitize_tool_text(&r.content) {
+            r.content = clean;
+        }
+        r
+    })
 }
 
 const DEFAULT_MAX_ITERATIONS: usize = 50;
@@ -3200,9 +3205,9 @@ impl AgentLoop {
             info!("calling LLM: model={}", self.model);
             let mut cancelled_partial_text: Option<String> = None;
             // Caps the "please resend the full tool call JSON" corrective
-            // retry (P0-2) to at most one attempt per iteration, so a model
-            // that keeps truncating its output cannot loop forever.
-            let mut tool_args_correction_attempted = false;
+            // retry (P0-2) per iteration, so a model that keeps truncating
+            // its output cannot loop forever.
+            let mut tool_args_corrections = 0u8;
             let mut context_overflow_attempted = false;
             let mut main_calls_remaining = MAX_MAIN_CALLS_PER_ITERATION;
             let response = 'attempt_with_correction: loop {
@@ -3612,21 +3617,26 @@ impl AgentLoop {
                         // silently retried forever either. Give the model exactly
                         // one chance, in the SAME iteration, to resend a complete
                         // and valid call before treating it as a hard failure.
-                        if !tool_args_correction_attempted
+                        if tool_args_corrections < 2
                             && error_class == crate::llm::error_class::ErrorClass::ToolArgsInvalid
                         {
-                            tool_args_correction_attempted = true;
+                            tool_args_corrections += 1;
                             warn!(
-                                "tool_args_invalid on iteration {}: requesting one corrective retry: {}",
-                                _iteration, msg
+                                "tool_args_invalid on iteration {}: corrective retry {}: {}",
+                                _iteration, tool_args_corrections, msg
                             );
+                            let text = if tool_args_corrections == 1 {
+                                "系统提示：你上一次的工具调用参数(arguments) JSON 不完整或无法解析，\
+                                 因此未被执行，也没有产生任何副作用。请重新完整输出这次工具调用\
+                                 （不要截断、不要省略字段）；如内容较长，可考虑拆分为多次更短的调用。"
+                            } else {
+                                "系统提示：工具调用参数 JSON 再次无法解析，仍未执行。字符串中的双引号必须写成 \\\"，\
+                                 反斜杠写成 \\\\，换行写成 \\n。请把大段代码拆成多次较短的 file_write/file_edit 调用，\
+                                 不要在一次调用里放入整份长文件。"
+                            };
                             let corrective = LlmMessage {
                                 role: "user".into(),
-                                content: MessageContent::text(
-                                    "系统提示：你上一次的工具调用参数(arguments) JSON 不完整或无法解析，\
-                                     因此未被执行，也没有产生任何副作用。请重新完整输出这次工具调用\
-                                     （不要截断、不要省略字段）；如内容较长，可考虑拆分为多次更短的调用。",
-                                ),
+                                content: MessageContent::text(text),
                             };
                             new_messages.push(corrective.clone());
                             messages.push(corrective.clone());

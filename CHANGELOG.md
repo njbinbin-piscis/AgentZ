@@ -5,6 +5,24 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.16] - 2026-10-25
+
+### Added
+
+- **Session export and import.** The chat header has export (⇪) and import (⇩) buttons. Export writes the whole conversation, including tool calls and results, to `.agentz-sessions/<title>.agentz-session.json` in the project by default, so it can be committed with the project. Import creates a new session on another machine; absolute paths under the original project root are rewritten to the local root.
+- **File edit cards in chat.** Agent `file_edit` and `file_write` calls are shown as cards with the file name, `+N −M` line counts and a collapsible colored diff. Clicking the file name opens it in the editor.
+
+### Changed
+
+- The editor tab bar's horizontal scrollbar is shown only while the pointer is over the tabs.
+
+### Fixed
+
+- **Agent turns stopped on tool arguments containing code.** Raw newlines, tabs, control characters and lone backslashes inside JSON strings are now repaired before parsing. If arguments still cannot be parsed, the model is told and asked to retry (twice, then to split large writes) instead of the tool being run with empty arguments.
+- **Tool output with ANSI escapes or control characters** is cleaned before it is sent to the model; progress-bar redraws are collapsed to their final state.
+- **Output mixing GBK and UTF-8 lines** on Chinese Windows is decoded per line.
+- **Python scripts run from `code_run` and the shell print Chinese text**: `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8` are set unless the caller already set them. The tool descriptions now explain cmd.exe quoting and the Windows PowerShell 5.1 rule for passing quotes to native programs.
+
 ## [1.0.15] - 2026-10-25
 
 ### Changed

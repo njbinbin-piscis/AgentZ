@@ -31,6 +31,17 @@ const MAX_OUTPUT_BYTES: usize = 200 * 1024;
 #[cfg(windows)]
 pub(crate) const CMD_LINE_ENV: &str = "AGENTZ_CMD_LINE";
 
+/// Python writes pipes in the ANSI code page (cp1252 raises on CJK text,
+/// cp936 emits GBK) unless told otherwise.
+#[cfg(windows)]
+pub(crate) fn add_utf8_env_defaults(env: &mut Vec<(std::ffi::OsString, std::ffi::OsString)>) {
+    for (key, value) in [("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8")] {
+        if !env.iter().any(|(k, _)| k.eq_ignore_ascii_case(key)) {
+            env.push((key.into(), value.into()));
+        }
+    }
+}
+
 #[cfg(windows)]
 pub(crate) fn cmd_utf8_args() -> Vec<std::ffi::OsString> {
     [
@@ -132,7 +143,7 @@ impl Tool for ShellTool {
 
     fn description(&self) -> &str {
         #[cfg(windows)]
-        return "Execute a Windows shell command inside a Windows AppContainer with filesystem access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled (cwd may leave workspace_root). The working directory must be inside workspace_root unless the sandbox is disabled; by default it is workspace_root. Elevated execution and other platforms are unavailable. Setup or cleanup failures stop execution without an unsandboxed retry. Supports PowerShell, 32-bit PowerShell, and cmd.exe. In strict mode, cmd directory listings and PowerShell location/child-process commands fail because ancestors of the workspace are not listable, and cmd built-ins print non-ANSI characters as '?'; use PowerShell, file_list/file_search or .NET APIs instead.";
+        return "Execute a Windows shell command inside a Windows AppContainer with filesystem access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled (cwd may leave workspace_root). The working directory must be inside workspace_root unless the sandbox is disabled; by default it is workspace_root. Elevated execution and other platforms are unavailable. Setup or cleanup failures stop execution without an unsandboxed retry. Supports PowerShell, 32-bit PowerShell, and cmd.exe. Windows PowerShell 5.1 drops double quotes inside arguments passed to native programs (python, node, git): write them as \\\" (python -c 'print(\\\"x\\\")') or use code_run, whose cmd syntax passes quotes unchanged. In strict mode, cmd directory listings and PowerShell location/child-process commands fail because ancestors of the workspace are not listable, and cmd built-ins print non-ANSI characters as '?'; use PowerShell, file_list/file_search or .NET APIs instead.";
 
         #[cfg(not(windows))]
         return "Unavailable: this platform does not have an enabled operating-system command sandbox. Commands are not executed.";
@@ -417,6 +428,7 @@ impl Tool for ShellTool {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
+            add_utf8_env_defaults(&mut env_overrides);
             if interpreter == "cmd" {
                 env_overrides.push((OsString::from(CMD_LINE_ENV), OsString::from(command)));
             }
