@@ -188,7 +188,7 @@ impl Tool for TaskTool {
         let direct_requested = input
             .get("isolation")
             .and_then(|v| v.as_str())
-            .map_or(false, |s| s.eq_ignore_ascii_case("direct"));
+            .is_some_and(|s| s.eq_ignore_ascii_case("direct"));
 
         let mut workspace = ctx.workspace_root.to_string_lossy().to_string();
         // Without a parent bridge we cannot tell whether the parent is read-only
@@ -359,7 +359,7 @@ impl Tool for TaskTool {
         // still work). A failed/cancelled run only keeps recovery refs.
         let merge_note = match isolation {
             Some(iso) => {
-                let merge = matches!(&outcome, Ok(_));
+                let merge = outcome.is_ok();
                 let cd = conflict_dir.clone();
                 match tokio::task::spawn_blocking(move || wt::finish(iso, merge, &cd)).await {
                     Ok(rep) => rep.render(),

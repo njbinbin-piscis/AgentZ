@@ -352,7 +352,7 @@ fn merge3(ours: &[u8], base: &[u8], theirs: &[u8]) -> Result<Vec<u8>, Option<Vec
     let _ = std::fs::remove_dir_all(&dir);
     match out {
         Some(o) if o.status.code() == Some(0) => Ok(o.stdout),
-        Some(o) if o.status.code().map_or(false, |c| c > 0) => Err(Some(o.stdout)),
+        Some(o) if o.status.code().is_some_and(|c| c > 0) => Err(Some(o.stdout)),
         _ => Err(None),
     }
 }
@@ -520,7 +520,9 @@ pub fn finish(iso: Isolation, merge: bool, conflict_dir: &Path) -> MergeReport {
             Applied::Conflict(reason, copy) => {
                 let saved = copy.and_then(|bytes| {
                     let p = conflict_dir.join(&iso.run_id).join(&path);
-                    p.parent().map(|d| std::fs::create_dir_all(d));
+                    if let Some(d) = p.parent() {
+                        let _ = std::fs::create_dir_all(d);
+                    }
                     std::fs::write(&p, bytes).ok().map(|_| p.to_string_lossy().to_string())
                 });
                 report.conflicts.push(Conflict {

@@ -363,7 +363,7 @@ pub async fn botz_room_todos(
     let db = db.lock().await;
     let mut all = db.list_koi_todos(None).map_err(|e| e.to_string())?;
     all.retain(|t| t.pool_session_id.as_deref() == Some(pool_id.as_str()));
-    all.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    all.sort_by_key(|t| t.created_at);
     Ok(all)
 }
 

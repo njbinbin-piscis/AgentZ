@@ -949,10 +949,10 @@ pub fn import_session_data(
             &created.id,
             &m.role,
             &rebase(&m.content),
-            m.tool_calls_json.as_deref().map(|s| rebase(s)).as_deref(),
-            m.tool_results_json.as_deref().map(|s| rebase(s)).as_deref(),
+            m.tool_calls_json.as_deref().map(rebase).as_deref(),
+            m.tool_results_json.as_deref().map(rebase).as_deref(),
             m.turn_index,
-            m.attachments_json.as_deref().map(|s| rebase(s)).as_deref(),
+            m.attachments_json.as_deref().map(rebase).as_deref(),
         )
         .map_err(|e| format!("append_message failed: {e}"))?;
     }

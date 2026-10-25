@@ -177,6 +177,12 @@ pub struct DelegationCache {
     entries: HashMap<String, (String, Instant, String)>,
 }
 
+impl Default for DelegationCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DelegationCache {
     pub fn new() -> Self {
         Self {

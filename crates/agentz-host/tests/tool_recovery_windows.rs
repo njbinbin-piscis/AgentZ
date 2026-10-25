@@ -123,7 +123,7 @@ async fn timed_out_child_tree_is_terminated_and_reported() {
     let observer = Observer::start(count);
 
     let started = Instant::now();
-    let result = ShellTool
+    let result = ShellTool::default()
         .call(json!({"command": long_tree(count), "interpreter": "cmd", "timeout": 8}), &ctx)
         .await
         .expect("shell call returns a result");
@@ -176,7 +176,7 @@ async fn cancelled_child_tree_is_terminated_and_reported() {
         observed_in.store(max_seen.load(Ordering::SeqCst), Ordering::SeqCst);
         trigger.store(true, Ordering::SeqCst);
     });
-    let result = ShellTool
+    let result = ShellTool::default()
         .call(json!({"command": long_tree(count), "interpreter": "cmd", "timeout": 120}), &ctx)
         .await
         .expect("shell call returns a result");
