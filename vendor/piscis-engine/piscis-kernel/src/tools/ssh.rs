@@ -375,6 +375,8 @@ impl SshTool {
                         stdout.extend_from_slice(&data);
                         if stdout.len() > 200 * 1024 {
                             stdout.truncate(200 * 1024);
+                            let whole = super::output::trim_partial_utf8_tail(&stdout).len();
+                            stdout.truncate(whole);
                             stdout.extend_from_slice(b"\n[output truncated at 200 KB]");
                             break;
                         }

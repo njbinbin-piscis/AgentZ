@@ -53,7 +53,7 @@ impl LspClient {
         root: &str,
         language: &str,
     ) -> Result<Arc<Self>, String> {
-        let mut child = piscis_kernel::proc::tokio_command(command)
+        let child = piscis_kernel::proc::tokio_command(command)
             .args(args)
             .current_dir(root)
             .stdin(Stdio::piped())
@@ -62,6 +62,18 @@ impl LspClient {
             .kill_on_drop(true)
             .spawn()
             .map_err(|e| format!("failed to spawn '{command}': {e}"))?;
+        Self::attach(child, root, language, Some(std::process::id())).await
+    }
+
+    /// Handshake with an already spawned server whose stdio is piped (e.g. one
+    /// started on a remote host through ssh). `root` is the server-side path;
+    /// `process_id` is `None` when this process is not visible to the server.
+    pub async fn attach(
+        mut child: Child,
+        root: &str,
+        language: &str,
+        process_id: Option<u32>,
+    ) -> Result<Arc<Self>, String> {
         let stdin = child.stdin.take().ok_or("no stdin handle")?;
         let stdout = child.stdout.take().ok_or("no stdout handle")?;
         let stderr = child.stderr.take();
@@ -131,7 +143,7 @@ impl LspClient {
 
         let root_uri = path_to_uri(root);
         let init = json!({
-            "processId": std::process::id(),
+            "processId": process_id,
             "rootUri": root_uri,
             "workspaceFolders": [{ "uri": root_uri, "name": "project" }],
             "capabilities": {
@@ -296,7 +308,17 @@ impl LspClient {
             return Err("file too large (>4MB)".into());
         }
         let text = String::from_utf8_lossy(&raw).to_string();
-        let uri = path_to_uri(path);
+        self.sync_text(&path_to_uri(path), text, language_id).await
+    }
+
+    /// [`Self::sync_file`] for content read elsewhere (remote files).
+    pub async fn sync_text(
+        &self,
+        uri: &str,
+        text: String,
+        language_id: &str,
+    ) -> Result<(String, bool), String> {
+        let uri = uri.to_string();
         let mut docs = self.docs.lock().await;
         match docs.get_mut(&uri) {
             None => {

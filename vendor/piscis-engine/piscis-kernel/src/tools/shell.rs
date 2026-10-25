@@ -24,6 +24,25 @@ const MAX_TIMEOUT_SECS: u64 = 300;
 #[cfg(windows)]
 const MAX_OUTPUT_BYTES: usize = 200 * 1024;
 
+/// cmd fixes its output code page when it starts, so `chcp 65001` must run
+/// in a parent cmd. The command reaches the child through this variable,
+/// expanded (`!…!`) after the parent has split its own line, so the user's
+/// quotes and `&` reach the child intact.
+#[cfg(windows)]
+pub(crate) const CMD_LINE_ENV: &str = "AGENTZ_CMD_LINE";
+
+#[cfg(windows)]
+pub(crate) fn cmd_utf8_args() -> Vec<std::ffi::OsString> {
+    [
+        "/d",
+        "/v:on",
+        "/c",
+        "chcp 65001 >nul 2>&1 & cmd /d /v:off /s /c \"!AGENTZ_CMD_LINE!\"",
+    ]
+    .map(std::ffi::OsString::from)
+    .to_vec()
+}
+
 /// Rewrite top-level unquoted `&&` chains into Windows PowerShell 5.1 compatible
 /// conditional blocks so LLM-generated `cmd1 && cmd2` commands do not fail with
 /// `The token '&&' is not a valid statement separator in this version`.
@@ -113,7 +132,7 @@ impl Tool for ShellTool {
 
     fn description(&self) -> &str {
         #[cfg(windows)]
-        return "Execute a Windows shell command inside a Windows AppContainer with filesystem access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled (cwd may leave workspace_root). The working directory must be inside workspace_root unless the sandbox is disabled; by default it is workspace_root. Elevated execution and other platforms are unavailable. Setup or cleanup failures stop execution without an unsandboxed retry. Supports PowerShell, 32-bit PowerShell, and cmd.exe.";
+        return "Execute a Windows shell command inside a Windows AppContainer with filesystem access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled (cwd may leave workspace_root). The working directory must be inside workspace_root unless the sandbox is disabled; by default it is workspace_root. Elevated execution and other platforms are unavailable. Setup or cleanup failures stop execution without an unsandboxed retry. Supports PowerShell, 32-bit PowerShell, and cmd.exe. In strict mode, cmd directory listings and PowerShell location/child-process commands fail because ancestors of the workspace are not listable, and cmd built-ins print non-ANSI characters as '?'; use PowerShell, file_list/file_search or .NET APIs instead.";
 
         #[cfg(not(windows))]
         return "Unavailable: this platform does not have an enabled operating-system command sandbox. Commands are not executed.";
@@ -347,15 +366,7 @@ impl Tool for ShellTool {
             let (program, args) = match interpreter {
                 "cmd" => {
                     let program = windir.join("System32\\cmd.exe");
-                    let full_command = format!("chcp 65001 >nul 2>&1 & {command}");
-                    (
-                        program,
-                        vec![
-                            OsString::from("/d"),
-                            OsString::from("/c"),
-                            OsString::from(full_command),
-                        ],
-                    )
+                    (program, cmd_utf8_args())
                 }
                 "powershell" | "powershell32" => {
                     let system_dir = if interpreter == "powershell32" {
@@ -393,7 +404,7 @@ impl Tool for ShellTool {
                 .as_u64()
                 .unwrap_or(DEFAULT_TIMEOUT_SECS)
                 .clamp(1, MAX_TIMEOUT_SECS);
-            let env_overrides = input["env"]
+            let mut env_overrides = input["env"]
                 .as_object()
                 .map(|values| {
                     values
@@ -406,6 +417,9 @@ impl Tool for ShellTool {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
+            if interpreter == "cmd" {
+                env_overrides.push((OsString::from(CMD_LINE_ENV), OsString::from(command)));
+            }
             let timeout = Duration::from_secs(timeout_secs);
             let cancel = ctx.cancel.clone();
             let sandbox_mode = ctx.settings.sandbox_mode;
@@ -535,8 +549,8 @@ impl Tool for ShellTool {
             // Presentation budget is deliberately far below the capture
             // cap: long lines are elided, whole lines head/tailed, and the
             // full output spills to disk (named below) when truncated.
-            let stdout_raw = String::from_utf8_lossy(&output.stdout).into_owned();
-            let stderr_raw = String::from_utf8_lossy(&output.stderr).into_owned();
+            let stdout_raw = super::output::decode_process_output(&output.stdout);
+            let stderr_raw = super::output::decode_process_output(&output.stderr);
             let (stdout, stdout_trimmed) = truncate_output(&stdout_raw, 24 * 1024);
             let (stderr, stderr_trimmed) = truncate_output(&stderr_raw, 12 * 1024);
             let collapsed_stdout = collapse_repeated_lines(&stdout);

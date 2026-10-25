@@ -40,12 +40,26 @@ pub fn install_if_remote(registry: &mut ToolRegistry, workspace_root: &str) {
         .copied()
         .filter(|n| registry.get(n).is_some())
         .collect();
+    let dev: Vec<&str> = REMOTE_DEV_TOOLS
+        .iter()
+        .copied()
+        .filter(|n| registry.get(n).is_some())
+        .collect();
     for name in REPLACED_TOOLS
         .iter()
-        .chain(LOCAL_ONLY_TOOLS)
+        .chain(REMOTE_DEV_TOOLS)
         .chain(MIRRORED_TOOLS)
     {
         registry.unregister(name);
+    }
+    for name in dev {
+        let tool: Box<dyn Tool> = match name {
+            "file_diff" => Box::new(super::remote_dev::RemoteFileDiff),
+            "code_run" => Box::new(super::remote_dev::RemoteCodeRun),
+            "read_lints" => Box::new(super::remote_dev::RemoteReadLints),
+            _ => Box::new(super::remote_dev::RemoteLsp),
+        };
+        registry.register(Box::new(BoundTool { inner: tool }));
     }
     for name in mirrored {
         let inner: Box<dyn Tool> = match name {
@@ -151,10 +165,11 @@ impl Tool for MirroredTool {
     }
 }
 
-/// Tools backed by local language servers / local execution.
-const LOCAL_ONLY_TOOLS: &[&str] = &["lsp", "read_lints", "code_run", "file_diff"];
+/// Language-server and execution tools re-implemented on the remote host
+/// (`tools::remote_dev`).
+const REMOTE_DEV_TOOLS: &[&str] = &["lsp", "read_lints", "code_run", "file_diff"];
 
-async fn remote_root(ctx: &ToolContext) -> anyhow::Result<String> {
+pub(super) async fn remote_root(ctx: &ToolContext) -> anyhow::Result<String> {
     remote::resolve(&ctx.workspace_root.to_string_lossy())
         .await
         .map_err(anyhow::Error::msg)?
@@ -186,7 +201,11 @@ fn join(root: &str, authority: &str, p: &str) -> anyhow::Result<String> {
     })
 }
 
-async fn resolve_path(ctx: &ToolContext, input: &Value, key: &str) -> anyhow::Result<String> {
+pub(super) async fn resolve_path(
+    ctx: &ToolContext,
+    input: &Value,
+    key: &str,
+) -> anyhow::Result<String> {
     let workspace = ctx.workspace_root.to_string_lossy();
     let uri = remote::vfs::parse(&workspace)
         .ok_or_else(|| anyhow::anyhow!("invalid remote workspace URI"))?;
@@ -226,7 +245,7 @@ mod tool_binding_tests {
     }
 }
 
-async fn read_text(path: &str) -> anyhow::Result<String> {
+pub(super) async fn read_text(path: &str) -> anyhow::Result<String> {
     let v = remote::call("fs.readFile", json!({ "path": path }))
         .await
         .map_err(anyhow::Error::msg)?;
@@ -245,13 +264,13 @@ async fn write_text(path: &str, text: &str) -> anyhow::Result<()> {
     .map_err(anyhow::Error::msg)
 }
 
-struct ExecOut {
-    code: i64,
-    stdout: String,
-    stderr: String,
+pub(super) struct ExecOut {
+    pub code: i64,
+    pub stdout: String,
+    pub stderr: String,
 }
 
-async fn sh(script: &str, cwd: &str, timeout_ms: u64) -> anyhow::Result<ExecOut> {
+pub(super) async fn sh(script: &str, cwd: &str, timeout_ms: u64) -> anyhow::Result<ExecOut> {
     let v = remote::call(
         "exec",
         json!({ "command": "sh", "args": ["-c", script], "cwd": cwd, "timeoutMs": timeout_ms }),
@@ -265,7 +284,7 @@ async fn sh(script: &str, cwd: &str, timeout_ms: u64) -> anyhow::Result<ExecOut>
     })
 }
 
-fn truncate(mut s: String) -> String {
+pub(super) fn truncate(mut s: String) -> String {
     if s.len() > MAX_OUTPUT_CHARS {
         let mut cut = MAX_OUTPUT_CHARS;
         while !s.is_char_boundary(cut) {

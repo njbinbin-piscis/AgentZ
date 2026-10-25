@@ -162,12 +162,24 @@ async fn run_action(
         return Ok(format_diagnostics(&diags));
     }
 
+    let (method, params) = action_request(action, &uri, input)?;
+    request_with_retry(client, action, method, params, changed)
+        .await
+        .map(|result| format_result_scoped(action, &result, workspace_root))
+}
+
+/// LSP method and params for a non-diagnostics tool action on document `uri`.
+pub fn action_request(
+    action: &str,
+    uri: &str,
+    input: &Value,
+) -> Result<(&'static str, Value), String> {
     let line = input["line"].as_u64().unwrap_or(1).saturating_sub(1);
     let character = input["character"].as_u64().unwrap_or(0);
     let position = json!({ "line": line, "character": character });
     let td = json!({ "uri": uri });
 
-    let (method, params) = match action {
+    Ok(match action {
         "hover" => (
             "textDocument/hover",
             json!({ "textDocument": td, "position": position }),
@@ -202,8 +214,17 @@ async fn run_action(
             ("workspace/symbol", json!({ "query": q }))
         }
         other => return Err(format!("unknown action '{other}'")),
-    };
+    })
+}
 
+/// Send `method`, retrying while a freshly started server is still indexing.
+pub async fn request_with_retry(
+    client: &LspClient,
+    action: &str,
+    method: &str,
+    params: Value,
+    changed: bool,
+) -> Result<Value, String> {
     if changed {
         tokio::time::sleep(Duration::from_millis(600)).await;
     }
@@ -221,7 +242,7 @@ async fn run_action(
                     tokio::time::sleep(Duration::from_millis(1500)).await;
                     continue;
                 }
-                return Ok(format_result_scoped(action, &result, workspace_root));
+                return Ok(result);
             }
             Err(e) => {
                 let retryable = {
@@ -284,7 +305,7 @@ fn detect_project_root(file: &str) -> String {
         .unwrap_or_else(|| ".".to_string())
 }
 
-fn format_result(action: &str, result: &Value) -> String {
+pub fn format_result(action: &str, result: &Value) -> String {
     match action {
         "hover" => match result.get("contents") {
             Some(Value::String(s)) => format!("Hover: {s}"),
@@ -664,7 +685,7 @@ pub(crate) async fn collect_diagnostics_for_file(
         .await)
 }
 
-pub(crate) fn format_diagnostics_pub(diagnostics: &[Value]) -> String {
+pub fn format_diagnostics_pub(diagnostics: &[Value]) -> String {
     format_diagnostics(diagnostics)
 }
 

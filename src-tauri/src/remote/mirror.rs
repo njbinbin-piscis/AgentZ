@@ -86,7 +86,7 @@ fn find_expr(newer: Option<&str>) -> String {
 
 /// Drops `.gitignore`d paths inside a git work tree; passthrough elsewhere.
 const GITIGNORE_FILTER: &str = "{ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-     git check-ignore --stdin -nv --non-matching | awk -F'\\t' '$1==\"::\"{print $2}'; else cat; fi; }";
+     git -c core.quotepath=false check-ignore --stdin -nv --non-matching | awk -F'\\t' '$1==\"::\"{print $2}'; else cat; fi; }";
 
 /// Bring the mirror up to date and return its local path.
 pub async fn sync(workspace: &str, force: bool) -> Result<PathBuf, String> {
@@ -212,6 +212,47 @@ pub async fn index_root(project: &str, sync_first: bool) -> Result<PathBuf, Stri
     } else {
         mirror_dir(project).ok_or_else(|| "no home directory".to_string())
     }
+}
+
+/// Copy generated workspace-relative files from the mirror to the remote, so
+/// user-facing documents (`.agentz/*.md`) live next to the sources and `.git`.
+/// The mirror itself stays a cache: sync never ships `.agentz` back down.
+pub async fn publish(workspace: &str, mirror: &Path, rels: &[&str]) -> Result<(), String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    let session = match super::bound_session() {
+        Some(s) => s,
+        None => super::bind(workspace).await?,
+    };
+    for rel in rels {
+        let Ok(bytes) = std::fs::read(mirror.join(rel)) else {
+            continue;
+        };
+        let path = format!("{}/{}", session.path.trim_end_matches('/'), rel);
+        session
+            .call(
+                "fs.writeFile",
+                serde_json::json!({ "path": path, "base64": STANDARD.encode(bytes) }),
+            )
+            .await
+            .map_err(|e| format!("write {rel} on remote: {e}"))?;
+    }
+    Ok(())
+}
+
+/// Display name of a workspace: the last path segment of the remote path for
+/// remote projects (the mirror directory name is a hash).
+pub fn workspace_name(workspace: &str, root: &Path) -> String {
+    let from_remote = vfs::parse(workspace).and_then(|u| {
+        u.path
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    });
+    from_remote
+        .or_else(|| root.file_name().map(|n| n.to_string_lossy().to_string()))
+        .unwrap_or_else(|| "workspace".to_string())
 }
 
 async fn extract(dir: &Path, archive: &[u8]) -> Result<(), String> {

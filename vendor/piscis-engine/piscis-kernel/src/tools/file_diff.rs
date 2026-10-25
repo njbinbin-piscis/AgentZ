@@ -148,7 +148,7 @@ impl Tool for FileDiffTool {
 
 /// Compute a unified diff between `old` and `new` text.
 /// Returns the diff as a string, or empty string if identical.
-fn unified_diff(old: &str, new: &str, label_a: &str, label_b: &str, context: usize) -> String {
+pub fn unified_diff(old: &str, new: &str, label_a: &str, label_b: &str, context: usize) -> String {
     let old_lines: Vec<&str> = old.lines().collect();
     let new_lines: Vec<&str> = new.lines().collect();
 

@@ -974,9 +974,7 @@ pub async fn symbol_find(
     project_dir: Option<String>,
     query: String,
 ) -> Result<Vec<CallGraphNode>, String> {
-    let root = PathBuf::from(crate::commands::data_scope::require_project_dir(
-        project_dir.as_deref(),
-    )?);
+    let root = symbol_root(project_dir.as_deref()).await?;
     tokio::task::spawn_blocking(move || {
         let idx = index_for(&root);
         find_symbols(&idx, &query, 30)
@@ -1005,15 +1003,19 @@ pub async fn symbol_call_graph(
     symbol_id: usize,
     depth: Option<usize>,
 ) -> Result<CallGraph, String> {
-    let root = PathBuf::from(crate::commands::data_scope::require_project_dir(
-        project_dir.as_deref(),
-    )?);
+    let root = symbol_root(project_dir.as_deref()).await?;
     tokio::task::spawn_blocking(move || {
         let idx = index_for(&root);
         call_graph(&idx, symbol_id, depth.unwrap_or(2).clamp(1, 4), 80)
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+/// Local project dir, or the synced mirror of a remote workspace.
+async fn symbol_root(project_dir: Option<&str>) -> Result<PathBuf, String> {
+    let project = crate::commands::data_scope::require_indexable_project_dir(project_dir)?;
+    crate::remote::mirror::index_root(&project, true).await
 }
 
 #[cfg(test)]

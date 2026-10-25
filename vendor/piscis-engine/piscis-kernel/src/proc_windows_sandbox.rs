@@ -867,7 +867,10 @@ fn spawn_capture_shared(
 ) -> thread::JoinHandle<Result<CapturedStream>> {
     thread::spawn(move || {
         use std::io::Read;
+        let head_limit = limit - limit / 2;
+        let tail_limit = limit / 2;
         let mut captured = Vec::with_capacity(limit.min(64 * 1024));
+        let mut tail = std::collections::VecDeque::<u8>::new();
         let mut buffer = [0u8; 8192];
         let mut total_bytes = 0u64;
         loop {
@@ -881,8 +884,27 @@ fn spawn_capture_shared(
             if let Some(stream) = &shared {
                 stream.append(&buffer[..read]);
             }
-            let remaining = limit.saturating_sub(captured.len());
-            captured.extend_from_slice(&buffer[..read.min(remaining)]);
+            let to_head = head_limit.saturating_sub(captured.len()).min(read);
+            captured.extend_from_slice(&buffer[..to_head]);
+            if tail_limit > 0 {
+                tail.extend(&buffer[to_head..read]);
+                let excess = tail.len().saturating_sub(tail_limit);
+                tail.drain(..excess);
+            }
+        }
+        if total_bytes as usize <= limit {
+            captured.extend(tail);
+        } else if tail_limit > 0 {
+            let head_len = crate::tools::output::trim_partial_utf8_tail(&captured).len();
+            captured.truncate(head_len);
+            let tail = tail.make_contiguous();
+            let start = tail.iter().take(3).take_while(|b| **b & 0xC0 == 0x80).count();
+            let kept_tail = &tail[start..];
+            let skipped = total_bytes as usize - head_len - kept_tail.len();
+            captured.extend_from_slice(
+                format!("\n… [{skipped} bytes not captured] …\n").as_bytes(),
+            );
+            captured.extend_from_slice(kept_tail);
         }
         Ok(CapturedStream {
             bytes: captured,
@@ -891,11 +913,23 @@ fn spawn_capture_shared(
     })
 }
 
+/// cmd.exe takes everything after `/c` or `/k` as raw command text and does
+/// not understand C-runtime `\"` escaping, so those arguments go verbatim.
 fn make_command_line(program: &OsStr, args: &[std::ffi::OsString]) -> Vec<u16> {
+    let is_cmd = Path::new(program)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.eq_ignore_ascii_case("cmd.exe") || n.eq_ignore_ascii_case("cmd"));
+    let mut raw = false;
     let mut line = quote_windows_arg(program);
     for arg in args {
         line.push(b' ' as u16);
-        line.extend(quote_windows_arg(arg));
+        if raw {
+            line.extend(arg.encode_wide());
+        } else {
+            line.extend(quote_windows_arg(arg));
+        }
+        raw |= is_cmd && (arg.eq_ignore_ascii_case("/c") || arg.eq_ignore_ascii_case("/k"));
     }
     line.push(0);
     line
@@ -994,11 +1028,12 @@ mod runner_tests {
     #[test]
     fn capture_reports_exact_limit_overflow_and_zero_limit_without_losing_eof() {
         use std::io::Write;
-        for (input, limit) in [
-            (b"abcd".as_slice(), 4),
-            (b"abcde".as_slice(), 4),
-            ("中文".as_bytes(), 4),
-            (b"abc".as_slice(), 0),
+        for (input, limit, expected) in [
+            (b"abcd".as_slice(), 4, "abcd"),
+            (b"abcde".as_slice(), 4, "ab\n… [1 bytes not captured] …\nde"),
+            ("中文字".as_bytes(), 4, "\n… [9 bytes not captured] …\n"),
+            ("一二三四".as_bytes(), 8, "一\n… [6 bytes not captured] …\n四"),
+            (b"abc".as_slice(), 0, ""),
         ] {
             let mut file = tempfile::tempfile().expect("create capture fixture");
             file.write_all(input).expect("write capture fixture");
@@ -1006,7 +1041,7 @@ mod runner_tests {
             file.seek(SeekFrom::Start(0)).expect("rewind fixture");
             let result = spawn_capture_shared(file, limit, None).join().unwrap().unwrap();
             assert_eq!(result.total_bytes, input.len() as u64);
-            assert_eq!(result.bytes, input[..input.len().min(limit)]);
+            assert_eq!(String::from_utf8_lossy(&result.bytes), expected);
         }
     }
 
@@ -1033,8 +1068,12 @@ mod runner_tests {
         )
         .expect("run two-stream truncation fixture");
         assert_eq!(result.exit_code, 0);
-        assert_eq!(result.stdout.len(), 64);
-        assert_eq!(result.stderr.len(), 64);
+        for (stream, line) in [(&result.stdout, "stdout-line"), (&result.stderr, "stderr-line")] {
+            let text = String::from_utf8_lossy(stream);
+            assert!(text.starts_with(line) && text.trim_end().ends_with(line), "{text}");
+            assert!(text.contains("bytes not captured"), "{text}");
+            assert!(stream.len() <= 64 + 48, "{text}");
+        }
         assert!(result.stdout_total_bytes > 64);
         assert!(result.stderr_total_bytes > 64);
         assert!(!result.cancelled && !result.timed_out);

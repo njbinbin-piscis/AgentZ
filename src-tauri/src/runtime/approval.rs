@@ -775,6 +775,7 @@ async fn direct_git_identity(root: &Path) -> Result<Value, String> {
         tokio::time::timeout(
             Duration::from_secs(10),
             piscis_kernel::proc::tokio_command("git")
+                .args(crate::commands::ide::GIT_UNQUOTED_PATHS)
                 .args(args)
                 .env("LC_ALL", "C")
                 .current_dir(root)

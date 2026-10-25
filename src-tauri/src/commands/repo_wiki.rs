@@ -18,7 +18,9 @@ use sha2::{Digest, Sha256};
 use tauri::AppHandle;
 
 use crate::commands::codebase::{build_index, search_index, CodeSearchHit};
-use crate::commands::data_scope::{open_project_kernel_state, require_project_dir};
+use crate::commands::data_scope::{
+    open_global_kernel_state, open_project_kernel_state, require_indexable_project_dir,
+};
 use crate::commands::graph::{self, GraphDoc};
 use crate::commands::graph_db::{
     export_repo_memory_markdown, open_graph_db, query_repo_notes, sync_from_graph_doc, RepoNote,
@@ -227,7 +229,7 @@ fn collect_module_skeleton(
 }
 
 /// Build the Track 1 deterministic architecture wiki markdown for `root`.
-pub fn generate(root: &Path) -> Result<String, String> {
+pub fn generate(root: &Path, project_name: &str) -> Result<String, String> {
     let conn = Connection::open(index_db_path(root)).map_err(|e| format!("open index db: {e}"))?;
     let has_chunks: i64 = conn
         .query_row("SELECT COUNT(*) FROM chunks", [], |r| r.get(0))
@@ -278,10 +280,6 @@ pub fn generate(root: &Path) -> Result<String, String> {
     let mut module_sorted: Vec<(&String, &ModuleStat)> = modules.iter().collect();
     module_sorted.sort_by_key(|x| std::cmp::Reverse(x.1.chunks));
 
-    let project_name = root
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| "workspace".to_string());
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M UTC").to_string();
     let doc_opt = ensure_graph(root);
     let repo_notes = query_repo_notes(root, None, true, 60).unwrap_or_default();
@@ -603,21 +601,41 @@ fn write_cached_module_wiki(
 /// and return the markdown plus path.
 #[tauri::command]
 pub async fn repo_wiki_generate(project_dir: Option<String>) -> Result<RepoWikiResult, String> {
-    let project = require_project_dir(project_dir.as_deref())?;
-    let root = PathBuf::from(project);
-    tokio::task::spawn_blocking(move || {
-        let md = generate(&root)?;
-        let out_dir = root.join(".agentz");
+    let (project, root) = wiki_root(project_dir.as_deref()).await?;
+    let name = crate::remote::mirror::workspace_name(&project, &root);
+    let build_root = root.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let md = generate(&build_root, &name)?;
+        let out_dir = build_root.join(".agentz");
         std::fs::create_dir_all(&out_dir).map_err(|e| format!("create .agentz: {e}"))?;
         let out = out_dir.join("REPO_WIKI.md");
         std::fs::write(&out, &md).map_err(|e| format!("write wiki: {e}"))?;
-        Ok(RepoWikiResult {
+        Ok::<_, String>(RepoWikiResult {
             path: ".agentz/REPO_WIKI.md".to_string(),
             markdown: md,
         })
     })
     .await
-    .map_err(|e| format!("wiki task failed: {e}"))?
+    .map_err(|e| format!("wiki task failed: {e}"))??;
+    publish_outputs(&project, &root, &[".agentz/REPO_WIKI.md"]).await?;
+    Ok(result)
+}
+
+/// Project id plus the local root the index code reads: the project itself,
+/// or the synced source mirror for `agentz-remote://` workspaces.
+async fn wiki_root(project_dir: Option<&str>) -> Result<(String, PathBuf), String> {
+    let project = require_indexable_project_dir(project_dir)?;
+    let root = crate::remote::mirror::index_root(&project, true).await?;
+    Ok((project, root))
+}
+
+/// Remote projects: copy generated documents to the remote `.agentz/`.
+async fn publish_outputs(project: &str, root: &Path, rels: &[&str]) -> Result<(), String> {
+    if crate::remote::is_remote(project) {
+        crate::remote::mirror::publish(project, root, rels).await
+    } else {
+        Ok(())
+    }
 }
 
 /// Generate the Track 2 Incremental DeepWiki (`.agentz/WIKI_DEEP.md`) with per-module
@@ -628,10 +646,16 @@ pub async fn repo_wiki_generate_deep(
     app: AppHandle,
     project_dir: Option<String>,
 ) -> Result<RepoWikiResult, String> {
-    let project = require_project_dir(project_dir.as_deref())?;
-    let root = PathBuf::from(&project);
+    let (project, root) = wiki_root(project_dir.as_deref()).await?;
+    let project_name = crate::remote::mirror::workspace_name(&project, &root);
 
-    let llm_cfg = if let Ok((_, settings_arc)) = open_project_kernel_state(&app, &project) {
+    // LLM settings are global; remote projects have no local session store.
+    let kernel_state = if crate::remote::is_remote(&project) {
+        open_global_kernel_state(&app)
+    } else {
+        open_project_kernel_state(&app, &project)
+    };
+    let llm_cfg = if let Ok((_, settings_arc)) = kernel_state {
         let s = settings_arc.lock().await;
         s.llm_providers
             .iter()
@@ -745,11 +769,7 @@ pub async fn repo_wiki_generate_deep(
     }
 
     let root_finalize = root.clone();
-    tokio::task::spawn_blocking(move || {
-        let project_name = root_finalize
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "workspace".to_string());
+    let result = tokio::task::spawn_blocking(move || {
         let now = chrono::Utc::now().format("%Y-%m-%d %H:%M UTC").to_string();
 
         let mut deep_md = String::new();
@@ -790,30 +810,43 @@ pub async fn repo_wiki_generate_deep(
             let _ = crate::commands::graph_agent::write_agent_artifacts(&root_finalize, &doc);
         }
 
-        Ok(RepoWikiResult {
+        Ok::<_, String>(RepoWikiResult {
             path: ".agentz/WIKI_DEEP.md".to_string(),
             markdown: deep_md,
         })
     })
     .await
-    .map_err(|e| format!("deep wiki finalize failed: {e}"))?
+    .map_err(|e| format!("deep wiki finalize failed: {e}"))??;
+    publish_outputs(
+        &project,
+        &root,
+        &[
+            ".agentz/WIKI_DEEP.md",
+            crate::commands::graph_agent::coding_brief_path(),
+        ],
+    )
+    .await?;
+    Ok(result)
 }
 
 /// Export and return `.agentz/REPO_MEMORY.md` (source-anchored repository memory notes).
 #[tauri::command]
 pub async fn repo_memory_read(project_dir: Option<String>) -> Result<RepoWikiResult, String> {
-    let project = require_project_dir(project_dir.as_deref())?;
-    let root = PathBuf::from(project);
-    tokio::task::spawn_blocking(move || {
-        let out = export_repo_memory_markdown(&root)?;
+    let project = require_indexable_project_dir(project_dir.as_deref())?;
+    let root = crate::remote::mirror::index_root(&project, false).await?;
+    let export_root = root.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let out = export_repo_memory_markdown(&export_root)?;
         let md = std::fs::read_to_string(&out).map_err(|e| format!("read REPO_MEMORY.md: {e}"))?;
-        Ok(RepoWikiResult {
+        Ok::<_, String>(RepoWikiResult {
             path: ".agentz/REPO_MEMORY.md".to_string(),
             markdown: md,
         })
     })
     .await
-    .map_err(|e| format!("repo memory task failed: {e}"))?
+    .map_err(|e| format!("repo memory task failed: {e}"))??;
+    publish_outputs(&project, &root, &[".agentz/REPO_MEMORY.md"]).await?;
+    Ok(result)
 }
 
 #[derive(Debug, serde::Serialize)]

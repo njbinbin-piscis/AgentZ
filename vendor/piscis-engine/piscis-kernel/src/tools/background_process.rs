@@ -81,8 +81,8 @@ pub fn detached_result(
             "Moved to the background after the foreground timeout; still running (NOT killed)."
         },
     )];
-    let stdout = String::from_utf8_lossy(stdout_so_far);
-    let stderr = String::from_utf8_lossy(stderr_so_far);
+    let stdout = super::output::decode_process_output(stdout_so_far);
+    let stderr = super::output::decode_process_output(stderr_so_far);
     if !stdout.trim().is_empty() {
         parts.push(format!("--- stdout so far ---\n{}", stdout.trim()));
     }
@@ -735,13 +735,13 @@ impl Tool for ProcessOutputTool {
         if !out.is_empty() {
             parts.push(format!(
                 "--- stdout ---\n{}",
-                String::from_utf8_lossy(&out)
+                super::output::decode_process_output(&out)
             ));
         }
         if !err.is_empty() {
             parts.push(format!(
                 "--- stderr ---\n{}",
-                String::from_utf8_lossy(&err)
+                super::output::decode_process_output(&err)
             ));
         }
         if out.is_empty() && err.is_empty() {

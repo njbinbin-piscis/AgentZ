@@ -274,6 +274,22 @@ async fn run_checker(checker: Checker, root: &str) -> Result<Vec<CheckerDiag>, S
     })
 }
 
+/// `(file, LSP-shaped diagnostic)` pairs from `cargo check --message-format=json`
+/// (`checker == "cargo"`) or `tsc --noEmit --pretty false` output.
+pub fn parse_checker_output(checker: &str, stdout: &str) -> Vec<(String, Value)> {
+    let diags = if checker == "cargo" {
+        parse_cargo(stdout)
+    } else {
+        parse_tsc(stdout)
+    };
+    diags.into_iter().map(|d| (d.file, d.value)).collect()
+}
+
+/// Whether a checker's (usually root-relative) file path names `file`.
+pub fn checker_file_matches(checker_file: &str, file: &str) -> bool {
+    same_file(checker_file, file)
+}
+
 fn parse_cargo(stdout: &str) -> Vec<CheckerDiag> {
     let mut out = Vec::new();
     for line in stdout.lines() {

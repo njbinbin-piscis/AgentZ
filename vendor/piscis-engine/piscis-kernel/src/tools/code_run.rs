@@ -201,13 +201,8 @@ impl Tool for CodeRunTool {
                     false,
                 ),
             };
-            let full_command = format!("chcp 65001 >nul 2>&1 & {command}");
-            let args = [
-                OsString::from("/d"),
-                OsString::from("/c"),
-                OsString::from(full_command),
-            ];
-            let env_overrides = input["env"]
+            let args = super::shell::cmd_utf8_args();
+            let mut env_overrides = input["env"]
                 .as_object()
                 .map(|values| {
                     values
@@ -220,6 +215,10 @@ impl Tool for CodeRunTool {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
+            env_overrides.push((
+                OsString::from(super::shell::CMD_LINE_ENV),
+                OsString::from(command),
+            ));
             let timeout = Duration::from_secs(timeout_secs);
             let cancel = ctx.cancel.clone();
             let sandbox_mode = ctx.settings.sandbox_mode;
@@ -355,8 +354,8 @@ impl Tool for CodeRunTool {
 
         #[cfg(windows)]
         {
-            let stdout_raw = String::from_utf8_lossy(&stdout_bytes);
-            let stderr_raw = String::from_utf8_lossy(&stderr_bytes);
+            let stdout_raw = super::output::decode_process_output(&stdout_bytes);
+            let stderr_raw = super::output::decode_process_output(&stderr_bytes);
             // Balanced presentation: per-line elision + whole-line head/tail
             // (see tools::output::smart_truncate), far below the capture cap.
             let (stdout, stdout_meta) = crate::tools::output::smart_truncate(

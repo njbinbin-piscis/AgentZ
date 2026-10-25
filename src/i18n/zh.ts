@@ -410,7 +410,7 @@ const zh = {
     modeWorkZ: "WorkZ",
     modeWorkZTitle: "WorkZ 模式（以任务为中心）",
     chat: "Chat",
-    chatTitle: "切换侧栏（Chat / 图谱）",
+    chatTitle: "显示/隐藏对话面板",
     sidePanelTitle: "IDE 侧栏",
     sidePanelChat: "Chat",
     sidePanelGraph: "图谱",

@@ -12,12 +12,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::time::Duration;
 
+/// Keep non-ASCII paths unescaped in line-based output.
+const UNQUOTED_PATHS: [&str; 2] = ["-c", "core.quotepath=false"];
+
 fn tokio_git_command() -> tokio::process::Command {
-    tokio_command("git")
+    let mut cmd = tokio_command("git");
+    cmd.args(UNQUOTED_PATHS);
+    cmd
 }
 
 fn std_git_command() -> std::process::Command {
-    std_command("git")
+    let mut cmd = std_command("git");
+    cmd.args(UNQUOTED_PATHS);
+    cmd
 }
 
 /// Run `git <args>` inside `dir` with an async cancellation check.

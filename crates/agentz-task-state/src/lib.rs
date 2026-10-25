@@ -29,6 +29,7 @@ pub(crate) mod git_process {
     pub(crate) fn command() -> std::process::Command {
         #[allow(unused_mut)]
         let mut cmd = std::process::Command::new("git");
+        cmd.args(UNQUOTED_PATHS);
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
@@ -37,10 +38,15 @@ pub(crate) mod git_process {
         cmd
     }
 
+    /// Line-based output (`--name-status`, `--numstat`) octal-escapes
+    /// non-ASCII paths unless quoting is off; `-z` output is unaffected.
+    const UNQUOTED_PATHS: [&str; 2] = ["-c", "core.quotepath=false"];
+
     /// Async `git` command with the console window suppressed on Windows.
     pub(crate) fn tokio_command() -> tokio::process::Command {
         #[allow(unused_mut)]
         let mut cmd = tokio::process::Command::new("git");
+        cmd.args(UNQUOTED_PATHS);
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
         cmd

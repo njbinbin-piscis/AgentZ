@@ -355,8 +355,88 @@ pub fn extract_error_lines(stdout: &str, stderr: &str) -> Vec<String> {
     out
 }
 
+/// Decodes captured child-process output. A multi-byte UTF-8 sequence cut by
+/// a capture cap is dropped. cmd built-ins write the ANSI code page even
+/// after `chcp 65001` while UTF-8-aware programs share the same pipe, so
+/// each line that is not valid UTF-8 is decoded with the ANSI code page.
+pub fn decode_process_output(bytes: &[u8]) -> String {
+    let bytes = trim_partial_utf8_tail(bytes);
+    if let Ok(s) = std::str::from_utf8(bytes) {
+        return s.to_owned();
+    }
+    let ansi = ansi_encoding();
+    let mut out = String::with_capacity(bytes.len());
+    for line in bytes.split_inclusive(|&b| b == b'\n') {
+        match std::str::from_utf8(line) {
+            Ok(s) => out.push_str(s),
+            Err(_) => match ansi.map(|enc| enc.decode_without_bom_handling(line)) {
+                Some((cow, false)) => out.push_str(&cow),
+                _ => out.push_str(&String::from_utf8_lossy(line)),
+            },
+        }
+    }
+    out
+}
+
+pub(crate) fn trim_partial_utf8_tail(bytes: &[u8]) -> &[u8] {
+    for back in 1..=3.min(bytes.len()) {
+        let b = bytes[bytes.len() - back];
+        if b & 0xC0 == 0x80 {
+            continue;
+        }
+        let need = match b {
+            0xC0..=0xDF => 2,
+            0xE0..=0xEF => 3,
+            0xF0..=0xF7 => 4,
+            _ => return bytes,
+        };
+        return if need > back { &bytes[..bytes.len() - back] } else { bytes };
+    }
+    bytes
+}
+
+#[cfg(windows)]
+fn ansi_encoding() -> Option<&'static encoding_rs::Encoding> {
+    let cp = unsafe { windows_sys::Win32::Globalization::GetACP() };
+    Some(match cp {
+        936 | 54936 => encoding_rs::GB18030,
+        950 => encoding_rs::BIG5,
+        932 => encoding_rs::SHIFT_JIS,
+        949 => encoding_rs::EUC_KR,
+        866 => encoding_rs::IBM866,
+        874 => encoding_rs::WINDOWS_874,
+        1250 => encoding_rs::WINDOWS_1250,
+        1251 => encoding_rs::WINDOWS_1251,
+        1252 => encoding_rs::WINDOWS_1252,
+        1253 => encoding_rs::WINDOWS_1253,
+        1254 => encoding_rs::WINDOWS_1254,
+        1255 => encoding_rs::WINDOWS_1255,
+        1256 => encoding_rs::WINDOWS_1256,
+        1257 => encoding_rs::WINDOWS_1257,
+        1258 => encoding_rs::WINDOWS_1258,
+        _ => return None,
+    })
+}
+
+#[cfg(not(windows))]
+fn ansi_encoding() -> Option<&'static encoding_rs::Encoding> {
+    None
+}
+
 /// Collapse consecutive duplicate lines: `line\nline\n...` → `line\n... (repeated N times)`.
 pub fn collapse_repeated_lines(s: &str) -> String {
+    fn flush(out: &mut String, line: &str, repeat: u32) {
+        out.push_str(line);
+        out.push('\n');
+        match repeat {
+            0 => {}
+            1 => {
+                out.push_str(line);
+                out.push('\n');
+            }
+            n => out.push_str(&format!("... (repeated {n} times)\n")),
+        }
+    }
     let mut out = String::new();
     let mut prev: Option<&str> = None;
     let mut repeat = 0u32;
@@ -365,26 +445,17 @@ pub fn collapse_repeated_lines(s: &str) -> String {
             repeat += 1;
             continue;
         }
-        if repeat > 0 {
-            if let Some(p) = prev {
-                out.push_str(p);
-                out.push('\n');
-                if repeat > 1 {
-                    out.push_str(&format!("... (repeated {} times)\n", repeat));
-                }
-            }
-            repeat = 0;
+        if let Some(p) = prev {
+            flush(&mut out, p, repeat);
         }
+        repeat = 0;
         prev = Some(line);
     }
     if let Some(p) = prev {
-        out.push_str(p);
-        if repeat > 0 {
-            out.push('\n');
-            if repeat > 1 {
-                out.push_str(&format!("... (repeated {} times)", repeat));
-            }
-        }
+        flush(&mut out, p, repeat);
+    }
+    if out.ends_with('\n') {
+        out.pop();
     }
     out
 }
@@ -495,7 +566,34 @@ mod tests {
     fn collapse_repeated_lines_works() {
         let s = "ok\nok\nok\nok\ndone";
         let c = collapse_repeated_lines(s);
-        assert!(c.contains("repeated"));
-        assert!(c.contains("done"));
+        assert_eq!(c, "ok\n... (repeated 3 times)\ndone");
+    }
+
+    #[test]
+    fn decode_process_output_drops_cut_utf8_tail() {
+        let mut b = "ab中".as_bytes().to_vec();
+        b.truncate(b.len() - 1);
+        assert_eq!(decode_process_output(&b), "ab");
+        assert_eq!(decode_process_output("ab中".as_bytes()), "ab中");
+        assert_eq!(decode_process_output(b"plain"), "plain");
+    }
+
+    #[test]
+    fn decode_process_output_keeps_utf8_lines_in_mixed_streams() {
+        let mut b = "外部 utf8\n".as_bytes().to_vec();
+        b.extend_from_slice(b"caf\xE9\r\n");
+        b.extend_from_slice("尾行".as_bytes());
+        let s = decode_process_output(&b);
+        assert!(s.starts_with("外部 utf8\n"), "{s}");
+        assert!(s.ends_with("尾行"), "{s}");
+        assert_eq!(s.lines().count(), 3);
+    }
+
+    #[test]
+    fn collapse_repeated_lines_keeps_every_distinct_line() {
+        assert_eq!(collapse_repeated_lines("a\r\nb\r\nc\r\n"), "a\nb\nc");
+        assert_eq!(collapse_repeated_lines("a\na\nb"), "a\na\nb");
+        assert_eq!(collapse_repeated_lines("x"), "x");
+        assert_eq!(collapse_repeated_lines(""), "");
     }
 }

@@ -419,7 +419,7 @@ const en = {
     modeWorkZ: "WorkZ",
     modeWorkZTitle: "WorkZ mode (task-centric)",
     chat: "Chat",
-    chatTitle: "Toggle side panel (Chat / Graph)",
+    chatTitle: "Show/hide chat panel",
     sidePanelTitle: "IDE side panel",
     sidePanelChat: "Chat",
     sidePanelGraph: "Graph",

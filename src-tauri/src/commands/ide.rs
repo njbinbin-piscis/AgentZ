@@ -1528,7 +1528,8 @@ pub async fn ide_git_create_branch(
 #[tauri::command]
 pub async fn ide_git_init(project_dir: String) -> Result<(), String> {
     let workspace = PathBuf::from(&project_dir);
-    if !workspace.is_dir() {
+    let remote = crate::remote::is_remote(&project_dir);
+    if !remote && !workspace.is_dir() {
         return Err("project directory does not exist".into());
     }
     if let Ok(top) = run_git_cmd(&workspace, &["rev-parse", "--show-toplevel"]).await {
@@ -1540,6 +1541,9 @@ pub async fn ide_git_init(project_dir: String) -> Result<(), String> {
     run_git_cmd(&workspace, &["init"])
         .await
         .map_err(|e| format!("git init failed: {}", e))?;
+    if remote {
+        crate::remote::refresh_git_repos(&project_dir).await?;
+    }
     Ok(())
 }
 
@@ -2795,7 +2799,17 @@ pub async fn ide_watcher_count(state: State<'_, AppState>) -> Result<usize, Stri
 /// Thin wrapper over [`piscis_kernel::proc::tokio_command`] kept as a named
 /// helper so all git invocations remain grep-able.
 fn new_git_cmd() -> Command {
-    tokio_command("git")
+    let mut cmd = tokio_command("git");
+    cmd.args(GIT_UNQUOTED_PATHS);
+    cmd
+}
+
+/// Non-ASCII paths are octal-escaped (`"\346\272\220.rs"`) in line-based git
+/// output unless quoting is off; `-z` output is unaffected either way.
+pub(crate) const GIT_UNQUOTED_PATHS: [&str; 2] = ["-c", "core.quotepath=false"];
+
+fn with_unquoted_paths<'a>(args: &[&'a str]) -> Vec<&'a str> {
+    GIT_UNQUOTED_PATHS.iter().copied().chain(args.iter().copied()).collect()
 }
 
 async fn run_git_cmd(dir: &Path, args: &[&str]) -> Result<String, String> {
@@ -2816,7 +2830,7 @@ async fn run_git_cmd_bytes(dir: &Path, args: &[&str]) -> Result<Vec<u8>, String>
         };
         let v = session.call(
             "exec",
-            serde_json::json!({ "command": "git", "args": args, "cwd": remote_dir, "timeoutMs": 30_000 }),
+            serde_json::json!({ "command": "git", "args": with_unquoted_paths(args), "cwd": remote_dir, "timeoutMs": 30_000 }),
         )
         .await?;
         if v.get("code").and_then(|c| c.as_i64()) != Some(0) {

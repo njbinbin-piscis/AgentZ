@@ -217,6 +217,7 @@ async fn run_git(dir: &Path, args: &[&str]) -> Result<String, String> {
     let output = timeout(
         Duration::from_secs(60),
         tokio_command("git")
+            .args(crate::commands::ide::GIT_UNQUOTED_PATHS)
             .args(args)
             .current_dir(dir)
             .kill_on_drop(true)

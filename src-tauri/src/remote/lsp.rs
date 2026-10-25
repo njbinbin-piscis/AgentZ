@@ -119,7 +119,7 @@ pub async fn start(target: RemoteTarget, project_dir: &str, language: &str) -> R
     Ok(port)
 }
 
-fn server_script(root: &str, server: &str, args: &[String]) -> String {
+pub(crate) fn server_script(root: &str, server: &str, args: &[String]) -> String {
     let argv = std::iter::once(server.to_string())
         .chain(args.iter().cloned())
         .map(|a| shell_quote(&a))

@@ -3,12 +3,12 @@
 //! module-level (directory group) aggregation that stays small on huge repos.
 
 use std::collections::{BTreeMap, HashMap};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::commands::data_scope::require_project_dir;
+use crate::commands::data_scope::require_indexable_project_dir;
 use crate::commands::graph::{load_graph, GraphDoc};
 
 const CHURN_DAYS: u32 = 90;
@@ -188,18 +188,22 @@ pub fn build_code_map(
     }
 }
 
+fn churn_args() -> [String; 7] {
+    [
+        "-c".into(),
+        "core.quotepath=false".into(),
+        "log".into(),
+        format!("--since={CHURN_DAYS}.days.ago"),
+        "--name-only".into(),
+        "--no-renames".into(),
+        "--pretty=format:".into(),
+    ]
+}
+
 /// Commits touching each path in the last [`CHURN_DAYS`] days.
 async fn git_churn(root: &Path) -> Option<HashMap<String, u32>> {
     let mut cmd = piscis_kernel::proc::tokio_command("git");
-    cmd.current_dir(root)
-        .args([
-            "log",
-            &format!("--since={CHURN_DAYS}.days.ago"),
-            "--name-only",
-            "--no-renames",
-            "--pretty=format:",
-        ])
-        .kill_on_drop(true);
+    cmd.current_dir(root).args(churn_args()).kill_on_drop(true);
     let out = tokio::time::timeout(Duration::from_secs(20), cmd.output())
         .await
         .ok()?
@@ -207,20 +211,49 @@ async fn git_churn(root: &Path) -> Option<HashMap<String, u32>> {
     if !out.status.success() {
         return None;
     }
+    Some(parse_churn(&String::from_utf8_lossy(&out.stdout)))
+}
+
+/// The mirror carries no `.git`, so remote history is read on the remote.
+async fn remote_git_churn(project: &str) -> Option<HashMap<String, u32>> {
+    let session = crate::remote::bind(project).await.ok()?;
+    let v = session
+        .call(
+            "exec",
+            serde_json::json!({
+                "command": "git",
+                "args": churn_args(),
+                "cwd": session.path,
+                "timeoutMs": 20_000,
+            }),
+        )
+        .await
+        .ok()?;
+    if v.get("code").and_then(|c| c.as_i64()) != Some(0) {
+        return None;
+    }
+    Some(parse_churn(v.get("stdout")?.as_str()?))
+}
+
+fn parse_churn(stdout: &str) -> HashMap<String, u32> {
     let mut counts: HashMap<String, u32> = HashMap::new();
-    for line in String::from_utf8_lossy(&out.stdout).lines() {
+    for line in stdout.lines() {
         let l = line.trim();
         if !l.is_empty() {
             *counts.entry(l.replace('\\', "/")).or_default() += 1;
         }
     }
-    Some(counts)
+    counts
 }
 
 #[tauri::command]
 pub async fn code_map_data(project_dir: Option<String>) -> Result<CodeMapData, String> {
-    let project = require_project_dir(project_dir.as_deref())?;
-    let root = PathBuf::from(project);
+    let project = require_indexable_project_dir(project_dir.as_deref())?;
+    let remote = crate::remote::is_remote(&project);
+    let mut root = crate::remote::mirror::index_root(&project, false).await?;
+    if remote && !root.join(".agentz-mirror-ok").is_file() {
+        root = crate::remote::mirror::index_root(&project, true).await?;
+    }
 
     let load_root = root.clone();
     let doc = tokio::task::spawn_blocking(move || load_graph(&load_root))
@@ -238,7 +271,11 @@ pub async fn code_map_data(project_dir: Option<String>) -> Result<CodeMapData, S
         });
     };
 
-    let churn = git_churn(&root).await;
+    let churn = if remote {
+        remote_git_churn(&project).await
+    } else {
+        git_churn(&root).await
+    };
     tokio::task::spawn_blocking(move || build_code_map(&doc, &root, churn.as_ref()))
         .await
         .map_err(|e| format!("code map task failed: {e}"))

@@ -125,7 +125,7 @@ impl Tool for WebFetchTool {
             )));
         }
 
-        let body = String::from_utf8_lossy(&bytes);
+        let body = decode_body(&bytes, &content_type);
         let (title, text) = if content_type.contains("html") || looks_like_html(&body) {
             extract_html(&body)
         } else {
@@ -150,6 +150,33 @@ impl Tool for WebFetchTool {
             Ok(ToolResult::ok(truncated))
         }
     }
+}
+
+/// Decodes with the charset from a BOM, the Content-Type header or an early
+/// `<meta charset>`; undeclared non-UTF-8 bodies fall back to GB18030.
+fn decode_body(bytes: &[u8], content_type: &str) -> String {
+    let label_after = |hay: &str, key: &str| -> Option<String> {
+        let at = hay.find(key)? + key.len();
+        let rest = hay[at..].trim_start_matches(['"', '\'', ' ']);
+        let end = rest
+            .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+            .unwrap_or(rest.len());
+        (end > 0).then(|| rest[..end].to_string())
+    };
+    let head = String::from_utf8_lossy(&bytes[..bytes.len().min(4096)]).to_ascii_lowercase();
+    let declared = encoding_rs::Encoding::for_bom(bytes)
+        .map(|(enc, _)| enc)
+        .or_else(|| {
+            label_after(content_type, "charset=")
+                .or_else(|| label_after(&head, "charset="))
+                .and_then(|l| encoding_rs::Encoding::for_label(l.as_bytes()))
+        });
+    let encoding = match declared {
+        Some(enc) => enc,
+        None if std::str::from_utf8(bytes).is_ok() => encoding_rs::UTF_8,
+        None => encoding_rs::GB18030,
+    };
+    encoding.decode(bytes).0.into_owned()
 }
 
 fn looks_like_html(body: &str) -> bool {
@@ -275,6 +302,16 @@ fn collapse_blank_lines(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decodes_declared_and_undeclared_gbk_pages() {
+        let (gbk, _, _) = encoding_rs::GBK.encode("<html><meta charset=\"gb2312\"><p>中文页面</p>");
+        assert!(decode_body(&gbk, "text/html").contains("中文页面"));
+        let (gbk, _, _) = encoding_rs::GBK.encode("纯文本中文");
+        assert_eq!(decode_body(&gbk, "text/plain; charset=GBK"), "纯文本中文");
+        assert_eq!(decode_body(&gbk, "text/plain"), "纯文本中文");
+        assert_eq!(decode_body("UTF-8 中文".as_bytes(), "text/html"), "UTF-8 中文");
+    }
 
     #[test]
     fn strips_basic_html() {

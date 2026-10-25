@@ -5,6 +5,24 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.15] - 2026-10-25
+
+### Changed
+
+- **Remote workspaces run code features next to the files, like VS Code Remote.** Fast Wiki, DeepWiki, the repository-memory panel, the code map, symbol search and the call graph now accept `agentz-remote://` projects. Indexes are computed on the local source mirror, which is used as a cache, and generated documents (`.agentz/REPO_WIKI.md`, `WIKI_DEEP.md`, `AGENT_CODING_BRIEF.md`, `REPO_MEMORY.md`) are written back to the remote repository. Code-map churn is read with `git log` on the remote.
+- **Agent `lsp`, `read_lints`, `code_run` and `file_diff` work in remote workspaces.** Language servers are started on the remote host, lints fall back to `cargo check` / `tsc --noEmit` there, commands run on the remote, and diffs read remote files. Previously these tools were removed from remote sessions.
+
+### Fixed
+
+- **Initialize Git repository** now works for remote workspaces.
+- The title-bar chat button tooltip now says it shows or hides the chat panel; it no longer mentions a graph view.
+- **Shell output on Windows kept only the last line.** Collapsing repeated lines dropped every line that differed from the next one, so multi-line PowerShell and cmd output looked truncated. Every line is now kept and only consecutive duplicates are folded.
+- **Long command output keeps its ending.** The 200 KB capture now holds the first and last halves with a "bytes not captured" marker, so the final lines (where errors usually appear) are visible. A capture cut no longer leaves a broken character.
+- **cmd prints Chinese and other non-ANSI text.** Built-ins such as `echo`, `cd` and `dir` ignored `chcp 65001` and wrote `?`. The command now runs in a nested cmd started after the code page switch, and quotes and `&` inside the command are passed through unchanged; previously quotes reached cmd as `\"`. Lines that are not UTF-8 are decoded with the system code page.
+- **Grep finds matches in UTF-16 and GBK files.** Files that were not UTF-8 were skipped silently. Grep now decodes them the same way file reads do and strips a leading BOM from matched lines.
+- **Git paths with Chinese characters** are shown as names instead of octal escapes (`core.quotepath=false`) in source control, agent task review, approvals and the code map.
+- **Web fetch decodes GBK/GB2312 pages** using the charset from the response header or `<meta charset>`.
+
 ## [1.0.14] - 2026-10-24
 
 ### Added

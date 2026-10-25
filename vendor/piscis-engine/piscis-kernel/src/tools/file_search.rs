@@ -17,6 +17,19 @@ pub const EXCLUDED_SEARCH_DIRECTORY_NAMES: &[&str] = &[
     ".vs",
 ];
 
+/// Decodes text in any encoding `file_read` understands; `None` for binary files.
+fn decode_text(bytes: &[u8]) -> Option<String> {
+    let utf16 = bytes.starts_with(&[0xFF, 0xFE]) || bytes.starts_with(&[0xFE, 0xFF]);
+    if !utf16 && bytes[..bytes.len().min(8192)].contains(&0) {
+        return None;
+    }
+    let (text, label) = super::file_read::decode_bytes(bytes);
+    if label == "utf-8-lossy" {
+        return None;
+    }
+    Some(text.strip_prefix('\u{FEFF}').map(str::to_owned).unwrap_or(text))
+}
+
 pub fn is_excluded_search_directory(name: &str) -> bool {
     EXCLUDED_SEARCH_DIRECTORY_NAMES
         .iter()
@@ -354,8 +367,11 @@ impl FileSearchTool {
                     return true;
                 }
 
-                let content = match std::fs::read_to_string(path) {
-                    Ok(c) => c,
+                let content = match std::fs::read(path) {
+                    Ok(bytes) => match decode_text(&bytes) {
+                        Some(c) => c,
+                        None => return true,
+                    },
                     Err(_) => return true,
                 };
 
