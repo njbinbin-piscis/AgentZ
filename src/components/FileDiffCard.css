@@ -95,13 +95,21 @@
 }
 
 .agentz-file-diff-line.add {
-  background: rgba(34, 197, 94, 0.12);
-  color: #bbf7d0;
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  box-shadow: inset 3px 0 0 #22c55e;
 }
 
 .agentz-file-diff-line.del {
-  background: rgba(248, 113, 113, 0.12);
-  color: #fecaca;
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+
+.agentz-file-diff-line.add .agentz-file-diff-gutter,
+.agentz-file-diff-line.del .agentz-file-diff-gutter {
+  opacity: 1;
+  font-weight: 600;
 }
 
 .agentz-file-diff-line.ctx {

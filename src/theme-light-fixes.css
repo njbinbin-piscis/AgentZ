@@ -1,7 +1,7 @@
 /* Light-theme overrides for components that hardcode dark-theme colors. */
 
-[data-theme="light"] .agentz-file-diff-line.add { color: #166534; background: rgba(34, 197, 94, 0.16); }
-[data-theme="light"] .agentz-file-diff-line.del { color: #991b1b; background: rgba(248, 113, 113, 0.16); }
+[data-theme="light"] .agentz-file-diff-line.add { color: #15803d; background: #dcfce7; box-shadow: inset 3px 0 0 #22c55e; }
+[data-theme="light"] .agentz-file-diff-line.del { color: #b91c1c; background: #fee2e2; box-shadow: inset 3px 0 0 #ef4444; }
 [data-theme="light"] .agentz-file-diff-tag.new { color: #15803d; }
 [data-theme="light"] .agentz-file-diff-tag.mod { color: #a16207; }
 

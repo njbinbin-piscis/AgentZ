@@ -348,6 +348,16 @@
   padding: 0;
 }
 
+.agentz-bg-redirect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  color: var(--text-dim, #9a9ab0);
+}
+
 .agentz-bg-output {
   margin: 6px 0 2px;
   max-height: 140px;

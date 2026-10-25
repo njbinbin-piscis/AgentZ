@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.18] - 2026-10-26
+
+### Changed
+
+- **Readable file edit diffs in chat.** Added lines are green text on a green background and removed lines are red text on a red background, with a colored bar on the left edge and bold `+`/`-` markers, in both dark and light themes.
+- **Redirected background output is pointed out.** When a background task has no captured output because its command writes to a file (`> out.log`, `2>> err.txt`, `| Tee-Object x`, …), *View output* names the file and opens it in the editor. The `shell` and `code_run` tool descriptions now suggest leaving background output unredirected, since it is captured automatically; redirection is still allowed.
+
 ## [1.0.17] - 2026-10-26
 
 ### Added

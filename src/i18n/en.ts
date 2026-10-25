@@ -1058,6 +1058,7 @@ const en = {
     bgOutput: "Output",
     bgHide: "Hide",
     bgNoOutput: "(no output yet)",
+    bgRedirected: "This command redirects its output to:",
     bgKill: "Stop",
     autoContinuePrompt:
       "The previous turn was interrupted by the time limit. Do not wait for the user — resume the unfinished work: review the items still open in plan_todo, continue them, and update their status. If nothing remains, state the conclusion briefly.",

@@ -173,7 +173,7 @@ impl Tool for ShellTool {
                 },
                 "background": {
                     "type": "boolean",
-                    "description": "Start in the background registry and return immediately with a bg_id. Use for builds, tests and servers that may run long. Manage it with process_wait/process_output/process_kill."
+                    "description": "Start in the background registry and return immediately with a bg_id. Use for builds, tests and servers that may run long. Manage it with process_wait/process_output/process_kill. Output is captured automatically (process_output, and the user's background panel), so redirecting it to a file is usually unnecessary; redirect only when you need the file itself."
                 },
                 "notify_on": {
                     "type": "string",

@@ -4,6 +4,7 @@ import {
   getBackgroundOutput,
   type BackgroundTask,
 } from "../../services/tauri/backgroundTasks";
+import { redirectTargets } from "./bgRedirect";
 
 function formatElapsed(ms: number): string {
   const secs = Math.floor(ms / 1000);
@@ -40,16 +41,19 @@ export default function BackgroundTasksPanel({
   currentSessionId,
   onKill,
   onOpenSession,
+  onOpenFile,
 }: {
   tasks: BackgroundTask[];
   currentSessionId: string | null;
   onKill: (bgId: string) => void;
   onOpenSession?: (sessionId: string) => void;
+  onOpenFile?: (path: string) => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [output, setOutput] = useState<string>("");
+  const [redirects, setRedirects] = useState<string[]>([]);
 
   if (tasks.length === 0) return null;
 
@@ -71,10 +75,12 @@ export default function BackgroundTasksPanel({
     }
     setExpanded(task.id);
     setOutput("");
+    setRedirects([]);
     try {
       const res = await getBackgroundOutput(task.id);
       const text = [res.stdout, res.stderr].filter(Boolean).join("\n");
       setOutput(text || t("chat.bgNoOutput"));
+      setRedirects(text ? [] : redirectTargets(task.label, task.cwd || task.workspace_root));
     } catch (e) {
       setOutput(String(e));
     }
@@ -146,6 +152,23 @@ export default function BackgroundTasksPanel({
             </div>
             {expanded === task.id && (
               <pre className="agentz-bg-output">{output}</pre>
+            )}
+            {expanded === task.id && redirects.length > 0 && (
+              <div className="agentz-bg-redirect">
+                {t("chat.bgRedirected")}
+                {redirects.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    className="agentz-bg-link"
+                    title={p}
+                    disabled={!onOpenFile}
+                    onClick={() => onOpenFile?.(p)}
+                  >
+                    {p.split(/[\\/]/).pop()}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         ))}

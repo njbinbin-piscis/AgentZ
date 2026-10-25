@@ -1027,6 +1027,7 @@ const zh = {
     bgOutput: "查看输出",
     bgHide: "收起",
     bgNoOutput: "（暂无输出）",
+    bgRedirected: "该命令把输出重定向到了文件：",
     bgKill: "终止",
     autoContinuePrompt:
       "上一轮因超过时间上限而中断。无需等待用户输入，直接接着完成未完成的任务：先查看 plan_todo 中仍未完成的事项，继续执行并更新其状态；若已无未完成项，简要说明结论。",

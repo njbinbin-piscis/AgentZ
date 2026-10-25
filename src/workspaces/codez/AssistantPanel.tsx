@@ -121,6 +121,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         tasks={bg.tasks}
         currentSessionId={s.sessionRef.current}
         onKill={(id) => void bg.kill(id)}
+        onOpenFile={s.onSelectPath}
         onOpenSession={(id) => {
           const meta = s.sessions.find((x) => x.id === id);
           void s.switchSession(id, meta?.source);
