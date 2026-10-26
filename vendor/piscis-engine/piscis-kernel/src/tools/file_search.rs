@@ -31,6 +31,12 @@ fn decode_text(bytes: &[u8]) -> Option<String> {
     Some(text.strip_prefix('\u{FEFF}').map(str::to_owned).unwrap_or(text))
 }
 
+/// Tool-state directories and secret files that searches never descend into or read.
+pub fn is_secret_or_metadata(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    matches!(n.as_str(), ".agentz" | ".codez" | ".piscis" | ".secret_key" | ".env") || n.starts_with(".env.")
+}
+
 pub fn is_excluded_search_directory(name: &str) -> bool {
     EXCLUDED_SEARCH_DIRECTORY_NAMES
         .iter()
@@ -496,6 +502,13 @@ fn walk_dir_opts<F: FnMut(&Path) -> bool>(
     for entry in entries.flatten() {
         let path = entry.path();
         let is_dir = path.is_dir();
+        if path
+            .file_name()
+            .map(os_text)
+            .is_some_and(|n| is_secret_or_metadata(&n))
+        {
+            continue;
+        }
         if is_dir {
             if let Some(dir_name) = path.file_name().map(os_text) {
                 let dir_name = dir_name.as_str();

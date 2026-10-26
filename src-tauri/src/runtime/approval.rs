@@ -868,7 +868,9 @@ async fn check_search_links(
                 }
                 let protected = name.to_lowercase();
                 if matches!(protected.as_str(), ".git" | ".agentz" | ".codez" | ".piscis" | ".secret_key" | ".env") || protected.starts_with(".env.") {
-                    return Err("Search scope contains protected metadata or secrets; select a narrower source directory".into());
+                    // Skip, don't fail the whole search: the search tool itself also
+                    // never reads these entries (see file_search::is_secret_or_metadata).
+                    continue;
                 }
                 if kind.is_dir() && level < depth {
                     pending.push((entry.path(), level + 1));

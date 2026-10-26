@@ -445,7 +445,10 @@ async fn run_in_process_koi_turn(
         ..Default::default()
     };
 
-    crate::runtime::approval::restrict_unapproved_background(&mut registry);
+    // Members are first-class workers: full file/shell/pool tooling in their own
+    // worktree (headless turns bypass prompts; the sandbox level still follows
+    // Settings). Only delegation stays off so the team depth remains one.
+    registry.retain(|t| !matches!(t.name(), "delegate" | "call_fish" | "task"));
     let mut deps = HeadlessDeps::new(db, settings, registry, sink);
     if let Some(secs) = request.task_timeout_secs.filter(|s| *s > 0) {
         deps.default_timeout = Duration::from_secs(u64::from(secs));

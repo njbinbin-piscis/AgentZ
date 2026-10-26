@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.26] - 2026-10-26
+
+### Fixed
+
+- **BotZ members were forced read-only and had no pool tools.** Member turns went through the background read-only restriction, which removed `shell`, file writes, `pool_chat` and `pool_org` (so the 1.0.25 wiring fix did not take effect). Members now keep full tooling in their own worktree; only delegation tools (`delegate`, `call_fish`, `task`) stay off.
+- **Searches failed as a whole on protected entries.** A `file_search` / `file_list` scope containing `.agentz`, `.codez`, `.piscis`, `.git`, `.env*` or `.secret_key` was rejected with `protected metadata or secrets`. Those entries are now skipped, and the search tool itself never descends into tool-state directories or reads `.env` / `.secret_key` contents.
+
 ## [1.0.25] - 2026-10-26
 
 ### Fixed
