@@ -324,6 +324,7 @@ pub fn run() {
             commands::botz::botz_assign_member,
             commands::botz::botz_todo_diff,
             commands::botz::botz_review_todo,
+            commands::botz::botz_open_pr,
             commands::botz::botz_get_bot,
             commands::botz::botz_list_bots,
             commands::botz::botz_save_bot,

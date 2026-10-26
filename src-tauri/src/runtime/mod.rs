@@ -19,6 +19,7 @@ pub mod heartbeat;
 pub mod journal_hooks;
 pub mod koi;
 pub mod owner_lease;
+pub mod parent_wake;
 pub mod patrol;
 pub mod plan_intent;
 pub mod project_scope;

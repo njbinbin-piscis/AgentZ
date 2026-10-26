@@ -191,8 +191,9 @@ async fn run_round(app: &AppHandle, project_dir: &str, max_busy_secs: i64) -> Op
 
     let (subagent, sink) = pool_wiring(app);
     let cfg = CoordinatorConfig::default();
-    let max_running = pool_max_concurrency();
     for pool in pools.iter().filter(|p| p.status == "active") {
+        let max_running = crate::commands::botz::room_max_concurrency(app, &pool.id)
+            .unwrap_or_else(pool_max_concurrency);
         let running = {
             let guard = db.lock().await;
             guard
@@ -220,6 +221,65 @@ async fn run_round(app: &AppHandle, project_dir: &str, max_busy_secs: i64) -> Op
             }
             _ => {}
         }
+        wake_finished_parents(&db, &store, &pool.id, sink.clone(), subagent.clone(), &cfg).await;
     }
     Some(active_pools)
+}
+
+/// Ask the owner of a parent todo to wrap up once all its subtasks are finished.
+async fn wake_finished_parents(
+    db: &std::sync::Arc<tokio::sync::Mutex<piscis_kernel::store::db::Database>>,
+    store: &PoolStore,
+    pool_id: &str,
+    sink: std::sync::Arc<dyn piscis_core::host::PoolEventSink>,
+    subagent: std::sync::Arc<dyn piscis_core::host::SubagentRuntime>,
+    cfg: &CoordinatorConfig,
+) {
+    use crate::runtime::parent_wake::{finished_parents, mark_woken};
+    let (todos, kois) = {
+        let guard = db.lock().await;
+        let mut all = guard.list_koi_todos(None).unwrap_or_default();
+        all.retain(|t| t.pool_session_id.as_deref() == Some(pool_id));
+        (all, guard.list_kois().unwrap_or_default())
+    };
+    for pid in finished_parents(&todos) {
+        let Some(parent) = todos.iter().find(|t| t.id == pid) else { continue };
+        let Some(owner) = kois.iter().find(|k| k.id == parent.owner_id) else { continue };
+        if !mark_woken(&pid) {
+            continue;
+        }
+        let content = format!(
+            "@!{} All subtasks of \"{}\" (todo {}) are finished. Read their results in the pool, \
+             post a short integrated summary, then call pool_org(action=\"complete_todo\", todo_id=\"{}\").",
+            owner.name,
+            parent.title,
+            pid,
+            pid
+        );
+        let caller = piscis_kernel::pool::model::CallerContext {
+            memory_owner_id: "piscis",
+            session_id: "patrol",
+            session_source: None,
+            pool_session_id: Some(pool_id),
+            cancel: None,
+        };
+        let args = piscis_kernel::pool::model::SendPoolMessageArgs {
+            pool_id: pool_id.to_string(),
+            sender_id: "piscis".into(),
+            content,
+            reply_to_message_id: None,
+        };
+        if let Err(e) = piscis_kernel::pool::services::send_pool_message(
+            store,
+            sink.clone(),
+            Some(subagent.clone()),
+            cfg,
+            &caller,
+            args,
+        )
+        .await
+        {
+            warn!(target: "pool::patrol", pool_id, "parent wake failed: {e}");
+        }
+    }
 }

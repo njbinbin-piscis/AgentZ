@@ -5,6 +5,21 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.25] - 2026-10-26
+
+### Fixed
+
+- **BotZ members had no `pool_chat` / `pool_org`.** The member tool registry never bound a pool event sink, so both tools were not registered and members could not post deliverables, hand off with `@!` or call `complete_todo`. Members now get the same wiring as the main agent.
+- **1.0.24 could not build.** The release bump also rewrote the `ryu` entry in `Cargo.lock` to a nonexistent 1.0.24; it is restored to 1.0.23.
+
+### Added
+
+- **Per-room concurrency.** Each BotZ room can cap how many members work at once (0 = global default of 3).
+- **Member token budgets.** Member turns count toward a bot's daily and new monthly token budget; 80% shows a warning and 100% pauses the bot (no new turns start).
+- **Parent/child tasks.** A subtask whose description has a `Parent: <todo id>` line shows a `?` marker on the board; when all subtasks of an open parent finish, its owner is woken once to summarize and complete it.
+- **Unread mentions.** Desks show a count of unread messages that `@` mention the member; opening the desk marks them read.
+- **Open PR.** The review panel can push a todo's branch and open a pull request through `gh`.
+
 ## [1.0.24] - 2026-10-26
 
 ### Fixed

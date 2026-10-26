@@ -38,6 +38,19 @@ pub struct BotzRoom {
     pub members: Vec<String>,
     #[serde(default)]
     pub org_spec: String,
+    /// Max member turns running at once in this room; 0 = global default.
+    #[serde(default)]
+    pub max_concurrency: u32,
+}
+
+/// Per-room concurrency override for a pool, if the room set one.
+pub fn room_max_concurrency(app: &AppHandle, pool_id: &str) -> Option<usize> {
+    let path = rooms_file(app).ok()?;
+    load_rooms(&path)
+        .into_iter()
+        .find(|r| r.pool_id.as_deref() == Some(pool_id))
+        .map(|r| r.max_concurrency as usize)
+        .filter(|n| *n > 0)
 }
 
 fn rooms_file(app: &AppHandle) -> Result<PathBuf, String> {
@@ -278,6 +291,14 @@ pub struct BotProfile {
     pub usage_date: String,
     #[serde(default)]
     pub usage_tokens: u64,
+    /// Monthly token cap across member turns and the home thread; 0 = unlimited.
+    #[serde(default)]
+    pub monthly_token_budget: u64,
+    /// YYYY-MM that month_tokens counts.
+    #[serde(default)]
+    pub month_key: String,
+    #[serde(default)]
+    pub month_tokens: u64,
     /// Session of the bot's persistent home thread (in `botz_home_dir`).
     #[serde(default)]
     pub home_session_id: Option<String>,
@@ -300,6 +321,66 @@ pub fn load_bot(dir: &Path, id: &str) -> BotProfile {
         .ok()
         .and_then(|raw| serde_json::from_str::<BotProfile>(raw.trim_start_matches('\u{feff}')).ok())
         .unwrap_or_else(|| BotProfile { id: id.to_string(), ..Default::default() })
+}
+
+/// Why a bot may not start a new member turn, if its budget is spent.
+pub fn budget_block(p: &BotProfile, today: &str, month: &str) -> Option<String> {
+    let day = if p.usage_date == today { p.usage_tokens } else { 0 };
+    let mon = if p.month_key == month { p.month_tokens } else { 0 };
+    if p.daily_token_budget > 0 && day >= p.daily_token_budget {
+        return Some(format!("daily token budget reached ({day}/{})", p.daily_token_budget));
+    }
+    if p.monthly_token_budget > 0 && mon >= p.monthly_token_budget {
+        return Some(format!("monthly token budget reached ({mon}/{})", p.monthly_token_budget));
+    }
+    None
+}
+
+/// Add `tokens` to the bot's daily and monthly counters.
+pub fn add_usage(p: &mut BotProfile, today: &str, month: &str, tokens: u64) {
+    if p.usage_date != today {
+        p.usage_date = today.to_string();
+        p.usage_tokens = 0;
+    }
+    if p.month_key != month {
+        p.month_key = month.to_string();
+        p.month_tokens = 0;
+    }
+    p.usage_tokens += tokens;
+    p.month_tokens += tokens;
+}
+
+fn now_keys() -> (String, String) {
+    let now = chrono::Local::now();
+    (now.format("%Y-%m-%d").to_string(), now.format("%Y-%m").to_string())
+}
+
+/// Budget gate for a pool member about to start a turn.
+pub fn member_budget_block(app: &AppHandle, koi_id: &str) -> Option<String> {
+    let dir = bots_dir(app).ok()?;
+    let (d, m) = now_keys();
+    budget_block(&load_bot(&dir, koi_id), &d, &m)
+}
+
+/// Count a finished member turn against the bot's budgets.
+pub fn record_member_usage(app: &AppHandle, koi_id: &str, tokens: u64) {
+    if tokens == 0 {
+        return;
+    }
+    let Ok(dir) = bots_dir(app) else { return };
+    let mut p = load_bot(&dir, koi_id);
+    let (d, m) = now_keys();
+    add_usage(&mut p, &d, &m, tokens);
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    if let Ok(json) = serde_json::to_string_pretty(&p) {
+        let path = bot_file(&dir, &p.id);
+        let tmp = path.with_extension("json.tmp");
+        if std::fs::write(&tmp, json).is_ok() {
+            let _ = std::fs::rename(&tmp, &path);
+        }
+    }
 }
 
 #[tauri::command]
@@ -515,6 +596,68 @@ pub struct ReviewOutcome {
 }
 
 /// Approve (complete + merge the member branch) or send the todo back with feedback.
+/// Last http(s) URL printed by `gh pr create`.
+pub fn pr_url_from_output(out: &str) -> Option<String> {
+    out.lines()
+        .rev()
+        .map(str::trim)
+        .find(|l| l.starts_with("https://") || l.starts_with("http://"))
+        .map(str::to_string)
+}
+
+fn run_git_tool(program: &str, dir: &str, args: &[&str]) -> Result<String, String> {
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(args).current_dir(dir);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let out = cmd.output().map_err(|e| format!("{program} not available: {e}"))?;
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    if out.status.success() {
+        Ok(text)
+    } else {
+        Err(text.trim().to_string())
+    }
+}
+
+/// Push a todo's branch and open a pull request with the GitHub CLI.
+#[tauri::command]
+pub async fn botz_open_pr(app: AppHandle, project_dir: String, todo_id: String) -> Result<String, String> {
+    let (db, _s) = open_project_kernel_state(&app, &project_dir)?;
+    let todo = {
+        let db = db.lock().await;
+        db.get_koi_todo(&todo_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("todo '{todo_id}' not found"))?
+    };
+    let branch = todo
+        .git_branch
+        .clone()
+        .filter(|b| !b.trim().is_empty())
+        .ok_or_else(|| "this todo has no branch".to_string())?;
+    tokio::task::spawn_blocking(move || {
+        run_git_tool("git", &project_dir, &["remote", "get-url", "origin"])
+            .map_err(|_| "no git remote 'origin' configured".to_string())?;
+        run_git_tool("git", &project_dir, &["push", "-u", "origin", &branch])?;
+        let title = todo.title.trim().to_string();
+        let body = todo.description.trim().to_string();
+        let out = run_git_tool(
+            "gh",
+            &project_dir,
+            &["pr", "create", "--head", &branch, "--title", &title, "--body", &body],
+        )?;
+        pr_url_from_output(&out).ok_or_else(|| format!("pull request created: {}", out.trim()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn botz_review_todo(
     app: AppHandle,
@@ -617,6 +760,26 @@ async fn run_git(dir: &Path, args: &[&str]) -> Result<String, String> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn extracts_pr_url() {
+        let out = "Creating pull request...\nhttps://github.com/o/r/pull/7\n";
+        assert_eq!(pr_url_from_output(out).as_deref(), Some("https://github.com/o/r/pull/7"));
+        assert!(pr_url_from_output("nothing").is_none());
+    }
+
+    #[test]
+    fn budget_blocks_on_daily_and_monthly_caps() {
+        let mut p = BotProfile { id: "a".into(), daily_token_budget: 100, monthly_token_budget: 250, ..Default::default() };
+        assert!(budget_block(&p, "2026-10-26", "2026-10").is_none());
+        add_usage(&mut p, "2026-10-26", "2026-10", 100);
+        assert!(budget_block(&p, "2026-10-26", "2026-10").unwrap().contains("daily"));
+        // New day resets daily but not monthly.
+        assert!(budget_block(&p, "2026-10-27", "2026-10").is_none());
+        add_usage(&mut p, "2026-10-27", "2026-10", 150);
+        assert!(budget_block(&p, "2026-10-28", "2026-10").unwrap().contains("monthly"));
+        assert!(budget_block(&p, "2026-11-01", "2026-11").is_none());
+    }
+
     fn room(name: &str, dir: &str, team: &str) -> BotzRoom {
         BotzRoom {
             id: String::new(),
@@ -628,6 +791,7 @@ mod tests {
             created_at: String::new(),
             members: Vec::new(),
             org_spec: String::new(),
+            max_concurrency: 0,
         }
     }
 

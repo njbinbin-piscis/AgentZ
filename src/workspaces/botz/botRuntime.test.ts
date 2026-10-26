@@ -62,3 +62,19 @@ describe("bot budget and memory", () => {
     expect(prompt.endsWith("hello")).toBe(true);
   });
 });
+
+import { budgetLevel as _budgetLevel, addUsage as _addUsage, overBudget as _overBudget } from "./botRuntime";
+
+describe("monthly budget", () => {
+  const base = {
+    id: "a", memory: "", routines: [], daily_token_budget: 0, usage_date: "", usage_tokens: 0,
+    monthly_token_budget: 1000, month_key: "", month_tokens: 0,
+  } as unknown as Parameters<typeof _addUsage>[0];
+  it("warns at 80% and pauses at 100% across days", () => {
+    let p = _addUsage(base, "2026-10-26", 800);
+    expect(_budgetLevel(p, "2026-10-27")).toBe("warn");
+    p = _addUsage(p, "2026-10-27", 200);
+    expect(_overBudget(p, "2026-10-28")).toBe(true);
+    expect(_budgetLevel(p, "2026-11-01")).toBe("ok");
+  });
+});

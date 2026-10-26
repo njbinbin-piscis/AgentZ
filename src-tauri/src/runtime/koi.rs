@@ -78,10 +78,19 @@ pub fn pool_wiring(app: &AppHandle) -> (Arc<dyn SubagentRuntime>, Arc<dyn PoolEv
 
 struct PoolTurnEventSink {
     app: AppHandle,
+    koi_id: String,
 }
 
 impl EventSink for PoolTurnEventSink {
     fn emit_session(&self, session_id: &str, event: &str, payload: Value) {
+        if event == "agent_event" && payload.get("type").and_then(Value::as_str) == Some("done") {
+            let n = |k: &str| payload.get(k).and_then(Value::as_u64).unwrap_or(0);
+            crate::commands::botz::record_member_usage(
+                &self.app,
+                &self.koi_id,
+                n("total_input_tokens") + n("total_output_tokens"),
+            );
+        }
         let _ = self.app.emit(
             POOL_CHAT_EVENT,
             json!({ "sessionId": session_id, "channel": event, "payload": payload }),
@@ -317,7 +326,14 @@ async fn run_in_process_koi_turn(
         materialize_headless_llm_settings(&mut s, &app, koi_llm_provider_id.as_deref());
     }
 
-    let sink: Arc<dyn EventSink> = Arc::new(PoolTurnEventSink { app: app.clone() });
+    if let Some(reason) = crate::commands::botz::member_budget_block(&app, &request.koi_id) {
+        return Ok(crashed_outcome(handle, &format!("bot paused: {reason}")));
+    }
+
+    let sink: Arc<dyn EventSink> = Arc::new(PoolTurnEventSink {
+        app: app.clone(),
+        koi_id: request.koi_id.clone(),
+    });
     let mut registry = build_koi_registry(&app, db.clone(), settings.clone(), sink.clone()).await;
 
     // Inject org_spec / assemble the member system prompt. Todo turns use the

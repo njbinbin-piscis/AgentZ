@@ -57,3 +57,33 @@ export function deskGrid(count: number, maxCols = 4): { cols: number; rows: numb
   const cols = Math.min(maxCols, Math.max(2, Math.ceil(Math.sqrt(count))));
   return { cols, rows: Math.ceil(count / cols) };
 }
+
+/** `Parent: <todo id>` line the coordinator writes into a subtask description. */
+export function parentRef(description: string): string | null {
+  const m = /^\s*parent:\s*`?([A-Za-z0-9-]{6,})/im.exec(description);
+  return m ? m[1] : null;
+}
+
+/** The parent todo of `todo` within the same pool, if it declares one. */
+export function parentOf<T extends { id: string; description: string }>(todo: T, todos: T[]): T | null {
+  const ref = parentRef(todo.description);
+  if (!ref) return null;
+  return todos.find((p) => p.id !== todo.id && p.id.startsWith(ref)) ?? null;
+}
+
+/** Whether a pool message addresses `name` with `@name` or `@!name`. */
+export function mentionsMember(content: string, name: string): boolean {
+  if (!name) return false;
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`@!?${esc}(?![\\p{L}\\p{N}_])`, "iu").test(content);
+}
+
+/** Messages after `lastReadId` that mention `name`, sent by someone else. */
+export function unreadFor(
+  feed: { id: number; sender_id: string; content: string }[],
+  koiId: string,
+  name: string,
+  lastReadId: number,
+): number {
+  return feed.filter((m) => m.id > lastReadId && m.sender_id !== koiId && mentionsMember(m.content, name)).length;
+}

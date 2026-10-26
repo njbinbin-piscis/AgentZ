@@ -5,7 +5,7 @@ import type { AgentInfo } from "../../services/tauri/agents";
 import { botzGetBot, botzHomeDir, botzSaveBot, type BotProfile, type BotRoutine } from "../../services/tauri/botz";
 import Markdown from "../codez/Markdown";
 import Avatar from "./Avatar";
-import { localDate, sendToBot, usageToday } from "./botRuntime";
+import { budgetLevel, localDate, sendToBot, usageMonth, usageToday } from "./botRuntime";
 import type { Activity } from "./activity";
 
 const LIVE_LIMIT = 8000;
@@ -186,6 +186,25 @@ export default function BotHome({ agent, activity, onBack }: { agent: AgentInfo;
                   ` · ${Math.min(100, Math.round((usageToday(profile, today) / profile.daily_token_budget) * 100))}%`}
               </span>
             </div>
+            <div className="botz-budget">
+              <input
+                type="number"
+                min={0}
+                step={100000}
+                value={profile.monthly_token_budget ?? 0}
+                onChange={(e) => void save({ ...profile, monthly_token_budget: Math.max(0, Number(e.target.value) || 0) })}
+              />
+              <span>
+                {t("botz.monthlyBudget", { defaultValue: "monthly tokens" })}: {usageMonth(profile, today).toLocaleString()}
+              </span>
+            </div>
+            {budgetLevel(profile, today) !== "ok" && (
+              <div className="botz-error">
+                {budgetLevel(profile, today) === "paused"
+                  ? t("botz.budgetPaused", { defaultValue: "Budget reached: this bot is paused and will not start new turns." })
+                  : t("botz.budgetWarn", { defaultValue: "Over 80% of the token budget is used." })}
+              </div>
+            )}
           </section>
 
           <section>

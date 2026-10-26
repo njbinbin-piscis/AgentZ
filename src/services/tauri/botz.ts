@@ -16,6 +16,8 @@ export interface BotzRoom {
   /** Member agent ids, owned by the room. */
   members?: string[];
   org_spec?: string;
+  /** Max member turns at once in this room; 0 or unset = global default. */
+  max_concurrency?: number;
 }
 
 export interface RoomSync {
@@ -85,6 +87,11 @@ export interface ReviewOutcome {
   message: string;
 }
 
+/** Push the todo's branch and open a PR with `gh`; resolves to the PR URL. */
+export function botzOpenPr(projectDir: string, todoId: string): Promise<string> {
+  return invoke<string>("botz_open_pr", { projectDir, todoId });
+}
+
 export function botzReviewTodo(
   projectDir: string,
   todoId: string,
@@ -114,6 +121,9 @@ export interface BotProfile {
   daily_token_budget: number;
   usage_date: string;
   usage_tokens: number;
+  monthly_token_budget?: number;
+  month_key?: string;
+  month_tokens?: number;
   home_session_id?: string | null;
 }
 

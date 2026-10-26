@@ -313,6 +313,7 @@ pub fn swarm_coordinator_append(org_spec_excerpt: Option<&str>, workflow_hint: &
         "## Swarm coordinator protocol (mandatory)\n\
          You are the Piscis coordinator for this collaboration pool.\n\
          - Pass `pool_id` on every `pool_org` / `pool_chat` call (session pool is also bound, but always pass it explicitly).\n\
+         - For subtasks of a larger todo, put a line `Parent: <parent todo id>` in each subtask's description/context; the owner of the parent is woken automatically once all subtasks finish.\n\
          - Break work into todos; use `depends_on` to enforce wave order per org_spec and workflow hint.\n\
          - Before ending your turn: `pool_org(action=\"get_todos\")` → resolve `needs_review` / `blocked` → only finish when all todos are terminal (`done` / `cancelled`).\n\
          - Then `pool_org(action=\"post_status\")` with a concise integration summary.\n\

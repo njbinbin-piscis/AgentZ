@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { KoiTodo } from "../../services/tauri/pool";
-import { botzReviewTodo, botzTodoDiff, type TodoDiff } from "../../services/tauri/botz";
+import { botzOpenPr, botzReviewTodo, botzTodoDiff, type TodoDiff } from "../../services/tauri/botz";
 
 export interface DiffLine {
   kind: "file" | "hunk" | "add" | "remove" | "context" | "meta";
@@ -65,6 +65,19 @@ export default function ReviewPanel({
 
   const lines = useMemo(() => (diff ? parseUnifiedDiff(diff.diff) : []), [diff]);
 
+  const [prUrl, setPrUrl] = useState<string | null>(null);
+  const openPr = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setPrUrl(await botzOpenPr(projectDir, todo.id));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const review = async (approve: boolean) => {
     setBusy(true);
     setError(null);
@@ -118,12 +131,25 @@ export default function ReviewPanel({
           {(diff?.truncated || lines.length > MAX_ROWS) && <div className="botz-empty">{t("botz.diffTruncated")}</div>}
         </div>
         {error && <div className="botz-error">{error}</div>}
+        {prUrl && (
+          <div className="botz-notice-inline">
+            {t("botz.prOpened", { defaultValue: "Pull request:" })}{" "}
+            <a href={prUrl} target="_blank" rel="noreferrer">
+              {prUrl}
+            </a>
+          </div>
+        )}
         <div className="botz-review-actions">
           <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder={t("botz.feedbackPlaceholder")} />
           <div className="botz-review-buttons">
             <button type="button" disabled={busy} onClick={() => void review(false)}>
               {t("botz.requestChanges")}
             </button>
+            {diff?.branch && (
+              <button type="button" disabled={busy} onClick={() => void openPr()}>
+                {t("botz.openPr", { defaultValue: "Open PR" })}
+              </button>
+            )}
             <button type="button" className="primary" disabled={busy} onClick={() => void review(true)}>
               {diff?.branch ? t("botz.approveMerge") : t("botz.approve")}
             </button>

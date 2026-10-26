@@ -32,7 +32,7 @@ import ToolTrace, { interleaveTools, upsertToolStep, truncateToolResultForUi, ty
 import Avatar from "./Avatar";
 import BotPicker from "./BotPicker";
 import ReviewPanel from "./ReviewPanel";
-import { activityFromEvent, deskGrid, koiIdFromSession, koiTaskSessionId, type Activity } from "./activity";
+import { activityFromEvent, parentOf, unreadFor, deskGrid, koiIdFromSession, koiTaskSessionId, type Activity } from "./activity";
 
 const COORDINATOR = "__coordinator__";
 const BUBBLE_MS = 9000;
@@ -128,6 +128,16 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
   const [live, setLive] = useState<Record<string, LiveTurn>>({});
   const [bubbles, setBubbles] = useState<Record<string, Bubble>>({});
   const [desk, setDesk] = useState<string | null>(null);
+  // Mailbox: a member's inbox is the pool messages that @mention them; opening
+  // the desk marks everything up to the newest message as read.
+  const mailKey = `botz-mail-${room.id}`;
+  const [lastRead, setLastRead] = useState<Record<string, number>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(mailKey) ?? "{}") as Record<string, number>;
+    } catch {
+      return {};
+    }
+  });
   const [todoSel, setTodoSel] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<MessageDto[]>([]);
   const [input, setInput] = useState("");
@@ -249,6 +259,19 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
     }, BUBBLE_MS + 50);
     return () => window.clearTimeout(timer);
   }, [feed]);
+
+  useEffect(() => {
+    if (!desk || desk === COORDINATOR || feed.length === 0) return;
+    const newest = feed.reduce((mx, m) => Math.max(mx, m.id), 0);
+    if ((lastRead[desk] ?? 0) >= newest) return;
+    const next = { ...lastRead, [desk]: newest };
+    setLastRead(next);
+    try {
+      localStorage.setItem(mailKey, JSON.stringify(next));
+    } catch {
+      // storage unavailable
+    }
+  }, [desk, feed, lastRead, mailKey]);
 
   const todoPrefixes = useMemo(() => new Set(todos.map((td) => td.id.slice(0, 8))), [todos]);
   const koiIds = useMemo(() => members.map((m) => m.koi_id), [members]);
@@ -487,6 +510,20 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
               </div>
             )}
           </span>
+          <label className="botz-concurrency" title={t("botz.concurrencyHint", { defaultValue: "Max members working at once" })}>
+            ⚡
+            <select
+              value={room.max_concurrency ?? 0}
+              onChange={(e) => onRoomChange({ ...room, max_concurrency: Number(e.target.value) })}
+            >
+              <option value={0}>{t("botz.concurrencyDefault", { defaultValue: "auto" })}</option>
+              {[1, 2, 3, 4, 5, 6, 8].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
           <button type="button" className={showBoard ? "active" : ""} onClick={() => setShowBoard((v) => !v)}>
             {t("botz.board")}
           </button>
@@ -523,6 +560,11 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
                 >
                   {bubbles[m.koi_id] && <div className="botz-bubble">{bubbles[m.koi_id].text}</div>}
                   {act === "waiting" && <div className="botz-alert">!</div>}
+                  {desk !== m.koi_id && unreadFor(feed, m.koi_id, m.name, lastRead[m.koi_id] ?? 0) > 0 && (
+                    <div className="botz-mail" title={t("botz.unreadMail", { defaultValue: "Unread messages" })}>
+                      ✉ {unreadFor(feed, m.koi_id, m.name, lastRead[m.koi_id] ?? 0)}
+                    </div>
+                  )}
                   <Avatar seed={m.koi_id} color={m.color} icon={m.icon} activity={act} />
                   <div className="botz-nameplate">
                     {m.name}
@@ -584,7 +626,14 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
                         <span className="botz-card-owner" style={{ background: owner?.color || "#7c6af7" }}>
                           {owner?.icon || "🐟"}
                         </span>
-                        <span className="botz-card-title">{td.title}</span>
+                        <span className="botz-card-title">
+                          {parentOf(td, todos) && (
+                            <span className="botz-card-parent" title={parentOf(td, todos)?.title}>
+                              ↳{" "}
+                            </span>
+                          )}
+                          {td.title}
+                        </span>
                       </div>
                     );
                   })}

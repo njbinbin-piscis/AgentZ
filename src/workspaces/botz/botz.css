@@ -1012,3 +1012,7 @@
 
 .botz-msg-user { white-space: pre-wrap; word-break: break-word; }
 .botz-msg.user { align-self: flex-end; }
+
+.botz-mail { position: absolute; top: 4px; left: 6px; font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--accent, #2d6cdf); color: #fff; }
+.botz-card-parent { opacity: 0.6; }
+.botz-concurrency { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }

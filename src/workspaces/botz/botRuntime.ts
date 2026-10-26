@@ -24,12 +24,40 @@ export function usageToday(p: BotProfile, today: string): number {
   return p.usage_date === today ? p.usage_tokens : 0;
 }
 
+export const monthKey = (today: string) => today.slice(0, 7);
+
+export function usageMonth(p: BotProfile, today: string): number {
+  return p.month_key === monthKey(today) ? (p.month_tokens ?? 0) : 0;
+}
+
 export function overBudget(p: BotProfile, today: string): boolean {
-  return p.daily_token_budget > 0 && usageToday(p, today) >= p.daily_token_budget;
+  if (p.daily_token_budget > 0 && usageToday(p, today) >= p.daily_token_budget) return true;
+  const monthly = p.monthly_token_budget ?? 0;
+  return monthly > 0 && usageMonth(p, today) >= monthly;
+}
+
+/** Highest used share (0..1+) across the daily and monthly caps; 0 when unlimited. */
+export function budgetRatio(p: BotProfile, today: string): number {
+  const d = p.daily_token_budget > 0 ? usageToday(p, today) / p.daily_token_budget : 0;
+  const m = (p.monthly_token_budget ?? 0) > 0 ? usageMonth(p, today) / (p.monthly_token_budget ?? 1) : 0;
+  return Math.max(d, m);
+}
+
+export type BudgetLevel = "ok" | "warn" | "paused";
+export function budgetLevel(p: BotProfile, today: string): BudgetLevel {
+  const r = budgetRatio(p, today);
+  return r >= 1 ? "paused" : r >= 0.8 ? "warn" : "ok";
 }
 
 export function addUsage(p: BotProfile, today: string, tokens: number): BotProfile {
-  return { ...p, usage_date: today, usage_tokens: usageToday(p, today) + Math.max(0, tokens) };
+  const add = Math.max(0, tokens);
+  return {
+    ...p,
+    usage_date: today,
+    usage_tokens: usageToday(p, today) + add,
+    month_key: monthKey(today),
+    month_tokens: usageMonth(p, today) + add,
+  };
 }
 
 const MEMORY_RE = /<memory>([\s\S]*?)<\/memory>/i;

@@ -36,3 +36,34 @@ describe("botz activity", () => {
     expect(deskGrid(20)).toEqual({ cols: 4, rows: 5 });
   });
 });
+
+import { parentOf, parentRef } from "./activity";
+
+describe("parent todos", () => {
+  it("reads the Parent line and resolves by id prefix", () => {
+    expect(parentRef("Do it\nParent: abcdef12")).toBe("abcdef12");
+    expect(parentRef("Parent: ab")).toBeNull();
+    const todos = [
+      { id: "abcdef1234", description: "" },
+      { id: "c1", description: "Parent: abcdef12" },
+    ];
+    expect(parentOf(todos[1], todos)?.id).toBe("abcdef1234");
+    expect(parentOf(todos[0], todos)).toBeNull();
+  });
+});
+
+import { mentionsMember, unreadFor } from "./activity";
+
+describe("mailbox", () => {
+  it("counts unread mentions only", () => {
+    expect(mentionsMember("@!Coder please review", "Coder")).toBe(true);
+    expect(mentionsMember("hi @Coders", "Coder")).toBe(false);
+    const feed = [
+      { id: 1, sender_id: "piscis", content: "@Coder old" },
+      { id: 2, sender_id: "piscis", content: "@!Coder new" },
+      { id: 3, sender_id: "coder", content: "@Coder self" },
+    ];
+    expect(unreadFor(feed, "coder", "Coder", 1)).toBe(1);
+    expect(unreadFor(feed, "coder", "Coder", 2)).toBe(0);
+  });
+});
