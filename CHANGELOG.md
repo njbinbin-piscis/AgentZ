@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.23] - 2026-10-26
+
+### Fixed
+
+- **400 errors from gateways that reject repeated tool calls.** Qwen on DashScope returns "Repetitive tool calls detected" when the same tool call (name and arguments) appears in several consecutive rounds. The request view now collapses such runs to the last round and notes the repeat count in its result; stored history is untouched, so sessions stuck on this error recover on the next send.
+
+### Changed
+
+- **Earlier, stronger loop protection.** The same call several rounds in a row now gets a nudge from the 3rd repeat (polling tools excluded). `code_run` producing an equivalent outcome again and again (digits such as timings and the internal operation id are ignored) warns from the 4th time and is blocked from the 8th, telling the model to report the blocker. A call whose warnings were ignored 3 times is blocked. The detector window is rebuilt from the saved session history, so a new turn no longer starts counting from zero.
+
 ## [1.0.22] - 2026-10-26
 
 ### Added

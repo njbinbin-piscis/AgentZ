@@ -321,6 +321,10 @@ struct ToolCallRecord {
     name: String,
     input_hash: u64,
     result_hash: u64,
+    /// Result hash with volatile parts (digits, recovery trailer) removed, so
+    /// reruns that differ only in timings still compare equal.
+    #[serde(default)]
+    norm_hash: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -343,16 +347,58 @@ struct LoopDetectorState {
     /// the moment any substantive action runs (click, type, hotkey,
     /// drag, file edit, shell command, …).
     consecutive_vision_only_turns: usize,
+    /// Warnings already issued per call hash; ignored warnings escalate to a block.
+    warned: HashMap<u64, usize>,
 }
 
 impl LoopDetectorState {
+    /// Rebuild the window from persisted history so a new turn does not start
+    /// with a clean slate while the model is still repeating itself.
+    fn seed_from_messages(&mut self, messages: &[LlmMessage]) {
+        let mut calls: HashMap<String, (String, serde_json::Value)> = HashMap::new();
+        for message in messages {
+            let MessageContent::Blocks(blocks) = &message.content else {
+                continue;
+            };
+            for block in blocks {
+                match block {
+                    ContentBlock::ToolUse { id, name, input } => {
+                        calls.insert(id.clone(), (name.clone(), input.clone()));
+                    }
+                    ContentBlock::ToolResult {
+                        tool_use_id,
+                        content,
+                        ..
+                    } => {
+                        if let Some((name, input)) = calls.get(tool_use_id) {
+                            self.record(
+                                name,
+                                input,
+                                stable_hash_result(content),
+                                stable_hash_normalized(content),
+                            );
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
     /// Record a completed tool call with its result hash.
-    fn record(&mut self, name: &str, input: &serde_json::Value, result_hash: u64) {
+    fn record(
+        &mut self,
+        name: &str,
+        input: &serde_json::Value,
+        result_hash: u64,
+        norm_hash: u64,
+    ) {
         let input_hash = stable_hash_input(name, input);
         self.history.push(ToolCallRecord {
             name: name.to_string(),
             input_hash,
             result_hash,
+            norm_hash,
         });
         if self.history.len() > TOOL_CALL_HISTORY_SIZE {
             self.history.remove(0);
@@ -369,6 +415,34 @@ impl LoopDetectorState {
     /// pattern the vision-loop detector is trying to encourage, so it
     /// should reset the consecutive-vision streak.
     fn detect(
+        &mut self,
+        pending_name: &str,
+        pending_input: &serde_json::Value,
+        batch: &[(String, String, serde_json::Value)],
+    ) -> LoopDetectionResult {
+        let mut result = self.detect_inner(pending_name, pending_input, batch);
+        if result.level == LoopLevel::Warning
+            && !matches!(result.detector, Some(LoopDetector::VisionLoop))
+        {
+            let hash = stable_hash_input(pending_name, pending_input);
+            let n = self.warned.entry(hash).or_insert(0);
+            *n += 1;
+            if *n > 3 {
+                result = LoopDetectionResult {
+                    level: LoopLevel::Critical,
+                    detector: result.detector,
+                    count: result.count,
+                    message: format!(
+                        "Tool '{}' was blocked: repeated warnings about this identical call were ignored. Do not retry it. Tell the user what is failing and ask how to proceed.",
+                        pending_name
+                    ),
+                };
+            }
+        }
+        result
+    }
+
+    fn detect_inner(
         &mut self,
         pending_name: &str,
         pending_input: &serde_json::Value,
@@ -531,6 +605,71 @@ impl LoopDetectorState {
             }
         } else {
             self.consecutive_vision_only_turns = 0;
+        }
+
+        // 3.8. Same call, equivalent outcome, again and again (not necessarily
+        // consecutive: edit-then-rerun cycles that never change the result).
+        // Only command-running tools: repeated reads of the same file
+        // legitimately return the same content.
+        let runs_commands = pending_name == "code_run";
+        if runs_commands {
+            if let Some(last) = self
+                .history
+                .iter()
+                .rev()
+                .find(|r| r.name == pending_name && r.input_hash == pending_hash)
+            {
+                let same = self
+                    .history
+                    .iter()
+                    .filter(|r| {
+                        r.name == pending_name
+                            && r.input_hash == pending_hash
+                            && r.norm_hash == last.norm_hash
+                    })
+                    .count();
+                if same >= 8 {
+                    return LoopDetectionResult {
+                        level: LoopLevel::Critical,
+                        detector: Some(LoopDetector::GlobalCircuitBreaker),
+                        count: same,
+                        message: format!(
+                            "Tool '{}' was run {} times with the same outcome and no progress. Stop retrying: report to the user what is failing and ask for direction.",
+                            pending_name, same
+                        ),
+                    };
+                }
+                if same >= 4 {
+                    return LoopDetectionResult {
+                        level: LoopLevel::Warning,
+                        detector: Some(LoopDetector::GenericRepeat),
+                        count: same,
+                        message: format!(
+                            "Tool '{}' has produced the same outcome {} times. Rerunning without a real change will not help; change the approach or report the blocker.",
+                            pending_name, same
+                        ),
+                    };
+                }
+            }
+        }
+
+        // 3.9. Early nudge: the same call several rounds in a row. The generic
+        // thresholds below are deliberately high; this one only asks the model
+        // to change approach before some providers reject the repetition.
+        if !KNOWN_POLL_TOOLS.contains(&pending_name) {
+            let streak = self.count_same_tool_streak(pending_name, pending_hash);
+            if streak >= 2 {
+                return LoopDetectionResult {
+                    level: LoopLevel::Warning,
+                    detector: Some(LoopDetector::GenericRepeat),
+                    count: streak + 1,
+                    message: format!(
+                        "Tool '{}' was called with identical arguments {} times in a row. Change the arguments or approach, or report what is blocking you.",
+                        pending_name,
+                        streak + 1
+                    ),
+                };
+            }
         }
 
         // 4. Generic repeat: same tool+input appearing too many times
@@ -704,6 +843,18 @@ fn same_tool_family(a: &str, b: &str) -> bool {
 }
 
 /// Compute a stable hash of a single tool result content string.
+/// Hash of a tool result without volatile parts: everything from the recovery
+/// trailer on (it carries a unique operation id) and all ASCII digits (timings,
+/// counters) are ignored.
+fn stable_hash_normalized(content: &str) -> u64 {
+    let body = content.split("[recovery_v1]").next().unwrap_or(content);
+    let mut hasher = DefaultHasher::new();
+    for ch in body.chars().filter(|c| !c.is_ascii_digit()) {
+        ch.hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
 fn stable_hash_result(content: &str) -> u64 {
     let mut hasher = DefaultHasher::new();
     content.hash(&mut hasher);
@@ -1468,7 +1619,79 @@ pub fn build_request_view_messages(
         let configured_limit = max_tool_result_tokens as usize;
         compact_trim_tool_results(&mut out, dynamic_limit.min(configured_limit));
     }
-    out
+    collapse_repeated_tool_rounds(out)
+}
+
+/// One assistant tool round (a single tool call plus its single result) as
+/// two adjacent messages, used to find identical consecutive rounds.
+fn single_tool_round(messages: &[LlmMessage], i: usize) -> Option<(String, String)> {
+    let (a, b) = (messages.get(i)?, messages.get(i + 1)?);
+    if a.role != "assistant" || b.role != "user" {
+        return None;
+    }
+    let (MessageContent::Blocks(ab), MessageContent::Blocks(bb)) = (&a.content, &b.content) else {
+        return None;
+    };
+    let mut uses = ab.iter().filter_map(|x| match x {
+        ContentBlock::ToolUse { id, name, input } => Some((id, name, input)),
+        _ => None,
+    });
+    let (id, name, input) = uses.next()?;
+    if uses.next().is_some() {
+        return None;
+    }
+    let mut results = bb.iter().filter_map(|x| match x {
+        ContentBlock::ToolResult { tool_use_id, .. } => Some(tool_use_id),
+        _ => None,
+    });
+    if results.next()? != id || results.next().is_some() {
+        return None;
+    }
+    Some((name.clone(), input.to_string()))
+}
+
+/// Some providers (e.g. Qwen on DashScope) reject a request with HTTP 400 when
+/// the history holds the same tool call (same name and arguments) in several
+/// consecutive rounds. Keep only the last round of every such run and note the
+/// repetition in its result, so the model still learns it was repeating
+/// itself. Operates on the request view only; stored history is untouched.
+pub fn collapse_repeated_tool_rounds(messages: Vec<LlmMessage>) -> Vec<LlmMessage> {
+    let mut drop = vec![false; messages.len()];
+    let mut notes: HashMap<usize, usize> = HashMap::new();
+    let mut i = 0;
+    while i < messages.len() {
+        let Some(sig) = single_tool_round(&messages, i) else {
+            i += 1;
+            continue;
+        };
+        let mut j = i + 2;
+        while single_tool_round(&messages, j).as_ref() == Some(&sig) {
+            j += 2;
+        }
+        let rounds = (j - i) / 2;
+        if rounds >= 2 {
+            drop[i..j - 2].fill(true);
+            notes.insert(j - 1, rounds);
+        }
+        i = j;
+    }
+    messages
+        .into_iter()
+        .enumerate()
+        .filter(|(idx, _)| !drop[*idx])
+        .map(|(idx, mut m)| {
+            if let (Some(n), MessageContent::Blocks(blocks)) = (notes.get(&idx), &mut m.content) {
+                for b in blocks.iter_mut() {
+                    if let ContentBlock::ToolResult { content, .. } = b {
+                        content.push_str(&format!(
+                            "\n[Note: this identical call was made {n} times in a row; earlier repeats were omitted. Change the arguments or approach instead of repeating it.]"
+                        ));
+                    }
+                }
+            }
+            m
+        })
+        .collect()
 }
 
 /// Rebuild rule-based minimal receipts for complete tool exchanges already in
@@ -2963,9 +3186,13 @@ impl AgentLoop {
 
         let max_iterations = ctx.max_iterations.unwrap_or(DEFAULT_MAX_ITERATIONS as u32) as usize;
         let mut loop_detector = LoopDetectorState {
-            history: restored_loop_history.unwrap_or_default(),
+            history: restored_loop_history.clone().unwrap_or_default(),
             consecutive_vision_only_turns: 0,
+            warned: HashMap::new(),
         };
+        if restored_loop_history.is_none() {
+            loop_detector.seed_from_messages(&messages);
+        }
         let mut rolling_summary = String::new();
         let mut seen_notifications: HashSet<String> =
             restored_seen_notifications.unwrap_or_default();
@@ -3972,7 +4199,7 @@ impl AgentLoop {
                             continue;
                         }
                         let rh = stable_hash_result(content);
-                        loop_detector.record(name, input, rh);
+                        loop_detector.record(name, input, rh, stable_hash_normalized(content));
                         let receipt = super::tool_receipt::render_receipt(
                             name, input, content, *is_error, None,
                         );
@@ -4536,6 +4763,119 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::{borrow::Cow, collections::HashMap, path::PathBuf, sync::Arc};
     use tokio::sync::mpsc;
+
+    fn tool_round(id: &str, args: Value) -> Vec<LlmMessage> {
+        vec![
+            LlmMessage {
+                role: "assistant".into(),
+                content: MessageContent::Blocks(vec![ContentBlock::ToolUse {
+                    id: id.into(),
+                    name: "read_file".into(),
+                    input: args,
+                }]),
+            },
+            LlmMessage {
+                role: "user".into(),
+                content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
+                    tool_use_id: id.into(),
+                    content: "same".into(),
+                    is_error: false,
+                }]),
+            },
+        ]
+    }
+
+    #[test]
+    fn repeated_identical_tool_rounds_collapse_to_the_last_one() {
+        let mut msgs = vec![LlmMessage {
+            role: "user".into(),
+            content: MessageContent::text("go"),
+        }];
+        for n in 0..4 {
+            msgs.extend(tool_round(&format!("a{n}"), json!({"path": "x"})));
+        }
+        msgs.extend(tool_round("b", json!({"path": "y"})));
+        let out = super::collapse_repeated_tool_rounds(msgs);
+        // user + 1 collapsed round + the different round
+        assert_eq!(out.len(), 5);
+        let MessageContent::Blocks(b) = &out[2].content else { panic!() };
+        let ContentBlock::ToolResult { content, tool_use_id, .. } = &b[0] else { panic!() };
+        assert_eq!(tool_use_id, "a3");
+        assert!(content.contains("4 times in a row"));
+    }
+
+    fn fresh_detector() -> super::LoopDetectorState {
+        super::LoopDetectorState {
+            history: Vec::new(),
+            consecutive_vision_only_turns: 0,
+            warned: HashMap::new(),
+        }
+    }
+
+    fn record_run(d: &mut super::LoopDetectorState, input: &Value, n: u32) {
+        let content = format!("tests {n}ms\nfail 5\n[recovery_v1]\n{{\"operation_id\":\"op{n}\"}}");
+        d.record(
+            "code_run",
+            input,
+            super::stable_hash_result(&content),
+            super::stable_hash_normalized(&content),
+        );
+        // An edit between runs keeps the consecutive-repeat nudge out of the way.
+        d.record("file_edit", &json!({"n": n}), u64::from(n), u64::from(n));
+    }
+
+    #[test]
+    fn code_run_with_same_outcome_warns_then_blocks() {
+        let input = json!({"command": "node --test"});
+        let batch = vec![("id".to_string(), "code_run".to_string(), input.clone())];
+        let mut d = fresh_detector();
+        for n in 0..3 {
+            record_run(&mut d, &input, n);
+        }
+        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Ok);
+        record_run(&mut d, &input, 3);
+        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Warning);
+        for n in 4..8 {
+            record_run(&mut d, &input, n);
+        }
+        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Critical);
+    }
+
+    #[test]
+    fn ignored_warnings_escalate_to_a_block() {
+        let input = json!({"command": "node --test"});
+        let batch = vec![("id".to_string(), "code_run".to_string(), input.clone())];
+        let mut d = fresh_detector();
+        for n in 0..4 {
+            record_run(&mut d, &input, n);
+        }
+        for _ in 0..3 {
+            assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Warning);
+        }
+        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Critical);
+    }
+
+    #[test]
+    fn history_seeds_the_detector_for_a_new_turn() {
+        let input = json!({"command": "node --test"});
+        let mut msgs = Vec::new();
+        for n in 0..5 {
+            msgs.extend(tool_round(&format!("c{n}"), input.clone()));
+        }
+        // tool_round uses `read_file`; seeding keeps whatever tool name was used.
+        let mut d = fresh_detector();
+        d.seed_from_messages(&msgs);
+        assert_eq!(d.history.len(), 5);
+    }
+
+
+    #[test]
+    fn different_arguments_are_not_collapsed() {
+        let mut msgs = Vec::new();
+        msgs.extend(tool_round("a", json!({"path": "x"})));
+        msgs.extend(tool_round("b", json!({"path": "y"})));
+        assert_eq!(super::collapse_repeated_tool_rounds(msgs).len(), 4);
+    }
 
     #[test]
     fn retry_candidates_and_backoff_are_hard_bounded() {
