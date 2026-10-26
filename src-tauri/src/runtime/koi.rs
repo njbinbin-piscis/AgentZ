@@ -214,10 +214,16 @@ async fn build_koi_registry(
     event_sink: Arc<dyn EventSink>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
+    // Members must reach the pool: the kernel koi prompt requires pool_chat /
+    // pool_org (deliverable post, complete_todo, @!mention handoff). Both tools
+    // only register when a pool event sink is bound.
+    let (subagent_runtime, pool_event_sink) = pool_wiring(app);
     let cfg = NeutralToolsConfig {
         db: Some(db),
         settings: Some(settings.clone()),
         event_sink: Some(event_sink),
+        pool_event_sink: Some(pool_event_sink),
+        subagent_runtime: Some(subagent_runtime),
         ..Default::default()
     };
     register_neutral_into(&mut registry, &cfg);
