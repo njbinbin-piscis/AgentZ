@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.19] - 2026-10-26
+
+### Fixed
+
+- Sandbox loopback tests no longer fail intermittently on Windows. Their local responder now reads the request before closing the socket, so curl is not reset mid-response. This changes tests only; application behavior is the same as 1.0.18.
+
 ## [1.0.18] - 2026-10-26
 
 ### Changed
