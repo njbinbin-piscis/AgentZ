@@ -333,6 +333,7 @@ pub fn run() {
             commands::session::chat_restore_checkpoint,
             commands::session::chat_delete_session,
             // LLM / kernel settings
+            commands::session::chat_usage_summary,
             commands::settings::get_settings,
             commands::settings::save_settings,
             commands::settings::save_settings_with_secrets,

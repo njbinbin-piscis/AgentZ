@@ -79,6 +79,20 @@ pub struct LlmProviderConfig {
     pub stream: Option<bool>,
 }
 
+/// List price of one model, per million tokens, in `currency`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ModelPrice {
+    pub provider: String,
+    pub model: String,
+    #[serde(default)]
+    pub input_per_million: f64,
+    #[serde(default)]
+    pub output_per_million: f64,
+    /// ISO 4217 code such as "USD" or "CNY"; empty means USD.
+    #[serde(default)]
+    pub currency: String,
+}
+
 impl Default for LlmProviderConfig {
     fn default() -> Self {
         Self {
@@ -588,6 +602,11 @@ pub struct Settings {
     #[serde(default)]
     pub llm_providers: Vec<LlmProviderConfig>,
 
+    /// User-entered list prices per provider + model, used for cost display.
+    /// Empty means no price is known and no cost is shown.
+    #[serde(default)]
+    pub model_prices: Vec<ModelPrice>,
+
     // ── Runtime Paths ───────────────────────────────────────────────────────
     /// User-specified executable paths for runtimes not found on PATH.
     /// Keys: "node", "npm", "python", "pip", "git"
@@ -872,6 +891,7 @@ impl Default for Settings {
             mcp_servers: Vec::new(),
             ssh_servers: Vec::new(),
             llm_providers: Vec::new(),
+            model_prices: Vec::new(),
             runtime_paths: HashMap::new(),
             vision_enabled: false,
             vision_use_main_llm: true,

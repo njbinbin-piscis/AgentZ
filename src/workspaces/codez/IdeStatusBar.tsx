@@ -1,14 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useExtensionUi } from "../../extensions/ui/useExtensionUi";
 import { extensionService } from "../../extensions/extensionService";
 import { extensionUiStore } from "../../extensions/extensionUiStore";
 import { describeRemoteDir } from "../../extensions/remoteTargets";
 import { useRemotePortWatch } from "../../extensions/remotePorts";
-import { onChatEvent, type AgentEvent, type ChatEventEnvelope } from "../../services/tauri/chat";
+import {
+  getUsageSummary,
+  onChatEvent,
+  type AgentEvent,
+  type ChatEventEnvelope,
+  type UsageSummary,
+} from "../../services/tauri/chat";
+import { getActiveChatSession, subscribeActiveChatSession } from "../../services/activeChatSession";
 import { useAppSettings } from "../../hooks/useAppSettings";
 import { useBackgroundTasks } from "../../hooks/useBackgroundTasks";
 import { loadScopedModelId, saveScopedModelId } from "../../utils/modelPrefs";
+import { summarizeUsage, type UsageSummaryView } from "../../utils/modelPricing";
 import type { BottomTab } from "./BottomPanel";
 
 interface IdeStatusBarProps {
@@ -18,18 +26,6 @@ interface IdeStatusBarProps {
   onOpenExtensions: () => void;
   /** Open the remote connection dialog. */
   onOpenRemote: () => void;
-}
-
-export interface StatusBarUsageStats {
-  inputTokens: number;
-  outputTokens: number;
-}
-
-/** Rough cost estimation ($3 / 1M input + $15 / 1M output as standard reference). */
-export function estimateTokenCostUsd(inputTokens: number, outputTokens: number): string {
-  const totalUsd = (inputTokens * 3 + outputTokens * 15) / 1_000_000;
-  if (totalUsd < 0.001 && inputTokens + outputTokens > 0) return "<$0.001";
-  return `$${totalUsd.toFixed(3)}`;
 }
 
 const CODICON_GLYPHS: Record<string, string> = {
@@ -98,37 +94,44 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
   const { t } = useTranslation();
   const bg = useBackgroundTasks(projectDir);
   const { statusBar, running, scm, hostError } = useExtensionUi();
-  const { llmProviders, defaultModelLabel } = useAppSettings();
+  const { appSettings, llmProviders, defaultModelLabel } = useAppSettings();
   const [selectedModelId, setSelectedModelId] = useState<string>(() => loadScopedModelId("codez"));
-  const [usage, setUsage] = useState<StatusBarUsageStats>({ inputTokens: 0, outputTokens: 0 });
+  const [summary, setSummary] = useState<UsageSummary | null>(null);
+  const sessionId = useSyncExternalStore(subscribeActiveChatSession, getActiveChatSession);
 
+  // Usage is persisted by the kernel per (session, model); reload on session or
+  // project change and after each model response / finished run.
   useEffect(() => {
-    setUsage({ inputTokens: 0, outputTokens: 0 });
-  }, [projectDir]);
-
-  useEffect(() => {
+    if (!projectDir) {
+      setSummary(null);
+      return;
+    }
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = () => {
+      getUsageSummary(sessionId, projectDir)
+        .then((s) => alive && setSummary(s))
+        .catch(() => {});
+    };
+    load();
     let unlisten: (() => void) | undefined;
-    let disposed = false;
     onChatEvent((env: ChatEventEnvelope) => {
-      if (env.channel !== "agent_event") return;
-      const evt = env.payload as AgentEvent;
-      if (evt.type === "context_usage") {
-        setUsage({
-          inputTokens: evt.cumulative_input_tokens ?? evt.estimated_input_tokens ?? 0,
-          outputTokens: evt.cumulative_output_tokens ?? 0,
-        });
-      }
+      const isUsage = env.channel === "agent_event" && (env.payload as AgentEvent).type === "context_usage";
+      if (!isUsage && env.channel !== "agent_final") return;
+      clearTimeout(timer);
+      timer = setTimeout(load, 400);
     })
       .then((fn) => {
-        if (disposed) fn();
-        else unlisten = fn;
+        if (alive) unlisten = fn;
+        else fn();
       })
       .catch(() => {});
     return () => {
-      disposed = true;
+      alive = false;
+      clearTimeout(timer);
       unlisten?.();
     };
-  }, []);
+  }, [projectDir, sessionId]);
 
   const modelOptions = useMemo(() => {
     const baseLabel = defaultModelLabel || t("chat.defaultModel");
@@ -155,8 +158,12 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
     defaultModelLabel ??
     t("chat.defaultModel");
 
-  const totalTokens = usage.inputTokens + usage.outputTokens;
-  const costLabel = estimateTokenCostUsd(usage.inputTokens, usage.outputTokens);
+  const sessionUsage = summarizeUsage(summary?.session ?? [], appSettings?.model_prices);
+  const projectUsage = summarizeUsage(summary?.project ?? [], appSettings?.model_prices);
+  const usageText = (u: UsageSummaryView) =>
+    `${formatCompactTokens(u.inputTokens + u.outputTokens)} tok${u.cost ? ` ? ${u.cost}${u.partial ? "+" : ""}` : ""}`;
+  const usageDetail = (label: string, u: UsageSummaryView) =>
+    `${label}: ${t("chat.usageInput")} ${u.inputTokens} ? ${t("chat.usageOutput")} ${u.outputTokens}${u.cost ? ` ? ${u.cost}` : ""}`;
 
   const left = statusBar.filter((s) => s.alignment === 1);
   const right = statusBar.filter((s) => s.alignment === 2);
@@ -264,9 +271,15 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
       <span
         data-testid="statusbar-token-cost-pill"
         className="ide-status-item ide-status-usage"
-        title={`Input: ${usage.inputTokens} · Output: ${usage.outputTokens}`}
+        title={[
+          usageDetail(t("chat.usageSession"), sessionUsage),
+          usageDetail(t("chat.usageProject"), projectUsage),
+          projectUsage.partial ? t("chat.costNoPrice") : "",
+        ]
+          .filter(Boolean)
+          .join("\n")}
       >
-        ◎ {formatCompactTokens(totalTokens)} tok · {costLabel}
+        {t("chat.usageSession")} {usageText(sessionUsage)} | {t("chat.usageProject")} {usageText(projectUsage)}
       </span>
 
       {hostError && (

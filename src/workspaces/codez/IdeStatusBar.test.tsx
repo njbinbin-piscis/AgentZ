@@ -1,7 +1,6 @@
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import IdeStatusBar, {
-  estimateTokenCostUsd,
   formatCodiconText,
   formatCompactTokens,
 } from "./IdeStatusBar";
@@ -39,17 +38,27 @@ vi.mock("../../extensions/extensionService", () => ({
   extensionService: extServiceMock,
 }));
 
-let chatListener: ((env: unknown) => void) | null = null;
 vi.mock("../../services/tauri/chat", () => ({
-  onChatEvent: (cb: (env: unknown) => void) => {
-    chatListener = cb;
+  onChatEvent: () => {
     return Promise.resolve(() => {});
   },
+  getUsageSummary: () =>
+    Promise.resolve({
+      session: [{ model: "gpt-4o", input_tokens: 10_000, output_tokens: 2_000 }],
+      project: [
+        { model: "gpt-4o", input_tokens: 200_000, output_tokens: 40_000 },
+        { model: "mystery", input_tokens: 1_000, output_tokens: 0 },
+      ],
+    }),
 }));
 
 vi.mock("../../hooks/useAppSettings", () => ({
   useAppSettings: () => ({
-    appSettings: null,
+    appSettings: {
+      model_prices: [
+        { provider: "openai", model: "gpt-4o", input_per_million: 2.5, output_per_million: 10, currency: "USD" },
+      ],
+    },
     llmProviders: [
       { id: "claude-sonnet", label: "Claude Sonnet", provider: "anthropic", model: "claude-3-7" },
       { id: "gpt-4o", label: "GPT-4o", provider: "openai", model: "gpt-4o" },
@@ -64,7 +73,6 @@ describe("IdeStatusBar model switcher & token/cost pill (R10-13)", () => {
   let root: ReactTestRenderer | null = null;
 
   afterEach(async () => {
-    chatListener = null;
     extUiState.running = false;
     if (root) {
       await act(async () => {
@@ -74,10 +82,10 @@ describe("IdeStatusBar model switcher & token/cost pill (R10-13)", () => {
     }
   });
 
-  it("formats token counts and estimates cost accurately", () => {
+  it("formats token counts and formats compact tokens", () => {
     expect(formatCompactTokens(500)).toBe("500");
     expect(formatCompactTokens(12_500)).toBe("12.5k");
-    expect(estimateTokenCostUsd(100_000, 10_000)).toBe("$0.450");
+    expect(formatCompactTokens(1_200_000)).toBe("1.2M");
   });
 
   it("provides translated chat.modelTitle and chat.defaultModel in zh and en locales", () => {
@@ -96,7 +104,7 @@ describe("IdeStatusBar model switcher & token/cost pill (R10-13)", () => {
     expect(formatCodiconText("$(sync~spin) Loading")).toBe("↻ Loading");
   });
 
-  it("updates token/cost pill on context_usage event and cycles models on click", async () => {
+  it("shows persisted session and project usage and cycles models on click", async () => {
     await act(async () => {
       root = create(
         <IdeStatusBar
@@ -116,19 +124,12 @@ describe("IdeStatusBar model switcher & token/cost pill (R10-13)", () => {
     });
     expect(modelBtn.children.join("")).toContain("Claude Sonnet");
 
-    await act(async () => {
-      chatListener?.({
-        channel: "agent_event",
-        payload: {
-          type: "context_usage",
-          cumulative_input_tokens: 10_000,
-          cumulative_output_tokens: 2_000,
-        },
-      });
-    });
-
     const usagePill = root!.root.findByProps({ "data-testid": "statusbar-token-cost-pill" });
-    expect(usagePill.children.join("")).toContain("12.0k");
+    const text = usagePill.children.join("");
+    // session: 12k tok, 10k*2.5/1M + 2k*10/1M = $0.045
+    expect(text).toContain("12.0k tok ? $0.045");
+    // project: 241k tok, priced part $0.900; '+' marks the unpriced model
+    expect(text).toContain("241.0k tok ? $0.900+");
   });
 
   it.each([false, true])(

@@ -611,6 +611,30 @@ pub async fn chat_list_sessions(
 }
 
 /// Load a session's messages in chronological order.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageSummary {
+    pub session: Vec<piscis_kernel::store::db::ModelUsageRow>,
+    pub project: Vec<piscis_kernel::store::db::ModelUsageRow>,
+}
+
+/// Token usage per model for one session and for the whole project.
+#[tauri::command]
+pub async fn chat_usage_summary(
+    app: AppHandle,
+    session_id: Option<String>,
+    project_dir: Option<String>,
+) -> Result<UsageSummary, String> {
+    with_db(&app, ProjectDirParam { project_dir }, |db| {
+        let session = match session_id.as_deref().filter(|s| !s.is_empty()) {
+            Some(id) => db.session_model_usage(id).map_err(|e| e.to_string())?,
+            None => Vec::new(),
+        };
+        let project = db.project_model_usage().map_err(|e| e.to_string())?;
+        Ok(UsageSummary { session, project })
+    })
+    .await
+}
 #[tauri::command]
 pub async fn chat_get_messages(
     app: AppHandle,

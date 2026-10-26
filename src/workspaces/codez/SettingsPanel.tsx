@@ -26,6 +26,8 @@ import DelegationSection from "./settings/DelegationSection";
 import DropdownSelect from "../../components/DropdownSelect";
 import "./SettingsPanel.css";
 
+import ModelPricesSection, { pricedModels } from "./settings/ModelPricesSection";
+
 type SettingsTab = "general" | "models" | "assistants" | "extensions" | "rules" | "hooks";
 
 interface SettingsPanelProps {
@@ -107,6 +109,7 @@ const DEFAULT_FORM: LlmSettings = {
   zhipu_api_key: "",
   kimi_api_key: "",
   llm_providers: [],
+  model_prices: [],
   mcp_servers: [],
 };
 
@@ -281,6 +284,7 @@ function toForm(data: SettingsResponse): LlmSettings {
     zhipu_api_key: data.zhipu_api_key || "",
     kimi_api_key: data.kimi_api_key || "",
     llm_providers: data.llm_providers ?? [],
+    model_prices: data.model_prices ?? [],
     mcp_servers: data.mcp_servers ?? [],
   };
 }
@@ -1011,6 +1015,12 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                   </button>
                 )}
               </section>
+
+              <ModelPricesSection
+                models={pricedModels(form, form.llm_providers)}
+                prices={form.model_prices ?? []}
+                onChange={(prices) => update("model_prices", prices)}
+              />
 
               <section className="agentz-settings-section">
                 <h3>{t("settings.mcpServers")}</h3>

@@ -463,3 +463,13 @@ export function journalUndoTurn(
     turnId,
   });
 }
+
+export interface UsageSummary {
+  session: Array<{ model: string; input_tokens: number; output_tokens: number }>;
+  project: Array<{ model: string; input_tokens: number; output_tokens: number }>;
+}
+
+/** Persisted token usage per model, for one session and for the whole project. */
+export function getUsageSummary(sessionId: string | null, projectDir: string): Promise<UsageSummary> {
+  return invoke<UsageSummary>("chat_usage_summary", { sessionId, projectDir });
+}

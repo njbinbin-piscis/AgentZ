@@ -3210,6 +3210,7 @@ impl AgentLoop {
             let mut tool_args_corrections = 0u8;
             let mut context_overflow_attempted = false;
             let mut main_calls_remaining = MAX_MAIN_CALLS_PER_ITERATION;
+            let mut usage_model = self.model.clone();
             let response = 'attempt_with_correction: loop {
                 // Loop-strategy next-turn hint may override the primary model
                 // for this iteration (default: no override).
@@ -3591,6 +3592,9 @@ impl AgentLoop {
                                     .await;
                             }
                         }
+                        if let Some(ref m) = succeeded_model {
+                            usage_model = m.clone();
+                        }
                         break 'attempt_with_correction r;
                     }
                     None => {
@@ -3690,6 +3694,14 @@ impl AgentLoop {
                     response.output_tokens,
                 ) {
                     warn!("Failed to persist usage totals: {}", error);
+                }
+                if let Err(error) = db.add_model_usage(
+                    &ctx.session_id,
+                    &usage_model,
+                    response.input_tokens,
+                    response.output_tokens,
+                ) {
+                    warn!("Failed to persist model usage: {}", error);
                 }
             }
 

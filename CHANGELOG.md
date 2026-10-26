@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.21] - 2026-10-26
+
+### Added
+
+- **Per-session and per-project usage in the status bar.** The status bar shows tokens and cost for the current session and for the whole project, e.g. `Session 12.0k tok ? $0.045 | Project 241.0k tok ? $0.900+`. The kernel now records usage per (session, model) in a new `model_usage` table, so the numbers survive restarts and project switches. New `chat_usage_summary` command.
+- **Model prices in Settings.** A new "Model prices" section sets input/output price per million tokens and a currency (USD, CNY, EUR, JPY, GBP) for the default model and every provider entry. Cost is each model's usage times its own price, summed; a trailing `+` means some used models have no price. Without any price only tokens are shown. The hardcoded $3/$15 estimate is removed.
+
+### Notes
+
+- Usage made before this version is not broken down by model and is not included in the totals.
+
 ## [1.0.20] - 2026-10-26
 
 ### Changed

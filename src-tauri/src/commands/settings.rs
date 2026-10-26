@@ -99,6 +99,8 @@ pub struct SaveLlmSettings {
     pub kimi_api_key: String,
     pub llm_providers: Vec<LlmProviderDto>,
     #[serde(default)]
+    pub model_prices: Vec<piscis_kernel::store::settings::ModelPrice>,
+    #[serde(default)]
     pub mcp_servers: Vec<McpServerDto>,
 }
 
@@ -138,6 +140,8 @@ pub struct LlmSettingsDto {
     pub zhipu_api_key: String,
     pub kimi_api_key: String,
     pub llm_providers: Vec<LlmProviderDto>,
+    #[serde(default)]
+    pub model_prices: Vec<piscis_kernel::store::settings::ModelPrice>,
     pub mcp_servers: Vec<McpServerDto>,
 }
 
@@ -411,6 +415,7 @@ fn to_dto(settings: &Settings, config_dir: String) -> LlmSettingsDto {
         zhipu_api_key: String::new(),
         kimi_api_key: String::new(),
         llm_providers: settings.llm_providers.iter().map(provider_to_dto).collect(),
+        model_prices: settings.model_prices.clone(),
         mcp_servers: settings.mcp_servers.iter().map(mcp_to_dto).collect(),
     }
 }
@@ -755,6 +760,11 @@ fn apply_settings_updates(settings: &mut Settings, updates: SaveLlmSettings) {
         });
     }
     settings.llm_providers = providers;
+    settings.model_prices = updates
+        .model_prices
+        .into_iter()
+        .filter(|p| !p.model.trim().is_empty() && p.input_per_million >= 0.0 && p.output_per_million >= 0.0)
+        .collect();
 
     // Keep legacy provider/model in sync when the user only maintains the
     // multi-provider list — headless Koi / IM turns read these fields.

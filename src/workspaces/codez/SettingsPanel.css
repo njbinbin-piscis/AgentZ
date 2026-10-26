@@ -861,3 +861,7 @@
   font-weight: 600;
 }
 
+
+.agentz-model-price-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
+.agentz-model-price-name { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agentz-model-price-row input[type=number] { width: 110px; }

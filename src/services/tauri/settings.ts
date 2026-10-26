@@ -1,5 +1,6 @@
 /** LLM settings IPC — reads/writes `config.json` via the Tauri backend. */
 import { invoke } from "@tauri-apps/api/core";
+import type { ModelPrice } from "../../utils/modelPricing";
 
 export interface LlmProviderConfig {
   id: string;
@@ -54,6 +55,8 @@ export interface LlmSettings {
   zhipu_api_key: string;
   kimi_api_key: string;
   llm_providers: LlmProviderConfig[];
+  /** User-entered list prices per provider + model (per million tokens). */
+  model_prices?: ModelPrice[];
   mcp_servers: McpServerConfig[];
 }
 

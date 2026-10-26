@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { setActiveChatSession } from "../../services/activeChatSession";
 import { useTranslation } from "react-i18next";
 import {
   chatSend,
@@ -303,6 +304,10 @@ export function useAssistantSession({
     useInteractiveCards();
 
   const sessionRef = useRef<string | null>(null);
+  const setSessionRef = (id: string | null) => {
+    sessionRef.current = id;
+    setActiveChatSession(id);
+  };
   const busyRef = useRef(false);
   busyRef.current = busy;
   const streamPendingRef = useRef("");
@@ -423,7 +428,7 @@ export function useAssistantSession({
   }, [toolSteps, setArtifacts, projectDir]);
 
   useEffect(() => {
-    sessionRef.current = null;
+    setSessionRef(null);
     setSessionReadOnly(false);
     setPermissionRequest(null);
     historyCursorRef.current = { sessionId: "", offset: 0 };
@@ -849,7 +854,7 @@ export function useAssistantSession({
     const startedViewed =
       sessionRef.current === turnSessionId ||
       (sessionRef.current === null && draftSessionIdRef.current === turnSessionId);
-    if (startedViewed) sessionRef.current = turnSessionId;
+    if (startedViewed) setSessionRef(turnSessionId);
     // The backend echoes the client-provided id, so this normally never
     // changes; it only moves if the backend ever assigns a different one.
     let effectiveSessionId = turnSessionId;
@@ -944,7 +949,7 @@ export function useAssistantSession({
       markFirstTaskDone();
       setFirstTaskDone(true);
       if (viewingNow) {
-        sessionRef.current = effectiveSessionId;
+        setSessionRef(effectiveSessionId);
         rememberLastSession(projectDir, effectiveSessionId);
         const turnId = res.turn_id ?? undefined;
         setMessages((m) => {
@@ -1219,7 +1224,7 @@ export function useAssistantSession({
     // background under its own session, and its queue stays with it. The
     // fresh view gets a reserved draft id so its first send (and anything
     // queued behind it) is keyed independently from the very first event.
-    sessionRef.current = null;
+    setSessionRef(null);
     draftSessionIdRef.current = crypto.randomUUID();
     discardStreamDelta();
     busyRef.current = false;
@@ -1252,7 +1257,7 @@ export function useAssistantSession({
         return;
       }
       try {
-        sessionRef.current = id;
+        setSessionRef(id);
         // The view now mirrors the target session: its own busy state (a
         // turn may still be running in the background) and its own queue —
         // never the previous session's. Unflushed stream deltas belong to
