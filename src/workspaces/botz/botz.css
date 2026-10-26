@@ -1009,3 +1009,6 @@
 .botz-routine-row .botz-empty {
   flex: 1;
 }
+
+.botz-msg-user { white-space: pre-wrap; word-break: break-word; }
+.botz-msg.user { align-self: flex-end; }

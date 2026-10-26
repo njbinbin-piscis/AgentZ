@@ -28,13 +28,13 @@ import {
   type BotzRoom,
 } from "../../services/tauri/botz";
 import Markdown from "../codez/Markdown";
+import ToolTrace, { interleaveTools, upsertToolStep, truncateToolResultForUi, type ToolTraceItem } from "../../components/ToolTrace";
 import Avatar from "./Avatar";
 import BotPicker from "./BotPicker";
 import ReviewPanel from "./ReviewPanel";
 import { activityFromEvent, deskGrid, koiIdFromSession, koiTaskSessionId, type Activity } from "./activity";
 
 const COORDINATOR = "__coordinator__";
-const LIVE_LIMIT = 6000;
 const BUBBLE_MS = 9000;
 
 const BOARD_COLUMNS: { key: string; statuses: string[]; drop: BoardStatus | null }[] = [
@@ -63,7 +63,36 @@ interface Bubble {
   at: number;
 }
 
-function SessionTranscript({ messages, live }: { messages: MessageDto[]; live: string }) {
+interface LiveTurn {
+  text: string;
+  tools: ToolTraceItem[];
+}
+
+function toTraceItems(tools: NonNullable<MessageDto["tools"]>): ToolTraceItem[] {
+  return tools.map((tl) => ({
+    id: tl.id,
+    name: tl.name,
+    input: tl.input,
+    result: tl.result ?? undefined,
+    status: tl.is_error ? "error" : "done",
+    textOffset: tl.text_offset,
+  }));
+}
+
+function Segments({ text, tools }: { text: string; tools: ToolTraceItem[] }) {
+  return (
+    <>
+      {interleaveTools(text, tools).map((seg, i) => (
+        <div key={i}>
+          {seg.text.trim() && <Markdown content={seg.text} compact />}
+          {seg.tools.length > 0 && <ToolTrace items={seg.tools} />}
+        </div>
+      ))}
+    </>
+  );
+}
+
+function SessionTranscript({ messages, live }: { messages: MessageDto[]; live?: LiveTurn }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -73,19 +102,18 @@ function SessionTranscript({ messages, live }: { messages: MessageDto[]; live: s
     <div className="botz-transcript" ref={ref}>
       {messages.map((m) => (
         <div key={m.id} className={`botz-msg ${m.role}`}>
-          {m.content.trim() && <Markdown content={m.content} compact />}
-          {m.tools && m.tools.length > 0 && (
-            <div className="botz-msg-tools">
-              {m.tools.map((tl) => (
-                <span key={tl.id} className={tl.is_error ? "err" : ""}>
-                  ▸ {tl.name}
-                </span>
-              ))}
-            </div>
+          {m.role === "user" ? (
+            <div className="botz-msg-user">{m.content}</div>
+          ) : (
+            <Segments text={m.content} tools={toTraceItems(m.tools ?? [])} />
           )}
         </div>
       ))}
-      {live && <pre className="botz-live">{live}</pre>}
+      {live && (live.text || live.tools.length > 0) && (
+        <div className="botz-msg assistant">
+          <Segments text={live.text} tools={live.tools} />
+        </div>
+      )}
     </div>
   );
 }
@@ -97,7 +125,7 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
   const [todos, setTodos] = useState<KoiTodo[]>([]);
   const [feed, setFeed] = useState<PoolMessage[]>([]);
   const [activity, setActivity] = useState<Record<string, Activity>>({});
-  const [live, setLive] = useState<Record<string, string>>({});
+  const [live, setLive] = useState<Record<string, LiveTurn>>({});
   const [bubbles, setBubbles] = useState<Record<string, Bubble>>({});
   const [desk, setDesk] = useState<string | null>(null);
   const [todoSel, setTodoSel] = useState<string | null>(null);
@@ -125,6 +153,7 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
   roomRef.current = room;
   const taskKeyRef = useRef<string | null>(null);
   const seenMsgRef = useRef<number>(0);
+  const pendingRef = useRef<{ sid: string; msg: MessageDto }[]>([]);
 
   // Ensure the room's pool exists; this also starts its patrol / heartbeat loops.
   useEffect(() => {
@@ -247,13 +276,24 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
         const next = activityFromEvent(evt, prev[who!] ?? "idle");
         return next && next !== prev[who!] ? { ...prev, [who!]: next } : prev;
       });
-      let chunk = "";
-      if (evt.type === "text_delta") chunk = evt.delta;
-      else if (evt.type === "tool_start") chunk = `\n▸ ${evt.name}\n`;
-      if (!chunk) return;
+      if (evt.type !== "text_delta" && evt.type !== "tool_start" && evt.type !== "tool_end") return;
       setLive((prev) => {
-        const next = (prev[sid] ?? "") + chunk;
-        return { ...prev, [sid]: next.length > LIVE_LIMIT ? next.slice(-LIVE_LIMIT) : next };
+        const cur = prev[sid] ?? { text: "", tools: [] };
+        let next: LiveTurn = cur;
+        if (evt.type === "text_delta") next = { ...cur, text: cur.text + evt.delta };
+        else if (evt.type === "tool_start") {
+          next = { ...cur, tools: upsertToolStep(cur.tools, evt, cur.text.length) };
+        } else {
+          next = {
+            ...cur,
+            tools: cur.tools.map((x) =>
+              x.id === evt.id
+                ? { ...x, status: evt.is_error ? "error" : "done", result: truncateToolResultForUi(evt.result) }
+                : x,
+            ),
+          };
+        }
+        return { ...prev, [sid]: next };
       });
     }).then((fn) => (disposed ? fn() : (unlisten = fn)));
     return () => {
@@ -309,11 +349,16 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
       setTranscript([]);
       return;
     }
+    let fetched: MessageDto[] = [];
     try {
-      setTranscript(await getMessages(openSessionId, room.dir));
+      fetched = await getMessages(openSessionId, room.dir);
     } catch {
-      setTranscript([]);
+      // keep pending only
     }
+    const extra = pendingRef.current
+      .filter((p) => p.sid === openSessionId && !fetched.some((m) => m.role === "user" && m.content === p.msg.content))
+      .map((p) => p.msg);
+    setTranscript([...fetched, ...extra]);
   }, [openSessionId, room.dir]);
 
   useEffect(() => {
@@ -323,8 +368,13 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
   // Reload a member transcript when its turn finishes.
   useEffect(() => {
     if (!desk || desk === COORDINATOR) return;
-    if (activity[desk] === "idle") void loadTranscript();
-  }, [activity, desk, loadTranscript]);
+    if (activity[desk] === "idle") {
+      void loadTranscript().then(() => {
+        const sid = koiTaskSessionId(desk, todoSel ?? "");
+        setLive((prev) => (prev[sid] ? { ...prev, [sid]: { text: "", tools: [] } } : prev));
+      });
+    }
+  }, [activity, desk, loadTranscript, todoSel]);
 
   const sendToTeam = useCallback(async () => {
     const text = input.trim();
@@ -338,7 +388,9 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
     const taskKey = crypto.randomUUID();
     taskKeyRef.current = taskKey;
     setDesk(COORDINATOR);
-    setTranscript((prev) => [...prev, { id: `local-${taskKey}`, role: "user", content: text }]);
+    const localMsg: MessageDto = { id: `local-${taskKey}`, role: "user", content: text };
+    pendingRef.current.push({ sid: sessionId, msg: localMsg });
+    setTranscript((prev) => [...prev, localMsg]);
     let prompt = text;
     if (first) {
       const org = room.org_spec?.trim();
@@ -370,12 +422,16 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
       taskKeyRef.current = null;
       setBusy(false);
       setActivity((prev) => ({ ...prev, [COORDINATOR]: "idle" }));
-      setLive((prev) => ({ ...prev, [sessionId]: "" }));
       try {
-        setTranscript(await getMessages(sessionId, room.dir));
+        const fetched = await getMessages(sessionId, room.dir);
+        if (fetched.some((m) => m.role === "user" && m.content === text)) {
+          pendingRef.current = pendingRef.current.filter((p) => p.msg.id !== localMsg.id);
+        }
+        setTranscript(fetched);
       } catch {
         // keep optimistic transcript
       }
+      setLive((prev) => ({ ...prev, [sessionId]: { text: "", tools: [] } }));
       void refresh();
     }
   }, [busy, i18n.language, input, onRoomChange, poolId, refresh, room.dir, room.name, room.org_spec, room.team_id]);
@@ -564,7 +620,7 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
               ))}
             </div>
           )}
-          <SessionTranscript messages={transcript} live={openSessionId ? (live[openSessionId] ?? "") : ""} />
+          <SessionTranscript messages={transcript} live={openSessionId ? live[openSessionId] : undefined} />
           {desk === COORDINATOR ? (
             <div className="botz-composer">
               <textarea

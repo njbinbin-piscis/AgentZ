@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.24] - 2026-10-26
+
+### Fixed
+
+- **BotZ: sent messages vanished and tool calls showed only a name.** The room drawer kept the user's message locally until the transcript reloaded, then dropped it; it now stays until the backend returns it. Tool calls (history and live stream) render with the shared tool trace: icon, summary, expandable input/output, edit diffs and sub-agent cards, interleaved with text.
+
 ## [1.0.23] - 2026-10-26
 
 ### Fixed
