@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.20] - 2026-10-26
+
+### Changed
+
+- **File edit diffs are process info.** Only the newest turn of the current run shows edit cards and the per-turn diff; they disappear when the next task is sent and are not shown when a session is restored. Earlier turns' edit tool calls no longer appear as cards or batch rows, and the stored turn diffs are released on send. Per-turn rollback is available for the newest turn only.
+- **Diffs take at most five rows.** Expanded edit cards and turn diffs are a five-row scroll area instead of growing to 220–320 px.
+- **Readable colors on the edit card.** Added lines are green on green, removed lines red on red, with a colored left bar and bold `+`/`-`, in dark and light themes (the 1.0.18 change had only covered the turn-diff card).
+
 ## [1.0.19] - 2026-10-26
 
 ### Fixed

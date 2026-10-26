@@ -30,3 +30,5 @@
 [data-theme="light"] .agentz-nb-cell-rail button:hover { background: var(--bg-hover); color: var(--text); }
 [data-theme="light"] .agentz-nb-md-edit { background: var(--bg-elev); border-color: var(--border); color: var(--text); }
 [data-theme="light"] .agentz-nb-output { background: var(--code-bg); }
+[data-theme="light"] .agentz-edit-line.is-add { color: #15803d; background: #dcfce7; box-shadow: inset 3px 0 0 #22c55e; }
+[data-theme="light"] .agentz-edit-line.is-remove { color: #b91c1c; background: #fee2e2; box-shadow: inset 3px 0 0 #ef4444; }

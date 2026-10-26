@@ -325,17 +325,21 @@ export function SubagentCard({ item }: { item: ToolTraceItem }) {
   );
 }
 
-export default function ToolTrace({ items }: { items: ToolTraceItem[] }) {
+export default function ToolTrace({ items, hideEdits = false }: { items: ToolTraceItem[]; hideEdits?: boolean }) {
   const subagents = items.filter((item) => isSubagentCall(item));
   const subagentIds = new Set(subagents.map((s) => s.id));
   const rest = items.filter((item) => !subagentIds.has(item.id));
   const edits = rest.flatMap((item) => {
-    if (item.status === "error") return [];
+    if (item.status === "error" || hideEdits) return [];
     const diff = fileEditDiff(item.name, item.input);
     return diff ? [{ item, diff }] : [];
   });
   const editIds = new Set(edits.map((e) => e.item.id));
-  const others = rest.filter((item) => !editIds.has(item.id));
+  // Settled edits from earlier turns are dropped (no card, no batch row).
+  const settledEditIds = hideEdits
+    ? new Set(rest.filter((item) => item.status !== "error" && fileEditDiff(item.name, item.input)).map((item) => item.id))
+    : editIds;
+  const others = rest.filter((item) => !settledEditIds.has(item.id));
   return (
     <>
       {others.length > 0 && <ToolBatch items={others} />}

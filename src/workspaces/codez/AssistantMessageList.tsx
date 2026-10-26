@@ -164,7 +164,10 @@ function AssistantMessageList({
         const isLastMessage = absoluteIndex === messages.length - 1;
         const isStreamingLast = busy && isLastMessage;
         const showCheckpoint = m.id && m.text.trim() && !isStreamingLast;
-        const diffs = m.turnId ? turnDiffsByTurnId[m.turnId] : undefined;
+        // Edit diffs are process info: only the newest turn of this run shows them.
+        // Earlier turns and restored history drop them (no turnId once reloaded).
+        const showEdits = isLastMessage && (busy || !!m.turnId);
+        const diffs = showEdits && m.turnId ? turnDiffsByTurnId[m.turnId] : undefined;
         // Live steps drive the in-flight turn; otherwise use what was persisted.
         const msgTools =
           isLastMessage && (busy || !m.tools?.length) && toolSteps.length > 0
@@ -177,7 +180,7 @@ function AssistantMessageList({
               interleaveTools(m.text, msgTools).map((seg, si, all) => (
                 <div key={`seg-${si}`} className="agentz-msg-seg">
                   {seg.text ? <Markdown content={seg.text} /> : null}
-                  {seg.tools.length > 0 && <ToolTrace items={seg.tools} />}
+                  {seg.tools.length > 0 && <ToolTrace items={seg.tools} hideEdits={!showEdits} />}
                   {isStreamingLast && si === all.length - 1 && !seg.text && seg.tools.length === 0 && (
                     <div className="agentz-msg-text agentz-thinking">{t("chat.thinking")}</div>
                   )}

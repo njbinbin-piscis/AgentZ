@@ -879,6 +879,8 @@ export function useAssistantSession({
       setError(null);
       setSetupError(false);
       composerDbg("runTurn → setMessages (user bubble)");
+      // Edit diffs of earlier turns are process info; drop them when a new turn starts.
+      setTurnDiffsByTurnId({});
       setMessages((m) => [
         ...m,
         { role: "user", text: displayText },

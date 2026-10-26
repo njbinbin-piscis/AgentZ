@@ -74,7 +74,8 @@
 .agentz-file-diff-body {
   margin: 0;
   padding: 6px 0;
-  max-height: 220px;
+  /* Five rows tall, then scroll. */
+  max-height: calc(5 * 1.45em);
   overflow: auto;
   background: var(--bg, #0f0f16);
 }

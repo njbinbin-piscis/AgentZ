@@ -70,4 +70,54 @@ describe("AssistantMessageList per-turn undo (R10-11)", () => {
 
     expect(onUndoTurn).toHaveBeenCalledWith("turn-42");
   });
-});
+
+  it("shows edit cards only for the newest turn of this run, not older turns or restored history", async () => {
+    const scrollRef = createRef<HTMLDivElement>();
+    const edit = (id: string) => ({
+      id,
+      name: "file_edit",
+      input: { path: `src/${id}.ts`, old_string: "a", new_string: "b" },
+      status: "done" as const,
+    });
+    const render = async (messages: Array<Record<string, unknown>>) => {
+      await act(async () => {
+        root = create(
+          <AssistantMessageList
+            messages={messages as never}
+            toolSteps={[]}
+            turnDiffsByTurnId={{}}
+            busy={false}
+            queuedView={[]}
+            pendingCards={[]}
+            scrollRef={scrollRef}
+            onForkCheckpoint={() => {}}
+            onRestoreCheckpoint={() => {}}
+            onCardSubmitted={() => {}}
+            onCardActionSent={() => {}}
+            permissionRequest={null}
+            onPermissionResolved={() => {}}
+          />,
+        );
+      });
+      return root!.root.findAll((n) => n.props.className === "agentz-edit-card-name").map((n) => n.children.join(""));
+    };
+
+    // Two turns in this run: only the latest keeps its card.
+    expect(
+      await render([
+        { id: "u1", role: "user", text: "one" },
+        { id: "a1", role: "assistant", text: "done 1", turnId: "t1", tools: [edit("old")] },
+        { id: "u2", role: "user", text: "two" },
+        { id: "a2", role: "assistant", text: "done 2", turnId: "t2", tools: [edit("new")] },
+      ]),
+    ).toEqual(["new.ts"]);
+
+    await act(async () => root?.unmount());
+    // Restored history (no turnId): nothing is shown.
+    expect(
+      await render([
+        { id: "u1", role: "user", text: "one" },
+        { id: "a1", role: "assistant", text: "done 1", tools: [edit("restored")] },
+      ]),
+    ).toEqual([]);
+  });});
