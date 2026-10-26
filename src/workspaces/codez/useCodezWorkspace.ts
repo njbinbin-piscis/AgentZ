@@ -11,6 +11,7 @@ import type { PaletteMode } from "./CommandPalette";
 import * as monaco from "monaco-editor";
 import { ideApi, onFileChanged } from "../../services/tauri/ide";
 import { recordUserRecentEdit } from "../../services/tauri/chat";
+import { getBgTerminal, subscribeBgTerminal } from "../../services/bgTerminal";
 import { extHostResourceSnapshot } from "../../services/tauri/extHostResource";
 import { graphIndexResourceSnapshot } from "../../services/tauri/graphIndexResource";
 import { fileUriString } from "../../services/tauri/editorUri";
@@ -180,6 +181,15 @@ export function useCodezWorkspace({
     setBottomTab(tab);
     setBottomOpen(true);
   }, []);
+
+  // "Show in terminal" on a background task opens its live output tab.
+  useEffect(
+    () =>
+      subscribeBgTerminal(() => {
+        if (getBgTerminal()) openBottomPanel("bgtask");
+      }),
+    [openBottomPanel],
+  );
 
   const openExtensionsSidebar = useCallback(() => {
     setSidebarTab("extensions");

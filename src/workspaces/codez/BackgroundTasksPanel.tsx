@@ -5,6 +5,7 @@ import {
   type BackgroundTask,
 } from "../../services/tauri/backgroundTasks";
 import { redirectTargets } from "./bgRedirect";
+import { openBgTerminal } from "../../services/bgTerminal";
 
 function formatElapsed(ms: number): string {
   const secs = Math.floor(ms / 1000);
@@ -139,6 +140,13 @@ export default function BackgroundTasksPanel({
                 onClick={() => void toggleOutput(task)}
               >
                 {expanded === task.id ? t("chat.bgHide") : t("chat.bgOutput")}
+              </button>
+              <button
+                type="button"
+                className="agentz-bg-action"
+                onClick={() => openBgTerminal(task.id)}
+              >
+                {t("chat.bgTerminal")}
               </button>
               {task.status === "running" && (
                 <button

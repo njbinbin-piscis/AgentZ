@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.22] - 2026-10-26
+
+### Added
+
+- **Show a background task in a terminal tab.** Each background task row has a "Show in terminal" button that opens a read-only "Background output" tab in the bottom panel. It replays the captured output and follows new output until the task ends, with colors, a status line and a truncation notice.
+
+### Fixed
+
+- **Chinese status bar labels.** The 1.0.21 session/project usage labels (and the 1.0.21 release docs) were written with corrupted characters and showed as question marks in the Chinese UI.
+
 ## [1.0.21] - 2026-10-26
 
 ### Added

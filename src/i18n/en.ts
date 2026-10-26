@@ -564,6 +564,7 @@ const en = {
     terminalCloseTab: "Close Terminal",
     terminalCloseTabConfirm:
       "Closing this terminal will stop any running programs (e.g. top, npm run dev). Continue?",
+    bgOutputTab: "Background output",
     terminalHidePanel: "Hide Terminal Panel",
     saveBlocked: {
       diff: "\"{{path}}\" is a diff view and cannot be saved. Open the file to edit it.",
@@ -1069,6 +1070,8 @@ const en = {
     bgOutput: "Output",
     bgHide: "Hide",
     bgNoOutput: "(no output yet)",
+    bgTerminal: "Show in terminal",
+    bgTruncated: "earlier output was truncated",
     bgRedirected: "This command redirects its output to:",
     bgKill: "Stop",
     autoContinuePrompt:

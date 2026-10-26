@@ -1,7 +1,9 @@
-import { useId, useMemo, useRef } from "react";
+import { useId, useMemo, useRef, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import DropdownSelect from "../../components/DropdownSelect";
 import TerminalPanel from "./Terminal";
+import BgTaskTerminal from "./BgTaskTerminal";
+import { getBgTerminal, subscribeBgTerminal } from "../../services/bgTerminal";
 import { tabNavigationTarget } from "./tabNavigation";
 import { useExtensionUi } from "../../extensions/ui/useExtensionUi";
 import { extensionService } from "../../extensions/extensionService";
@@ -11,7 +13,7 @@ import WebviewHost from "../../extensions/ui/WebviewHost";
 import DebugView from "../../extensions/ui/DebugView";
 import type { TestItemDto } from "../../extensions/common/dto";
 
-export type BottomTab = "terminal" | "output" | "debug" | "scm" | "tests" | "views" | "webviews";
+export type BottomTab = "terminal" | "output" | "debug" | "scm" | "tests" | "views" | "webviews" | "bgtask";
 
 interface BottomPanelProps {
   projectDir: string;
@@ -61,6 +63,7 @@ export default function BottomPanel({
   const panelId = useId();
   const tabButtons = useRef(new Map<string, HTMLButtonElement>());
 
+  const bgReq = useSyncExternalStore(subscribeBgTerminal, getBgTerminal);
   const scmCount = ui.scm.reduce((n, p) => n + p.groups.reduce((g, gr) => g + gr.resources.length, 0), 0);
 
   // Terminal is always available; extension tabs surface only when populated.
@@ -68,6 +71,7 @@ export default function BottomPanel({
     const list: { id: BottomTab; label: string; count?: number; dot?: boolean }[] = [
       { id: "terminal", label: t("ide.terminal") || "Terminal" },
     ];
+    if (bgReq) list.push({ id: "bgtask", label: t("ide.bgOutputTab") || "Background output" });
     if (ui.outputChannels.length) list.push({ id: "output", label: t("ide.output") || "Output", count: ui.outputChannels.length });
     if (ui.debugOutput.length || ui.running) list.push({ id: "debug", label: t("ide.debugConsole") || "Debug Console", count: ui.debugOutput.length });
     if (ui.treeViews.length) list.push({ id: "views", label: t("ide.views") || "Views", count: ui.treeViews.length });
@@ -75,7 +79,7 @@ export default function BottomPanel({
     if (ui.tests.length) list.push({ id: "tests", label: t("ide.testing") || "Testing", count: ui.tests.length });
     if (ui.webviews.length) list.push({ id: "webviews", label: t("ide.webviews") || "Webviews", count: ui.webviews.length });
     return list;
-  }, [t, ui.outputChannels.length, ui.debugOutput.length, ui.running, ui.treeViews.length, ui.scm.length, ui.tests.length, ui.webviews.length, scmCount]);
+  }, [t, bgReq, ui.outputChannels.length, ui.debugOutput.length, ui.running, ui.treeViews.length, ui.scm.length, ui.tests.length, ui.webviews.length, scmCount]);
 
   // If the active tab disappears (extension unloaded), fall back to terminal.
   const current = tabs.some((tb) => tb.id === activeTab) ? activeTab : "terminal";
@@ -126,6 +130,12 @@ export default function BottomPanel({
             onSendSelectionToChat={onSendTerminalToChat}
           />
         </div>
+
+        {bgReq && (
+          <div className="ide-bottom-pane" style={{ display: current === "bgtask" ? "flex" : "none" }}>
+            <BgTaskTerminal key={bgReq.taskId} taskId={bgReq.taskId} visible={open && current === "bgtask"} />
+          </div>
+        )}
 
         {current === "output" && (
           <div className="ide-bottom-pane scroll">
