@@ -1219,7 +1219,12 @@ mod runner_tests {
             loop {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
-                        use std::io::Write;
+                        use std::io::{Read, Write};
+                        // Drain the request first: closing with unread data makes Windows send RST and curl fails with "Recv failure".
+                        let _ = stream.set_nonblocking(false);
+                        let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+                        let mut request = [0u8; 2048];
+                        let _ = stream.read(&mut request);
                         let _ = stream.write_all(
                             b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
                         );
@@ -1309,7 +1314,12 @@ mod runner_tests {
             loop {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
-                        use std::io::Write;
+                        use std::io::{Read, Write};
+                        // Drain the request first: closing with unread data makes Windows send RST and curl fails with "Recv failure".
+                        let _ = stream.set_nonblocking(false);
+                        let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+                        let mut request = [0u8; 2048];
+                        let _ = stream.read(&mut request);
                         let _ = stream.write_all(
                             b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
                         );
