@@ -23,8 +23,25 @@ export function loadScopedModelId(scope: ModelScope): string {
 export function saveScopedModelId(scope: ModelScope, modelId: string): void {
   try {
     if (typeof localStorage === "undefined") return;
+    const prev = localStorage.getItem(STORAGE_KEYS[scope]);
     localStorage.setItem(STORAGE_KEYS[scope], modelId);
+    if (prev !== modelId && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(MODEL_CHANGE_EVENT, { detail: { scope, modelId } }));
+    }
   } catch {
     /* ignore in headless test environments */
   }
+}
+
+export const MODEL_CHANGE_EVENT = "agentz-model-change";
+
+/** Call `cb` whenever another surface (status bar, composer) changes the scope's model. */
+export function subscribeScopedModelId(scope: ModelScope, cb: (modelId: string) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onChange = (e: Event) => {
+    const d = (e as CustomEvent<{ scope: ModelScope; modelId: string }>).detail;
+    if (d && d.scope === scope) cb(d.modelId);
+  };
+  window.addEventListener(MODEL_CHANGE_EVENT, onChange);
+  return () => window.removeEventListener(MODEL_CHANGE_EVENT, onChange);
 }

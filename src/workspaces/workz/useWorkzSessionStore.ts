@@ -19,7 +19,7 @@ import {
 } from "../../services/tauri/chat";
 import { useAppSettings, pruneModelId } from "../../hooks/useAppSettings";
 import { useStickToBottom } from "../../hooks/useStickToBottom";
-import { loadScopedModelId, saveScopedModelId } from "../../utils/modelPrefs";
+import { loadScopedModelId, saveScopedModelId, subscribeScopedModelId } from "../../utils/modelPrefs";
 import { useInputHistory } from "../../components/useInputHistory";
 import { useAtMention } from "../../hooks/useAtMention";
 import { useSlashCompletion } from "../../hooks/useSlashCompletion";
@@ -439,6 +439,14 @@ export function useWorkzSessionStore({
   useEffect(() => {
     setModelId((id) => pruneModelId(id, llmProviders));
   }, [llmProviders]);
+
+  useEffect(
+    () =>
+      subscribeScopedModelId("workz", (id) =>
+        setModelId((cur) => (cur === id ? cur : pruneModelId(id, llmProviders))),
+      ),
+    [llmProviders],
+  );
 
   useEffect(() => {
     listTeams()

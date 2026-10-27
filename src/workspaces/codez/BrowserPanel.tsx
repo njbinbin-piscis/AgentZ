@@ -3,6 +3,9 @@ import { useTranslation } from "react-i18next";
 import {
   browserClickAt,
   browserClose,
+  browserHistoryStep,
+  browserInsertText,
+  browserPressKey,
   browserCurrentUrl,
   browserInspectAt,
   browserNavigate,
@@ -446,6 +449,53 @@ export default function BrowserPanel({
     [pickMode, refreshShot, refreshScrollInfo],
   );
 
+  // Forward typing to the focused page element. Printable characters go through
+  // insertText (IME and shortcuts untouched); navigation/editing keys are real key events.
+  const refreshSoon = useCallback(() => {
+    setTimeout(() => {
+      void refreshShot();
+      void refreshScrollInfo();
+    }, 150);
+  }, [refreshShot, refreshScrollInfo]);
+
+  const handleCanvasKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (pickMode || e.nativeEvent.isComposing) return;
+      const mods = (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0);
+      const printable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+      if (printable) {
+        e.preventDefault();
+        void browserInsertText(e.key).then(refreshSoon, (err) => setError(String(err)));
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.length === 1) return; // let paste/copy shortcuts reach onPaste
+      if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") return;
+      e.preventDefault();
+      void browserPressKey(e.key, mods).then(refreshSoon, () => {});
+    },
+    [pickMode, refreshSoon],
+  );
+
+  const handleCanvasPaste = useCallback(
+    (e: React.ClipboardEvent<HTMLDivElement>) => {
+      const text = e.clipboardData.getData("text/plain");
+      if (!text) return;
+      e.preventDefault();
+      void browserInsertText(text).then(refreshSoon, (err) => setError(String(err)));
+    },
+    [refreshSoon],
+  );
+
+  const historyStep = useCallback(
+    (delta: number) => {
+      void browserHistoryStep(delta)
+        .then(() => new Promise((r) => setTimeout(r, 400)))
+        .then(() => Promise.all([refreshShot(), syncAddressFromBackend(), refreshScrollInfo()]))
+        .catch((err) => setError(String(err)));
+    },
+    [refreshShot, syncAddressFromBackend, refreshScrollInfo],
+  );
+
   const screenshotToChat = useCallback(async () => {
     try {
       const b64 = await browserScreenshot();
@@ -503,6 +553,12 @@ export default function BrowserPanel({
   return (
     <div className="agentz-browser">
       <div className="agentz-browser-toolbar">
+        <button className="agentz-browser-btn" onClick={() => historyStep(-1)} title={t("browser.back", { defaultValue: "Back" })}>
+          ←
+        </button>
+        <button className="agentz-browser-btn" onClick={() => historyStep(1)} title={t("browser.forward", { defaultValue: "Forward" })}>
+          →
+        </button>
         <button
           className="agentz-browser-btn"
           onClick={() => void syncViewport().then(refreshShot)}
@@ -562,7 +618,13 @@ export default function BrowserPanel({
             ref={canvasRef}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            onClick={(e) => void handleCanvasClick(e)}
+            tabIndex={0}
+            onKeyDown={handleCanvasKeyDown}
+            onPaste={handleCanvasPaste}
+            onClick={(e) => {
+              e.currentTarget.focus();
+              void handleCanvasClick(e);
+            }}
           >
             {loading && (
               <div className="agentz-browser-loading-overlay">{t("browser.loading")}</div>

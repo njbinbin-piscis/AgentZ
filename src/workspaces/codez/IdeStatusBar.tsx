@@ -15,7 +15,7 @@ import {
 import { getActiveChatSession, subscribeActiveChatSession } from "../../services/activeChatSession";
 import { useAppSettings } from "../../hooks/useAppSettings";
 import { useBackgroundTasks } from "../../hooks/useBackgroundTasks";
-import { loadScopedModelId, saveScopedModelId } from "../../utils/modelPrefs";
+import { loadScopedModelId, saveScopedModelId, subscribeScopedModelId } from "../../utils/modelPrefs";
 import { summarizeUsage, type UsageSummaryView } from "../../utils/modelPricing";
 import type { BottomTab } from "./BottomPanel";
 
@@ -144,6 +144,12 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
     }
     return items;
   }, [llmProviders, defaultModelLabel, t]);
+
+  // Follow the composer's picker (and drop ids whose provider was removed).
+  useEffect(() => subscribeScopedModelId("codez", setSelectedModelId), []);
+  useEffect(() => {
+    setSelectedModelId((id) => (id && !llmProviders.some((p) => p.id === id) ? "" : id));
+  }, [llmProviders]);
 
   const handleCycleModel = () => {
     if (modelOptions.length <= 1) return;

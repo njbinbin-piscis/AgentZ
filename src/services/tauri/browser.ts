@@ -139,3 +139,18 @@ export function browserElementChipLabel(el: PickedElement): string {
   if (tag) return `<${tag}>`;
   return el.selector;
 }
+
+/** Type text into the focused page element (typing, IME, paste). */
+export function browserInsertText(text: string): Promise<void> {
+  return invoke<void>("browser_insert_text", { text });
+}
+
+/** Press a non-printable key; modifiers: 1 Alt, 2 Ctrl, 4 Meta, 8 Shift. */
+export function browserPressKey(key: string, modifiers = 0): Promise<void> {
+  return invoke<void>("browser_press_key", { key, modifiers });
+}
+
+/** Go back (-1) or forward (+1) in page history. */
+export function browserHistoryStep(delta: number): Promise<void> {
+  return invoke<void>("browser_history_step", { delta });
+}

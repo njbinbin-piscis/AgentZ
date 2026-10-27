@@ -306,3 +306,6 @@
 .agentz-browser-inspector-send:hover {
   background: var(--accent-hover);
 }
+
+.agentz-browser-canvas:focus { outline: none; }
+.agentz-browser-canvas:focus-visible { box-shadow: inset 0 0 0 1px var(--accent, #7c6af7); }

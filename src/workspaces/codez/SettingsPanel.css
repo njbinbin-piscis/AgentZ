@@ -865,3 +865,20 @@
 .agentz-model-price-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
 .agentz-model-price-name { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agentz-model-price-row input[type=number] { width: 110px; }
+
+/* Currency dropdown: fixed width so the native popup is not clipped, and themed options. */
+.agentz-model-price-row select {
+  flex: 0 0 auto;
+  width: 88px;
+  min-width: 88px;
+  font-size: 13px;
+  color-scheme: inherit;
+  cursor: pointer;
+}
+.agentz-model-price-row select option {
+  background: var(--bg-elev-2, #1b1b26);
+  color: var(--text, #e8e8f0);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 4px 8px;
+}

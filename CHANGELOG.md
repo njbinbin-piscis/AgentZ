@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **User messages were rejected with `task queued/running or goal mutation active` while a background-task continuation turn was running.** That turn was invisible to the UI, so the session looked idle. The backend now announces it (`host_turn_started`); the session shows as running, sends queue behind it, and Stop targets it. A send that still hits a busy gate is retried instead of failing, and a continuation that loses the race to a user turn is re-parked rather than dropped.
+- **Embedded browser panel could hang and ignore input.** A hung page operation held the browser lock indefinitely, blocking every later call; each phase is now time-bounded and navigation no longer waits forever for `load`. Clicks are real mouse events, typing/paste/keys are forwarded to the page, and Back/Forward buttons were added.
+- **Model picker out of sync.** The status bar and composer now follow each other's model choice, and a model whose provider was removed is dropped.
+- **Currency dropdown in model pricing settings was clipped and unthemed.**
 - The busy error now reports the holder (`task_key`, phase, age) to make future occurrences diagnosable.
 
 ## [1.0.26] - 2026-10-26

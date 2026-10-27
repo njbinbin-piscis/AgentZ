@@ -125,3 +125,26 @@ pub async fn browser_state(state: State<'_, AppState>) -> Result<BrowserState, S
 pub async fn browser_close_guard(state: State<'_, AppState>) -> Result<BrowserCloseGuard, String> {
     Ok(state.browser_activity.close_guard().await)
 }
+
+#[tauri::command]
+pub async fn browser_insert_text(state: State<'_, AppState>, text: String) -> Result<(), String> {
+    state.browser.insert_text(&text).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn browser_press_key(
+    state: State<'_, AppState>,
+    key: String,
+    modifiers: Option<i64>,
+) -> Result<(), String> {
+    state
+        .browser
+        .press_key(&key, modifiers.unwrap_or(0))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn browser_history_step(state: State<'_, AppState>, delta: i32) -> Result<(), String> {
+    state.browser.history_step(delta).await.map_err(|e| e.to_string())
+}

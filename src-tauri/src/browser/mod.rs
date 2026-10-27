@@ -19,6 +19,13 @@ use robotz_browser::{create_browser_manager, BrowserOptions, SharedBrowserManage
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
+/// Longest a single page operation may hold the browser lock.
+const PAGE_OP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
+/// Longest a caller waits to get the browser lock before reporting it busy.
+const PAGE_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(20);
+/// How long navigation waits for the load event before returning anyway.
+const NAV_SETTLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(12);
+
 /// Tracks page navigation generations and snapshot-bound element refs (AZ-053 / R10-04).
 #[derive(Clone, Debug)]
 pub struct BrowserGenerationTracker {
@@ -283,10 +290,23 @@ impl BrowserManager {
         F: FnOnce(Page) -> Fut,
         Fut: std::future::Future<Output = Result<T>>,
     {
-        let mut mgr = self.inner.lock().await;
-        mgr.launch().await.context("failed to launch browser")?;
-        let page = mgr.active_page().await.context("no active browser page")?;
-        f(page.as_ref().clone()).await
+        // The manager lock is held for the whole call, so a hung page operation
+        // would queue every later panel/agent call behind it (no clicks, no
+        // typing, Enter in the address bar does nothing). Bound each phase.
+        let mut mgr = tokio::time::timeout(PAGE_LOCK_WAIT, self.inner.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy with another operation; try again"))?;
+        tokio::time::timeout(PAGE_OP_TIMEOUT, mgr.launch())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser launch timed out"))?
+            .context("failed to launch browser")?;
+        let page = tokio::time::timeout(PAGE_OP_TIMEOUT, mgr.active_page())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser did not return an active page"))?
+            .context("no active browser page")?;
+        tokio::time::timeout(PAGE_OP_TIMEOUT, f(page.as_ref().clone()))
+            .await
+            .map_err(|_| anyhow::anyhow!("browser operation timed out"))?
     }
 
     /// Resize the Chromium viewport to match the IDE browser panel (CSS pixels).
@@ -367,7 +387,8 @@ impl BrowserManager {
             page.goto(target.as_str())
                 .await
                 .context("navigation failed")?;
-            let _ = page.wait_for_navigation().await;
+            // Pages that never fire `load` must not pin the browser lock.
+            let _ = tokio::time::timeout(NAV_SETTLE_TIMEOUT, page.wait_for_navigation()).await;
             current_url(&page).await
         })
         .await
@@ -420,10 +441,90 @@ impl BrowserManager {
     /// Click whatever element is at viewport coordinates (x, y) — used to
     /// forward clicks from the panel screenshot.
     pub async fn click_at(&self, x: f64, y: f64) -> Result<bool> {
+        // Real input events first: they move focus into inputs, follow links and
+        // trigger form controls the way a user click does.
+        if self.mouse_click(x, y).await.is_ok() {
+            return Ok(true);
+        }
         let js = format!(
             "(() => {{ const el = document.elementFromPoint({x}, {y}); if (!el) return false; el.scrollIntoView({{block:'center',inline:'center'}}); el.click(); return true; }})()"
         );
         Ok(self.eval(&js).await?.as_bool().unwrap_or(false))
+    }
+
+    /// Dispatch a genuine left click (move, press, release) at viewport coordinates.
+    pub async fn mouse_click(&self, x: f64, y: f64) -> Result<()> {
+        use chromiumoxide::cdp::browser_protocol::input::{
+            DispatchMouseEventParams, DispatchMouseEventType, MouseButton,
+        };
+        self.with_page(|page| async move {
+            for (kind, button, count) in [
+                (DispatchMouseEventType::MouseMoved, MouseButton::None, 0),
+                (DispatchMouseEventType::MousePressed, MouseButton::Left, 1),
+                (DispatchMouseEventType::MouseReleased, MouseButton::Left, 1),
+            ] {
+                let params = DispatchMouseEventParams::builder()
+                    .r#type(kind)
+                    .x(x)
+                    .y(y)
+                    .button(button)
+                    .click_count(count)
+                    .build()
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                page.execute(params).await.context("mouse event failed")?;
+            }
+            Ok(())
+        })
+        .await
+    }
+
+    /// Insert text at the focused element (typing, IME and paste).
+    pub async fn insert_text(&self, text: &str) -> Result<()> {
+        use chromiumoxide::cdp::browser_protocol::input::InsertTextParams;
+        let text = text.to_string();
+        self.with_page(|page| async move {
+            page.execute(InsertTextParams::new(text))
+                .await
+                .context("insert text failed")?;
+            Ok(())
+        })
+        .await
+    }
+
+    /// Press a non-printable key (Enter, Backspace, arrows, …) with modifiers
+    /// (bit 1 = Alt, 2 = Ctrl, 4 = Meta, 8 = Shift).
+    pub async fn press_key(&self, key: &str, modifiers: i64) -> Result<()> {
+        use chromiumoxide::cdp::browser_protocol::input::{
+            DispatchKeyEventParams, DispatchKeyEventType,
+        };
+        let Some((code, vk)) = special_key(key) else {
+            anyhow::bail!("unsupported key '{key}'");
+        };
+        let key = key.to_string();
+        self.with_page(|page| async move {
+            for kind in [DispatchKeyEventType::RawKeyDown, DispatchKeyEventType::KeyUp] {
+                let mut b = DispatchKeyEventParams::builder()
+                    .r#type(kind.clone())
+                    .key(key.clone())
+                    .code(code)
+                    .windows_virtual_key_code(vk)
+                    .native_virtual_key_code(vk)
+                    .modifiers(modifiers);
+                if key == "Enter" && matches!(kind, DispatchKeyEventType::RawKeyDown) {
+                    b = b.text("\r");
+                }
+                let params = b.build().map_err(|e| anyhow::anyhow!(e))?;
+                page.execute(params).await.context("key event failed")?;
+            }
+            Ok(())
+        })
+        .await
+    }
+
+    /// Go back / forward in the page history.
+    pub async fn history_step(&self, delta: i32) -> Result<()> {
+        let js = format!("history.go({delta})");
+        self.eval(&js).await.map(|_| ())
     }
 
     /// Identify the element at viewport coordinates (x, y) for pick / inspect.
@@ -650,6 +751,26 @@ fn element_info_js(el_expr: &str) -> String {
             }};
         }})()"#
     )
+}
+
+/// DOM `code` and Windows virtual key code for keys that are not plain text.
+fn special_key(key: &str) -> Option<(&'static str, i64)> {
+    Some(match key {
+        "Enter" => ("Enter", 13),
+        "Backspace" => ("Backspace", 8),
+        "Tab" => ("Tab", 9),
+        "Escape" => ("Escape", 27),
+        "Delete" => ("Delete", 46),
+        "ArrowLeft" => ("ArrowLeft", 37),
+        "ArrowUp" => ("ArrowUp", 38),
+        "ArrowRight" => ("ArrowRight", 39),
+        "ArrowDown" => ("ArrowDown", 40),
+        "Home" => ("Home", 36),
+        "End" => ("End", 35),
+        "PageUp" => ("PageUp", 33),
+        "PageDown" => ("PageDown", 34),
+        _ => return None,
+    })
 }
 
 fn normalise_url(input: &str) -> String {
