@@ -479,6 +479,16 @@ pub fn run() {
             commands::workspace::workspace_save,
             commands::workspace::workspace_close_ack,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running the AgentZ desktop application");
+        .build(tauri::generate_context!())
+        .expect("error while building the AgentZ desktop application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Some(state) = app.try_state::<state::AppState>() {
+                    if state.background_runs.kill_all() > 0 {
+                        // Give the exec threads a moment to tear down process trees.
+                        std::thread::sleep(std::time::Duration::from_millis(800));
+                    }
+                }
+            }
+        });
 }

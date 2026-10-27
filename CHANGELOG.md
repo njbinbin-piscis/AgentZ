@@ -5,6 +5,21 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.28] - 2026-10-28
+
+### Fixed
+
+- **A background task finishing during a running turn no longer starts a second, hidden turn.** The notice is delivered into the running turn and the agent handles it before its next step; a separate continuation turn starts only when the session is idle. Unconsumed notices are re-routed, not lost.
+- **Agent hangs while a background server was running.** Reading a finished process's output now stops after 5 s even if a child process still holds the pipe open (sandboxed and plain runners).
+- **Shell commands could be cut off by the agent loop at exactly their own 120 s timeout** before moving to the background. The loop limit now follows the tool's requested timeout plus 30 s.
+- Killed background tasks no longer trigger an automatic continuation; a job already reported as ready only reports its exit if it failed; restored notices no longer block live events.
+- Browser tool actions are capped at 90 s and honour Stop.
+- Background tasks are killed when the app exits; finished task records are capped at 64.
+
+### Added
+
+- `service: true` option for background `shell` / `code_run`: long-lived dev servers and watchers with no runtime cap, reported when ready and only on unexpected exit.
+
 ## [1.0.27] - 2026-10-27
 
 ### Fixed

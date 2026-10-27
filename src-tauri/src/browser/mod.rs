@@ -23,6 +23,8 @@ use tokio::sync::Mutex;
 const PAGE_OP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
 /// Longest a caller waits to get the browser lock before reporting it busy.
 const PAGE_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(20);
+/// Longest a single agent `browser` tool action may run.
+const AGENT_ACTION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
 /// How long navigation waits for the load event before returning anyway.
 const NAV_SETTLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(12);
 
@@ -172,7 +174,26 @@ impl Tool for GuardedBrowserTool {
                 obj.entry("auto_screenshot").or_insert(serde_json::Value::Bool(true));
             }
         }
-        let mut res = self.inner.call(input, ctx).await?;
+        // RobotZ holds the shared browser lock for the whole action; a page that
+        // never settles (open JS dialog, load that never fires) would otherwise
+        // hang this turn and every later browser call. Dropping the future
+        // releases the lock.
+        let cancel = ctx.cancel.clone();
+        let cancelled = async move {
+            while !cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            }
+        };
+        let mut res = tokio::select! {
+            r = tokio::time::timeout(AGENT_ACTION_TIMEOUT, self.inner.call(input, ctx)) => match r {
+                Ok(r) => r?,
+                Err(_) => return Ok(ToolResult::err(format!(
+                    "browser action '{action}' timed out after {}s (page may be blocked by a dialog or never finished loading); retry, or take a snapshot to inspect the page",
+                    AGENT_ACTION_TIMEOUT.as_secs()
+                ))),
+            },
+            _ = cancelled => return Ok(ToolResult::err("browser action cancelled")),
+        };
         if action == "snapshot" && !res.is_error {
             let gen = self.generations.record_snapshot();
             res.content = format!("{}\n[snapshot_generation={gen}]", res.content);

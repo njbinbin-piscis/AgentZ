@@ -175,6 +175,10 @@ impl Tool for ShellTool {
                     "type": "boolean",
                     "description": "Start in the background registry and return immediately with a bg_id. Use for builds, tests and servers that may run long. Manage it with process_wait/process_output/process_kill. Output is captured automatically (process_output, and the user's background panel), so redirecting it to a file is usually unnecessary; redirect only when you need the file itself."
                 },
+                "service": {
+                    "type": "boolean",
+                    "description": "With background=true: a long-lived process (dev server, watcher). No runtime cap; it lives until killed, the session is deleted, or the app exits. You are notified once when ready (if ready_port/ready_log is set) and again only if it exits unexpectedly."
+                },
                 "notify_on": {
                     "type": "string",
                     "enum": ["exit", "ready"],
@@ -215,6 +219,7 @@ impl Tool for ShellTool {
                 "cwd": { "type": "string" },
                 "timeout": { "type": "integer", "minimum": 1 },
                 "background": { "type": "boolean" },
+                "service": { "type": "boolean" },
                 "notify_on": { "type": "string", "enum": ["exit", "ready"] },
                 "ready_port": { "type": "integer" },
                 "ready_log": { "type": "string" },

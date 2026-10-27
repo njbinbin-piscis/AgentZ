@@ -802,7 +802,8 @@ pub async fn run_agentz_turn(
         )
         .map_err(|e| anyhow!(e))?;
     let client = budget_scope.guard(client);
-    let agent = harness.into_agent_loop(client, None, None);
+    let (inbox_guard, inbox_rx) = crate::runtime::turn_inbox::open(&session_id);
+    let agent = harness.into_agent_loop(client, Some(inbox_rx), None);
 
     journal.begin_turn(&session_id);
 
@@ -860,6 +861,18 @@ pub async fn run_agentz_turn(
     let run_fut = agent.run(llm_messages, tx, cancel.clone(), ctx);
     let mut turn_timeout_secs: Option<u64> = None;
     let run_res = tokio::time::timeout(timeout, run_fut).await;
+    inbox_guard.close();
+    if let Some(rx) = agent.notification_rx.as_ref() {
+        let mut rx = rx.lock().await;
+        let mut leftover = Vec::new();
+        while let Ok(msg) = rx.try_recv() {
+            leftover.push(msg);
+        }
+        let state = app.state::<crate::state::AppState>().inner().clone();
+        state
+            .bg_hub
+            .on_turn_closed(app.clone(), state.clone(), &session_id, leftover);
+    }
 
     let (ok, new_messages, error_msg): (bool, Vec<LlmMessage>, Option<String>) = match run_res {
         Ok(Ok((msgs, _total_in, _total_out))) => (true, msgs, None),

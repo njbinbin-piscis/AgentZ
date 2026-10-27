@@ -56,6 +56,24 @@ const TOOL_TIMEOUT_SECS: u64 = 120;
 /// After a cancel request, a running tool gets this long to finish its own teardown
 /// (for example a sandboxed shell terminating its Job Object) before its future is dropped.
 const CANCEL_GRACE_SECS: u64 = 8;
+/// Slack over a tool's own timeout so it can finish its timeout handling
+/// (e.g. moving a shell command to the background) before the loop gives up.
+const TOOL_TIMEOUT_SLACK_SECS: u64 = 30;
+/// Upper bound for tool-requested timeouts.
+const TOOL_TIMEOUT_MAX_SECS: u64 = 3600;
+
+/// Loop-level timeout for one tool call: the default, or longer when the
+/// call asks for its own (`timeout` / `timeout_secs` seconds, `timeout_ms`).
+fn tool_timeout_for(input: &serde_json::Value) -> u64 {
+    let own = input["timeout"]
+        .as_u64()
+        .or_else(|| input["timeout_secs"].as_u64())
+        .or_else(|| input["timeout_ms"].as_u64().map(|ms| ms.div_ceil(1000)));
+    match own {
+        Some(s) => (s.min(TOOL_TIMEOUT_MAX_SECS) + TOOL_TIMEOUT_SLACK_SECS).max(TOOL_TIMEOUT_SECS),
+        None => TOOL_TIMEOUT_SECS + TOOL_TIMEOUT_SLACK_SECS,
+    }
+}
 const READ_TOOL_MAX_CONCURRENCY: usize = 4;
 // Logical primary-agent calls only: auxiliary compaction/vision and client wire
 // retries remain outside this budget. Correction/overflow share one iteration window.
@@ -2625,8 +2643,9 @@ impl AgentLoop {
                     // terminate their own process tree. Dropping the future at the first watcher poll
                     // raced that teardown and misreported the outcome as interrupted. Instead, after
                     // a cancel request the tool gets a bounded grace period; only then is it dropped.
+                    let tool_timeout_secs = tool_timeout_for(&input);
                     let mut tool_future = Box::pin(tokio::time::timeout(
-                        std::time::Duration::from_secs(TOOL_TIMEOUT_SECS),
+                        std::time::Duration::from_secs(tool_timeout_secs),
                         call_with_completion(tool, input.clone(), &tool_ctx),
                     ));
                     let outcome = tokio::select! {
@@ -2659,10 +2678,10 @@ impl AgentLoop {
                             super::tool::ToolResult::err(friendly)
                         }
                         Some(Err(_)) => {
-                            warn!("Tool '{}' timed out after {}s", name, TOOL_TIMEOUT_SECS);
+                            warn!("Tool '{}' timed out after {}s", name, tool_timeout_secs);
                             super::tool::ToolResult::err(format!(
                                 "工具 '{}' 执行超时（{}秒）。可能原因：命令阻塞、网络超时或进程挂起。请尝试简化命令或分步执行。",
-                                name, TOOL_TIMEOUT_SECS
+                                name, tool_timeout_secs
                             ))
                         }
                         None => {

@@ -29,4 +29,5 @@ pub mod subagent_worktree;
 pub mod subagent_policy;
 pub mod task_budget;
 pub mod task_details;
+pub mod turn_inbox;
 pub mod workflow;

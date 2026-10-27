@@ -7,7 +7,7 @@
 
 use crate::agent::tool::{Tool, ToolContext, ToolResult};
 use crate::background::{
-    BackgroundRegistry, BgEntry, BgOutcome, BgSnapshot, BgSpec, NotifyOn, ReadySpec,
+    BackgroundRegistry, BgEntry, BgKind, BgOutcome, BgSnapshot, BgSpec, NotifyOn, ReadySpec,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -22,6 +22,7 @@ pub struct BgParams {
     pub detached: bool,
     pub notify_on: NotifyOn,
     pub ready: ReadySpec,
+    pub kind: BgKind,
 }
 
 pub fn parse_bg_params(input: &Value) -> BgParams {
@@ -40,6 +41,11 @@ pub fn parse_bg_params(input: &Value) -> BgParams {
         detached: input["background"].as_bool().unwrap_or(false),
         notify_on,
         ready,
+        kind: if input["service"].as_bool().unwrap_or(false) {
+            BgKind::Service
+        } else {
+            BgKind::Job
+        },
     }
 }
 
@@ -57,6 +63,7 @@ pub fn bg_spec(
         notify_on: params.notify_on,
         ready: params.ready.clone(),
         max_runtime: None,
+        kind: params.kind,
     }
 }
 
@@ -204,11 +211,16 @@ pub fn spawn_std_detached(
                 Err(error) => break BgOutcome::Failed(format!("wait failed: {error}")),
             }
         };
-        if let Some(t) = out_thread {
-            let _ = t.join();
-        }
-        if let Some(t) = err_thread {
-            let _ = t.join();
+        // A grandchild that inherited the pipe can hold it open forever;
+        // never let that keep the task from reaching a terminal state.
+        let drain_deadline = std::time::Instant::now() + Duration::from_secs(5);
+        for t in [out_thread, err_thread].into_iter().flatten() {
+            while !t.is_finished() && std::time::Instant::now() < drain_deadline {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            if t.is_finished() {
+                let _ = t.join();
+            }
         }
         outcome
     });

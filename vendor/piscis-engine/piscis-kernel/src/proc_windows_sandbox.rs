@@ -325,24 +325,25 @@ impl SandboxProcess {
         drop(job);
         // Join both readers and attempt ACL cleanup even if one stage fails. A failed stage
         // must not skip the other reader or be converted into confirmed cleanup.
-        let stdout = self
-            .stdout_thread
-            .take()
-            .map(|t| {
-                t.join()
-                    .map_err(|_| anyhow::anyhow!("stdout capture thread panicked"))
-                    .and_then(|result| result)
-            })
-            .transpose()?;
-        let stderr = self
-            .stderr_thread
-            .take()
-            .map(|t| {
-                t.join()
-                    .map_err(|_| anyhow::anyhow!("stderr capture thread panicked"))
-                    .and_then(|result| result)
-            })
-            .transpose()?;
+        // A process outside the Job (e.g. a server spawned concurrently that
+        // inherited the pipe's write end) can keep the pipe open indefinitely
+        // after the command exited. Don't wait for EOF forever: fall back to
+        // what was captured so far and leave the reader to finish on its own.
+        let drain_deadline = Instant::now() + CAPTURE_DRAIN_TIMEOUT;
+        let stdout = join_capture(
+            self.stdout_thread.take(),
+            &self.stdout_shared,
+            max_output_bytes_hint(&self.stdout_shared),
+            drain_deadline,
+            "stdout",
+        )?;
+        let stderr = join_capture(
+            self.stderr_thread.take(),
+            &self.stderr_shared,
+            max_output_bytes_hint(&self.stderr_shared),
+            drain_deadline,
+            "stderr",
+        )?;
         let acl_cleanup = if let Some(ref mut workspace) = self.workspace_lease {
             workspace.finish()
         } else {
@@ -855,6 +856,40 @@ impl Drop for AttributeList {
 struct CapturedStream {
     bytes: Vec<u8>,
     total_bytes: u64,
+}
+
+/// How long to wait for pipe EOF after the command's Job is empty.
+const CAPTURE_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
+
+fn max_output_bytes_hint(shared: &crate::background::SharedStream) -> usize {
+    (shared.total() as usize).min(1024 * 1024)
+}
+
+fn join_capture(
+    thread: Option<thread::JoinHandle<Result<CapturedStream>>>,
+    shared: &crate::background::SharedStream,
+    fallback_bytes: usize,
+    deadline: Instant,
+    label: &str,
+) -> Result<Option<CapturedStream>> {
+    let Some(t) = thread else { return Ok(None) };
+    while !t.is_finished() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(20));
+    }
+    if t.is_finished() {
+        return t
+            .join()
+            .map_err(|_| anyhow::anyhow!("{label} capture thread panicked"))
+            .and_then(|r| r)
+            .map(Some);
+    }
+    tracing::warn!(
+        "{label} pipe still held open by a process outside the command's Job; returning captured output without EOF"
+    );
+    Ok(Some(CapturedStream {
+        bytes: shared.tail(fallback_bytes),
+        total_bytes: shared.total(),
+    }))
 }
 
 /// Capture a stream into a capped buffer, mirroring every chunk into the

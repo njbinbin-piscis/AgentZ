@@ -71,6 +71,10 @@ impl Tool for CodeRunTool {
                     "type": "boolean",
                     "description": "Start in the background registry and return immediately with a bg_id. Use for slow builds/tests and servers. Manage it with process_wait/process_output/process_kill. Output is captured automatically (process_output, and the user's background panel), so redirecting it to a file is usually unnecessary; redirect only when you need the file itself."
                 },
+                "service": {
+                    "type": "boolean",
+                    "description": "With background=true: a long-lived process (dev server, watcher). No runtime cap; it lives until killed, the session is deleted, or the app exits. Notified when ready (if ready_port/ready_log is set) and again only on unexpected exit."
+                },
                 "notify_on": {
                     "type": "string",
                     "enum": ["exit", "ready"],

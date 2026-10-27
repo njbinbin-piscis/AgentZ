@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use piscis_kernel::background::{BgEvent, BgSnapshot, NotifyOn};
+use piscis_kernel::background::{BgEvent, BgKind, BgSnapshot, NotifyOn, ReadySpec};
 use serde_json::json;
 use tauri::{AppHandle, Emitter};
 
@@ -45,6 +45,34 @@ pub struct BgContinuationHub {
     dispatched: Mutex<HashSet<String>>,
     counts: Mutex<HashMap<String, u32>>,
     pending: Mutex<HashMap<String, PendingContinuation>>,
+    /// Notices handed to a running turn, keyed by prompt text, until that
+    /// turn closes (so unconsumed ones can be re-routed).
+    injected: Mutex<HashMap<String, PendingContinuation>>,
+}
+
+/// Whether a registry event should be reported back to the agent.
+fn should_notify(
+    kind: &str,
+    task_kind: BgKind,
+    notify_on: NotifyOn,
+    has_ready: bool,
+    ready_notified: bool,
+    snap: &BgSnapshot,
+) -> bool {
+    // An explicit kill (agent, user, session cleanup) was intended.
+    if snap.killed {
+        return false;
+    }
+    let clean_exit = snap.status == "exited" && snap.exit_code == Some(0);
+    match (kind, task_kind) {
+        ("ready", BgKind::Service) => has_ready,
+        ("ready", BgKind::Job) => notify_on == NotifyOn::Ready,
+        // Services are expected to run until stopped: any exit is unexpected.
+        (_, BgKind::Service) => true,
+        // Already reported as ready: only a failure is news.
+        (_, BgKind::Job) if ready_notified => !clean_exit,
+        _ => true,
+    }
 }
 
 impl BgContinuationHub {
@@ -81,6 +109,13 @@ impl BgContinuationHub {
             .lock()
             .unwrap()
             .insert(format!("{bg_id}:{kind}"))
+    }
+
+    fn was_claimed(&self, bg_id: &str, kind: &str) -> bool {
+        self.dispatched
+            .lock()
+            .unwrap()
+            .contains(&format!("{bg_id}:{kind}"))
     }
 
     fn claim_budget(&self, session_id: &str) -> bool {
@@ -138,11 +173,15 @@ impl BgContinuationHub {
         let Some(entry) = state.background_runs.get(&snap.id) else {
             return;
         };
-        let wants = match kind {
-            "ready" => entry.notify_on == NotifyOn::Ready,
-            _ => true, // terminal always notifies its starter
-        };
-        if !wants {
+        let ready_notified = self.was_claimed(&snap.id, "ready");
+        if !should_notify(
+            kind,
+            entry.kind,
+            entry.notify_on,
+            entry.ready != ReadySpec::None,
+            ready_notified,
+            &snap,
+        ) {
             return;
         }
         if !self.try_claim(&snap.id, kind) {
@@ -150,14 +189,6 @@ impl BgContinuationHub {
         }
         let project_dir = snap.workspace_root.clone();
         if project_dir.is_empty() || snap.session_id.is_empty() {
-            return;
-        }
-        if !self.claim_budget(&snap.session_id) {
-            tracing::info!(
-                session_id = %snap.session_id,
-                bg_id = %snap.id,
-                "background continuation suppressed: auto-continuation budget exhausted"
-            );
             return;
         }
 
@@ -230,10 +261,74 @@ impl BgContinuationHub {
             session_source,
             prefer_zh,
         };
+
+        // A turn is running in this session: hand the notice to it instead of
+        // queueing a separate turn behind it.
+        if crate::runtime::turn_inbox::try_deliver(&snap.session_id, pending.prompt.clone()) {
+            self.injected
+                .lock()
+                .unwrap()
+                .insert(pending.prompt.clone(), pending);
+            let _ = app.emit(
+                CHAT_EVENT,
+                json!({
+                    "sessionId": snap.session_id,
+                    "channel": "background_task_injected",
+                    "payload": { "bgId": snap.id, "kind": kind },
+                }),
+            );
+            return;
+        }
+        self.park_and_dispatch(app, state, pending).await;
+    }
+
+    /// The session's running turn ended. Notices it never consumed are
+    /// re-routed to a continuation turn; consumed ones are forgotten.
+    pub fn on_turn_closed(
+        &self,
+        app: AppHandle,
+        state: AppState,
+        session_id: &str,
+        undelivered: Vec<String>,
+    ) {
+        let mut retry = Vec::new();
+        {
+            let mut injected = self.injected.lock().unwrap();
+            for msg in undelivered {
+                if let Some(p) = injected.remove(&msg) {
+                    retry.push(p);
+                }
+            }
+            injected.retain(|_, p| p.session_id != session_id);
+        }
+        for pending in retry {
+            let hub = state.bg_hub.clone();
+            let app = app.clone();
+            let state = state.clone();
+            tauri::async_runtime::spawn(async move {
+                hub.park_and_dispatch(app, state, pending).await;
+            });
+        }
+    }
+
+    async fn park_and_dispatch(
+        &self,
+        app: AppHandle,
+        state: AppState,
+        pending: PendingContinuation,
+    ) {
+        if !self.claim_budget(&pending.session_id) {
+            tracing::info!(
+                session_id = %pending.session_id,
+                bg_id = %pending.bg_id,
+                "background continuation suppressed: auto-continuation budget exhausted"
+            );
+            return;
+        }
         self.pending
             .lock()
             .unwrap()
-            .insert(snap.id.clone(), pending.clone());
+            .insert(pending.bg_id.clone(), pending.clone());
         crate::runtime::background_store::save_pending(
             &app,
             &pending.project_dir,
@@ -333,7 +428,7 @@ impl BgContinuationHub {
         )
         .await;
         for item in stored {
-            if !self.try_claim(&item.bg_id, "terminal") {
+            if !self.try_claim(&item.bg_id, "restored") {
                 continue;
             }
             if !self.claim_budget(&item.session_id) {
@@ -381,6 +476,47 @@ mod tests {
         assert!(hub.try_claim("bg-2", "terminal"));
     }
 
+    fn snap(status: &'static str, exit: Option<i32>, killed: bool) -> BgSnapshot {
+        BgSnapshot {
+            id: "bg".into(),
+            session_id: "s".into(),
+            workspace_root: String::new(),
+            label: String::new(),
+            cwd: String::new(),
+            pid: None,
+            status,
+            kind: "job",
+            killed,
+            exit_code: exit,
+            error: None,
+            ready: false,
+            started_unix_ms: 0,
+            finished_unix_ms: None,
+            elapsed_ms: 0,
+            stdout_total: 0,
+            stderr_total: 0,
+        }
+    }
+
+    #[test]
+    fn notify_policy() {
+        let ok = snap("exited", Some(0), false);
+        let bad = snap("exited", Some(1), false);
+        let killed = snap("killed", Some(130), true);
+        // Kills are never reported.
+        assert!(!should_notify("terminal", BgKind::Job, NotifyOn::Exit, false, false, &killed));
+        assert!(!should_notify("terminal", BgKind::Service, NotifyOn::Exit, false, false, &killed));
+        // Jobs report completion; after a ready notice only failures.
+        assert!(should_notify("terminal", BgKind::Job, NotifyOn::Exit, false, false, &ok));
+        assert!(!should_notify("terminal", BgKind::Job, NotifyOn::Ready, true, true, &ok));
+        assert!(should_notify("terminal", BgKind::Job, NotifyOn::Ready, true, true, &bad));
+        // Services: ready when a condition exists; any unrequested exit.
+        let running = snap("running", None, false);
+        assert!(should_notify("ready", BgKind::Service, NotifyOn::Exit, true, false, &running));
+        assert!(!should_notify("ready", BgKind::Job, NotifyOn::Exit, true, false, &running));
+        assert!(should_notify("terminal", BgKind::Service, NotifyOn::Exit, false, false, &ok));
+    }
+
     #[test]
     fn budget_caps_and_user_turn_resets() {
         let hub = BgContinuationHub::new();
@@ -410,6 +546,7 @@ mod tests {
             },
         );
         assert_eq!(hub.pending_count(), 1);
+        assert!(!hub.was_claimed("bg-9", "ready"));
         hub.cancel_pending_for_bg("bg-9");
         assert_eq!(hub.pending_count(), 0);
     }

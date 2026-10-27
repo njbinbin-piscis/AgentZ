@@ -198,9 +198,37 @@ pub struct BgSpec {
     pub cwd: String,
     pub notify_on: NotifyOn,
     pub ready: ReadySpec,
-    /// Hard runtime cap; `None` uses the registry default.
+    /// Hard runtime cap; `None` uses the registry default (jobs) or no
+    /// practical cap (services).
     pub max_runtime: Option<Duration>,
+    pub kind: BgKind,
 }
+
+/// Intent of a background task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BgKind {
+    /// Bounded work (build, test run, long script): killed at `max_runtime`;
+    /// its completion is reported back to the agent.
+    #[default]
+    Job,
+    /// Long-lived process (dev server, watcher): no runtime cap; only an
+    /// unexpected exit is reported.
+    Service,
+}
+
+impl BgKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Job => "job",
+            Self::Service => "service",
+        }
+    }
+}
+
+/// Effectively unbounded runtime for services (they end with the session/app).
+const SERVICE_MAX_RUNTIME: Duration = Duration::from_secs(30 * 24 * 3600);
+/// Terminal entries kept in memory for listing / output reads.
+const MAX_RETAINED_TERMINAL: usize = 64;
 
 #[derive(Debug)]
 struct BgInner {
@@ -221,6 +249,7 @@ pub struct BgEntry {
     pub notify_on: NotifyOn,
     pub ready: ReadySpec,
     pub max_runtime: Duration,
+    pub kind: BgKind,
     pub started_unix_ms: u64,
     started: Instant,
     pid: Mutex<Option<u32>>,
@@ -249,6 +278,9 @@ pub struct BgSnapshot {
     pub cwd: String,
     pub pid: Option<u32>,
     pub status: &'static str,
+    pub kind: &'static str,
+    /// True when stopped by an explicit kill (agent, user or session cleanup).
+    pub killed: bool,
     pub exit_code: Option<i32>,
     pub error: Option<String>,
     pub ready: bool,
@@ -311,6 +343,8 @@ impl BgEntry {
             cwd: self.cwd.clone(),
             pid: *self.pid.lock().unwrap(),
             status: g.status.as_str(),
+            kind: self.kind.as_str(),
+            killed: self.is_killed(),
             exit_code: g.exit_code,
             error: g.error.clone(),
             ready: g.ready_fired,
@@ -475,7 +509,11 @@ impl BackgroundRegistry {
             cwd: spec.cwd,
             notify_on: spec.notify_on,
             ready: spec.ready,
-            max_runtime: spec.max_runtime.unwrap_or(self.default_max_runtime),
+            max_runtime: spec.max_runtime.unwrap_or(match spec.kind {
+                BgKind::Job => self.default_max_runtime,
+                BgKind::Service => SERVICE_MAX_RUNTIME,
+            }),
+            kind: spec.kind,
             started_unix_ms: now_unix_ms(),
             started: Instant::now(),
             pid: Mutex::new(None),
@@ -499,11 +537,25 @@ impl BackgroundRegistry {
             entry.stdout.set_log_file(log_path.clone());
             entry.stderr.set_log_file(log_path);
         }
-        self.entries
-            .lock()
-            .unwrap()
-            .insert(id.clone(), entry.clone());
-        self.order.lock().unwrap().push(id);
+        {
+            let mut entries = self.entries.lock().unwrap();
+            let mut order = self.order.lock().unwrap();
+            entries.insert(id.clone(), entry.clone());
+            order.push(id);
+            // Bound memory: drop the oldest finished entries beyond the cap.
+            let terminal: Vec<String> = order
+                .iter()
+                .filter(|k| entries.get(*k).is_some_and(|e| e.status().is_terminal()))
+                .cloned()
+                .collect();
+            if terminal.len() > MAX_RETAINED_TERMINAL {
+                let drop_n = terminal.len() - MAX_RETAINED_TERMINAL;
+                for k in &terminal[..drop_n] {
+                    entries.remove(k);
+                }
+                order.retain(|k| entries.contains_key(k));
+            }
+        }
         Ok(entry)
     }
 
@@ -638,6 +690,18 @@ impl BackgroundRegistry {
         n
     }
 
+    /// Kill every running task (host shutdown).
+    pub fn kill_all(&self) -> usize {
+        let mut n = 0;
+        for entry in self.entries.lock().unwrap().values() {
+            if entry.status() == BgStatus::Running {
+                entry.kill.store(true, Ordering::Relaxed);
+                n += 1;
+            }
+        }
+        n
+    }
+
     /// Block (poll) until the entry is terminal, its readiness fires, or the
     /// timeout elapses. Used by `process_wait`; runs on the caller's thread.
     pub fn wait_for(
@@ -679,6 +743,7 @@ mod tests {
             notify_on: NotifyOn::Exit,
             ready: ReadySpec::None,
             max_runtime: None,
+            kind: BgKind::Job,
         }
     }
 

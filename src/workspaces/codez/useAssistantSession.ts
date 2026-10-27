@@ -1221,17 +1221,18 @@ export function useAssistantSession({
       if (sessionRef.current !== sessionId) return;
       historyCursorRef.current = { sessionId, offset: page.next_offset };
       setHasMoreOlder(page.has_more);
+      const loaded = page.messages.map(messageFromDto);
       setMessages((prev) => {
         const turnById = new Map<string, string>();
         for (const m of prev) {
           if (m.id && m.turnId) turnById.set(m.id, m.turnId);
         }
-        return page.messages.map((dto) => {
-          const msg = messageFromDto(dto);
+        return loaded.map((msg) => {
           const turnId = msg.id ? turnById.get(msg.id) : undefined;
           return turnId ? { ...msg, turnId } : msg;
         });
       });
+      return loaded;
     },
     [projectDir],
   );
@@ -1315,16 +1316,23 @@ export function useAssistantSession({
         // A restored session opens on the newest message; older ones lazy-load
         // when the user scrolls up.
         stickToBottomRef.current = true;
-        await syncMessagesFromDb(id);
+        const loaded = await syncMessagesFromDb(id);
         if (sessionRef.current === id && turnBookRef.current.isRunning(id)) {
           // This session is mid-turn: give the live stream a trailing
           // assistant bubble to land in (persisted history ends at the
           // user message until the turn completes).
-          setMessages((prev) =>
-            prev.length > 0 && prev[prev.length - 1].role === "user"
-              ? [...prev, { role: "assistant", text: "" }]
-              : prev,
-          );
+          // Live deltas append to the last assistant bubble and live tool steps
+          // replace its persisted tools, so both must continue from what was
+          // reloaded — not from 0, which splits the text at wrong offsets.
+          const last = loaded?.[loaded.length - 1];
+          if (!last || last.role === "user") {
+            setMessages((prev) => [...prev, { role: "assistant", text: "" }]);
+            streamLenRef.current = 0;
+            setToolSteps([]);
+          } else {
+            streamLenRef.current = last.text.length;
+            setToolSteps(last.tools ?? []);
+          }
         }
         if (artifactScope?.handle) {
           void queryTaskPlan(artifactScope.handle, id)
@@ -1339,7 +1347,7 @@ export function useAssistantSession({
             if (el) el.scrollTop = el.scrollHeight;
           }),
         );
-        setToolSteps([]);
+        if (!turnBookRef.current.isRunning(id)) setToolSteps([]);
         setError(null);
         setShowSessions(false);
         setContextUsage(null);
