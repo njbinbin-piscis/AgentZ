@@ -538,8 +538,9 @@ impl BackgroundRegistry {
             entry.stderr.set_log_file(log_path);
         }
         {
-            let mut entries = self.entries.lock().unwrap();
+            // Lock order must match `list`: order, then entries.
             let mut order = self.order.lock().unwrap();
+            let mut entries = self.entries.lock().unwrap();
             entries.insert(id.clone(), entry.clone());
             order.push(id);
             // Bound memory: drop the oldest finished entries beyond the cap.
@@ -745,6 +746,34 @@ mod tests {
             max_runtime: None,
             kind: BgKind::Job,
         }
+    }
+
+    #[test]
+    fn concurrent_create_and_list_do_not_deadlock() {
+        let registry = Arc::new(BackgroundRegistry::new());
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let r1 = registry.clone();
+        let creator = std::thread::spawn(move || {
+            for _ in 0..2000 {
+                if let Ok(e) = r1.create(spec("s")) {
+                    e.finish(BgStatus::Exited, Some(0), None);
+                }
+            }
+        });
+        let r2 = registry.clone();
+        let lister = std::thread::spawn(move || {
+            for _ in 0..2000 {
+                let _ = r2.list(None, None);
+            }
+        });
+        std::thread::spawn(move || {
+            creator.join().unwrap();
+            lister.join().unwrap();
+            let _ = done_tx.send(());
+        });
+        done_rx
+            .recv_timeout(Duration::from_secs(20))
+            .expect("create/list deadlocked");
     }
 
     #[test]

@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.29] - 2026-10-28
+
+### Fixed
+
+- **The app could freeze permanently: sends stuck on "thinking" and Stop did nothing (regression in 1.0.28).** Creating a background task and listing tasks took the registry's two locks in opposite orders and could deadlock; the background panel's polling then exhausted the async runtime. Both paths now use the same lock order.
+- **Plan mode wrote plans to `.agentz/plans/`, but file tools refused to read them back.** `.agentz/plans/*.md` is now treated as ordinary agent files; the rest of `.agentz` stays protected.
+
 ## [1.0.28] - 2026-10-28
 
 ### Fixed

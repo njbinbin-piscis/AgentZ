@@ -972,6 +972,10 @@ fn validate_source_path(root: &Path, raw: &str) -> Result<(), String> {
     let relative = resolved
         .strip_prefix(root)
         .map_err(|_| "File target escapes the authorized environment")?;
+    // Plan documents are the agent's own working files, not host metadata.
+    if piscis_kernel::agent::plan_doc::is_allowed_plan_path(root, &relative.to_string_lossy()) {
+        return Ok(());
+    }
     if relative.as_os_str().is_empty()
         || relative.components().any(|c| {
             let part = c.as_os_str().to_string_lossy().to_lowercase();
@@ -991,6 +995,20 @@ fn validate_source_path(root: &Path, raw: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plan_documents_are_readable_other_metadata_is_not() {
+        let dir = std::env::temp_dir().join(format!("agentz-plan-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(dir.join(".agentz").join("plans")).unwrap();
+        std::fs::write(dir.join(".agentz").join("plans").join("p.md"), "x").unwrap();
+        std::fs::write(dir.join(".agentz").join("journal.db"), "x").unwrap();
+        let root = std::fs::canonicalize(&dir).unwrap();
+        assert!(validate_source_path(&root, ".agentz/plans/p.md").is_ok());
+        assert!(validate_source_path(&root, ".agentz/plans/new.md").is_ok());
+        assert!(validate_source_path(&root, ".agentz/journal.db").is_err());
+        assert!(validate_source_path(&root, ".agentz/plans/p.txt").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[tokio::test]
     async fn projectless_binding_isolated_and_lost_catalog_refused() {
