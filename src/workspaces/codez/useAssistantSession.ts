@@ -29,7 +29,7 @@ import {
 } from "../../services/tauri/chat";
 import { useAppSettings, pruneModelId } from "../../hooks/useAppSettings";
 import { useStickToBottom } from "../../hooks/useStickToBottom";
-import { loadScopedModelId, saveScopedModelId } from "../../utils/modelPrefs";
+import { loadScopedModelId, saveScopedModelId, subscribeScopedModelId } from "../../utils/modelPrefs";
 import { useInputHistory } from "../../components/useInputHistory";
 import { listInstalledSkills, type InstalledSkill } from "../../services/tauri/workbench";
 import { listAgents, type AgentInfo } from "../../services/tauri/agents";
@@ -269,6 +269,8 @@ export function useAssistantSession({
   const chatModeRef = useRef<ChatMode>(chatMode);
   const [modelId, setModelId] = useState(() => loadScopedModelId("codez"));
   const { appSettings, llmProviders, defaultModelLabel, defaultModelHint } = useAppSettings();
+  const llmProvidersRef = useRef(llmProviders);
+  llmProvidersRef.current = llmProviders;
   const inputHistory = useInputHistory("agentz-input-history-codez");
   const [toast, setToast] = useState<string | null>(null);
   const [planItems, setPlanItems] = useState<PlanTodoItem[]>([]);
@@ -494,6 +496,15 @@ export function useAssistantSession({
     saveScopedModelId("codez", modelId);
   }, [modelId]);
 
+  // The status bar switcher changes the same preference; follow it.
+  useEffect(
+    () =>
+      subscribeScopedModelId("codez", (id) =>
+        setModelId((cur) => (cur === id ? cur : pruneModelId(id, llmProvidersRef.current))),
+      ),
+    [],
+  );
+
   useEffect(() => {
     localStorage.setItem("agentz-enabled-skills", JSON.stringify(enabledSkills));
   }, [enabledSkills]);
@@ -625,11 +636,41 @@ export function useAssistantSession({
         }
         return;
       }
+      // A backend-originated turn (background-task continuation) started on a
+      // session: mirror it as running so sends queue behind it and Stop targets it.
+      if (env.channel === "host_turn_started" && env.sessionId) {
+        const sid = env.sessionId;
+        const key = (env.payload as { taskKey?: string }).taskKey;
+        if (turnBookRef.current.isRunning(sid) || !key) return;
+        taskKeyBySessionRef.current.set(sid, key);
+        markRunning(sid, true);
+        if (sid === sessionRef.current) {
+          setError(null);
+          setMessages((m) => [...m, { role: "assistant", text: "" }]);
+          streamLenRef.current = 0;
+          setToolSteps([]);
+          syncBusyView();
+        }
+        return;
+      }
       // Terminal events must be handled even if `busy` state hasn't committed yet
       // (React batches setState; the backend can finish before re-render).
       if (env.channel === "agent_final") {
         const sid = env.sessionId;
         if (!sid) return;
+        if (taskKeyBySessionRef.current.get(sid)?.startsWith("host-bg-")) {
+          taskKeyBySessionRef.current.delete(sid);
+          markRunning(sid, false);
+          if (sid === sessionRef.current) {
+            syncBusyView();
+            void syncMessagesFromDb(sid).catch(() => {});
+          }
+          const next = turnBookRef.current.shiftNext(sid);
+          if (next) {
+            syncQueuedView(sid);
+            void runTurnRef.current(next);
+          }
+        }
         const fin = env.payload as {
           ok: boolean;
           error?: string;

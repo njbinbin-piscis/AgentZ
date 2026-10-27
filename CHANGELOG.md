@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.27] - 2026-10-27
+
+### Fixed
+
+- **User messages were rejected with `task queued/running or goal mutation active` while a background-task continuation turn was running.** That turn was invisible to the UI, so the session looked idle. The backend now announces it (`host_turn_started`); the session shows as running, sends queue behind it, and Stop targets it. A send that still hits a busy gate is retried instead of failing, and a continuation that loses the race to a user turn is re-parked rather than dropped.
+- The busy error now reports the holder (`task_key`, phase, age) to make future occurrences diagnosable.
+
 ## [1.0.26] - 2026-10-26
 
 ### Fixed

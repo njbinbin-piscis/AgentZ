@@ -448,6 +448,8 @@ pub async fn dispatch_host_turn(
         .map(str::trim)
         .filter(|k| !k.is_empty())
         .map(str::to_owned);
+    let note_key = task_key.clone().unwrap_or_else(|| "-".into());
+    let note_session = session_id.clone().unwrap_or_default();
     let registration = crate::runtime::chat_cancel::Registration::new(
         state.chat_cancel.clone(),
         state.task_cancel.clone(),
@@ -465,6 +467,11 @@ pub async fn dispatch_host_turn(
         std::path::Path::new(&project),
         &binding,
     )?);
+    state.task_activity.note_holder(
+        std::path::Path::new(&project),
+        session_id.as_deref().unwrap_or(""),
+        &format!("task_key={note_key} phase=waiting-agent-slot"),
+    );
     let _permit =
         match crate::runtime::chat_cancel::acquire(state.agent_slots.clone(), &cancel).await {
             Ok(permit) => permit,
@@ -559,6 +566,24 @@ pub async fn dispatch_host_turn(
         ..Default::default()
     };
 
+    state.task_activity.note_holder(
+        std::path::Path::new(&project),
+        &note_session,
+        &format!("task_key={note_key} phase=running"),
+    );
+    // Backend-originated turns (background continuation) are invisible to the
+    // UI's own turn bookkeeping; announce them so the session shows as running
+    // and user sends queue behind it instead of being rejected.
+    if note_key.starts_with("host-bg-") {
+        let _ = app.emit(
+            CHAT_EVENT,
+            serde_json::json!({
+                "sessionId": note_session,
+                "channel": "host_turn_started",
+                "payload": { "taskKey": note_key },
+            }),
+        );
+    }
     state.browser_activity.set_chat_turn_active(true);
 
     let result = run_agentz_turn(

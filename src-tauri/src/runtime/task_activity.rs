@@ -15,6 +15,20 @@ fn holders() -> &'static MapMutex<HashMap<Key, (String, std::time::Instant)>> {
 #[derive(Clone, Default)]
 pub struct TaskActivity(Arc<MapMutex<Entries>>);
 impl TaskActivity {
+    /// Annotate the current holder (e.g. task key, "waiting for agent slot",
+    /// "running") so a busy error says what the holder is doing.
+    pub fn note_holder(&self, project: &Path, task: &str, note: &str) {
+        let Ok(root) = agentz_task_state::canonical_root(project) else {
+            return;
+        };
+        if let Ok(mut h) = holders().lock() {
+            if let Some((c, _)) = h.get_mut(&(root, task.to_owned())) {
+                let base = c.split(" | ").next().unwrap_or("").to_owned();
+                *c = format!("{base} | {note}");
+            }
+        }
+    }
+
     #[track_caller]
     pub fn try_enter(&self, project: &Path, task: &str) -> Result<OwnedMutexGuard<()>, String> {
         let loc = std::panic::Location::caller();
