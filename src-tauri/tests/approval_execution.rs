@@ -119,8 +119,10 @@ async fn background_actual_parameters_and_file_scope_are_checked_before_provider
                 .unwrap()
                 .is_error
         );
+        // Protected entries (`.env.local`, `.agentz`, ...) are skipped, not fatal.
         assert!(
-            tool.call(json!({"path":".", "include_hidden":true}), &ctx)
+            !tool
+                .call(json!({"path":".", "include_hidden":true}), &ctx)
                 .await
                 .unwrap()
                 .is_error
@@ -808,10 +810,13 @@ async fn search_start_directory_is_bounded_before_delegate_execution() {
                     workspace_root: &f.root,
                 })
                 .await,
-            HookDecision::Deny(_)
+            HookDecision::Continue
         ));
     }
-    assert_eq!(delegate.before.load(Ordering::SeqCst), 0);
+    // Protected entries in scope are skipped by the search itself, so the call
+    // proceeds to the delegate hook.
+    let base = delegate.before.load(Ordering::SeqCst);
+    assert_eq!(base, 2);
     for name in ["file_search", "file_list"] {
         for path in [
             outside.to_string_lossy().into_owned(),
@@ -833,7 +838,7 @@ async fn search_start_directory_is_bounded_before_delegate_execution() {
         }
         assert_eq!(
             delegate.before.load(Ordering::SeqCst),
-            if name == "file_search" { 0 } else { 1 }
+            base + if name == "file_search" { 0 } else { 1 }
         );
         let input = json!({"path":"src"});
         let event = ToolHookEvent {
@@ -849,7 +854,7 @@ async fn search_start_directory_is_bounded_before_delegate_execution() {
         ));
         f.hooks.after_tool(&event, &ToolResult::ok("fixture")).await;
     }
-    assert_eq!(delegate.before.load(Ordering::SeqCst), 2);
+    assert_eq!(delegate.before.load(Ordering::SeqCst), base + 2);
 }
 
 #[cfg(windows)]
