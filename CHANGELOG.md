@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.33] - 2026-10-28
+
+### Fixed
+
+- **Turns crawled for minutes per step and the agent reported "empty tool output" when a model's max output tokens equaled its context window** (e.g. 256000/256000). The input budget became 0, so every iteration ran a full compaction (an extra summarization LLM call) and squashed history down to 3–4 messages, discarding the tool results just returned. The output reservation is now capped at 1/4 of the window, and a zero budget never triggers compaction.
+
+### Changed
+
+- **Per-model context window.** Each model entry has its own context window (0 = inherit the main model) and the runtime uses the selected model's value; previously all models shared one global window.
+- **Settings reorganized.** New "Agent" tab holds policy mode, max iterations, shell/file-write confirmation, always-allowed tools, delegation and MCP servers; "Models" holds only model settings. The max output field now explains it is not the context window and warns when it exceeds 1/4 of the window. The panel opens on "General".
+
 ## [1.0.32] - 2026-10-28
 
 ### Fixed

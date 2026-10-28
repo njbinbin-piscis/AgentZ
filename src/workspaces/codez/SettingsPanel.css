@@ -236,6 +236,10 @@
   line-height: 1.5;
 }
 
+.agentz-settings-hint--warn {
+  color: var(--warning, #e0a040);
+}
+
 .agentz-settings-hint code {
   font-size: 11px;
   background: var(--bg-elev-2, #1b1b26);

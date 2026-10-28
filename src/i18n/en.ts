@@ -690,6 +690,8 @@ const en = {
     titleHub: "Settings",
     subtitleHub: "Models & runtime environment",
     tabModels: "Models",
+    tabAgent: "Agent",
+    agentRuntime: "Agent runtime & permissions",
     tabGeneral: "General",
     tabChannels: "Message channels",
     tabSkills: "Skills",
@@ -720,7 +722,7 @@ const en = {
     maxTokens: "Max output tokens (per response)",
     maxTokensHint: "Limits how long each model reply can be. 0 = use provider default.",
     contextWindow: "Context window (input tokens)",
-    contextWindowHint: "Input context limit. 0 = auto (inferred from the model).",
+    contextWindowHint: "Input context limit of the main model, also the default for models without their own value. 0 = auto (inferred from the model).",
     maxIterations: "Agent maximum iterations",
     maxIterationsHint:
       "Maximum model/tool iterations in one Agent task. Default: 200; the task stops safely at the limit.",
@@ -766,6 +768,12 @@ const en = {
     llmProviderId: "ID (unique)",
     llmProviderLabel: "Display name",
     llmProviderMaxTokens: "Max output tokens (0 = inherit global)",
+    llmProviderMaxTokensHint: "Limits only the length of each reply from this model; it is not the context window. Typical values: 8000–32000.",
+    llmProviderContextWindow: "Context window (0 = inherit main model)",
+    llmProviderContextWindowHint: "Input context limit this model supports. 0 = use the main model's setting (current: {{window}}).",
+    llmProviderMaxTokensTooLarge:
+      "Output limit too large: it eats into input space. At runtime at most {{cap}} (1/4 of the context window) is reserved.",
+    contextWindowAuto: "auto",
     temperature: "Temperature",
     temperatureHint:
       "Leave empty for the provider default; range 0-2, lower is more deterministic. Some reasoning models ignore it.",

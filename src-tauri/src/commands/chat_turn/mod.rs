@@ -613,7 +613,7 @@ pub async fn run_agentz_turn(
     ) = {
         let s = settings.lock().await;
         (
-            s.context_window,
+            runtime.context_window,
             s.llm_read_timeout_secs.max(30),
             s.policy_mode.clone(),
             s.tool_rate_limit_per_minute,

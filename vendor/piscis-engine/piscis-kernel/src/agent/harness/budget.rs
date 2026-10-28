@@ -96,6 +96,10 @@ impl LayeredBudget {
 
     /// Classify an estimated request size into a tier.
     pub fn classify(&self, estimated_input_tokens: u32) -> CompactionTier {
+        // No known budget: thresholds of 0 would make every request "Full".
+        if self.total == 0 {
+            return CompactionTier::None;
+        }
         if estimated_input_tokens >= self.trigger_full {
             CompactionTier::Full
         } else if estimated_input_tokens >= self.trigger_auto {
@@ -158,6 +162,21 @@ mod tests {
         assert_eq!(b.classify(94_999), CompactionTier::Auto);
         assert_eq!(b.classify(b.trigger_full), CompactionTier::Full);
         assert_eq!(b.classify(b.total + 10), CompactionTier::Full);
+    }
+
+    #[test]
+    fn output_reservation_equal_to_window_keeps_an_input_budget() {
+        // max_tokens configured equal to the window (seen in the field).
+        let b = LayeredBudget::from_context_window(256_000, 256_000);
+        assert!(b.total > 100_000, "total={}", b.total);
+        assert_eq!(b.classify(57_000), CompactionTier::None);
+    }
+
+    #[test]
+    fn zero_budget_never_compacts() {
+        let b = LayeredBudget::with_total(0);
+        assert_eq!(b.classify(0), CompactionTier::None);
+        assert_eq!(b.classify(1_000_000), CompactionTier::None);
     }
 
     #[test]

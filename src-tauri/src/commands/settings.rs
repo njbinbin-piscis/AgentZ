@@ -57,6 +57,8 @@ pub struct LlmProviderDto {
     pub base_url: String,
     pub max_tokens: u32,
     #[serde(default)]
+    pub context_window: u32,
+    #[serde(default)]
     pub temperature: Option<f32>,
     #[serde(default)]
     pub top_p: Option<f32>,
@@ -379,6 +381,7 @@ fn provider_to_dto(p: &LlmProviderConfig) -> LlmProviderDto {
         api_key: String::new(),
         base_url: p.base_url.clone(),
         max_tokens: p.max_tokens,
+        context_window: p.context_window,
         temperature: p.temperature,
         top_p: p.top_p,
         thinking: p.thinking,
@@ -753,6 +756,7 @@ fn apply_settings_updates(settings: &mut Settings, updates: SaveLlmSettings) {
             api_key: existing_api_key,
             base_url: item.base_url,
             max_tokens: item.max_tokens,
+            context_window: item.context_window,
             temperature: item.temperature,
             top_p: item.top_p,
             thinking: item.thinking,

@@ -34,6 +34,7 @@ pub(super) struct LlmRuntime {
     pub api_key: String,
     pub base_url: String,
     pub max_tokens: u32,
+    pub context_window: u32,
     pub options: llm::ClientOptions,
     pub stream: Option<bool>,
 }
@@ -185,6 +186,11 @@ pub(super) fn resolve_llm_runtime(
             } else {
                 settings.max_tokens.max(1024)
             },
+            context_window: if provider.context_window > 0 {
+                provider.context_window
+            } else {
+                settings.context_window
+            },
             options: llm::ClientOptions {
                 temperature: provider.temperature,
                 top_p: provider.top_p,
@@ -220,6 +226,11 @@ pub(super) fn resolve_llm_runtime(
                 } else {
                     settings.max_tokens.max(1024)
                 },
+                context_window: if first.context_window > 0 {
+                    first.context_window
+                } else {
+                    settings.context_window
+                },
                 options: llm::ClientOptions {
                     temperature: first.temperature,
                     top_p: first.top_p,
@@ -243,6 +254,7 @@ pub(super) fn resolve_llm_runtime(
         api_key,
         base_url: settings.custom_base_url.clone(),
         max_tokens: settings.max_tokens.max(1024),
+        context_window: settings.context_window,
         options: llm::ClientOptions {
             temperature: settings.temperature,
             top_p: settings.top_p,
@@ -849,7 +861,7 @@ pub(crate) async fn run_subagent_with_options(
     ) = {
         let s = settings.lock().await;
         (
-            s.context_window,
+            runtime.context_window,
             s.llm_read_timeout_secs.max(30),
             s.policy_mode.clone(),
             s.tool_rate_limit_per_minute,

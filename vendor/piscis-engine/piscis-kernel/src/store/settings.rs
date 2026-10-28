@@ -65,6 +65,9 @@ pub struct LlmProviderConfig {
     /// Max output tokens; 0 means inherit from global settings
     #[serde(default)]
     pub max_tokens: u32,
+    /// Context window in tokens; 0 means inherit from global settings
+    #[serde(default)]
+    pub context_window: u32,
     /// Sampling temperature; None = provider default.
     #[serde(default)]
     pub temperature: Option<f32>,
@@ -103,6 +106,7 @@ impl Default for LlmProviderConfig {
             api_key: String::new(),
             base_url: String::new(),
             max_tokens: 0,
+            context_window: 0,
             temperature: None,
             top_p: None,
             thinking: None,

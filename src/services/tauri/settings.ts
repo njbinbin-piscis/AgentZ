@@ -10,6 +10,7 @@ export interface LlmProviderConfig {
   api_key: string;
   base_url: string;
   max_tokens: number;
+  context_window?: number;
   temperature?: number | null;
   top_p?: number | null;
   thinking?: boolean | null;

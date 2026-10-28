@@ -238,7 +238,11 @@ pub fn compute_total_input_budget(context_window: u32, max_tokens: u32) -> usize
             _ => 32_000,
         }
     };
-    let usable = window.saturating_sub(max_tokens as usize);
+    // Output reservation never takes more than a quarter of the window:
+    // `max_tokens` configured equal to the window would leave a zero input
+    // budget, which classifies every request as overflowing.
+    let reserved = (max_tokens as usize).min(window / 4);
+    let usable = window.saturating_sub(reserved);
     (usable as f64 * 0.85) as usize
 }
 

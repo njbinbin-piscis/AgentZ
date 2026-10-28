@@ -28,7 +28,7 @@ import "./SettingsPanel.css";
 
 import ModelPricesSection, { pricedModels } from "./settings/ModelPricesSection";
 
-type SettingsTab = "general" | "models" | "assistants" | "extensions" | "rules" | "hooks";
+type SettingsTab = "general" | "models" | "agent" | "assistants" | "extensions" | "rules" | "hooks";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -227,6 +227,7 @@ const EMPTY_LLM_PROVIDER: LlmProviderConfig = {
   api_key: "",
   base_url: "",
   max_tokens: 0,
+  context_window: 0,
   temperature: null,
   top_p: null,
   thinking: null,
@@ -291,7 +292,7 @@ function toForm(data: SettingsResponse): LlmSettings {
 
 export default function SettingsPanel({ onClose, projectDir = null }: SettingsPanelProps) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<SettingsTab>("models");
+  const [tab, setTab] = useState<SettingsTab>("general");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -306,6 +307,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
   const [llmEditForm, setLlmEditForm] = useState<LlmProviderConfig>(EMPTY_LLM_PROVIDER);
   const [llmEditDeleteKey, setLlmEditDeleteKey] = useState(false);
   const [llmShowKey, setLlmShowKey] = useState(false);
+  const effectiveEditWindow = (llmEditForm.context_window ?? 0) > 0 ? (llmEditForm.context_window ?? 0) : form.context_window;
   // Global flash model used by delegated sub-agents.
   const [flashProviderId, setFlashProviderId] = useState<string | null>(null);
 
@@ -463,6 +465,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
             [
               ["general", t("settings.tabGeneral")],
               ["models", t("settings.tabModels")],
+              ["agent", t("settings.tabAgent")],
               ["assistants", t("settings.tabChannels")],
               ["extensions", t("settings.tabExtensions")],
               ["rules", t("settings.tabRules")],
@@ -526,21 +529,6 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                         onChange={(v) => update("language", v)}
                       />
                     </div>
-                    <div className="agentz-settings-field">
-                      <label htmlFor="agentz-settings-policy">{t("settings.policyMode")}</label>
-                      <DropdownSelect
-                        id="agentz-settings-policy"
-                        variant="field"
-                        value={form.policy_mode}
-                        options={[
-                          { id: "balanced", label: t("settings.policyBalanced") },
-                          { id: "strict", label: t("settings.policyStrict") },
-                          { id: "dev", label: t("settings.policyDev") },
-                        ]}
-                        onChange={(v) => update("policy_mode", v)}
-                      />
-                      <p className="agentz-settings-hint">{t("settings.policyModeHint")}</p>
-                    </div>
                   </section>
 
                   <WorkzDirSection />
@@ -561,7 +549,6 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     {t("settings.configDirHint")}
                   </div>
 
-                  <DelegationSection />
                   <DiagnosticsSection />
                 </div>
 
@@ -583,7 +570,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
           </>
         )}
 
-        {tab === "models" && (
+        {(tab === "models" || tab === "agent") && (
           <>
             {error && <div className="agentz-settings-error">{error}</div>}
 
@@ -592,6 +579,8 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
             ) : (
           <>
             <div className="agentz-settings-body">
+              {tab === "models" && (
+              <>
               <section className="agentz-settings-section">
                 <h3>{t("settings.aiProvider")}</h3>
 
@@ -683,108 +672,6 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     onChange={(e) => update("context_window", Number(e.target.value) || 0)}
                   />
                   <p className="agentz-settings-hint">{t("settings.contextWindowHint")}</p>
-                </div>
-
-                <div className="agentz-settings-field">
-                  <label htmlFor="agentz-settings-max-iterations">{t("settings.maxIterations")}</label>
-                  <input
-                    id="agentz-settings-max-iterations"
-                    type="number"
-                    min={1}
-                    max={1000}
-                    value={form.max_iterations}
-                    onChange={(e) => update("max_iterations", Math.min(1000, Math.max(1, Number(e.target.value) || 1)))}
-                  />
-                  <p className="agentz-settings-hint">{t("settings.maxIterationsHint")}</p>
-                </div>
-
-                <div className="agentz-settings-field">
-                  <label className="agentz-settings-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={form.confirm_shell_commands ?? true}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setForm((prev) => {
-                          const current = prev.always_allow_tools ?? [];
-                          const nextTools = checked
-                            ? current.filter((item) => item !== "shell" && item !== "code_run")
-                            : current.includes("shell")
-                              ? current
-                              : [...current, "shell"];
-                          return {
-                            ...prev,
-                            confirm_shell_commands: checked,
-                            always_allow_tools: nextTools,
-                          };
-                        });
-                      }}
-                    />
-                    {t("settings.confirmShellCommands")}
-                  </label>
-                  <p className="agentz-settings-hint">{t("settings.confirmShellCommandsHint")}</p>
-                </div>
-
-                <div className="agentz-settings-field">
-                  <label className="agentz-settings-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={form.confirm_file_writes ?? true}
-                      onChange={(e) => update("confirm_file_writes", e.target.checked)}
-                    />
-                    {t("settings.confirmFileWrites")}
-                  </label>
-                  <p className="agentz-settings-hint">{t("settings.confirmFileWritesHint")}</p>
-                </div>
-
-                <div className="agentz-settings-field">
-                  <label>{t("settings.alwaysAllowTools")}</label>
-                  <div className="agentz-permission-chips">
-                    {[
-                      { id: "shell", label: t("settings.toolPermShell") },
-                      { id: "code_run", label: t("settings.toolPermCodeRun") },
-                      { id: "read_lints", label: t("settings.toolPermReadLints") },
-                      { id: "lsp", label: t("settings.toolPermLsp") },
-                      { id: "browser", label: t("settings.toolPermBrowser") },
-                      { id: "*", label: t("settings.toolPermAll") },
-                    ].map((tool) => {
-                      const list = form.always_allow_tools ?? [];
-                      const active =
-                        list.includes(tool.id) ||
-                        (tool.id === "shell" && form.confirm_shell_commands === false);
-                      return (
-                        <button
-                          key={tool.id}
-                          type="button"
-                          className={`agentz-permission-chip ${active ? "active" : ""}`}
-                          onClick={() => {
-                            setForm((prev) => {
-                              const current = prev.always_allow_tools ?? [];
-                              const isCurrentlyActive =
-                                current.includes(tool.id) ||
-                                (tool.id === "shell" && prev.confirm_shell_commands === false);
-                              const nextTools = isCurrentlyActive
-                                ? current.filter((item) => item !== tool.id)
-                                : [...current.filter((item) => item !== tool.id), tool.id];
-                              const nextConfirmShell =
-                                tool.id === "shell"
-                                  ? isCurrentlyActive
-                                  : prev.confirm_shell_commands;
-                              return {
-                                ...prev,
-                                confirm_shell_commands: nextConfirmShell,
-                                always_allow_tools: nextTools,
-                              };
-                            });
-                          }}
-                        >
-                          {active ? "✓ " : ""}
-                          {tool.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="agentz-settings-hint">{t("settings.alwaysAllowToolsHint")}</p>
                 </div>
 
                 <div className="agentz-settings-field">
@@ -959,6 +846,31 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                             setLlmEditForm((f) => ({ ...f, max_tokens: Number(e.target.value) || 0 }))
                           }
                         />
+                        <p className="agentz-settings-hint">{t("settings.llmProviderMaxTokensHint")}</p>
+                        {effectiveEditWindow > 0 && llmEditForm.max_tokens > effectiveEditWindow / 4 && (
+                          <p className="agentz-settings-hint agentz-settings-hint--warn">
+                            {t("settings.llmProviderMaxTokensTooLarge", {
+                              cap: String(Math.floor(effectiveEditWindow / 4)),
+                            })}
+                          </p>
+                        )}
+                      </div>
+                      <div className="agentz-settings-field">
+                        <label>{t("settings.llmProviderContextWindow")}</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1024}
+                          value={llmEditForm.context_window ?? 0}
+                          onChange={(e) =>
+                            setLlmEditForm((f) => ({ ...f, context_window: Number(e.target.value) || 0 }))
+                          }
+                        />
+                        <p className="agentz-settings-hint">
+                          {t("settings.llmProviderContextWindowHint", {
+                            window: form.context_window > 0 ? String(form.context_window) : t("settings.contextWindowAuto"),
+                          })}
+                        </p>
                       </div>
                       <SamplingFields
                         idPrefix="agentz-llm-edit"
@@ -1021,6 +933,133 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                 prices={form.model_prices ?? []}
                 onChange={(prices) => update("model_prices", prices)}
               />
+              </>
+              )}
+
+              {tab === "agent" && (
+              <>
+              <section className="agentz-settings-section">
+                <h3>{t("settings.agentRuntime")}</h3>
+                <div className="agentz-settings-field">
+                    <label htmlFor="agentz-settings-policy">{t("settings.policyMode")}</label>
+                    <DropdownSelect
+                      id="agentz-settings-policy"
+                      variant="field"
+                      value={form.policy_mode}
+                      options={[
+                        { id: "balanced", label: t("settings.policyBalanced") },
+                        { id: "strict", label: t("settings.policyStrict") },
+                        { id: "dev", label: t("settings.policyDev") },
+                      ]}
+                      onChange={(v) => update("policy_mode", v)}
+                    />
+                    <p className="agentz-settings-hint">{t("settings.policyModeHint")}</p>
+                  </div>
+                <div className="agentz-settings-field">
+                  <label htmlFor="agentz-settings-max-iterations">{t("settings.maxIterations")}</label>
+                  <input
+                    id="agentz-settings-max-iterations"
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={form.max_iterations}
+                    onChange={(e) => update("max_iterations", Math.min(1000, Math.max(1, Number(e.target.value) || 1)))}
+                  />
+                  <p className="agentz-settings-hint">{t("settings.maxIterationsHint")}</p>
+                </div>
+
+                <div className="agentz-settings-field">
+                  <label className="agentz-settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={form.confirm_shell_commands ?? true}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setForm((prev) => {
+                          const current = prev.always_allow_tools ?? [];
+                          const nextTools = checked
+                            ? current.filter((item) => item !== "shell" && item !== "code_run")
+                            : current.includes("shell")
+                              ? current
+                              : [...current, "shell"];
+                          return {
+                            ...prev,
+                            confirm_shell_commands: checked,
+                            always_allow_tools: nextTools,
+                          };
+                        });
+                      }}
+                    />
+                    {t("settings.confirmShellCommands")}
+                  </label>
+                  <p className="agentz-settings-hint">{t("settings.confirmShellCommandsHint")}</p>
+                </div>
+
+                <div className="agentz-settings-field">
+                  <label className="agentz-settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={form.confirm_file_writes ?? true}
+                      onChange={(e) => update("confirm_file_writes", e.target.checked)}
+                    />
+                    {t("settings.confirmFileWrites")}
+                  </label>
+                  <p className="agentz-settings-hint">{t("settings.confirmFileWritesHint")}</p>
+                </div>
+
+                <div className="agentz-settings-field">
+                  <label>{t("settings.alwaysAllowTools")}</label>
+                  <div className="agentz-permission-chips">
+                    {[
+                      { id: "shell", label: t("settings.toolPermShell") },
+                      { id: "code_run", label: t("settings.toolPermCodeRun") },
+                      { id: "read_lints", label: t("settings.toolPermReadLints") },
+                      { id: "lsp", label: t("settings.toolPermLsp") },
+                      { id: "browser", label: t("settings.toolPermBrowser") },
+                      { id: "*", label: t("settings.toolPermAll") },
+                    ].map((tool) => {
+                      const list = form.always_allow_tools ?? [];
+                      const active =
+                        list.includes(tool.id) ||
+                        (tool.id === "shell" && form.confirm_shell_commands === false);
+                      return (
+                        <button
+                          key={tool.id}
+                          type="button"
+                          className={`agentz-permission-chip ${active ? "active" : ""}`}
+                          onClick={() => {
+                            setForm((prev) => {
+                              const current = prev.always_allow_tools ?? [];
+                              const isCurrentlyActive =
+                                current.includes(tool.id) ||
+                                (tool.id === "shell" && prev.confirm_shell_commands === false);
+                              const nextTools = isCurrentlyActive
+                                ? current.filter((item) => item !== tool.id)
+                                : [...current.filter((item) => item !== tool.id), tool.id];
+                              const nextConfirmShell =
+                                tool.id === "shell"
+                                  ? isCurrentlyActive
+                                  : prev.confirm_shell_commands;
+                              return {
+                                ...prev,
+                                confirm_shell_commands: nextConfirmShell,
+                                always_allow_tools: nextTools,
+                              };
+                            });
+                          }}
+                        >
+                          {active ? "✓ " : ""}
+                          {tool.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="agentz-settings-hint">{t("settings.alwaysAllowToolsHint")}</p>
+                </div>
+
+              </section>
+
+              <DelegationSection />
 
               <section className="agentz-settings-section">
                 <h3>{t("settings.mcpServers")}</h3>
@@ -1134,6 +1173,8 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                   + {t("settings.mcpServerAdd")}
                 </button>
               </section>
+              </>
+              )}
             </div>
 
             <div className="agentz-settings-footer">
