@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.30] - 2026-10-28
+
+### Fixed
+
+- **Sends stuck on "thinking" (Stop ineffective) when a stdio MCP server was slow or silent.** Turn setup waited forever for `initialize` / `tools/list`. Requests now time out (60 s setup, 300 s tool calls), replies are matched by request id, a failed server is skipped for 5 minutes instead of being relaunched every turn, and concurrent turns share one connection attempt.
+- **Very large MCP tool catalogs overflowed the model context.** Each server's tool definitions are capped (~120 KB; descriptions trimmed to 1024 chars, single schemas over 16 KB skipped); dropped tools are logged.
+
 ## [1.0.29] - 2026-10-28
 
 ### Fixed

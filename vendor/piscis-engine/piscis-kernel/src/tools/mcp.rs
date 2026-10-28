@@ -21,6 +21,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout};
 use tokio::sync::Mutex;
@@ -45,6 +46,13 @@ pub struct McpToolInfo {
 }
 
 // ─── JSON-RPC helpers ─────────────────────────────────────────────────────────
+
+/// Bound for `initialize` and `tools/list`; turn setup waits on these.
+const MCP_SETUP_TIMEOUT: Duration = Duration::from_secs(60);
+const MCP_CALL_TIMEOUT: Duration = Duration::from_secs(300);
+/// A server that failed to start is not retried for this long, so every
+/// turn does not pay its startup timeout again.
+const MCP_FAILURE_BACKOFF: Duration = Duration::from_secs(300);
 
 static REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -100,22 +108,35 @@ impl StdioTransport {
         })
     }
 
-    async fn send_request(&mut self, request: &Value) -> Result<Value> {
+    async fn send_request(&mut self, request: &Value, timeout: Duration) -> Result<Value> {
         let mut line = serde_json::to_string(request)?;
         line.push('\n');
-        self.stdin.write_all(line.as_bytes()).await?;
-        self.stdin.flush().await?;
-
-        let mut response_line = String::new();
-        self.stdout.read_line(&mut response_line).await?;
-        let response: Value = serde_json::from_str(response_line.trim()).map_err(|e| {
+        let id = request.get("id").cloned();
+        let exchange = async {
+            self.stdin.write_all(line.as_bytes()).await?;
+            self.stdin.flush().await?;
+            // Servers may interleave notifications, log lines, or the late
+            // reply to an earlier timed-out request; wait for our id.
+            loop {
+                let mut response_line = String::new();
+                if self.stdout.read_line(&mut response_line).await? == 0 {
+                    return Err(anyhow!("MCP server closed its output"));
+                }
+                let Ok(response) = serde_json::from_str::<Value>(response_line.trim()) else {
+                    continue;
+                };
+                if id.is_none() || response.get("id") == id.as_ref() {
+                    return Ok(response);
+                }
+            }
+        };
+        tokio::time::timeout(timeout, exchange).await.map_err(|_| {
             anyhow!(
-                "Invalid JSON-RPC response: {} (raw: {})",
-                e,
-                response_line.trim()
+                "MCP server did not answer '{}' within {}s",
+                request["method"].as_str().unwrap_or("?"),
+                timeout.as_secs()
             )
-        })?;
-        Ok(response)
+        })?
     }
 }
 
@@ -359,7 +380,7 @@ impl McpClient {
                         "clientInfo": { "name": "piscis-desktop", "version": "0.1.0" }
                     }),
                 );
-                let resp = t.send_request(&init_req).await?;
+                let resp = t.send_request(&init_req, MCP_SETUP_TIMEOUT).await?;
                 if resp.get("error").is_some() {
                     return Err(anyhow!("MCP initialize error: {}", resp["error"]));
                 }
@@ -430,7 +451,7 @@ impl McpClient {
     pub async fn list_tools(&self) -> Result<Vec<McpToolInfo>> {
         self.ensure_connected().await?;
         let req = make_request("tools/list", json!({}));
-        let resp = self.send_rpc(req).await?;
+        let resp = self.send_rpc(req, MCP_SETUP_TIMEOUT).await?;
         let tools = resp["result"]["tools"]
             .as_array()
             .ok_or_else(|| anyhow!("tools/list: missing tools array"))?;
@@ -450,7 +471,7 @@ impl McpClient {
                 "arguments": arguments,
             }),
         );
-        let resp = self.send_rpc(req).await?;
+        let resp = self.send_rpc(req, MCP_CALL_TIMEOUT).await?;
 
         if let Some(err) = resp.get("error") {
             return Err(anyhow!("MCP tool error: {}", err));
@@ -476,10 +497,10 @@ impl McpClient {
         Ok(serde_json::to_string(result)?)
     }
 
-    async fn send_rpc(&self, req: Value) -> Result<Value> {
+    async fn send_rpc(&self, req: Value, timeout: Duration) -> Result<Value> {
         let mut guard = self.transport.lock().await;
         match guard.as_mut() {
-            Some(Transport::Stdio(t)) => t.send_request(&req).await,
+            Some(Transport::Stdio(t)) => t.send_request(&req, timeout).await,
             Some(Transport::Sse(t)) => t.send_request(&req).await,
             Some(Transport::Http(t)) => t.send_request(&req).await,
             None => Err(anyhow!("MCP transport not connected")),
@@ -548,6 +569,43 @@ fn mcp_cache() -> &'static Mutex<HashMap<String, Arc<CachedMcpServer>>> {
     MCP_SERVER_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Serialized size one server's tool definitions may add to every model
+/// request (≈30k tokens). Larger catalogs would overflow the context window.
+const MCP_SERVER_SCHEMA_BUDGET: usize = 120 * 1024;
+const MCP_DESCRIPTION_MAX_CHARS: usize = 1024;
+/// A single tool whose schema alone exceeds this is skipped.
+const MCP_TOOL_SCHEMA_MAX: usize = 16 * 1024;
+
+/// Trim descriptions and keep tools, in server order, while they fit the budget.
+fn fit_tool_budget(tools: Vec<McpToolInfo>) -> Vec<McpToolInfo> {
+    let mut used = 0usize;
+    let mut kept = Vec::new();
+    for mut tool in tools {
+        if let Some(desc) = tool.description.as_mut() {
+            if desc.chars().count() > MCP_DESCRIPTION_MAX_CHARS {
+                *desc = desc.chars().take(MCP_DESCRIPTION_MAX_CHARS).collect::<String>() + "…";
+            }
+        }
+        let size = serde_json::to_string(&tool).map(|s| s.len()).unwrap_or(usize::MAX);
+        if size > MCP_TOOL_SCHEMA_MAX || used + size > MCP_SERVER_SCHEMA_BUDGET {
+            continue;
+        }
+        used += size;
+        kept.push(tool);
+    }
+    kept
+}
+
+fn connect_locks() -> &'static Mutex<HashMap<String, Arc<Mutex<()>>>> {
+    static LOCKS: OnceLock<Mutex<HashMap<String, Arc<Mutex<()>>>>> = OnceLock::new();
+    LOCKS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn failures() -> &'static Mutex<HashMap<String, Instant>> {
+    static FAILURES: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
+    FAILURES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 fn config_cache_key(config: &McpServerConfig) -> String {
     serde_json::to_string(config).unwrap_or_else(|_| {
         format!(
@@ -588,16 +646,47 @@ pub async fn build_mcp_tools(config: &McpServerConfig) -> Vec<McpProxyTool> {
     }
 
     let cache_key = config_cache_key(config);
+    // One connection attempt per server at a time; concurrent turns wait for
+    // it instead of each spawning their own server process.
+    let connect_lock = {
+        let mut locks = connect_locks().lock().await;
+        locks.entry(cache_key.clone()).or_default().clone()
+    };
+    let _connecting = connect_lock.lock().await;
     if let Some(cached) = {
         let cache = mcp_cache().lock().await;
         cache.get(&cache_key).cloned()
     } {
         return proxy_tools_from_cached(config, cached);
     }
+    if let Some(failed_at) = failures().lock().await.get(&cache_key) {
+        if failed_at.elapsed() < MCP_FAILURE_BACKOFF {
+            return vec![];
+        }
+    }
 
     let client = Arc::new(McpClient::new(config.clone()));
-    match client.list_tools().await {
+    let listed = client.list_tools().await;
+    if listed.is_err() {
+        failures().lock().await.insert(cache_key.clone(), Instant::now());
+        // Drop the half-initialised transport now (kills a stdio child).
+        client.disconnect().await;
+    } else {
+        failures().lock().await.remove(&cache_key);
+    }
+    match listed {
         Ok(tools) => {
+            let offered = tools.len();
+            let tools = fit_tool_budget(tools);
+            if tools.len() < offered {
+                warn!(
+                    "MCP server '{}' offers {} tools; only {} fit the {} KB schema budget, the rest are not registered",
+                    config.name,
+                    offered,
+                    tools.len(),
+                    MCP_SERVER_SCHEMA_BUDGET / 1024
+                );
+            }
             info!(
                 "MCP server '{}' provides {} tool(s)",
                 config.name,
@@ -614,5 +703,38 @@ pub async fn build_mcp_tools(config: &McpServerConfig) -> Vec<McpProxyTool> {
             warn!("MCP server '{}' failed to connect: {}", config.name, e);
             vec![]
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tool(name: &str, desc_len: usize, schema_len: usize) -> McpToolInfo {
+        McpToolInfo {
+            name: name.into(),
+            description: Some("d".repeat(desc_len)),
+            input_schema: Some(json!({ "pad": "x".repeat(schema_len) })),
+        }
+    }
+
+    #[test]
+    fn tool_budget_trims_descriptions_and_drops_oversized() {
+        let kept = fit_tool_budget(vec![
+            tool("small", 5000, 100),
+            tool("huge", 10, 70_000),
+            tool("ok", 10, 1000),
+        ]);
+        let names: Vec<_> = kept.iter().map(|t| t.name.as_str()).collect();
+        assert_eq!(names, ["small", "ok"]);
+        assert!(kept[0].description.as_ref().unwrap().chars().count() <= MCP_DESCRIPTION_MAX_CHARS + 1);
+    }
+
+    #[test]
+    fn tool_budget_caps_total_size() {
+        let kept = fit_tool_budget((0..200).map(|i| tool(&format!("t{i}"), 10, 8000)).collect());
+        let total: usize = kept.iter().map(|t| serde_json::to_string(t).unwrap().len()).sum();
+        assert!(total <= MCP_SERVER_SCHEMA_BUDGET);
+        assert!(kept.len() > 10 && kept.len() < 200);
     }
 }
