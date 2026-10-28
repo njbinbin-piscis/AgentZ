@@ -607,12 +607,22 @@ fn failures() -> &'static Mutex<HashMap<String, Instant>> {
 }
 
 fn config_cache_key(config: &McpServerConfig) -> String {
-    serde_json::to_string(config).unwrap_or_else(|_| {
-        format!(
-            "{}\n{}\n{}\n{}\n{:?}\n{:?}",
-            config.name, config.transport, config.command, config.url, config.args, config.env
-        )
+    // HashMap iteration order differs per instance; sort `env`/`headers` or
+    // the key changes between turns and the server is relaunched every time.
+    fn sorted(m: &HashMap<String, String>) -> std::collections::BTreeMap<&String, &String> {
+        m.iter().collect()
+    }
+    json!({
+        "name": config.name,
+        "transport": config.transport,
+        "command": config.command,
+        "args": config.args,
+        "url": config.url,
+        "env": sorted(&config.env),
+        "headers": sorted(&config.headers),
+        "enabled": config.enabled,
     })
+    .to_string()
 }
 
 fn proxy_tools_from_cached(
@@ -728,6 +738,25 @@ mod tests {
         let names: Vec<_> = kept.iter().map(|t| t.name.as_str()).collect();
         assert_eq!(names, ["small", "ok"]);
         assert!(kept[0].description.as_ref().unwrap().chars().count() <= MCP_DESCRIPTION_MAX_CHARS + 1);
+    }
+
+    #[test]
+    fn cache_key_is_stable_across_map_instances() {
+        let config = |order: &[(&str, &str)]| McpServerConfig {
+            name: "s".into(),
+            transport: "stdio".into(),
+            command: "node".into(),
+            args: vec![],
+            url: String::new(),
+            env: order.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            headers: HashMap::new(),
+            enabled: true,
+        };
+        let pairs: Vec<(String, String)> = (0..20).map(|i| (format!("K{i}"), format!("v{i}"))).collect();
+        let refs: Vec<(&str, &str)> = pairs.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        let mut rev = refs.clone();
+        rev.reverse();
+        assert_eq!(config_cache_key(&config(&refs)), config_cache_key(&config(&rev)));
     }
 
     #[test]

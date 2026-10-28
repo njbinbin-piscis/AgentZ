@@ -367,7 +367,11 @@ impl BgEntry {
             out.push_str(&err);
         }
         if out.len() > max_bytes {
-            out = out[out.len() - max_bytes..].to_string();
+            let mut start = out.len() - max_bytes;
+            while !out.is_char_boundary(start) {
+                start += 1;
+            }
+            out = out[start..].to_string();
         }
         out
     }

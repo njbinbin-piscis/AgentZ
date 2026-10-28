@@ -586,7 +586,7 @@ pub async fn dispatch_host_turn(
     }
     state.browser_activity.set_chat_turn_active(true);
 
-    let result = run_agentz_turn(
+    let turn = run_agentz_turn(
         app.clone(),
         request,
         kernel,
@@ -612,8 +612,20 @@ pub async fn dispatch_host_turn(
         prefer_zh.unwrap_or(false),
         queued_run,
         Some(state.background_runs.clone()),
-    )
-    .await;
+    );
+    // A panic inside the turn would otherwise drop this command's future
+    // without a reply, leaving the UI on "thinking" forever.
+    let result = match futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(turn)).await {
+        Ok(result) => result,
+        Err(panic) => {
+            let message = panic
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| panic.downcast_ref::<&str>().map(|s| s.to_string()))
+                .unwrap_or_else(|| "unknown panic".into());
+            Err(anyhow::anyhow!("internal error: {message}"))
+        }
+    };
 
     state.browser_activity.set_chat_turn_active(false);
 

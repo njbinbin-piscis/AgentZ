@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.31] - 2026-10-28
+
+### Fixed
+
+- **Sends stuck on "thinking" forever when the message `@`-referenced a large non-ASCII file (e.g. Chinese docs over 12 KB).** Truncating the inlined file cut through a multi-byte character and panicked; the panic dropped the turn without a reply to the UI. Truncation now respects character boundaries, and a panic inside a turn is returned as an error instead of hanging.
+- **MCP servers were relaunched on every turn**, and a failing server was retried every turn despite the backoff: the cache key serialized `env`/`headers` HashMaps in random order. The key is now stable.
+- Background task output tails no longer risk the same multi-byte truncation panic.
+
 ## [1.0.30] - 2026-10-28
 
 ### Fixed

@@ -292,10 +292,14 @@ fn read_ref_block(workspace_root: &str, ref_path: &str) -> Option<String> {
     }
     let content = String::from_utf8_lossy(&raw).into_owned();
     let truncated = if content.len() > MAX_FILE_REF_CHARS {
+        let mut cut = MAX_FILE_REF_CHARS;
+        while !content.is_char_boundary(cut) {
+            cut -= 1;
+        }
         format!(
             "{}\n… [truncated, {} chars omitted]",
-            &content[..MAX_FILE_REF_CHARS],
-            content.len() - MAX_FILE_REF_CHARS
+            &content[..cut],
+            content.len() - cut
         )
     } else {
         content
@@ -873,5 +877,21 @@ mod remote_context_binding_tests {
                 .is_none());
         })
         .await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn large_multibyte_file_ref_truncates_without_panicking() {
+        let dir = std::env::temp_dir().join(format!("agentz-ref-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // "a" shifts every 3-byte char off the 12000-byte boundary.
+        std::fs::write(dir.join("doc.md"), format!("a{}", "\u{8bbe}\u{8ba1}".repeat(4000))).unwrap();
+        let block = read_ref_block(&dir.to_string_lossy(), "doc.md").expect("file inlined");
+        assert!(block.contains("[truncated,"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
