@@ -24,6 +24,9 @@ pub struct EditorSnapshot {
     /// Relative path → unsaved editor buffer (only for dirty tabs).
     #[serde(default)]
     pub dirty_buffers: HashMap<String, String>,
+    /// Open paths shown in rendered preview (Markdown/HTML) rather than source.
+    #[serde(default)]
+    pub preview_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -111,6 +114,8 @@ fn sanitize_snapshot(mut snap: WorkspaceSnapshot) -> WorkspaceSnapshot {
             && !content.is_empty()
             && snap.editor.open_paths.iter().any(|p| p == path)
     });
+    let open = snap.editor.open_paths.clone();
+    snap.editor.preview_paths.retain(|p| open.contains(p));
     if let Some(ref active) = snap.editor.active_path {
         if !snap.editor.open_paths.iter().any(|p| p == active) {
             snap.editor.active_path = snap.editor.open_paths.first().cloned();

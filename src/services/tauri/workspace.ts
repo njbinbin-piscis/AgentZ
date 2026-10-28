@@ -5,6 +5,8 @@ export interface EditorSnapshot {
   open_paths: string[];
   active_path: string | null;
   dirty_buffers: Record<string, string>;
+  /** Open paths shown in rendered preview rather than source. */
+  preview_paths?: string[];
 }
 
 export interface LayoutSnapshot {
@@ -48,6 +50,7 @@ export function editorSnapshotFromTabs(
         ? activePath
         : restorable[0]?.path ?? null,
     dirty_buffers,
+    preview_paths: restorable.filter((t) => t.viewMode === "preview").map((t) => t.path),
   };
 }
 

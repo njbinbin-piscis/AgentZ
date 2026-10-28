@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.32] - 2026-10-28
+
+### Fixed
+
+- **The composer forgot its model on every restart.** Model providers load asynchronously; the "drop a removed model" cleanup ran against the still-empty list and wiped the saved choice. Cleanup now waits for settings to load (composer and status bar). Saved agent and skill selections are no longer cleared when their lists come back empty.
+- **Markdown/HTML tabs reopened in source view after a restart.** The workspace snapshot now records which open tabs were in preview mode and restores them.
+
 ## [1.0.31] - 2026-10-28
 
 ### Fixed

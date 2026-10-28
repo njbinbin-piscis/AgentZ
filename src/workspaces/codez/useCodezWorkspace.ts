@@ -31,6 +31,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { FileNode, OpenTab, TabViewMode } from "./types";
 import type { EditorSnapshot, LayoutSnapshot } from "../../services/tauri/workspace";
 import { editorSnapshotFromTabs } from "../../services/tauri/workspace";
+import { isPreviewablePath } from "./FileIcon";
 import { useProjectEdgeActions, useProjectEdgeState } from "../../contexts/ProjectEdgeContext";
 import { normalizeRelPath, shouldWatchPath } from "../../utils/pathFilter";
 import {
@@ -421,6 +422,7 @@ export function useCodezWorkspace({
     void (async () => {
       const restored: OpenTab[] = [];
       let restoreFailed = false;
+      const previewPaths = new Set(editor.preview_paths ?? []);
       for (const path of editor.open_paths) {
         const fullPath = `${projectDir}/${path}`;
         const dirty = editor.dirty_buffers[path];
@@ -446,7 +448,7 @@ export function useCodezWorkspace({
             content: dirty !== undefined ? dirty : fc.content,
             isDirty: dirty !== undefined,
             isReadOnly: false,
-            viewMode: "editor",
+            viewMode: previewPaths.has(path) && isPreviewablePath(path) ? "preview" : "editor",
             fileSize: fc.size,
           });
         } catch {

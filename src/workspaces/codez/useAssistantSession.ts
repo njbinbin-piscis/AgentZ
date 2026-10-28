@@ -460,13 +460,19 @@ export function useAssistantSession({
   }, [projectDir, clearCards, clearSessionArtifacts, discardStreamDelta]);
 
   useEffect(() => {
+    // Before settings load, `llmProviders` is empty; pruning then would wipe
+    // the saved model on every start.
+    if (!appSettings) return;
     setModelId((id) => pruneModelId(id, llmProviders));
-  }, [llmProviders]);
+  }, [appSettings, llmProviders]);
 
   useEffect(() => {
     listInstalledSkills()
       .then((skills) => {
         setInstalledSkills(skills);
+        // An empty list at startup usually means "not ready", not "all
+        // uninstalled"; keep the saved selection rather than wiping it.
+        if (!skills.length) return;
         const slugs = new Set(skills.map((s) => s.slug));
         setEnabledSkills((cur) => cur.filter((s) => slugs.has(s)));
       })
@@ -474,6 +480,7 @@ export function useAssistantSession({
     listAgents()
       .then((list) => {
         setAgents(list);
+        if (!list.length) return;
         const ids = new Set(list.map((a) => a.id));
         setActiveAgent((cur) => (cur && !ids.has(cur) ? "" : cur));
       })
@@ -500,7 +507,9 @@ export function useAssistantSession({
   useEffect(
     () =>
       subscribeScopedModelId("codez", (id) =>
-        setModelId((cur) => (cur === id ? cur : pruneModelId(id, llmProvidersRef.current))),
+        setModelId((cur) =>
+          cur === id ? cur : llmProvidersRef.current.length ? pruneModelId(id, llmProvidersRef.current) : id,
+        ),
       ),
     [],
   );

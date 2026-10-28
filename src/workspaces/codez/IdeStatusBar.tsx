@@ -148,8 +148,9 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
   // Follow the composer's picker (and drop ids whose provider was removed).
   useEffect(() => subscribeScopedModelId("codez", setSelectedModelId), []);
   useEffect(() => {
+    if (!appSettings) return;
     setSelectedModelId((id) => (id && !llmProviders.some((p) => p.id === id) ? "" : id));
-  }, [llmProviders]);
+  }, [appSettings, llmProviders]);
 
   const handleCycleModel = () => {
     if (modelOptions.length <= 1) return;
