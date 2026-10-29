@@ -122,6 +122,10 @@ impl Tool for TaskTool {
         true
     }
 
+    fn manages_own_timeout(&self) -> bool {
+        true
+    }
+
     async fn call(&self, input: Value, ctx: &ToolContext) -> anyhow::Result<ToolResult> {
         let action = input
             .get("action")
@@ -226,8 +230,8 @@ impl Tool for TaskTool {
                     }
                 }
                 let writable = !caps.read_only && bridge.is_some();
-                // Writing and testing takes longer than scouting.
-                let (default_iters, default_timeout) = if writable { (40, 900) } else { (0, 0) };
+                // 0 defers to the sub-agent settings (Agent tab).
+                let (default_iters, default_timeout) = (0, 0);
                 (
                     delegated_agent_system_prompt(&workspace, &m.name, &persona, writable),
                     m.name.clone(),

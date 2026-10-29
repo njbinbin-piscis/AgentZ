@@ -2643,7 +2643,11 @@ impl AgentLoop {
                     // terminate their own process tree. Dropping the future at the first watcher poll
                     // raced that teardown and misreported the outcome as interrupted. Instead, after
                     // a cancel request the tool gets a bounded grace period; only then is it dropped.
-                    let tool_timeout_secs = tool_timeout_for(&input);
+                    let tool_timeout_secs = if tool.manages_own_timeout() {
+                        TOOL_TIMEOUT_MAX_SECS
+                    } else {
+                        tool_timeout_for(&input)
+                    };
                     let mut tool_future = Box::pin(tokio::time::timeout(
                         std::time::Duration::from_secs(tool_timeout_secs),
                         call_with_completion(tool, input.clone(), &tool_ctx),

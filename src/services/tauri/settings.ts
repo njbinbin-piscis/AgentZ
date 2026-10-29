@@ -38,6 +38,8 @@ export interface LlmSettings {
   max_tokens: number;
   context_window: number;
   max_iterations: number;
+  subagent_max_iterations?: number;
+  subagent_timeout_secs?: number;
   policy_mode: string;
   confirm_shell_commands?: boolean;
   confirm_file_writes?: boolean;

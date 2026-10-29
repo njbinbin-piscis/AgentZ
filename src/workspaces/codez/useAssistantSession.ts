@@ -100,6 +100,21 @@ interface ChatMessage {
   tools?: ToolTraceItem[];
 }
 
+/** Before a new turn clears the live steps, pin them to the bubble they belong to,
+ *  unless that bubble was already reloaded with its persisted calls. */
+export function keepLiveToolSteps(messages: ChatMessage[], steps: ToolTraceItem[]): ChatMessage[] {
+  const last = messages[messages.length - 1];
+  if (steps.length === 0 || last?.role !== "assistant" || (last.tools?.length ?? 0) > 0) {
+    return messages;
+  }
+  const copy = messages.slice();
+  copy[copy.length - 1] = {
+    ...last,
+    tools: steps.map((s) => (s.status === "running" ? { ...s, status: "error" as const } : s)),
+  };
+  return copy;
+}
+
 function messageFromDto(m: MessageDto): ChatMessage {
   return {
     id: m.id,
@@ -282,6 +297,8 @@ export function useAssistantSession({
     })));
   }, []);
   const [toolSteps, setToolSteps] = useState<ToolTraceItem[]>([]);
+  const toolStepsRef = useRef<ToolTraceItem[]>([]);
+  toolStepsRef.current = toolSteps;
   const [taskPanelOpen, setTaskPanelOpen] = useState(false);
   const [modeNotice, setModeNotice] = useState<string | null>(null);
   const [contextUsage, setContextUsage] = useState<ContextUsageSnapshot | null>(null);
@@ -655,7 +672,8 @@ export function useAssistantSession({
         markRunning(sid, true);
         if (sid === sessionRef.current) {
           setError(null);
-          setMessages((m) => [...m, { role: "assistant", text: "" }]);
+          const priorSteps = toolStepsRef.current;
+          setMessages((m) => [...keepLiveToolSteps(m, priorSteps), { role: "assistant", text: "" }]);
           streamLenRef.current = 0;
           setToolSteps([]);
           syncBusyView();
@@ -670,14 +688,14 @@ export function useAssistantSession({
         if (taskKeyBySessionRef.current.get(sid)?.startsWith("host-bg-")) {
           taskKeyBySessionRef.current.delete(sid);
           markRunning(sid, false);
-          if (sid === sessionRef.current) {
-            syncBusyView();
-            void syncMessagesFromDb(sid).catch(() => {});
-          }
+          const synced =
+            sid === sessionRef.current
+              ? (syncBusyView(), syncMessagesFromDb(sid).catch(() => {}))
+              : Promise.resolve();
           const next = turnBookRef.current.shiftNext(sid);
           if (next) {
             syncQueuedView(sid);
-            void runTurnRef.current(next);
+            void synced.then(() => runTurnRef.current(next));
           }
         }
         const fin = env.payload as {
@@ -936,8 +954,9 @@ export function useAssistantSession({
       composerDbg("runTurn → setMessages (user bubble)");
       // Edit diffs of earlier turns are process info; drop them when a new turn starts.
       setTurnDiffsByTurnId({});
+      const priorSteps = toolStepsRef.current;
       setMessages((m) => [
-        ...m,
+        ...keepLiveToolSteps(m, priorSteps),
         { role: "user", text: displayText },
         { role: "assistant", text: "" },
       ]);
@@ -1048,15 +1067,15 @@ export function useAssistantSession({
       const queue = turnBookRef.current.queueFor(effectiveSessionId);
       if (isViewing()) {
         syncBusyView();
-        if (queue.length === 0) {
-          try {
-            composerDbg("runTurn → syncMessagesFromDb");
-            await syncMessagesFromDb(effectiveSessionId);
-            composerDbg("runTurn ← syncMessagesFromDb ok");
-          } catch (syncErr) {
-            composerDbg("runTurn ← syncMessagesFromDb failed", String(syncErr));
-            // keep in-memory messages if reload fails
-          }
+        // Reload even when a follow-up is queued: the next turn clears the live
+        // tool steps, and only the persisted rows still carry this turn's calls.
+        try {
+          composerDbg("runTurn → syncMessagesFromDb");
+          await syncMessagesFromDb(effectiveSessionId);
+          composerDbg("runTurn ← syncMessagesFromDb ok");
+        } catch (syncErr) {
+          composerDbg("runTurn ← syncMessagesFromDb failed", String(syncErr));
+          // keep in-memory messages if reload fails
         }
       }
       if (projectDir && queue.length === 0) {

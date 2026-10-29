@@ -69,6 +69,10 @@ impl Tool for DelegateTool {
         true
     }
 
+    fn manages_own_timeout(&self) -> bool {
+        true
+    }
+
     async fn call(&self, input: Value, ctx: &ToolContext) -> anyhow::Result<ToolResult> {
         let task = input
             .get("task")

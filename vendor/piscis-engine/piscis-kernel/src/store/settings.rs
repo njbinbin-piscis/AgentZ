@@ -496,6 +496,12 @@ pub struct Settings {
     /// Maximum tool-call iterations per agent run (default 50)
     #[serde(default = "default_max_iterations")]
     pub max_iterations: u32,
+    /// Sub-agent iteration cap; 0 = half of `max_iterations`.
+    #[serde(default)]
+    pub subagent_max_iterations: u32,
+    /// Sub-agent wall-clock timeout in seconds; 0 = built-in default.
+    #[serde(default)]
+    pub subagent_timeout_secs: u32,
     /// Cumulative-input-tokens cap after which an auto summary/compaction
     /// kicks in. Set to 0 to disable.
     ///
@@ -874,6 +880,8 @@ impl Default for Settings {
             smtp_from_name: String::new(),
             email_enabled: false,
             max_iterations: default_max_iterations(),
+            subagent_max_iterations: 0,
+            subagent_timeout_secs: 0,
             auto_compact_input_tokens_threshold: default_auto_compact_input_tokens_threshold(),
             compaction_micro_percent: default_compaction_micro_percent(),
             compaction_auto_percent: default_compaction_auto_percent(),

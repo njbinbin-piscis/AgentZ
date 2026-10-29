@@ -76,6 +76,10 @@ pub struct SaveLlmSettings {
     pub max_tokens: u32,
     pub context_window: u32,
     pub max_iterations: u32,
+    #[serde(default)]
+    pub subagent_max_iterations: u32,
+    #[serde(default)]
+    pub subagent_timeout_secs: u32,
     pub policy_mode: String,
     #[serde(default = "default_enabled")]
     pub confirm_shell_commands: bool,
@@ -124,6 +128,8 @@ pub struct LlmSettingsDto {
     pub max_tokens: u32,
     pub context_window: u32,
     pub max_iterations: u32,
+    pub subagent_max_iterations: u32,
+    pub subagent_timeout_secs: u32,
     pub policy_mode: String,
     pub confirm_shell_commands: bool,
     pub confirm_file_writes: bool,
@@ -400,6 +406,8 @@ fn to_dto(settings: &Settings, config_dir: String) -> LlmSettingsDto {
         max_tokens: settings.max_tokens,
         context_window: settings.context_window,
         max_iterations: settings.max_iterations,
+        subagent_max_iterations: settings.subagent_max_iterations,
+        subagent_timeout_secs: settings.subagent_timeout_secs,
         policy_mode: settings.policy_mode.clone(),
         confirm_shell_commands: settings.confirm_shell_commands,
         confirm_file_writes: settings.confirm_file_writes,
@@ -703,6 +711,8 @@ fn apply_settings_updates(settings: &mut Settings, updates: SaveLlmSettings) {
     settings.max_tokens = updates.max_tokens;
     settings.context_window = updates.context_window;
     settings.max_iterations = updates.max_iterations.clamp(1, 1_000);
+    settings.subagent_max_iterations = updates.subagent_max_iterations.min(1_000);
+    settings.subagent_timeout_secs = updates.subagent_timeout_secs.min(3_600);
     settings.policy_mode = updates.policy_mode;
     settings.confirm_shell_commands = updates.confirm_shell_commands;
     settings.confirm_file_writes = updates.confirm_file_writes;

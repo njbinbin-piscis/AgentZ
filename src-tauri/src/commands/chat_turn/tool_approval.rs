@@ -396,6 +396,46 @@ mod durable_devenv_wiring_tests {
     }
 }
 
+#[cfg(test)]
+mod subagent_final_report_tests {
+    use super::*;
+
+    fn msg(role: &str, text: &str) -> LlmMessage {
+        LlmMessage {
+            role: role.into(),
+            content: MessageContent::text(text),
+        }
+    }
+
+    #[test]
+    fn report_request_keeps_task_and_history() {
+        let run = vec![msg("assistant", "reading"), msg("user", "result")];
+        let out = final_report_messages("find X", &run, 100_000);
+        assert_eq!(out.len(), 4);
+        assert_eq!(out[0].content.as_text(), "find X");
+        assert_eq!(out[1].role, "assistant");
+        assert_eq!(out[3].content.as_text(), SUBAGENT_FINAL_REPORT_PROMPT);
+    }
+
+    #[test]
+    fn over_budget_drops_oldest_and_starts_on_assistant() {
+        let big = "x".repeat(8_000);
+        let run = vec![
+            msg("assistant", &big),
+            msg("user", &big),
+            msg("assistant", "late call"),
+            msg("user", "late result"),
+        ];
+        let fixed = llm::estimate_message_tokens(&msg("user", "t"))
+            + llm::estimate_message_tokens(&msg("user", SUBAGENT_FINAL_REPORT_PROMPT));
+        let out = final_report_messages("t", &run, fixed + 3_000);
+        assert_eq!(out[0].content.as_text(), "t");
+        assert_eq!(out[1].role, "assistant");
+        assert_eq!(out[1].content.as_text(), "late call");
+        assert_eq!(out.len(), 4);
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) fn build_tool_registry(
     app: tauri::AppHandle,
@@ -858,6 +898,8 @@ pub(crate) async fn run_subagent_with_options(
         fallback,
         compaction,
         tool_settings,
+        default_iterations,
+        default_timeout_secs,
     ) = {
         let s = settings.lock().await;
         (
@@ -870,6 +912,12 @@ pub(crate) async fn run_subagent_with_options(
             s.fallback_models.clone(),
             CompactionSettings::from_settings(&s),
             Arc::new(piscis_kernel::agent::tool::ToolSettings::from_settings(&s)),
+            subagent_default_iterations(s.subagent_max_iterations, s.max_iterations),
+            if s.subagent_timeout_secs > 0 {
+                u64::from(s.subagent_timeout_secs)
+            } else {
+                SUBAGENT_DEFAULT_TIMEOUT_SECS
+            },
         )
     };
 
@@ -917,7 +965,7 @@ pub(crate) async fn run_subagent_with_options(
         workspace_root: PathBuf::from(&workspace_root),
         bypass_permissions: false,
         settings: tool_settings,
-        max_iterations: Some(options.max_iterations.filter(|n| *n > 0).unwrap_or(10)),
+        max_iterations: Some(options.max_iterations.filter(|n| *n > 0).unwrap_or(default_iterations)),
         memory_owner_id: "piscis".to_string(),
         pool_session_id: None,
         tool_use_id: None,
@@ -962,11 +1010,47 @@ pub(crate) async fn run_subagent_with_options(
         (text, tool_calls, tokens, edited)
     });
 
-    let timeout_secs = options.timeout_secs.filter(|n| *n > 0).unwrap_or(240);
+    let timeout_secs = options.timeout_secs.filter(|n| *n > 0).unwrap_or(default_timeout_secs);
     let run_fut = agent.run(messages, tx, cancel.clone(), ctx);
     let run_res = tokio::time::timeout(Duration::from_secs(timeout_secs), run_fut).await;
-    let (text, tool_calls, (input_tokens, output_tokens), edited_paths) =
+    let (mut text, tool_calls, (mut input_tokens, mut output_tokens), edited_paths) =
         collector.await.unwrap_or_default();
+
+    // A run that spends every iteration on tool calls ends without a report.
+    // Ask once more, with no tools offered, for findings from what it gathered.
+    if let Ok(Ok((final_messages, _, _))) = &run_res {
+        if text.trim().is_empty() && !cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            let tool_defs = agent
+                .registry
+                .to_tool_defs(piscis_kernel::agent::tool::ToolDefMode::Minimal);
+            let budget = llm::compute_context_budget(context_window, runtime.max_tokens)
+                .saturating_sub(llm::estimate_request_overhead_tokens(
+                    Some(&agent.system_prompt),
+                    &tool_defs,
+                ));
+            let messages = final_report_messages(&task, final_messages, budget);
+            let req = llm::LlmRequest {
+                messages,
+                system: Some(agent.system_prompt.clone()),
+                // Providers reject tool_use history without tool definitions;
+                // the prompt forbids further calls.
+                tools: tool_defs,
+                model: runtime.model.clone(),
+                max_tokens: runtime.max_tokens,
+                stream: false,
+                vision_override: Some(false),
+            };
+            match tokio::time::timeout(Duration::from_secs(120), agent.client.complete(req)).await {
+                Ok(Ok(resp)) => {
+                    input_tokens = input_tokens.saturating_add(resp.input_tokens);
+                    output_tokens = output_tokens.saturating_add(resp.output_tokens);
+                    text = resp.content;
+                }
+                Ok(Err(e)) => tracing::warn!("sub-agent final report request failed: {e}"),
+                Err(_) => tracing::warn!("sub-agent final report request timed out"),
+            }
+        }
+    }
 
     crate::runtime::subagent_policy::record_run(
         matches!(run_res, Ok(Ok(_))),
@@ -999,6 +1083,53 @@ pub(crate) async fn run_subagent_with_options(
             model_fallback,
         }),
     }
+}
+
+const SUBAGENT_DEFAULT_TIMEOUT_SECS: u64 = 900;
+
+/// Configured cap, or half the main agent's when unset (at least 10).
+fn subagent_default_iterations(configured: u32, main: u32) -> u32 {
+    if configured > 0 {
+        configured
+    } else {
+        (main / 2).max(10)
+    }
+}
+
+const SUBAGENT_FINAL_REPORT_PROMPT: &str = "You have used up your step budget. Do not call any more tools. \
+Write your findings report now from the information you already gathered: what you found (with file paths), \
+what remains uncertain, and what you did not get to.";
+
+/// The sub-agent's own conversation (the run returns only what it appended,
+/// so the task brief is put back in front), trimmed oldest-first to `budget`,
+/// followed by the request for a report.
+fn final_report_messages(task: &str, run_messages: &[LlmMessage], budget: usize) -> Vec<LlmMessage> {
+    let mut history = run_messages.to_vec();
+    piscis_kernel::agent::loop_::compact_trim_tool_results(&mut history, 2_000);
+    let prompt = LlmMessage {
+        role: "user".into(),
+        content: MessageContent::text(SUBAGENT_FINAL_REPORT_PROMPT),
+    };
+    let task_msg = LlmMessage {
+        role: "user".into(),
+        content: MessageContent::text(task),
+    };
+    let fixed = llm::estimate_message_tokens(&task_msg) + llm::estimate_message_tokens(&prompt);
+    let mut total: usize = fixed + history.iter().map(llm::estimate_message_tokens).sum::<usize>();
+    let mut start = 0;
+    while start < history.len() && total > budget {
+        total -= llm::estimate_message_tokens(&history[start]);
+        start += 1;
+    }
+    // Never begin on a tool result whose call was dropped.
+    while start < history.len() && history[start].role != "assistant" {
+        start += 1;
+    }
+    let mut messages = Vec::with_capacity(history.len() - start + 2);
+    messages.push(task_msg);
+    messages.extend(history.drain(start..));
+    messages.push(prompt);
+    messages
 }
 
 struct NullEventSink;

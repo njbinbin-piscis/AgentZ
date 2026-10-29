@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.34] - 2026-10-29
+
+### Fixed
+
+- **Sub-agents (`delegate` / `task`) were killed after 150 s.** The agent loop's generic per-tool timeout fired long before the sub-agent's own deadline (240 s read-only, 900 s writable), discarding all partial findings. Tools that manage their own deadline are now only bounded by the absolute 1-hour cap.
+- **Sub-agents returned "no findings" when they spent every step on tool calls.** The host now asks once more, with the sub-agent's own task brief and gathered tool results (trimmed to the model's budget), for a findings report.
+- **Tool-call bubbles vanished after stopping a turn and sending a new message.** Live tool steps were only shown on the last message and were cleared when the next turn started; the interrupted bubble was never reloaded when a follow-up was queued. Steps are now pinned to their bubble and the history is always reloaded.
+
+### Added
+
+- **Sub-agent iteration and timeout settings** on the Agent tab. Iterations default to half of the main agent's limit (min 10); timeout defaults to 900 s (max 3600). Agent manifest values still take precedence.
+
 ## [1.0.33] - 2026-10-28
 
 ### Fixed

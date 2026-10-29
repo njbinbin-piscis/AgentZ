@@ -91,6 +91,8 @@ const DEFAULT_FORM: LlmSettings = {
   max_tokens: 0,
   context_window: 0,
   max_iterations: 200,
+  subagent_max_iterations: 0,
+  subagent_timeout_secs: 0,
   policy_mode: "balanced",
   confirm_shell_commands: true,
   confirm_file_writes: true,
@@ -266,6 +268,8 @@ function toForm(data: SettingsResponse): LlmSettings {
     custom_base_url: data.custom_base_url || "",
     max_tokens: data.max_tokens ?? 0,
     max_iterations: data.max_iterations ?? 200,
+    subagent_max_iterations: data.subagent_max_iterations ?? 0,
+    subagent_timeout_secs: data.subagent_timeout_secs ?? 0,
     context_window: data.context_window ?? 0,
     policy_mode: data.policy_mode || "balanced",
     confirm_shell_commands: data.confirm_shell_commands ?? true,
@@ -966,6 +970,34 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     onChange={(e) => update("max_iterations", Math.min(1000, Math.max(1, Number(e.target.value) || 1)))}
                   />
                   <p className="agentz-settings-hint">{t("settings.maxIterationsHint")}</p>
+                </div>
+
+                <div className="agentz-settings-field">
+                  <label htmlFor="agentz-settings-subagent-iterations">{t("settings.subagentMaxIterations")}</label>
+                  <input
+                    id="agentz-settings-subagent-iterations"
+                    type="number"
+                    min={0}
+                    max={1000}
+                    value={form.subagent_max_iterations ?? 0}
+                    onChange={(e) => update("subagent_max_iterations", Math.min(1000, Math.max(0, Number(e.target.value) || 0)))}
+                  />
+                  <p className="agentz-settings-hint">
+                    {t("settings.subagentMaxIterationsHint", { value: String(Math.max(10, Math.floor(form.max_iterations / 2))) })}
+                  </p>
+                </div>
+
+                <div className="agentz-settings-field">
+                  <label htmlFor="agentz-settings-subagent-timeout">{t("settings.subagentTimeout")}</label>
+                  <input
+                    id="agentz-settings-subagent-timeout"
+                    type="number"
+                    min={0}
+                    max={3600}
+                    value={form.subagent_timeout_secs ?? 0}
+                    onChange={(e) => update("subagent_timeout_secs", Math.min(3600, Math.max(0, Number(e.target.value) || 0)))}
+                  />
+                  <p className="agentz-settings-hint">{t("settings.subagentTimeoutHint")}</p>
                 </div>
 
                 <div className="agentz-settings-field">

@@ -231,6 +231,13 @@ pub trait Tool: Send + Sync {
         false
     }
 
+    /// Whether the tool enforces its own deadline (e.g. a sub-agent run). The
+    /// loop then only applies the absolute upper bound, so it cannot cut the
+    /// run short before the tool returns its partial result.
+    fn manages_own_timeout(&self) -> bool {
+        false
+    }
+
     /// Execute the tool
     async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult>;
 }
