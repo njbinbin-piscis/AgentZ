@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   chatSend,
   chatCancel,
+  chatSetSessionProfile,
   onChatEvent,
   listSessions,
   SESSION_SOURCE_CODEZ,
@@ -30,6 +31,7 @@ import {
 import { useAppSettings, pruneModelId } from "../../hooks/useAppSettings";
 import { useStickToBottom } from "../../hooks/useStickToBottom";
 import { loadScopedModelId, saveScopedModelId, subscribeScopedModelId } from "../../utils/modelPrefs";
+import { loadSessionProfile, removeSessionProfile, saveSessionProfile } from "../../utils/sessionProfile";
 import { useInputHistory } from "../../components/useInputHistory";
 import { listInstalledSkills, type InstalledSkill } from "../../services/tauri/workbench";
 import { listAgents, type AgentInfo } from "../../services/tauri/agents";
@@ -538,6 +540,16 @@ export function useAssistantSession({
   useEffect(() => {
     localStorage.setItem("agentz-active-agent", activeAgent);
   }, [activeAgent]);
+
+  // Each session remembers its own selection; the host needs it for the turns
+  // it starts by itself (background-task continuations).
+  useEffect(() => {
+    const sid = sessionRef.current ?? draftSessionIdRef.current;
+    if (!sid) return;
+    const profile = { modelId, agentId: activeAgent, enabledSkills };
+    saveSessionProfile(sid, profile);
+    void chatSetSessionProfile(sid, profile).catch(() => {});
+  }, [modelId, activeAgent, enabledSkills]);
 
   useEffect(() => {
     if (!insertRequest?.paths.length) return;
@@ -1328,6 +1340,14 @@ export function useAssistantSession({
       }
       try {
         setSessionRef(id);
+        const profile = loadSessionProfile(id);
+        if (profile) {
+          setModelId(
+            llmProvidersRef.current.length ? pruneModelId(profile.modelId, llmProvidersRef.current) : profile.modelId,
+          );
+          setActiveAgent(profile.agentId);
+          setEnabledSkills(profile.enabledSkills);
+        }
         // The view now mirrors the target session: its own busy state (a
         // turn may still be running in the background) and its own queue —
         // never the previous session's. Unflushed stream deltas belong to
@@ -1564,6 +1584,7 @@ export function useAssistantSession({
       try {
         await deleteSession(id, projectDir!);
         turnBookRef.current.deleteSession(id);
+        removeSessionProfile(id);
         if (sessionRef.current === id) newSession();
         refreshSessions();
       } catch (e) {

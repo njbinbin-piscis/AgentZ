@@ -40,8 +40,18 @@ struct PendingContinuation {
     prefer_zh: bool,
 }
 
+/// What the user picked in the composer for their latest turn in a session;
+/// continuations reuse it instead of falling back to the default model.
+#[derive(Clone, Default, Debug, PartialEq)]
+pub struct TurnProfile {
+    pub model_id: Option<String>,
+    pub agent_id: Option<String>,
+    pub enabled_skills: Option<Vec<String>>,
+}
+
 #[derive(Default)]
 pub struct BgContinuationHub {
+    profiles: Mutex<HashMap<String, TurnProfile>>,
     dispatched: Mutex<HashSet<String>>,
     counts: Mutex<HashMap<String, u32>>,
     pending: Mutex<HashMap<String, PendingContinuation>>,
@@ -82,8 +92,26 @@ impl BgContinuationHub {
 
     /// A user-initiated turn (anything not dispatched by this hub) resets
     /// the session's automatic-continuation budget.
-    pub fn note_user_turn(&self, session_id: &str) {
+    pub fn note_user_turn(&self, session_id: &str, profile: TurnProfile) {
         self.counts.lock().unwrap().remove(session_id);
+        self.set_profile(session_id, profile);
+    }
+
+    /// The user changed the session's composer selection (without sending).
+    pub fn set_profile(&self, session_id: &str, profile: TurnProfile) {
+        self.profiles
+            .lock()
+            .unwrap()
+            .insert(session_id.to_string(), profile);
+    }
+
+    fn profile_for(&self, session_id: &str) -> TurnProfile {
+        self.profiles
+            .lock()
+            .unwrap()
+            .get(session_id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// Drop a parked (not yet dispatched) continuation for a task, e.g.
@@ -94,6 +122,7 @@ impl BgContinuationHub {
 
     /// Session deleted: drop every parked continuation targeting it.
     pub fn cancel_pending_for_session(&self, session_id: &str) {
+        self.profiles.lock().unwrap().remove(session_id);
         self.pending
             .lock()
             .unwrap()
@@ -373,6 +402,7 @@ impl BgContinuationHub {
         // A user turn can grab the task gate between the idle check and dispatch;
         // re-park on that error instead of failing the continuation.
         loop {
+            let profile = self.profile_for(&pending.session_id);
             let result = dispatch_host_turn(
                 app.clone(),
                 None,
@@ -386,6 +416,9 @@ impl BgContinuationHub {
                     task_key: Some(format!("host-bg-{bg_id}")),
                     session_source: pending.session_source.clone(),
                     prefer_zh: Some(pending.prefer_zh),
+                    model_id: profile.model_id,
+                    agent_id: profile.agent_id,
+                    enabled_skills: profile.enabled_skills,
                     ..Default::default()
                 },
             )
@@ -526,8 +559,22 @@ mod tests {
         assert!(!hub.claim_budget("sess"));
         // Other sessions have their own budget.
         assert!(hub.claim_budget("other"));
-        hub.note_user_turn("sess");
+        hub.note_user_turn("sess", TurnProfile::default());
         assert!(hub.claim_budget("sess"));
+    }
+
+    #[test]
+    fn continuation_reuses_latest_user_turn_profile() {
+        let hub = BgContinuationHub::new();
+        assert_eq!(hub.profile_for("sess"), TurnProfile::default());
+        let picked = TurnProfile {
+            model_id: Some("mimopro".into()),
+            agent_id: Some("reviewer".into()),
+            enabled_skills: Some(vec!["tdd".into()]),
+        };
+        hub.note_user_turn("sess", picked.clone());
+        assert_eq!(hub.profile_for("sess"), picked);
+        assert_eq!(hub.profile_for("other"), TurnProfile::default());
     }
 
     #[test]

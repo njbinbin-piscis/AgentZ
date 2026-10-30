@@ -374,7 +374,14 @@ pub async fn dispatch_host_turn(
             .as_deref()
             .is_some_and(|k| k.starts_with("host-bg-"));
         if !is_host_bg {
-            state.bg_hub.note_user_turn(sid);
+            state.bg_hub.note_user_turn(
+                sid,
+                crate::runtime::background_continuation::TurnProfile {
+                    model_id: model_id.clone(),
+                    agent_id: agent_id.clone(),
+                    enabled_skills: enabled_skills.clone(),
+                },
+            );
         }
     }
     // Held before queueing and through the entire turn; RAII also releases on errors.
@@ -666,6 +673,32 @@ pub async fn chat_cancel_all(state: State<'_, AppState>) -> Result<(), String> {
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
+    Ok(())
+}
+
+/// Record the composer selection of a session, so turns the host starts for it
+/// (background-task continuations) use that session's latest choice.
+#[tauri::command]
+pub async fn chat_set_session_profile(
+    state: State<'_, AppState>,
+    session_id: String,
+    model_id: Option<String>,
+    agent_id: Option<String>,
+    enabled_skills: Option<Vec<String>>,
+) -> Result<(), String> {
+    let session_id = session_id.trim();
+    if session_id.is_empty() {
+        return Ok(());
+    }
+    let nonempty = |v: Option<String>| v.filter(|s| !s.trim().is_empty());
+    state.bg_hub.set_profile(
+        session_id,
+        crate::runtime::background_continuation::TurnProfile {
+            model_id: nonempty(model_id),
+            agent_id: nonempty(agent_id),
+            enabled_skills: enabled_skills.filter(|s| !s.is_empty()),
+        },
+    );
     Ok(())
 }
 

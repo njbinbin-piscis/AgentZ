@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.35] - 2026-10-31
+
+### Fixed
+
+- **Background-task continuations always ran on the main model.** A continuation now uses the model, agent and skills the user last set in that session instead of the global default.
+- **Model selection was shared across sessions.** Each Code session remembers its own model, agent and skills and restores them on switch; new sessions inherit the current selection. Changing the selection without sending is synced to the host too (`chat_set_session_profile`).
+
 ## [1.0.34] - 2026-10-29
 
 ### Fixed

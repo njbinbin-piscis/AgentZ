@@ -388,6 +388,19 @@ export function chatCancel(taskKey?: string | null): Promise<void> {
   return invoke<void>("chat_cancel", { taskKey: taskKey ?? null });
 }
 
+/** Tell the host a session's composer selection, for turns it starts itself. */
+export function chatSetSessionProfile(
+  sessionId: string,
+  profile: { modelId: string; agentId: string; enabledSkills: string[] },
+): Promise<void> {
+  return invoke<void>("chat_set_session_profile", {
+    sessionId,
+    modelId: profile.modelId || null,
+    agentId: profile.agentId || null,
+    enabledSkills: profile.enabledSkills.length > 0 ? profile.enabledSkills : null,
+  });
+}
+
 // ── File journal (Review / Undo) ─────────────────────────────────────────
 
 /** List files changed by a turn (applied, not yet undone). */
