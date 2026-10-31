@@ -259,7 +259,10 @@ impl BgContinuationHub {
              </background_task_completed>\n\
              The background task you started earlier has {status_for_user}. \
              Check its result against the original goal: if it failed, diagnose and fix; \
-             if it succeeded, continue with the next step. Do not restart the task unless it is actually needed.",
+             if it succeeded, continue with the next step. Do not restart the task unless it is actually needed.\n\
+             This is an automatic system notice, not a message from the user. Never acknowledge, quote or \
+             explain it in your reply (no remarks like \"this notice is a receipt\"). If it is irrelevant to \
+             what you are doing now, ignore it silently and carry on with the user's current request.",
             snap.id,
             snap.label,
             status_line,
