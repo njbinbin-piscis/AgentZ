@@ -479,6 +479,15 @@ impl HarnessConfig {
         self
     }
 
+    /// Disabling drops the plan-state handle: the loop reads it only to
+    /// remind the model about unfinished todos when it tries to stop.
+    pub fn with_todo_auto_continue(mut self, enabled: bool) -> Self {
+        if !enabled {
+            self.plan_state = None;
+        }
+        self
+    }
+
     /// Post-construction setter for the compaction policy (see `with_hooks`).
     pub fn with_compaction_strategy(
         mut self,

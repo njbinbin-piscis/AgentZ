@@ -33,7 +33,7 @@ interface AssistantMessageListProps {
   /** Fetch + prepend the next-older page; resolves with the number of messages added. */
   onLoadOlder?: () => Promise<number>;
   onSelectPath?: (path: string) => void;
-  onForkCheckpoint: (messageId: string) => void | Promise<void>;
+  onForkCheckpoint: (messageId: string, fullHistory: boolean) => void | Promise<void>;
   onRestoreCheckpoint: (messageId: string) => void | Promise<void>;
   onUndoTurn?: (turnId: string) => void | Promise<void>;
   onCardSubmitted: (requestId: string) => void;
@@ -50,6 +50,60 @@ const INITIAL_VISIBLE = 50;
 const LOAD_MORE = 10;
 /** Distance from the top (px) that trips the lazy-load of older messages. */
 const LOAD_AT_TOP_PX = 40;
+
+function ForkMenu({ onFork }: { onFork: (fullHistory: boolean) => void }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const pick = (fullHistory: boolean) => {
+    setOpen(false);
+    onFork(fullHistory);
+  };
+
+  return (
+    <div className="agentz-fork-menu" ref={rootRef}>
+      <button
+        type="button"
+        className="agentz-checkpoint-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        title={t("chat.checkpointFork")}
+      >
+        {t("chat.checkpointFork")} ▾
+      </button>
+      {open && (
+        <div className="agentz-fork-popover" role="menu">
+          <button type="button" role="menuitem" onClick={() => pick(false)}>
+            {t("chat.forkContextOnly")}
+            <span>{t("chat.forkContextOnlyHint")}</span>
+          </button>
+          <button type="button" role="menuitem" onClick={() => pick(true)}>
+            {t("chat.forkFullHistory")}
+            <span>{t("chat.forkFullHistoryHint")}</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Isolated from composer input state so keystrokes do not re-render markdown. */
 function AssistantMessageList({
@@ -213,14 +267,7 @@ function AssistantMessageList({
             {showCheckpoint && (
               <div className="agentz-checkpoint">
                 <span className="agentz-checkpoint-label">{t("chat.checkpoint")}</span>
-                <button
-                  type="button"
-                  className="agentz-checkpoint-btn"
-                  onClick={() => void onForkCheckpoint(m.id!)}
-                  title={t("chat.checkpointFork")}
-                >
-                  {t("chat.checkpointFork")}
-                </button>
+                <ForkMenu onFork={(fullHistory) => void onForkCheckpoint(m.id!, fullHistory)} />
                 <button
                   type="button"
                   className="agentz-checkpoint-btn muted"

@@ -346,12 +346,15 @@ export function forkSession(
   projectDir: string,
   title?: string,
   upToMessageId?: string | null,
+  /** false = only the recent window the model still sees; default copies everything. */
+  fullHistory = true,
 ): Promise<SessionMeta> {
   return invoke<SessionMeta>("chat_fork_session", {
     sessionId,
     projectDir,
     title: title ?? null,
     upToMessageId: upToMessageId ?? null,
+    fullHistory,
   });
 }
 

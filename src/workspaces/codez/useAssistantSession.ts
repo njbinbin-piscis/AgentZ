@@ -1475,10 +1475,10 @@ export function useAssistantSession({
   }, [projectDir]);
 
   const forkFromCheckpoint = useCallback(
-    async (messageId: string) => {
+    async (messageId: string, fullHistory: boolean) => {
       if (!sessionRef.current || !projectDir || busy) return;
       try {
-        const forked = await forkSession(sessionRef.current, projectDir!, undefined, messageId);
+        const forked = await forkSession(sessionRef.current, projectDir!, undefined, messageId, fullHistory);
         refreshSessions();
         await switchSession(forked.id, forked.source);
       } catch (e) {

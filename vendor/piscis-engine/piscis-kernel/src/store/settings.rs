@@ -502,6 +502,10 @@ pub struct Settings {
     /// Sub-agent wall-clock timeout in seconds; 0 = built-in default.
     #[serde(default)]
     pub subagent_timeout_secs: u32,
+    /// When the model stops with plan todos still open, remind it to keep
+    /// going (bounded per turn). Off = the model's stop always ends the turn.
+    #[serde(default = "default_true")]
+    pub todo_auto_continue: bool,
     /// Cumulative-input-tokens cap after which an auto summary/compaction
     /// kicks in. Set to 0 to disable.
     ///
@@ -882,6 +886,7 @@ impl Default for Settings {
             max_iterations: default_max_iterations(),
             subagent_max_iterations: 0,
             subagent_timeout_secs: 0,
+            todo_auto_continue: true,
             auto_compact_input_tokens_threshold: default_auto_compact_input_tokens_threshold(),
             compaction_micro_percent: default_compaction_micro_percent(),
             compaction_auto_percent: default_compaction_auto_percent(),

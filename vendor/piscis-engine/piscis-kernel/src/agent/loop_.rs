@@ -119,6 +119,47 @@ const TOOL_RESULT_HARD_MAX_CHARS: usize = 48_000;
 const CONTEXT_SINGLE_RESULT_SHARE: f64 = 0.5;
 const CHECKPOINT_MAX_BYTES: usize = 8_000_000;
 
+/// A reply that asks the user for a decision or says it is waiting for one.
+/// The unfinished-todo reminder must not answer that question on the user's behalf.
+fn awaits_user(text: &str) -> bool {
+    let tail: String = {
+        let trimmed = text.trim_end();
+        let chars: Vec<char> = trimmed.chars().collect();
+        chars[chars.len().saturating_sub(400)..].iter().collect()
+    };
+    if tail.contains('？') || tail.trim_end().ends_with('?') {
+        return true;
+    }
+    let lower = tail.to_lowercase();
+    const WAITING: &[&str] = &[
+        "等你", "等您", "请确认", "请你确认", "需要你确认", "需要您确认", "是否继续", "要不要",
+        "要我继续", "你决定", "您决定", "等待你", "等待您", "明确同意",
+        "waiting for your", "wait for your", "let me know", "should i ", "shall i ",
+        "do you want", "would you like", "please confirm", "your approval",
+    ];
+    WAITING.iter().any(|phrase| lower.contains(phrase))
+}
+
+#[cfg(test)]
+mod awaits_user_tests {
+    use super::awaits_user;
+
+    #[test]
+    fn a_question_or_a_request_for_consent_stops_the_todo_reminder() {
+        assert!(awaits_user(
+            "要我继续 r6b（demo 路由接 HTTP，让首页 3D 演示恢复）吗？删 runtime/ 我会等你明确同意。"
+        ));
+        assert!(awaits_user("Done with r6a. Should I start on r6b?"));
+        assert!(awaits_user("Let me know whether to delete runtime/."));
+    }
+
+    #[test]
+    fn a_plain_progress_report_does_not() {
+        assert!(!awaits_user("已完成 r6a：网关路由接好，测试 12 项通过。"));
+        assert!(!awaits_user("Updated `a?.b` handling in parser.ts and reran the tests."));
+    }
+}
+
 // ── Vision-loop (screenshot-heavy) nudge ────────────────────────────────
 // Desktop-automation vision agents (WeChat/QQ input, screen-control tasks)
 // frequently fall into "describe-then-verify" loops: move → screenshot →
@@ -3219,9 +3260,9 @@ impl AgentLoop {
         let mut rolling_summary = String::new();
         let mut seen_notifications: HashSet<String> =
             restored_seen_notifications.unwrap_or_default();
-        // Guard: limit how many times we re-prompt for unfinished todos.
-        // After this many consecutive text-only (no tool call) responses with
-        // unfinished todos, stop injecting reminders and exit gracefully.
+        // Guard: limit how many times one turn re-prompts for unfinished todos.
+        // The count is never reset by tool calls; otherwise a turn whose model
+        // keeps stopping to ask the user is pushed on indefinitely.
         const TODO_REMINDER_MAX: usize = 2;
         let mut todo_reminder_count: usize = 0;
         let mut rolling_summary_version = 0i64;
@@ -3994,7 +4035,10 @@ impl AgentLoop {
                     vec![]
                 };
 
-                if !unfinished_todos.is_empty() && todo_reminder_count < TODO_REMINDER_MAX {
+                if !unfinished_todos.is_empty()
+                    && todo_reminder_count < TODO_REMINDER_MAX
+                    && !awaits_user(&text_buf)
+                {
                     // Inject a reminder and continue the loop instead of breaking
                     todo_reminder_count += 1;
                     warn!(
@@ -4013,7 +4057,8 @@ impl AgentLoop {
                         .await;
                     let reminder = format!(
                         "⚠️ 你的计划中还有未完成的步骤，请继续执行或将其标记为 cancelled：\n{}\n\n\
-                         `plan_todo` 只更新计划板，本身不算实际进展。请继续使用能真正推进任务的工具，或直接产出可交付结果；如果这些步骤无法完成，再用 `plan_todo` 标记为 cancelled 并说明原因。",
+                         `plan_todo` 只更新计划板，本身不算实际进展。请继续使用能真正推进任务的工具，或直接产出可交付结果；如果这些步骤无法完成，再用 `plan_todo` 标记为 cancelled 并说明原因。\n\n\
+                         如果下一步需要用户决定、确认或授权（例如删除文件、改变范围），不要自行继续：直接向用户提问并结束本轮。",
                         unfinished_todos.join("\n")
                     );
                     let reminder_msg = LlmMessage {
@@ -4042,8 +4087,6 @@ impl AgentLoop {
             // ── Per-tool loop detection (before execution) ──────────────────
             // Check each tool call against the sliding window history.
             // Critical = block the tool call; Warning = inject hint but continue.
-            // Reset the todo reminder counter since the LLM is making progress.
-            todo_reminder_count = 0;
             let mut blocked_tool_ids: Vec<String> = Vec::new();
             let mut warning_messages: Vec<String> = Vec::new();
             for (id, name, input) in &tool_calls {

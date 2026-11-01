@@ -40,6 +40,7 @@ export interface LlmSettings {
   max_iterations: number;
   subagent_max_iterations?: number;
   subagent_timeout_secs?: number;
+  todo_auto_continue?: boolean;
   policy_mode: string;
   confirm_shell_commands?: boolean;
   confirm_file_writes?: boolean;

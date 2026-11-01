@@ -568,36 +568,82 @@ fn messages_raw_chronological(db: &Database, session_id: &str) -> Result<Vec<Cha
         .map_err(|e| format!("get_messages failed: {e}"))
 }
 
+/// Rows a context-only fork keeps: the same recent window the history view loads.
+const FORK_CONTEXT_ROWS: usize = 1000;
+
+fn all_messages_chronological(db: &Database, session_id: &str) -> Result<Vec<ChatMessage>, String> {
+    let page = 500;
+    let mut offset = 0;
+    let mut out = Vec::new();
+    loop {
+        let batch = db
+            .get_messages(session_id, page, offset)
+            .map_err(|e| format!("get_messages failed: {e}"))?;
+        let n = batch.len() as i64;
+        out.extend(batch);
+        if n < page {
+            return Ok(out);
+        }
+        offset += n;
+    }
+}
+
+/// Copy messages (with tool calls/results, turn index and attachments) into
+/// `dest_id`. `full_history = false` keeps only the recent window plus the
+/// source's rolling summary and state frame, i.e. what the model still sees.
 fn copy_messages_to_session(
     db: &Database,
     source_id: &str,
     dest_id: &str,
     up_to_message_id: Option<&str>,
+    full_history: bool,
 ) -> Result<(), String> {
-    let msgs = messages_raw_chronological(db, source_id)?;
-    if msgs.is_empty() {
+    let mut msgs = all_messages_chronological(db, source_id)?;
+    if let Some(target) = up_to_message_id {
+        let end = msgs
+            .iter()
+            .position(|m| m.id == target)
+            .ok_or_else(|| format!("checkpoint message '{target}' not found in session"))?;
+        msgs.truncate(end + 1);
+    }
+    if !full_history && msgs.len() > FORK_CONTEXT_ROWS {
+        msgs.drain(..msgs.len() - FORK_CONTEXT_ROWS);
+    }
+    for m in &msgs {
+        db.append_message_full_with_attachments(
+            dest_id,
+            &m.role,
+            &m.content,
+            m.tool_calls_json.as_deref(),
+            m.tool_results_json.as_deref(),
+            m.turn_index,
+            m.attachments_json.as_deref(),
+        )
+        .map_err(|e| format!("copy message failed: {e}"))?;
+    }
+    // Summary and frame describe the source's latest state, which may be past the checkpoint.
+    if up_to_message_id.is_some() {
         return Ok(());
     }
-    if let Some(target) = up_to_message_id {
-        let mut found = false;
-        for m in msgs {
-            db.append_message(dest_id, &m.role, &m.content)
-                .map_err(|e| format!("copy message failed: {e}"))?;
-            if m.id == target {
-                found = true;
-                break;
-            }
+    if let Some(state) = db
+        .get_session_context_state(source_id)
+        .map_err(|e| format!("get_session_context_state failed: {e}"))?
+    {
+        if !state.rolling_summary.trim().is_empty() {
+            db.update_session_rolling_summary(
+                dest_id,
+                &state.rolling_summary,
+                state.rolling_summary_version,
+            )
+            .map_err(|e| format!("copy summary failed: {e}"))?;
         }
-        if !found {
-            return Err(format!(
-                "checkpoint message '{target}' not found in session"
-            ));
-        }
-    } else {
-        for m in msgs {
-            db.append_message(dest_id, &m.role, &m.content)
-                .map_err(|e| format!("copy message failed: {e}"))?;
-        }
+    }
+    if let Some(frame) = db
+        .get_session_state_frame_json(source_id)
+        .map_err(|e| format!("get_session_state_frame_json failed: {e}"))?
+    {
+        db.update_session_state_frame_json(dest_id, Some(&frame))
+            .map_err(|e| format!("copy state frame failed: {e}"))?;
     }
     Ok(())
 }
@@ -863,6 +909,7 @@ pub async fn chat_fork_session(
     session_id: String,
     title: Option<String>,
     up_to_message_id: Option<String>,
+    full_history: Option<bool>,
     project_dir: Option<String>,
 ) -> Result<SessionMeta, String> {
     with_db(&app, ProjectDirParam { project_dir }, |db| {
@@ -897,7 +944,13 @@ pub async fn chat_fork_session(
             .create_session_with_source(Some(&fork_title), &fork_source)
             .map_err(|e| format!("create_session failed: {e}"))?;
 
-        copy_messages_to_session(db, &session_id, &created.id, up_to_message_id.as_deref())?;
+        copy_messages_to_session(
+            db,
+            &session_id,
+            &created.id,
+            up_to_message_id.as_deref(),
+            full_history.unwrap_or(true),
+        )?;
 
         let refreshed = db
             .get_session(&created.id)

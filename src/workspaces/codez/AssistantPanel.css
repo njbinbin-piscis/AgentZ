@@ -627,6 +627,51 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.agentz-fork-menu {
+  position: relative;
+}
+
+.agentz-fork-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 100100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: calc(220px * var(--ui-font-scale, 1));
+  padding: calc(4px * var(--ui-font-scale, 1));
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-popup, #242432);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.agentz-fork-popover button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: calc(6px * var(--ui-font-scale, 1)) calc(10px * var(--ui-font-scale, 1));
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  text-align: left;
+  cursor: pointer;
+}
+
+.agentz-fork-popover button span {
+  color: var(--text-dim);
+  font-size: calc(11px * var(--ui-font-scale, 1));
+  line-height: 1.3;
+}
+
+.agentz-fork-popover button:hover {
+  background: var(--bg-elev-2);
+}
+
 /* Plan resume dialog */
 .agentz-plan-resume-overlay {
   position: fixed;

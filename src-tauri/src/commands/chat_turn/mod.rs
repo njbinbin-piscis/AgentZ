@@ -616,6 +616,7 @@ pub async fn run_agentz_turn(
         compaction,
         tool_settings,
         max_iterations,
+        todo_auto_continue,
     ) = {
         let s = settings.lock().await;
         (
@@ -634,6 +635,7 @@ pub async fn run_agentz_turn(
             CompactionSettings::from_settings(&s),
             Arc::new(piscis_kernel::agent::tool::ToolSettings::from_settings(&s)),
             s.max_iterations,
+            s.todo_auto_continue,
         )
     };
 
@@ -796,7 +798,8 @@ pub async fn run_agentz_turn(
         plan_store.clone(),
     )
     .with_hooks(hooks)
-    .with_streaming(enable_streaming);
+    .with_streaming(enable_streaming)
+    .with_todo_auto_continue(todo_auto_continue);
 
     let budget_limits =
         crate::runtime::task_budget::load_limits_for_app(&app).map_err(|e| anyhow!(e))?;

@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.40] - 2026-11-02
+
+### Added
+
+- **Setting: auto-continue while plan todos are open.** Settings → Agent has a new toggle, on by default. Off means the turn ends whenever the model stops, even with unfinished todos.
+- **Fork from here offers two modes.** The checkpoint button opens a themed menu: *Copy context only* (the recent window the model still sees) or *Copy full history* (every message before the checkpoint).
+
+### Fixed
+
+- **The agent kept going after asking the user to decide.** The unfinished-todo reminder no longer fires when the reply asks a question or waits for approval. The reminder cap (2) now applies per turn; tool calls no longer reset it. The reminder itself tells the model to ask and stop when the next step needs the user.
+- **Forked sessions lost history.** Forking read only the newest 1000 rows and copied text only. It now copies every message with tool calls, tool results, turn index and attachments. Forking the whole chat also carries over the rolling summary and state frame.
+
 ## [1.0.39] - 2026-11-01
 
 ### Fixed

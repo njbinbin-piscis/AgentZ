@@ -93,6 +93,7 @@ const DEFAULT_FORM: LlmSettings = {
   max_iterations: 200,
   subagent_max_iterations: 0,
   subagent_timeout_secs: 0,
+  todo_auto_continue: true,
   policy_mode: "balanced",
   confirm_shell_commands: true,
   confirm_file_writes: true,
@@ -270,6 +271,7 @@ function toForm(data: SettingsResponse): LlmSettings {
     max_iterations: data.max_iterations ?? 200,
     subagent_max_iterations: data.subagent_max_iterations ?? 0,
     subagent_timeout_secs: data.subagent_timeout_secs ?? 0,
+    todo_auto_continue: data.todo_auto_continue ?? true,
     context_window: data.context_window ?? 0,
     policy_mode: data.policy_mode || "balanced",
     confirm_shell_commands: data.confirm_shell_commands ?? true,
@@ -998,6 +1000,18 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
                     onChange={(e) => update("subagent_timeout_secs", Math.min(3600, Math.max(0, Number(e.target.value) || 0)))}
                   />
                   <p className="agentz-settings-hint">{t("settings.subagentTimeoutHint")}</p>
+                </div>
+
+                <div className="agentz-settings-field">
+                  <label className="agentz-settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={form.todo_auto_continue ?? true}
+                      onChange={(e) => update("todo_auto_continue", e.target.checked)}
+                    />
+                    {t("settings.todoAutoContinue")}
+                  </label>
+                  <p className="agentz-settings-hint">{t("settings.todoAutoContinueHint")}</p>
                 </div>
 
                 <div className="agentz-settings-field">
