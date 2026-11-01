@@ -61,6 +61,9 @@ impl Tool for FileSearchTool {
          - 'grep': Search file contents for a regex pattern. Returns matching lines with file path and line number. \
            Use 'include' to filter by file extension (e.g. '*.rs', '*.txt'). \
          \
+         path must be a directory. A file path is an error (`Path is not a directory`), not an empty result. \
+         To search one file, pass its parent directory and set include to that file name, or use file_read. \
+         \
          Tips: \
          - To find all .py files under C:\\MyApp: action=glob, pattern=**/*.py, path=C:\\MyApp \
          - To find all files containing 'TBRuntime': action=grep, pattern=TBRuntime, path=C:\\Tribon \
@@ -82,7 +85,7 @@ impl Tool for FileSearchTool {
                 },
                 "path": {
                     "type": "string",
-                    "description": "Root directory to search in. Relative paths are resolved from workspace root (e.g. 'src' searches inside workspace/src/). Defaults to workspace root if omitted."
+                    "description": "Directory to search in. Must be a directory, never a file. A file path returns an error (`Path is not a directory`) instead of 'No matches'. To search one file, pass its parent directory and set include to the file name, or use file_read. Relative paths resolve from the workspace root. Defaults to the workspace root when omitted."
                 },
                 "include": {
                     "type": "string",
@@ -155,6 +158,12 @@ impl Tool for FileSearchTool {
             return Ok(ToolResult::err(format!(
                 "Path does not exist: {}",
                 root.display()
+            )));
+        }
+        if !root.is_dir() {
+            let shown = display_path_for_tool(&root, &ctx.workspace_root);
+            return Ok(ToolResult::err(format!(
+                "Path is not a directory: {shown}. path must be a directory. To search this file, pass its parent directory and set include to the file name, or use file_read."
             )));
         }
 
@@ -645,6 +654,59 @@ mod tests {
         assert!(res_ignored.content.contains("Found 1 match"));
         assert!(res_ignored.content.contains("index.d.ts"));
 
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[tokio::test]
+    async fn file_path_is_an_error_not_no_matches() {
+        use crate::agent::tool::{Tool, ToolContext, ToolSettings};
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
+
+        let root =
+            std::env::temp_dir().join(format!("file-search-not-dir-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).expect("create file search fixture");
+        let file = root.join("notes.md");
+        std::fs::write(&file, "hello needle").expect("write file");
+        let ctx = ToolContext {
+            session_id: "file-search".into(),
+            workspace_root: root.clone(),
+            bypass_permissions: false,
+            settings: Arc::new(ToolSettings::default()),
+            max_iterations: None,
+            memory_owner_id: "test".into(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel: Arc::new(AtomicBool::new(false)),
+            loop_halt: None,
+        };
+        let file_path = file.to_string_lossy().to_string();
+        let tool = FileSearchTool;
+        for (action, pattern) in [("grep", "needle"), ("glob", "*.md")] {
+            let result = tool
+                .call(
+                    json!({ "action": action, "pattern": pattern, "path": file_path }),
+                    &ctx,
+                )
+                .await
+                .unwrap();
+            assert!(result.is_error, "{action}: {}", result.content);
+            assert!(
+                result.content.contains("Path is not a directory"),
+                "{action}: {}",
+                result.content
+            );
+            assert!(
+                !result.content.contains("No matches"),
+                "{action}: {}",
+                result.content
+            );
+            assert!(
+                !result.content.contains("No files found"),
+                "{action}: {}",
+                result.content
+            );
+        }
         let _ = std::fs::remove_dir_all(&root);
     }
 }
