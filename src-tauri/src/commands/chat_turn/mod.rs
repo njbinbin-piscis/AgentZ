@@ -334,7 +334,13 @@ pub async fn run_agentz_turn(
         .or(slash_display)
         .unwrap_or_else(|| request.prompt.clone());
 
-    let with_browser = expand_browser_element_refs(&effective_prompt, &browser).await;
+    let browser_session = request
+        .session_id
+        .clone()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_default();
+    let with_browser =
+        expand_browser_element_refs(&effective_prompt, &browser, &browser_session).await;
     let snippets = {
         let snippets_map = app
             .state::<crate::state::AppState>()
@@ -714,7 +720,7 @@ pub async fn run_agentz_turn(
     // Vision models get a compressed screenshot after each visual browser action.
     app.state::<crate::state::AppState>()
         .browser
-        .set_auto_screenshot(vision_override);
+        .set_auto_screenshot(&session_id, vision_override);
     let registry = Arc::new(registry);
     let hooks: Arc<dyn piscis_kernel::agent::hooks::AgentHooks> =
         Arc::new(crate::runtime::journal_hooks::JournalWithIdeNotify::new(

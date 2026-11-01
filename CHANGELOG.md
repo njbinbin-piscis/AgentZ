@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.37] - 2026-11-01
+
+### Fixed
+
+- **Parallel sessions shared one browser page.** Each chat session now has its own Chromium tab. The CodeZ panel and that session's `browser` tool both drive it, so another session cannot navigate or click it. Closing the browser tab closes only that session's page. WorkZ can open the same browser in the right-hand preview; a task's agent uses that task's page, separate from CodeZ.
+- **Task notifications did not say which chat they belonged to.** Each notice now includes the session title and the latest assistant reply.
+
+### Changed
+
+- **BotZ "join room" uses the in-app dropdown** instead of the native select, matching the other menus.
+
 ## [1.0.36] - 2026-10-31
 
 ### Fixed

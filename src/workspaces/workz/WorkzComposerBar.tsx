@@ -48,6 +48,7 @@ export interface WorkzComposerBarProps {
   worktree: AgentTaskInfo | null;
   onOpenReview: (wt: AgentTaskInfo) => void;
   selectedId: string | null;
+  onOpenBrowser?: () => void;
   hasSteps: boolean;
   onShowToast: (msg: string) => void;
   onSetError: (err: string) => void;
@@ -120,6 +121,7 @@ export default function WorkzComposerBar({
   worktree,
   onOpenReview,
   selectedId,
+  onOpenBrowser,
   hasSteps,
   onShowToast,
   onSetError,
@@ -309,6 +311,16 @@ export default function WorkzComposerBar({
         </div>
 
         <div className="agentz-workz-bar-right">
+          {onOpenBrowser && (
+            <button
+              type="button"
+              className="agentz-workz-review-btn"
+              onClick={onOpenBrowser}
+              title={selectedId ? t("browser.tabTitle") : t("browser.needsSession")}
+            >
+              {t("browser.tabTitle")}
+            </button>
+          )}
           {isSwarmTeam && activePoolId && (
             <button
               type="button"

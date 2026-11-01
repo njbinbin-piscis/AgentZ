@@ -371,6 +371,13 @@ export function useAssistantSession({
   const [runningIds, setRunningIds] = useState<string[]>([]);
   /** Id reserved for the not-yet-sent new session in view (no DB row yet). */
   const draftSessionIdRef = useRef<string | null>(null);
+  // The browser panel keys its tab off the session shown on screen, including
+  // a draft that has not been sent yet. The first send reuses this id.
+  useEffect(() => {
+    if (sessionRef.current) return;
+    draftSessionIdRef.current ??= crypto.randomUUID();
+    setActiveChatSession(draftSessionIdRef.current);
+  }, []);
   const taskKeyBySessionRef = useRef<Map<string, string>>(new Map());
   const markRunning = useCallback((id: string | null, on: boolean) => {
     turnBookRef.current.markRunning(id, on);
@@ -1308,6 +1315,7 @@ export function useAssistantSession({
     // queued behind it) is keyed independently from the very first event.
     setSessionRef(null);
     draftSessionIdRef.current = crypto.randomUUID();
+    setActiveChatSession(draftSessionIdRef.current);
     discardStreamDelta();
     busyRef.current = false;
     setBusy(false);

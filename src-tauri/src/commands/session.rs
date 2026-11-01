@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
@@ -253,6 +253,85 @@ fn resolve_workz_task_list_title(db: &Database, session: &Session) -> Option<Str
         return session.title.clone();
     }
     Some(title)
+}
+
+/// Title and latest assistant reply for a task notification.
+/// `task_id` on a chat run is the session id.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionNoticePreview {
+    pub title: Option<String>,
+    pub last_reply: Option<String>,
+}
+
+pub fn session_notice_preview(db: &Database, session_id: &str) -> Option<SessionNoticePreview> {
+    let session = db.get_session(session_id).ok()??;
+    let title = session_display_title(db, &session);
+    let last_reply = last_assistant_reply(db, session_id);
+    if title.is_none() && last_reply.is_none() {
+        return None;
+    }
+    Some(SessionNoticePreview { title, last_reply })
+}
+
+fn session_display_title(db: &Database, session: &Session) -> Option<String> {
+    let title = if is_workz_task_source(&session.source) {
+        resolve_workz_task_list_title(db, session)
+    } else if is_codez_source(&session.source) {
+        resolve_codez_list_title(db, session)
+    } else {
+        session
+            .title
+            .clone()
+            .filter(|title| !title.trim().is_empty())
+            .or_else(|| first_user_title(db, &session.id))
+    }?;
+    collapse_notice_text(&title).map(|title| clip_notice_text(&title, 120))
+}
+
+fn first_user_title(db: &Database, session_id: &str) -> Option<String> {
+    let msgs = db.get_messages(session_id, 8, 0).ok()?;
+    let first = msgs.into_iter().find(|message| message.role == "user")?;
+    let title = truncate_title_line(&prompt_text_for_title(&first.content), 80);
+    if title.is_empty() {
+        None
+    } else {
+        Some(title)
+    }
+}
+
+fn last_assistant_reply(db: &Database, session_id: &str) -> Option<String> {
+    let raw: String = db
+        .conn
+        .query_row(
+            "SELECT content FROM messages \
+             WHERE session_id = ?1 AND role = 'assistant' AND trim(content) != '' \
+             ORDER BY rowid DESC LIMIT 1",
+            [session_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .ok()
+        .flatten()?;
+    let text = collapse_notice_text(&raw)?;
+    Some(clip_notice_text(&text, 2_000))
+}
+
+fn collapse_notice_text(text: &str) -> Option<String> {
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.is_empty() {
+        None
+    } else {
+        Some(collapsed)
+    }
+}
+
+fn clip_notice_text(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    let mut clipped: String = text.chars().take(max_chars.saturating_sub(1)).collect();
+    clipped.push('…');
+    clipped
 }
 
 /// A single persisted chat message for history reload.
@@ -1129,6 +1208,7 @@ pub async fn chat_delete_session(
     if let Some(state) = app.try_state::<crate::state::AppState>() {
         state.bg_hub.cancel_pending_for_session(&session_id);
         state.background_runs.kill_session(&session_id);
+        let _ = state.browser.close_session(&session_id).await;
     }
     with_db(&app, ProjectDirParam { project_dir }, |db| {
         db.delete_session(&session_id)
@@ -1186,6 +1266,45 @@ mod tests {
             messages: vec![],
         };
         assert!(import_session_data(&db, &data, None).is_err());
+    }
+
+    #[test]
+    fn notice_preview_uses_sidebar_title_and_latest_assistant_reply() {
+        let db = Database::open_in_memory().unwrap();
+        let named = db
+            .create_session_with_source(Some("修复登录"), "codez")
+            .unwrap();
+        db.append_message(&named.id, "user", "登录失败").unwrap();
+        db.append_message(&named.id, "assistant", "先看日志").unwrap();
+        db.append_message(&named.id, "assistant", "   ").unwrap();
+        db.append_message(&named.id, "assistant", "已经修好了\n请再试一次")
+            .unwrap();
+        assert_eq!(
+            session_notice_preview(&db, &named.id),
+            Some(SessionNoticePreview {
+                title: Some("修复登录".into()),
+                last_reply: Some("已经修好了 请再试一次".into()),
+            })
+        );
+
+        let generic = db
+            .create_session_with_source(Some("CodeZ chat"), "codez")
+            .unwrap();
+        db.append_message(&generic.id, "user", "帮我加一个通知标题")
+            .unwrap();
+        db.append_message(&generic.id, "assistant", "好").unwrap();
+        let preview = session_notice_preview(&db, &generic.id).unwrap();
+        assert_eq!(preview.title.as_deref(), Some("帮我加一个通知标题"));
+
+        let long = "回".repeat(2_050);
+        db.append_message(&generic.id, "assistant", &long).unwrap();
+        let clipped = session_notice_preview(&db, &generic.id)
+            .unwrap()
+            .last_reply
+            .unwrap();
+        assert_eq!(clipped.chars().count(), 2_000);
+        assert!(clipped.ends_with('…'));
+        assert!(session_notice_preview(&db, "missing").is_none());
     }
 
     #[test]

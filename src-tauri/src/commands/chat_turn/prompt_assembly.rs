@@ -369,15 +369,19 @@ fn collect_browser_element_refs(raw: &str) -> Vec<String> {
     refs
 }
 
-pub(super) async fn expand_browser_element_refs(raw: &str, browser: &BrowserManager) -> String {
+pub(super) async fn expand_browser_element_refs(
+    raw: &str,
+    browser: &BrowserManager,
+    session_id: &str,
+) -> String {
     let refs = collect_browser_element_refs(raw);
     if refs.is_empty() {
         return raw.to_string();
     }
 
-    let browser_open = browser.is_open().await;
+    let browser_open = browser.session_has_page(session_id).await;
     let page_url = if browser_open {
-        browser.current_url().await.unwrap_or_default()
+        browser.current_url(session_id).await.unwrap_or_default()
     } else {
         String::new()
     };
@@ -391,7 +395,7 @@ pub(super) async fn expand_browser_element_refs(raw: &str, browser: &BrowserMana
             ));
             continue;
         }
-        match browser.query_selector(&selector).await {
+        match browser.query_selector(session_id, &selector).await {
             Ok(Some(el)) => {
                 let dom_path = if el.dom_path.is_empty() {
                     "(n/a)".to_string()

@@ -10,6 +10,7 @@ import {
   botzSetRoomMembers,
   type BotzRoom,
 } from "../../services/tauri/botz";
+import DropdownSelect from "../../components/DropdownSelect";
 import Avatar from "./Avatar";
 import BotPicker from "./BotPicker";
 import RoomView from "./RoomView";
@@ -302,24 +303,21 @@ export default function BotZWorkspace({ projectDir }: BotZWorkspaceProps) {
                         </button>
                       ))}
                       {rooms.some((r) => !inRooms.includes(r)) && (
-                        <select
-                          className="botz-join-room"
-                          value=""
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            const room = rooms.find((r) => r.id === e.target.value);
-                            if (room) void joinRoom(a, room);
-                          }}
-                        >
-                          <option value="">＋ {t("botz.joinRoom")}</option>
-                          {rooms
-                            .filter((r) => !inRooms.includes(r))
-                            .map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.name}
-                              </option>
-                            ))}
-                        </select>
+                        <div className="botz-join-room" onClick={(e) => e.stopPropagation()}>
+                          <DropdownSelect
+                            variant="text"
+                            placement="down"
+                            value=""
+                            placeholder={`＋ ${t("botz.joinRoom")}`}
+                            options={rooms
+                              .filter((r) => !inRooms.includes(r))
+                              .map((r) => ({ id: r.id, label: r.name }))}
+                            onChange={(id) => {
+                              const room = rooms.find((r) => r.id === id);
+                              if (room) void joinRoom(a, room);
+                            }}
+                          />
+                        </div>
                       )}
                     </div>
                   </div>

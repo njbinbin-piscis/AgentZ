@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { revealInFolder } from "../../services/tauri";
 import type { PickedElement } from "../../services/tauri/browser";
@@ -13,6 +13,7 @@ import GitPanel from "./GitPanel";
 import BottomPanel from "./BottomPanel";
 import BrowserPanel from "./BrowserPanel";
 import { BROWSER_TAB_PATH, isBrowserTab } from "./browserTab";
+import { getActiveChatSession, subscribeActiveChatSession } from "../../services/activeChatSession";
 import { isRecoveryPath, recoveryOriginalPath } from "./editorRecovery";
 import ExtensionsManager from "./ExtensionsManager";
 import IdeStatusBar from "./IdeStatusBar";
@@ -93,6 +94,7 @@ export default function CodeZWorkspace(props: IDEProps) {
   } = props;
 
   const s = useCodezWorkspace(props);
+  const chatSessionId = useSyncExternalStore(subscribeActiveChatSession, getActiveChatSession);
   const fileTreeMenuRef = useRef<HTMLDivElement>(null);
   const fileTreeMenuStyle = useContextMenuPosition(s.fileTreeContextMenu, fileTreeMenuRef);
 
@@ -314,6 +316,7 @@ export default function CodeZWorkspace(props: IDEProps) {
               </div>
             ) : isBrowserTab(s.activeTabPath) && browserOpen ? (
               <BrowserPanel
+                sessionId={chatSessionId ?? ""}
                 onClose={() => s.handleTabClose(BROWSER_TAB_PATH)}
                 onSendElementToChat={(el) => onSendElementToChat?.(el)}
                 onScreenshotToChat={(base64) => onScreenshotToChat?.(base64)}

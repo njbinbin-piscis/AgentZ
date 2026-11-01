@@ -16,6 +16,7 @@ import { extHostResourceSnapshot } from "../../services/tauri/extHostResource";
 import { graphIndexResourceSnapshot } from "../../services/tauri/graphIndexResource";
 import { fileUriString } from "../../services/tauri/editorUri";
 import { BROWSER_TAB_PATH, isBrowserTab } from "./browserTab";
+import { getActiveChatSession } from "../../services/activeChatSession";
 import {
   browserClose,
   browserCloseGuard,
@@ -1216,7 +1217,7 @@ export function useCodezWorkspace({
           const ok = await requestBrowserClose();
           if (!ok) return;
           onBrowserOpenChange?.(false);
-          void browserClose().catch(() => {});
+          void browserClose(getActiveChatSession() ?? "").catch(() => {});
           setActiveTabPath((cur) =>
             isBrowserTab(cur) ? tabsRef.current[0]?.path ?? null : cur,
           );

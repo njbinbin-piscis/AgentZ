@@ -265,12 +265,28 @@
 }
 
 .botz-join-room {
+  display: inline-flex;
+}
+
+.botz-bot-rooms .botz-join-room .agentz-dropdown-trigger {
+  max-width: none;
   font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 1px 6px;
   background: transparent;
-  color: inherit;
+  color: var(--text, #e8e8f0);
   border: 1px dashed var(--border, #2a2a38);
   border-radius: 6px;
-  padding: 1px 4px;
+}
+
+.botz-bot-rooms .botz-join-room .agentz-dropdown-trigger:hover:not(:disabled) {
+  border-color: var(--accent, #7c6af7);
+  color: var(--text, #e8e8f0);
+}
+
+.botz-bot-rooms .botz-join-room .agentz-dropdown-label {
+  flex: none;
 }
 
 /* ── Room ── */

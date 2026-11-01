@@ -188,6 +188,8 @@ export function useWorkzSessionStore({
   const { setArtifacts, setPreviewPath, refreshGitChanges, setPendingReview } =
     useProjectEdgeActions();
   const previewPath = useProjectEdgeState((s) => s.previewPath);
+  const previewPathRef = useRef(previewPath);
+  previewPathRef.current = previewPath;
   const [tasks, setTasks] = useState<SessionMeta[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [steps, setSteps] = useState<AgentStep[]>([]);
@@ -1180,7 +1182,7 @@ export function useWorkzSessionStore({
             .catch(() => {});
         }
         setError(environmentResult.status === "rejected" ? String(environmentResult.reason) : null);
-        setPreviewPath(null);
+        setPreviewPath(previewPathRef.current === "__agentz_browser__" ? "__agentz_browser__" : null);
         refreshGitChanges();
         clearCards();
       } catch (e) {

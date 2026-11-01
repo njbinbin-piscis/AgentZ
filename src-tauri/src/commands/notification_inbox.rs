@@ -1,9 +1,11 @@
 //! Project-scoped notification reads. Only trusted host event sources may post.
+use crate::commands::session::session_notice_preview;
 use crate::state::AppState;
 use agentz_task_state::{
     approval::{ApprovalStore, Status},
-    inbox::{InboxStore, Notice},
+    inbox::{InboxStore, Notice, NoticeKind},
 };
+use piscis_kernel::store::db::Database;
 use serde::Serialize;
 use std::{
     path::Path,
@@ -12,8 +14,22 @@ use std::{
 use tauri::{State, WebviewWindow};
 
 #[derive(Serialize)]
+pub struct InboxNoticeView {
+    pub event_key: String,
+    pub task_id: String,
+    pub kind: NoticeKind,
+    pub summary: String,
+    pub created_ms: i64,
+    pub read_ms: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_reply: Option<String>,
+}
+
+#[derive(Serialize)]
 pub struct InboxPage {
-    pub notices: Vec<Notice>,
+    pub notices: Vec<InboxNoticeView>,
     pub unread_count: u64,
 }
 
@@ -44,9 +60,11 @@ pub async fn notification_inbox_list(
                 tracing::warn!(%error, "approval inbox reconciliation unavailable");
             }
         }
+        let notices = store.recent(limit)?;
+        let unread_count = store.unread_count()?;
         Ok(InboxPage {
-            notices: store.recent(limit)?,
-            unread_count: store.unread_count()?,
+            notices: enrich_notices(scope.project(), notices),
+            unread_count,
         })
     })
 }
@@ -69,6 +87,39 @@ pub async fn notification_inbox_mark_read(
         }
         InboxStore::open(scope.project())?.mark_read(&event_key, read_ms)
     })
+}
+
+fn enrich_notices(project: &Path, notices: Vec<Notice>) -> Vec<InboxNoticeView> {
+    let db_path = project.join(".agentz").join("piscis.db");
+    let db = if db_path.is_file() {
+        match Database::open(&db_path) {
+            Ok(db) => Some(db),
+            Err(error) => {
+                tracing::warn!(%error, "notification session lookup unavailable");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    notices
+        .into_iter()
+        .map(|notice| {
+            let preview = db
+                .as_ref()
+                .and_then(|db| session_notice_preview(db, &notice.task_id));
+            InboxNoticeView {
+                event_key: notice.event_key,
+                task_id: notice.task_id,
+                kind: notice.kind,
+                summary: notice.summary,
+                created_ms: notice.created_ms,
+                read_ms: notice.read_ms,
+                session_title: preview.as_ref().and_then(|preview| preview.title.clone()),
+                last_reply: preview.and_then(|preview| preview.last_reply),
+            }
+        })
+        .collect()
 }
 
 fn clock_ms() -> Result<i64, String> {
@@ -249,6 +300,52 @@ mod tests {
         assert_eq!(reopened.unread_count().unwrap(), 1000);
         drop(reopened);
         drop(approvals);
+        std::fs::remove_dir_all(project).unwrap();
+    }
+
+    #[test]
+    fn listed_notices_include_the_session_title_and_latest_reply() {
+        let project =
+            std::env::temp_dir().join(format!("agentz-inbox-preview-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(project.join(".agentz")).unwrap();
+        let db = piscis_kernel::store::db::Database::open(&project.join(".agentz/piscis.db")).unwrap();
+        let session = db
+            .create_session_with_source(Some("修通知"), "codez")
+            .unwrap();
+        db.append_message(&session.id, "user", "通知看不出是哪个对话")
+            .unwrap();
+        db.append_message(&session.id, "assistant", "先改列表")
+            .unwrap();
+        db.append_message(&session.id, "assistant", "已带上标题和最后回复")
+            .unwrap();
+        drop(db);
+        let views = enrich_notices(
+            &project,
+            vec![
+                Notice {
+                    event_key: "run-terminal:done".into(),
+                    task_id: session.id.clone(),
+                    kind: NoticeKind::Completed,
+                    summary: "Task completed".into(),
+                    created_ms: 10,
+                    read_ms: None,
+                },
+                Notice {
+                    event_key: "run-terminal:missing".into(),
+                    task_id: "missing-session".into(),
+                    kind: NoticeKind::Failed,
+                    summary: "Task failed".into(),
+                    created_ms: 11,
+                    read_ms: None,
+                },
+            ],
+        );
+        assert_eq!(views[0].session_title.as_deref(), Some("修通知"));
+        assert_eq!(views[0].last_reply.as_deref(), Some("已带上标题和最后回复"));
+        assert_eq!(views[0].summary, "Task completed");
+        assert!(views[1].session_title.is_none());
+        assert!(views[1].last_reply.is_none());
+        drop(views);
         std::fs::remove_dir_all(project).unwrap();
     }
 }

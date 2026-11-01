@@ -767,6 +767,15 @@
 }
 
 /* ── File preview pane ─────────────────────────────────────────────────── */
+.agentz-workz-preview.browser {
+  width: min(56%, 760px);
+}
+
+.agentz-workz-preview.browser .agentz-browser {
+  flex: 1;
+  min-height: 0;
+}
+
 .agentz-workz-preview {
   width: min(44%, 520px);
   flex-shrink: 0;

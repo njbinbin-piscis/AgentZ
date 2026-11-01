@@ -1569,7 +1569,8 @@ const en = {
     zoomReset: "Reset zoom (Ctrl+0)",
     zoomLevel: "Zoom {{percent}}%",
     closeConfirm:
-      "The agent may be using the browser. Close anyway? This ends the browser session.",
+      "The agent may be using this session's browser. Close anyway? Only this session's page is closed.",
+    needsSession: "Open or send a task before opening the browser.",
     agentAction: "Agent: {{action}}",
   },
 

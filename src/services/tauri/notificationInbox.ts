@@ -8,6 +8,10 @@ export interface TaskNotice {
   summary: string;
   created_ms: number;
   read_ms: number | null;
+  /** Sidebar title of the chat this task belongs to. */
+  session_title?: string;
+  /** Latest non-empty assistant message, collapsed to one line. */
+  last_reply?: string;
 }
 export interface InboxPage { notices: TaskNotice[]; unread_count: number }
 
@@ -23,13 +27,40 @@ function id(value: unknown, max: number): asserts value is string {
 function time(value: unknown): asserts value is number {
   if (!Number.isSafeInteger(value) || (value as number) < 0) throw new Error("Invalid inbox timestamp");
 }
+const NOTICE_KEYS = ["event_key", "task_id", "kind", "summary", "created_ms", "read_ms"] as const;
+const OPTIONAL_TEXT_KEYS = ["session_title", "last_reply"] as const;
+
+function text(value: unknown, max: number): asserts value is string {
+  if (typeof value !== "string" || value.length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value))
+    throw new Error("Invalid inbox text");
+}
+
+function optionalText(record: Record<string, unknown>, key: (typeof OPTIONAL_TEXT_KEYS)[number], max: number): string | undefined {
+  if (!(key in record) || record[key] == null) return undefined;
+  text(record[key], max);
+  const value = (record[key] as string).trim();
+  return value ? value : undefined;
+}
+
 function notice(value: unknown): TaskNotice {
   const n = object(value);
-  if (Object.keys(n).length !== 6) throw new Error("Invalid inbox notice");
+  const keys = Object.keys(n);
+  if (keys.some((key) => !NOTICE_KEYS.includes(key as (typeof NOTICE_KEYS)[number]) && !OPTIONAL_TEXT_KEYS.includes(key as (typeof OPTIONAL_TEXT_KEYS)[number])))
+    throw new Error("Invalid inbox notice");
+  if (NOTICE_KEYS.some((key) => !(key in n))) throw new Error("Invalid inbox notice");
   id(n.event_key, 512); id(n.task_id, 256); id(n.summary, 240);
   if (!["meaningful_change", "completed", "failed", "action_required"].includes(n.kind as string)) throw new Error("Invalid inbox kind");
   time(n.created_ms); if (n.read_ms !== null) time(n.read_ms);
-  return n as unknown as TaskNotice;
+  return {
+    event_key: n.event_key as string,
+    task_id: n.task_id as string,
+    kind: n.kind as NoticeKind,
+    summary: n.summary as string,
+    created_ms: n.created_ms as number,
+    read_ms: n.read_ms as number | null,
+    session_title: optionalText(n, "session_title", 240),
+    last_reply: optionalText(n, "last_reply", 4500),
+  };
 }
 
 export async function listNotifications(scopeHandle: string, limit = 50): Promise<InboxPage> {

@@ -1,14 +1,16 @@
 //! IDE Browser panel driver (CDP) backed by [`robotz_browser`].
 //!
-//! The panel streams PNG screenshots and forwards pointer events. The same
-//! [`SharedBrowserManager`] is registered as the agent `browser` tool so
-//! automation and the user see one page.
+//! One Chromium process is shared, but each chat session gets its own tab.
+//! The panel and that session's `browser` tool both drive that tab, so
+//! parallel CodeZ sessions and WorkZ sessions do not navigate or click on
+//! each other's pages. Cookies still belong to the shared browser profile.
 
 pub mod activity;
 pub mod events;
 
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -108,23 +110,29 @@ impl BrowserGenerationTracker {
 /// Generation-guarded wrapper around [`robotz_browser::BrowserTool`].
 pub struct GuardedBrowserTool {
     inner: robotz_browser::BrowserTool,
-    generations: BrowserGenerationTracker,
-    /// When set (vision-capable model), visual actions request an auto screenshot.
-    auto_screenshot: Arc<std::sync::atomic::AtomicBool>,
+    manager: BrowserManager,
 }
 
 impl GuardedBrowserTool {
-    pub fn new(
-        manager: SharedBrowserManager,
-        generations: BrowserGenerationTracker,
-        auto_screenshot: Arc<std::sync::atomic::AtomicBool>,
-    ) -> Self {
+    pub fn new(manager: BrowserManager) -> Self {
         Self {
-            inner: robotz_browser::BrowserTool::new(manager),
-            generations,
-            auto_screenshot,
+            inner: robotz_browser::BrowserTool::new(manager.shared()),
+            manager,
         }
     }
+}
+
+/// Tab id of a session's primary page. Extra tabs created inside the session
+/// use the same prefix plus `#`.
+pub fn session_tab_id(session_id: &str) -> String {
+    let key = session_id.trim();
+    let key = if key.is_empty() { "default" } else { key };
+    format!("session:{key}")
+}
+
+fn tab_belongs_to_session(session_id: &str, tab: &str) -> bool {
+    let primary = session_tab_id(session_id);
+    tab == primary || tab.starts_with(&format!("{primary}#"))
 }
 
 #[async_trait]
@@ -142,38 +150,93 @@ impl Tool for GuardedBrowserTool {
     }
 
     async fn call(&self, mut input: serde_json::Value, ctx: &ToolContext) -> Result<ToolResult> {
+        // Hold the session gate for the whole action so another session cannot
+        // retarget the shared "active tab" while RobotZ runs.
+        let Ok(_gate) = tokio::time::timeout(PAGE_LOCK_WAIT, self.manager.lock_ops()).await else {
+            return Ok(ToolResult::err(
+                "browser is busy with another session; try again".to_string(),
+            ));
+        };
+
         let action = input
             .get("action")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_ascii_lowercase();
 
-        if matches!(
-            action.as_str(),
-            "navigate" | "goto" | "open" | "reload" | "back" | "forward" | "close"
-        ) {
-            self.generations.advance_navigation();
-        } else if let Some(raw_ref) = input
-            .get("ref")
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.trim().is_empty())
+        if action == "close" {
+            self.manager.close_session_locked(&ctx.session_id).await?;
+            return Ok(ToolResult::ok(
+                "Closed this session's browser page. Other sessions were left open.",
+            ));
+        }
+        if action == "list_tabs" {
+            return Ok(ToolResult::ok(self.manager.session_tab_report(&ctx.session_id)));
+        }
+
+        let mut created: Option<String> = None;
+        if action == "new_tab" {
+            let id = format!(
+                "{}#{}",
+                session_tab_id(&ctx.session_id),
+                &uuid_suffix()
+            );
+            if let Some(obj) = input.as_object_mut() {
+                obj.insert("tab_id".into(), serde_json::Value::String(id.clone()));
+            }
+            created = Some(id);
+        } else if matches!(action.as_str(), "switch_tab" | "close_tab") {
+            let requested = input.get("tab_id").and_then(|v| v.as_str()).unwrap_or("");
+            if !tab_belongs_to_session(&ctx.session_id, requested) {
+                return Ok(ToolResult::err(format!(
+                    "tab '{requested}' belongs to another session"
+                )));
+            }
+        } else if let Some(obj) = input.as_object_mut() {
+            // Drop a caller-supplied tab id so the action hits the page this
+            // session is bound to, not some other session's tab.
+            obj.remove("tab_id");
+        }
+
+        let tab = self.manager.current_tab(&ctx.session_id);
+        let generations = self.manager.tracker(&tab);
+        if created.is_none()
+            && matches!(
+                action.as_str(),
+                "navigate" | "goto" | "open" | "reload" | "back" | "forward"
+            )
         {
-            let explicit_gen = input.get("snapshot_generation").and_then(|v| v.as_u64());
-            match self.generations.validate_element_ref(raw_ref, explicit_gen) {
-                Ok((clean_ref, _)) => {
-                    if let Some(obj) = input.as_object_mut() {
-                        obj.insert("ref".to_string(), serde_json::Value::String(clean_ref));
+            generations.advance_navigation();
+        } else if created.is_none() && action != "close_tab" && action != "switch_tab" {
+            if let Some(raw_ref) = input
+                .get("ref")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.trim().is_empty())
+            {
+                let explicit_gen = input.get("snapshot_generation").and_then(|v| v.as_u64());
+                match generations.validate_element_ref(raw_ref, explicit_gen) {
+                    Ok((clean_ref, _)) => {
+                        if let Some(obj) = input.as_object_mut() {
+                            obj.insert("ref".to_string(), serde_json::Value::String(clean_ref));
+                        }
                     }
+                    Err(msg) => return Ok(ToolResult::err(msg)),
                 }
-                Err(msg) => return Ok(ToolResult::err(msg)),
             }
         }
 
-        if self.auto_screenshot.load(std::sync::atomic::Ordering::Relaxed) {
+        if self.manager.auto_screenshot_for(&ctx.session_id) {
             if let Some(obj) = input.as_object_mut() {
-                obj.entry("auto_screenshot").or_insert(serde_json::Value::Bool(true));
+                obj.entry("auto_screenshot")
+                    .or_insert(serde_json::Value::Bool(true));
             }
         }
+
+        // Launch (or focus) this session's tab before RobotZ reads the active page.
+        if let Err(e) = self.manager.bind(&ctx.session_id).await {
+            return Ok(ToolResult::err(e.to_string()));
+        }
+
         // RobotZ holds the shared browser lock for the whole action; a page that
         // never settles (open JS dialog, load that never fires) would otherwise
         // hang this turn and every later browser call. Dropping the future
@@ -195,11 +258,46 @@ impl Tool for GuardedBrowserTool {
             _ = cancelled => return Ok(ToolResult::err("browser action cancelled")),
         };
         if action == "snapshot" && !res.is_error {
-            let gen = self.generations.record_snapshot();
+            let gen = generations.record_snapshot();
             res.content = format!("{}\n[snapshot_generation={gen}]", res.content);
+        }
+        if !res.is_error {
+            if let Some(id) = created {
+                self.manager.remember(&ctx.session_id, &id);
+            } else if action == "switch_tab" {
+                if let Some(id) = input_tab_id_from_result(&res.content) {
+                    self.manager.remember(&ctx.session_id, &id);
+                }
+            } else if action == "close_tab" {
+                if let Some(closed) = input_tab_id_from_result(&res.content) {
+                    self.manager.forget_tab(&ctx.session_id, &closed);
+                }
+            }
         }
         Ok(res)
     }
+}
+
+fn uuid_suffix() -> String {
+    let u = uuid_simple();
+    u
+}
+
+fn uuid_simple() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("{nanos:x}")
+}
+
+/// `Switched to tab: <id>` / unused for new_tab (we already know the id).
+fn input_tab_id_from_result(content: &str) -> Option<String> {
+    content
+        .rsplit_once(": ")
+        .map(|(_, id)| id.trim().to_string())
+        .filter(|id| !id.is_empty())
 }
 
 /// Page scroll geometry, returned to the panel so it can drive a synthetic
@@ -251,13 +349,20 @@ pub struct BrowserState {
 }
 
 /// Cloneable handle to the live Chromium session. Stored in `AppState` and
-/// shared with the agent `browser` tool (RobotZ).
+/// shared with the agent `browser` tool (RobotZ). Tabs are per chat session.
 #[derive(Clone)]
 pub struct BrowserManager {
     inner: SharedBrowserManager,
-    viewport: Arc<Mutex<(u32, u32)>>,
-    generations: BrowserGenerationTracker,
-    auto_screenshot: Arc<std::sync::atomic::AtomicBool>,
+    /// Serializes "focus this session's tab, then operate". RobotZ itself only
+    /// has one active tab, so concurrent sessions must take turns.
+    ops: Arc<Mutex<()>>,
+    /// session key -> tab id the panel and tool currently show.
+    session_tabs: Arc<StdMutex<HashMap<String, String>>>,
+    /// session key -> every tab id that session created.
+    owned_tabs: Arc<StdMutex<HashMap<String, HashSet<String>>>>,
+    trackers: Arc<StdMutex<HashMap<String, BrowserGenerationTracker>>>,
+    viewports: Arc<StdMutex<HashMap<String, (u32, u32)>>>,
+    auto_screenshot: Arc<StdMutex<HashMap<String, bool>>>,
 }
 
 impl Default for BrowserManager {
@@ -268,9 +373,12 @@ impl Default for BrowserManager {
         };
         Self {
             inner: create_browser_manager(options),
-            viewport: Arc::new(Mutex::new((1280, 800))),
-            generations: BrowserGenerationTracker::new(),
-            auto_screenshot: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            ops: Arc::new(Mutex::new(())),
+            session_tabs: Arc::new(StdMutex::new(HashMap::new())),
+            owned_tabs: Arc::new(StdMutex::new(HashMap::new())),
+            trackers: Arc::new(StdMutex::new(HashMap::new())),
+            viewports: Arc::new(StdMutex::new(HashMap::new())),
+            auto_screenshot: Arc::new(StdMutex::new(HashMap::new())),
         }
     }
 }
@@ -285,28 +393,196 @@ impl BrowserManager {
         self.inner.clone()
     }
 
-    /// Returns the shared generation tracker for DOM snapshot / navigation validation.
-    pub fn generations(&self) -> BrowserGenerationTracker {
-        self.generations.clone()
+    pub async fn lock_ops(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.ops.lock().await
+    }
+
+    /// Tab the session will use, without launching Chromium.
+    pub fn current_tab(&self, session_id: &str) -> String {
+        let key = session_tab_id(session_id);
+        self.session_tabs
+            .lock()
+            .unwrap()
+            .get(&key)
+            .cloned()
+            .unwrap_or(key)
+    }
+
+    pub fn tracker(&self, tab: &str) -> BrowserGenerationTracker {
+        self.trackers
+            .lock()
+            .unwrap()
+            .entry(tab.to_string())
+            .or_default()
+            .clone()
+    }
+
+    fn forget_tab(&self, session_id: &str, tab: &str) {
+        let key = session_tab_id(session_id);
+        if let Some(set) = self.owned_tabs.lock().unwrap().get_mut(&key) {
+            set.remove(tab);
+        }
+        let mut current = self.session_tabs.lock().unwrap();
+        if current.get(&key).map(|t| t == tab).unwrap_or(false) {
+            current.insert(key.clone(), key);
+        }
+    }
+
+    fn remember(&self, session_id: &str, tab: &str) {
+        let key = session_tab_id(session_id);
+        self.session_tabs
+            .lock()
+            .unwrap()
+            .insert(key.clone(), tab.to_string());
+        self.owned_tabs
+            .lock()
+            .unwrap()
+            .entry(key)
+            .or_default()
+            .insert(tab.to_string());
+    }
+
+    fn session_tab_report(&self, session_id: &str) -> String {
+        let key = session_tab_id(session_id);
+        let current = self.current_tab(session_id);
+        let tabs = self
+            .owned_tabs
+            .lock()
+            .unwrap()
+            .get(&key)
+            .cloned()
+            .unwrap_or_default();
+        if tabs.is_empty() {
+            return "No open tabs in this session".to_string();
+        }
+        let mut list: Vec<_> = tabs.into_iter().collect();
+        list.sort();
+        let lines: Vec<_> = list
+            .into_iter()
+            .map(|t| {
+                if t == current {
+                    format!("* {t} (active)")
+                } else {
+                    t
+                }
+            })
+            .collect();
+        format!("Open tabs:\n{}", lines.join("\n"))
+    }
+
+    /// Focus this session's tab and make it the browser's active page.
+    pub async fn bind(&self, session_id: &str) -> Result<String> {
+        let tab = self.current_tab(session_id);
+        self.remember(session_id, &tab);
+        let mut mgr = tokio::time::timeout(PAGE_LOCK_WAIT, self.inner.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy with another operation; try again"))?;
+        mgr.get_or_create_page(&tab)
+            .await
+            .context("failed to open the session browser tab")?;
+        mgr.switch_tab(&tab)
+            .context("failed to focus the session browser tab")?;
+        Ok(tab)
+    }
+
+    pub async fn session_has_page(&self, session_id: &str) -> bool {
+        let tab = self.current_tab(session_id);
+        let mgr = self.inner.lock().await;
+        mgr.is_running() && mgr.list_tabs().iter().any(|t| t == &tab)
     }
 
     /// Builds a generation-guarded [`GuardedBrowserTool`] bound to this manager.
     pub fn guarded_tool(&self) -> GuardedBrowserTool {
-        GuardedBrowserTool::new(
-            self.inner.clone(),
-            self.generations.clone(),
-            self.auto_screenshot.clone(),
-        )
+        GuardedBrowserTool::new(self.clone())
     }
 
     /// Enable per-turn auto screenshots after visual actions (vision-capable models only).
-    pub fn set_auto_screenshot(&self, on: bool) {
+    pub fn set_auto_screenshot(&self, session_id: &str, on: bool) {
         self.auto_screenshot
-            .store(on, std::sync::atomic::Ordering::Relaxed);
+            .lock()
+            .unwrap()
+            .insert(session_tab_id(session_id), on);
     }
 
-    /// Run a closure with the active page, launching Chrome first if needed.
-    async fn with_page<T, F, Fut>(&self, f: F) -> Result<T>
+    fn auto_screenshot_for(&self, session_id: &str) -> bool {
+        self.auto_screenshot
+            .lock()
+            .unwrap()
+            .get(&session_tab_id(session_id))
+            .copied()
+            .unwrap_or(false)
+    }
+
+    /// Close every tab and the Chromium process. Used when the project goes away.
+    pub async fn close_all(&self) -> Result<()> {
+        let _gate = tokio::time::timeout(PAGE_LOCK_WAIT, self.ops.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy with another session; try again"))?;
+        self.session_tabs.lock().unwrap().clear();
+        self.owned_tabs.lock().unwrap().clear();
+        self.trackers.lock().unwrap().clear();
+        self.viewports.lock().unwrap().clear();
+        let mut mgr = self.inner.lock().await;
+        if mgr.is_running() {
+            let _ = mgr.close().await;
+        }
+        Ok(())
+    }
+
+    /// Close only this session's tabs. The Chromium process stays up while any
+    /// other session still has a page.
+    pub async fn close_session(&self, session_id: &str) -> Result<()> {
+        let _gate = tokio::time::timeout(PAGE_LOCK_WAIT, self.ops.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy with another session; try again"))?;
+        self.close_session_locked(session_id).await
+    }
+
+    async fn close_session_locked(&self, session_id: &str) -> Result<()> {
+        let key = session_tab_id(session_id);
+        let mut tabs = self
+            .owned_tabs
+            .lock()
+            .unwrap()
+            .remove(&key)
+            .unwrap_or_default();
+        if let Some(current) = self.session_tabs.lock().unwrap().remove(&key) {
+            tabs.insert(current);
+        }
+        tabs.insert(key);
+        let mut mgr = self.inner.lock().await;
+        for tab in &tabs {
+            if mgr.list_tabs().iter().any(|t| t == tab) {
+                let _ = mgr.close_tab(tab).await;
+            }
+            self.trackers.lock().unwrap().remove(tab);
+            self.viewports.lock().unwrap().remove(tab);
+        }
+        if mgr.list_tabs().is_empty() && mgr.is_running() {
+            let _ = mgr.close().await;
+        }
+        Ok(())
+    }
+
+    /// Focus `session_id`'s tab, then run a closure with that page.
+    ///
+    /// Takes the session gate. Do not call this while already holding `ops`
+    /// (it is not re-entrant).
+    async fn with_page<T, F, Fut>(&self, session_id: &str, f: F) -> Result<T>
+    where
+        F: FnOnce(Page) -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        let _gate = tokio::time::timeout(PAGE_LOCK_WAIT, self.ops.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy with another session; try again"))?;
+        self.bind(session_id).await?;
+        self.with_active_page(f).await
+    }
+
+    /// Run a closure with the active page. Caller must already hold `ops` and
+    /// have [`Self::bind`]ed the right tab.
+    async fn with_active_page<T, F, Fut>(&self, f: F) -> Result<T>
     where
         F: FnOnce(Page) -> Fut,
         Fut: std::future::Future<Output = Result<T>>,
@@ -332,15 +608,19 @@ impl BrowserManager {
 
     /// Resize the Chromium viewport to match the IDE browser panel (CSS pixels).
     /// Keeps screenshot coordinates 1:1 with the panel for accurate clicks/picks.
-    pub async fn set_viewport(&self, width: u32, height: u32) -> Result<(u32, u32)> {
+    pub async fn set_viewport(&self, session_id: &str, width: u32, height: u32) -> Result<(u32, u32)> {
         use chromiumoxide::cdp::browser_protocol::emulation::{
             ScreenOrientation, ScreenOrientationType, SetDeviceMetricsOverrideParams,
         };
 
         let w = width.clamp(320, 3840);
         let h = height.clamp(200, 2160);
-        *self.viewport.lock().await = (w, h);
-        self.with_page(|page| async move {
+        let _gate = tokio::time::timeout(PAGE_LOCK_WAIT, self.ops.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy with another session; try again"))?;
+        let tab = self.bind(session_id).await?;
+        self.viewports.lock().unwrap().insert(tab, (w, h));
+        self.with_active_page(|page| async move {
             // Keep screen.width/height in sync with innerWidth/innerHeight — otherwise
             // CSS media queries and min-width layouts still assume a desktop screen
             // (~1280px) and the page overflows the panel by ~1/3.
@@ -376,35 +656,42 @@ impl BrowserManager {
     }
 
     /// Current viewport size (width, height) in CSS pixels.
-    pub async fn viewport_size(&self) -> (u32, u32) {
-        *self.viewport.lock().await
+    pub async fn viewport_size(&self, session_id: &str) -> (u32, u32) {
+        let tab = self.current_tab(session_id);
+        self.viewports
+            .lock()
+            .unwrap()
+            .get(&tab)
+            .copied()
+            .unwrap_or((1280, 800))
     }
 
     /// Read the page's current scroll position and content/viewport extents.
-    pub async fn scroll_info(&self) -> Result<ScrollInfo> {
-        let val = self.eval(SCROLL_INFO_JS).await?;
+    pub async fn scroll_info(&self, session_id: &str) -> Result<ScrollInfo> {
+        let val = self.eval(session_id, SCROLL_INFO_JS).await?;
         Ok(serde_json::from_value(val).unwrap_or_default())
     }
 
     /// Scroll the page by a wheel delta (CSS pixels) and report new geometry.
-    pub async fn scroll_by(&self, dx: f64, dy: f64) -> Result<ScrollInfo> {
+    pub async fn scroll_by(&self, session_id: &str, dx: f64, dy: f64) -> Result<ScrollInfo> {
         let js = format!("(() => {{ window.scrollBy({dx}, {dy}); {SCROLL_INFO_JS_BODY} }})()");
-        let val = self.eval(&js).await?;
+        let val = self.eval(session_id, &js).await?;
         Ok(serde_json::from_value(val).unwrap_or_default())
     }
 
     /// Scroll the page to an absolute offset (CSS pixels) and report geometry.
-    pub async fn scroll_to(&self, x: f64, y: f64) -> Result<ScrollInfo> {
+    pub async fn scroll_to(&self, session_id: &str, x: f64, y: f64) -> Result<ScrollInfo> {
         let js = format!("(() => {{ window.scrollTo({x}, {y}); {SCROLL_INFO_JS_BODY} }})()");
-        let val = self.eval(&js).await?;
+        let val = self.eval(session_id, &js).await?;
         Ok(serde_json::from_value(val).unwrap_or_default())
     }
 
     /// Navigate to `url` and wait for the load to settle. Returns the final URL.
-    pub async fn navigate(&self, url: &str) -> Result<String> {
-        self.generations.advance_navigation();
+    pub async fn navigate(&self, session_id: &str, url: &str) -> Result<String> {
+        let tab = self.current_tab(session_id);
+        self.tracker(&tab).advance_navigation();
         let target = normalise_url(url);
-        self.with_page(|page| async move {
+        self.with_page(session_id, |page| async move {
             page.goto(target.as_str())
                 .await
                 .context("navigation failed")?;
@@ -416,10 +703,10 @@ impl BrowserManager {
     }
 
     /// Capture the current page as a base64-encoded PNG.
-    pub async fn screenshot_png_base64(&self) -> Result<String> {
+    pub async fn screenshot_png_base64(&self, session_id: &str) -> Result<String> {
         use base64::Engine;
         let bytes = self
-            .with_page(|page| async move {
+            .with_page(session_id, |page| async move {
                 page.screenshot(
                     ScreenshotParams::builder()
                         .format(CaptureScreenshotFormat::Png)
@@ -433,8 +720,8 @@ impl BrowserManager {
     }
 
     /// Capture the current page as raw PNG bytes (for the agent tool to save).
-    pub async fn screenshot_png_bytes(&self) -> Result<Vec<u8>> {
-        self.with_page(|page| async move {
+    pub async fn screenshot_png_bytes(&self, session_id: &str) -> Result<Vec<u8>> {
+        self.with_page(session_id, |page| async move {
             page.screenshot(
                 ScreenshotParams::builder()
                     .format(CaptureScreenshotFormat::Png)
@@ -447,9 +734,9 @@ impl BrowserManager {
     }
 
     /// Evaluate a JS expression and return its JSON value.
-    pub async fn eval(&self, script: &str) -> Result<serde_json::Value> {
+    pub async fn eval(&self, session_id: &str, script: &str) -> Result<serde_json::Value> {
         let script = script.to_string();
-        self.with_page(|page| async move {
+        self.with_page(session_id, |page| async move {
             let res = page
                 .evaluate(script.as_str())
                 .await
@@ -461,24 +748,24 @@ impl BrowserManager {
 
     /// Click whatever element is at viewport coordinates (x, y) — used to
     /// forward clicks from the panel screenshot.
-    pub async fn click_at(&self, x: f64, y: f64) -> Result<bool> {
+    pub async fn click_at(&self, session_id: &str, x: f64, y: f64) -> Result<bool> {
         // Real input events first: they move focus into inputs, follow links and
         // trigger form controls the way a user click does.
-        if self.mouse_click(x, y).await.is_ok() {
+        if self.mouse_click(session_id, x, y).await.is_ok() {
             return Ok(true);
         }
         let js = format!(
             "(() => {{ const el = document.elementFromPoint({x}, {y}); if (!el) return false; el.scrollIntoView({{block:'center',inline:'center'}}); el.click(); return true; }})()"
         );
-        Ok(self.eval(&js).await?.as_bool().unwrap_or(false))
+        Ok(self.eval(session_id, &js).await?.as_bool().unwrap_or(false))
     }
 
     /// Dispatch a genuine left click (move, press, release) at viewport coordinates.
-    pub async fn mouse_click(&self, x: f64, y: f64) -> Result<()> {
+    pub async fn mouse_click(&self, session_id: &str, x: f64, y: f64) -> Result<()> {
         use chromiumoxide::cdp::browser_protocol::input::{
             DispatchMouseEventParams, DispatchMouseEventType, MouseButton,
         };
-        self.with_page(|page| async move {
+        self.with_page(session_id, |page| async move {
             for (kind, button, count) in [
                 (DispatchMouseEventType::MouseMoved, MouseButton::None, 0),
                 (DispatchMouseEventType::MousePressed, MouseButton::Left, 1),
@@ -500,10 +787,10 @@ impl BrowserManager {
     }
 
     /// Insert text at the focused element (typing, IME and paste).
-    pub async fn insert_text(&self, text: &str) -> Result<()> {
+    pub async fn insert_text(&self, session_id: &str, text: &str) -> Result<()> {
         use chromiumoxide::cdp::browser_protocol::input::InsertTextParams;
         let text = text.to_string();
-        self.with_page(|page| async move {
+        self.with_page(session_id, |page| async move {
             page.execute(InsertTextParams::new(text))
                 .await
                 .context("insert text failed")?;
@@ -514,7 +801,7 @@ impl BrowserManager {
 
     /// Press a non-printable key (Enter, Backspace, arrows, …) with modifiers
     /// (bit 1 = Alt, 2 = Ctrl, 4 = Meta, 8 = Shift).
-    pub async fn press_key(&self, key: &str, modifiers: i64) -> Result<()> {
+    pub async fn press_key(&self, session_id: &str, key: &str, modifiers: i64) -> Result<()> {
         use chromiumoxide::cdp::browser_protocol::input::{
             DispatchKeyEventParams, DispatchKeyEventType,
         };
@@ -522,7 +809,7 @@ impl BrowserManager {
             anyhow::bail!("unsupported key '{key}'");
         };
         let key = key.to_string();
-        self.with_page(|page| async move {
+        self.with_page(session_id, |page| async move {
             for kind in [DispatchKeyEventType::RawKeyDown, DispatchKeyEventType::KeyUp] {
                 let mut b = DispatchKeyEventParams::builder()
                     .r#type(kind.clone())
@@ -543,15 +830,15 @@ impl BrowserManager {
     }
 
     /// Go back / forward in the page history.
-    pub async fn history_step(&self, delta: i32) -> Result<()> {
+    pub async fn history_step(&self, session_id: &str, delta: i32) -> Result<()> {
         let js = format!("history.go({delta})");
-        self.eval(&js).await.map(|_| ())
+        self.eval(session_id, &js).await.map(|_| ())
     }
 
     /// Identify the element at viewport coordinates (x, y) for pick / inspect.
-    pub async fn pick_at(&self, x: f64, y: f64) -> Result<Option<PickedElement>> {
+    pub async fn pick_at(&self, session_id: &str, x: f64, y: f64) -> Result<Option<PickedElement>> {
         let js = element_at_point_js(x, y);
-        let val = self.eval(&js).await?;
+        let val = self.eval(session_id, &js).await?;
         if val.is_null() {
             return Ok(None);
         }
@@ -559,15 +846,15 @@ impl BrowserManager {
     }
 
     /// Alias for [`Self::pick_at`] — used for hover-highlight in the panel.
-    pub async fn inspect_at(&self, x: f64, y: f64) -> Result<Option<PickedElement>> {
-        self.pick_at(x, y).await
+    pub async fn inspect_at(&self, session_id: &str, x: f64, y: f64) -> Result<Option<PickedElement>> {
+        self.pick_at(session_id, x, y).await
     }
 
     /// Resolve a CSS selector against the live page (for chat `@browser-element` expansion).
-    pub async fn query_selector(&self, selector: &str) -> Result<Option<PickedElement>> {
+    pub async fn query_selector(&self, session_id: &str, selector: &str) -> Result<Option<PickedElement>> {
         let sel = serde_json::to_string(selector).context("encode selector")?;
         let js = element_info_js(&format!("document.querySelector({sel})"));
-        let val = self.eval(&js).await?;
+        let val = self.eval(session_id, &js).await?;
         if val.is_null() {
             return Ok(None);
         }
@@ -575,9 +862,9 @@ impl BrowserManager {
     }
 
     /// Click the first element matching a CSS selector (agent automation).
-    pub async fn click_selector(&self, selector: &str) -> Result<()> {
+    pub async fn click_selector(&self, session_id: &str, selector: &str) -> Result<()> {
         let selector = selector.to_string();
-        self.with_page(|page| async move {
+        self.with_page(session_id, |page| async move {
             let el = page
                 .find_element(selector.as_str())
                 .await
@@ -589,10 +876,10 @@ impl BrowserManager {
     }
 
     /// Type text into the element matching `selector`, optionally pressing Enter.
-    pub async fn type_into(&self, selector: &str, text: &str, submit: bool) -> Result<()> {
+    pub async fn type_into(&self, session_id: &str, selector: &str, text: &str, submit: bool) -> Result<()> {
         let selector = selector.to_string();
         let text = text.to_string();
-        self.with_page(|page| async move {
+        self.with_page(session_id, |page| async move {
             let el = page
                 .find_element(selector.as_str())
                 .await
@@ -608,7 +895,7 @@ impl BrowserManager {
     }
 
     /// Return the innerText of `selector` (or the whole body when omitted).
-    pub async fn get_text(&self, selector: Option<&str>) -> Result<String> {
+    pub async fn get_text(&self, session_id: &str, selector: Option<&str>) -> Result<String> {
         let js = match selector {
             Some(sel) => format!(
                 "(() => {{ const e = document.querySelector({sel}); return e ? (e.innerText || '') : ''; }})()",
@@ -616,12 +903,12 @@ impl BrowserManager {
             ),
             None => "document.body ? document.body.innerText : ''".to_string(),
         };
-        Ok(self.eval(&js).await?.as_str().unwrap_or("").to_string())
+        Ok(self.eval(session_id, &js).await?.as_str().unwrap_or("").to_string())
     }
 
     /// The page's current URL.
-    pub async fn current_url(&self) -> Result<String> {
-        self.with_page(|page| async move { current_url(&page).await })
+    pub async fn current_url(&self, session_id: &str) -> Result<String> {
+        self.with_page(session_id, |page| async move { current_url(&page).await })
             .await
     }
 
@@ -631,11 +918,18 @@ impl BrowserManager {
     }
 
     /// Current browser session snapshot for the IDE panel.
-    pub async fn state(&self) -> BrowserState {
-        let open = self.is_open().await;
-        let (width, height) = *self.viewport.lock().await;
+    pub async fn state(&self, session_id: &str) -> BrowserState {
+        let tab = self.current_tab(session_id);
+        let open = self.session_has_page(session_id).await;
+        let (width, height) = self
+            .viewports
+            .lock()
+            .unwrap()
+            .get(&tab)
+            .copied()
+            .unwrap_or((1280, 800));
         let url = if open {
-            self.current_url().await.unwrap_or_default()
+            self.current_url(session_id).await.unwrap_or_default()
         } else {
             String::new()
         };
@@ -644,15 +938,8 @@ impl BrowserManager {
             url,
             viewport_width: width,
             viewport_height: height,
-            snapshot_generation: self.generations.current_generation(),
+            snapshot_generation: self.tracker(&tab).current_generation(),
         }
-    }
-
-    /// Close the browser.
-    pub async fn close(&self) -> Result<()> {
-        self.generations.advance_navigation();
-        self.inner.lock().await.close().await;
-        Ok(())
     }
 }
 
@@ -848,8 +1135,9 @@ mod tests {
     async fn guarded_browser_tool_fails_closed_on_stale_ref_without_launching_browser() {
         let mgr = BrowserManager::new();
         let tool = mgr.guarded_tool();
-        mgr.generations().record_snapshot(); // snapshot at gen 1
-        mgr.generations().advance_navigation(); // navigate to gen 2
+        let tab = session_tab_id("test");
+        mgr.tracker(&tab).record_snapshot(); // snapshot at gen 1
+        mgr.tracker(&tab).advance_navigation(); // navigate to gen 2
 
         let ctx = ToolContext {
             session_id: "test".to_string(),
@@ -882,12 +1170,27 @@ mod tests {
     #[ignore = "requires local Chromium"]
     async fn launch_with_unique_profile() {
         let mgr = BrowserManager::new();
-        mgr.set_viewport(800, 600).await.unwrap();
-        mgr.navigate("about:blank")
+        mgr.set_viewport("t", 800, 600).await.unwrap();
+        mgr.navigate("t", "about:blank")
             .await
             .expect("browser should launch");
         assert!(mgr.is_open().await);
-        mgr.close().await.unwrap();
+        mgr.close_session("t").await.unwrap();
         assert!(!mgr.is_open().await);
+    }
+
+    #[test]
+    fn sessions_do_not_share_tabs_or_snapshot_generation() {
+        let mgr = BrowserManager::new();
+        let a = mgr.current_tab("sess-a");
+        let b = mgr.current_tab("sess-b");
+        assert_ne!(a, b);
+        assert!(tab_belongs_to_session("sess-a", &a));
+        assert!(!tab_belongs_to_session("sess-a", &b));
+        mgr.tracker(&a).record_snapshot();
+        mgr.tracker(&a).advance_navigation();
+        assert_eq!(mgr.tracker(&b).current_generation(), 1);
+        assert_eq!(mgr.tracker(&a).current_generation(), 2);
+        assert_eq!(mgr.session_tab_report("sess-a"), "No open tabs in this session");
     }
 }

@@ -1,6 +1,7 @@
 /**
  * Embedded browser IPC — drives a headless Chromium over CDP in the Rust host.
- * The same page is shared with the agent's `browser` automation tool.
+ * Each chat session has its own tab; pass that session's id so the panel and
+ * the agent tool stay on the same page and do not touch other sessions.
  */
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -45,14 +46,18 @@ export interface PickedElement {
   react_component?: string;
 }
 
-/** Navigate the shared page; returns the final URL. */
-export function browserNavigate(url: string): Promise<string> {
-  return invoke<string>("browser_navigate", { url });
+/** Navigate this session's page; returns the final URL. */
+export function browserNavigate(sessionId: string, url: string): Promise<string> {
+  return invoke<string>("browser_navigate", { sessionId, url });
 }
 
 /** Resize the Chromium viewport to match the panel (CSS pixels). */
-export function browserSetViewport(width: number, height: number): Promise<[number, number]> {
-  return invoke<[number, number]>("browser_set_viewport", { width, height });
+export function browserSetViewport(
+  sessionId: string,
+  width: number,
+  height: number,
+): Promise<[number, number]> {
+  return invoke<[number, number]>("browser_set_viewport", { sessionId, width, height });
 }
 
 /** Page scroll geometry, used to drive the synthetic scrollbars. */
@@ -65,55 +70,60 @@ export interface ScrollInfo {
   client_height: number;
 }
 
-/** Scroll the shared page by a wheel delta (CSS pixels); returns new geometry. */
-export function browserScrollBy(x: number, y: number): Promise<ScrollInfo> {
-  return invoke<ScrollInfo>("browser_scroll_by", { x, y });
+/** Scroll this session's page by a wheel delta (CSS pixels); returns new geometry. */
+export function browserScrollBy(sessionId: string, x: number, y: number): Promise<ScrollInfo> {
+  return invoke<ScrollInfo>("browser_scroll_by", { sessionId, x, y });
 }
 
-/** Scroll the shared page to an absolute offset (CSS pixels). */
-export function browserScrollTo(x: number, y: number): Promise<ScrollInfo> {
-  return invoke<ScrollInfo>("browser_scroll_to", { x, y });
+/** Scroll this session's page to an absolute offset (CSS pixels). */
+export function browserScrollTo(sessionId: string, x: number, y: number): Promise<ScrollInfo> {
+  return invoke<ScrollInfo>("browser_scroll_to", { sessionId, x, y });
 }
 
 /** Read the page's current scroll position + content extents. */
-export function browserScrollInfo(): Promise<ScrollInfo> {
-  return invoke<ScrollInfo>("browser_scroll_info");
+export function browserScrollInfo(sessionId: string): Promise<ScrollInfo> {
+  return invoke<ScrollInfo>("browser_scroll_info", { sessionId });
 }
 
-/** Capture the current page as a base64-encoded PNG (no data: prefix). */
-export function browserScreenshot(): Promise<string> {
-  return invoke<string>("browser_screenshot");
+/** Capture this session's page as a base64-encoded PNG (no data: prefix). */
+export function browserScreenshot(sessionId: string): Promise<string> {
+  return invoke<string>("browser_screenshot", { sessionId });
 }
 
 /** Forward a click at viewport coordinates (CSS pixels). */
-export function browserClickAt(x: number, y: number): Promise<boolean> {
-  return invoke<boolean>("browser_click_at", { x, y });
+export function browserClickAt(sessionId: string, x: number, y: number): Promise<boolean> {
+  return invoke<boolean>("browser_click_at", { sessionId, x, y });
 }
 
 /** Identify the element at viewport coordinates for pick / inspect. */
-export function browserPickAt(x: number, y: number): Promise<PickedElement | null> {
-  return invoke<PickedElement | null>("browser_pick_at", { x, y });
+export function browserPickAt(sessionId: string, x: number, y: number): Promise<PickedElement | null> {
+  return invoke<PickedElement | null>("browser_pick_at", { sessionId, x, y });
 }
 
 /** Hover-inspect: element + bounding rect at viewport coordinates. */
-export function browserInspectAt(x: number, y: number): Promise<PickedElement | null> {
-  return invoke<PickedElement | null>("browser_inspect_at", { x, y });
+export function browserInspectAt(sessionId: string, x: number, y: number): Promise<PickedElement | null> {
+  return invoke<PickedElement | null>("browser_inspect_at", { sessionId, x, y });
 }
 
-export function browserCurrentUrl(): Promise<string> {
-  return invoke<string>("browser_current_url");
+export function browserCurrentUrl(sessionId: string): Promise<string> {
+  return invoke<string>("browser_current_url", { sessionId });
 }
 
 export function browserIsOpen(): Promise<boolean> {
   return invoke<boolean>("browser_is_open");
 }
 
-export function browserClose(): Promise<void> {
-  return invoke<void>("browser_close");
+export function browserClose(sessionId: string): Promise<void> {
+  return invoke<void>("browser_close", { sessionId });
 }
 
-export function browserState(): Promise<BrowserState> {
-  return invoke<BrowserState>("browser_state");
+/** Close every session's page and the shared Chromium process. */
+export function browserCloseAll(): Promise<void> {
+  return invoke<void>("browser_close", { sessionId: null });
+}
+
+export function browserState(sessionId: string): Promise<BrowserState> {
+  return invoke<BrowserState>("browser_state", { sessionId });
 }
 
 export function browserCloseGuard(): Promise<BrowserCloseGuard> {
@@ -141,16 +151,16 @@ export function browserElementChipLabel(el: PickedElement): string {
 }
 
 /** Type text into the focused page element (typing, IME, paste). */
-export function browserInsertText(text: string): Promise<void> {
-  return invoke<void>("browser_insert_text", { text });
+export function browserInsertText(sessionId: string, text: string): Promise<void> {
+  return invoke<void>("browser_insert_text", { sessionId, text });
 }
 
 /** Press a non-printable key; modifiers: 1 Alt, 2 Ctrl, 4 Meta, 8 Shift. */
-export function browserPressKey(key: string, modifiers = 0): Promise<void> {
-  return invoke<void>("browser_press_key", { key, modifiers });
+export function browserPressKey(sessionId: string, key: string, modifiers = 0): Promise<void> {
+  return invoke<void>("browser_press_key", { sessionId, key, modifiers });
 }
 
 /** Go back (-1) or forward (+1) in page history. */
-export function browserHistoryStep(delta: number): Promise<void> {
-  return invoke<void>("browser_history_step", { delta });
+export function browserHistoryStep(sessionId: string, delta: number): Promise<void> {
+  return invoke<void>("browser_history_step", { sessionId, delta });
 }

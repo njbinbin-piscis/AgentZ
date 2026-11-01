@@ -35,6 +35,8 @@ const EMPTY_SCROLL: ScrollInfo = {
 };
 
 interface BrowserPanelProps {
+  /** Chat session whose browser tab this panel shows. */
+  sessionId: string;
   onClose: () => void;
   onSendElementToChat: (el: PickedElement) => void;
   onScreenshotToChat: (base64: string) => void;
@@ -67,6 +69,7 @@ function rectStyle(el: PickedElement, img: HTMLImageElement): React.CSSPropertie
  * highlight in pick mode, Cursor-style inspector sidebar, agent-shared CDP page.
  */
 export default function BrowserPanel({
+  sessionId,
   onClose,
   onSendElementToChat,
   onScreenshotToChat,
@@ -76,6 +79,8 @@ export default function BrowserPanel({
   onRequestClose,
 }: BrowserPanelProps) {
   const { t } = useTranslation();
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
   const [address, setAddress] = useState("");
   const [shot, setShot] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -106,7 +111,7 @@ export default function BrowserPanel({
   /** Resolves `true` when the page image changed since the previous capture. */
   const refreshShot = useCallback(async (): Promise<boolean> => {
     try {
-      const b64 = await browserScreenshot();
+      const b64 = await browserScreenshot(sessionIdRef.current);
       setError(null);
       if (b64 === lastShotRef.current) return false;
       lastShotRef.current = b64;
@@ -120,7 +125,7 @@ export default function BrowserPanel({
 
   const refreshScrollInfo = useCallback(async () => {
     try {
-      setScroll(await browserScrollInfo());
+      setScroll(await browserScrollInfo(sessionIdRef.current));
     } catch {
       // Page not ready yet.
     }
@@ -131,7 +136,7 @@ export default function BrowserPanel({
     wheelAccum.current = { dx: 0, dy: 0 };
     if (dx === 0 && dy === 0) return;
     try {
-      const info = await browserScrollBy(dx, dy);
+      const info = await browserScrollBy(sessionIdRef.current, dx, dy);
       setScroll(info);
       await refreshShot();
     } catch (e) {
@@ -165,7 +170,7 @@ export default function BrowserPanel({
 
     syncingViewportRef.current = true;
     try {
-      await browserSetViewport(w, h);
+      await browserSetViewport(sessionIdRef.current, w, h);
       lastViewportRef.current = { w, h };
       viewportReady.current = true;
       await refreshShot();
@@ -179,11 +184,11 @@ export default function BrowserPanel({
 
   const syncAddressFromBackend = useCallback(async () => {
     try {
-      const st = await browserState();
+      const st = await browserState(sessionIdRef.current);
       if (st.url) setAddress(st.url);
     } catch {
       try {
-        const url = await browserCurrentUrl();
+        const url = await browserCurrentUrl(sessionIdRef.current);
         if (url) setAddress(url);
       } catch {
         /* browser not launched */
@@ -195,7 +200,9 @@ export default function BrowserPanel({
     void syncAddressFromBackend();
     let unlisten: (() => void) | undefined;
     let disposed = false;
-    void onBrowserChanged(() => {
+    void onBrowserChanged((payload) => {
+      const mine = sessionIdRef.current;
+      if (payload.session_id && mine && payload.session_id !== mine) return;
       void refreshShot();
       void syncAddressFromBackend();
       void refreshScrollInfo();
@@ -208,6 +215,20 @@ export default function BrowserPanel({
       unlisten?.();
     };
   }, [refreshShot, refreshScrollInfo, syncAddressFromBackend]);
+
+  // Switching chats shows that session's page, not the one we were just looking at.
+  useEffect(() => {
+    lastShotRef.current = null;
+    setShot(null);
+    setAddress("");
+    setScroll(EMPTY_SCROLL);
+    setSelected(null);
+    setHovered(null);
+    viewportReady.current = false;
+    lastViewportRef.current = null;
+    void syncAddressFromBackend();
+    void syncViewport();
+  }, [sessionId, syncAddressFromBackend, syncViewport]);
 
   useEffect(() => {
     if (refreshSignal > 0) {
@@ -326,7 +347,7 @@ export default function BrowserPanel({
     setError(null);
     try {
       await syncViewport();
-      const finalUrl = await browserNavigate(url);
+      const finalUrl = await browserNavigate(sessionIdRef.current, url);
       setAddress(finalUrl || url);
       await syncViewport();
       await refreshShot();
@@ -350,7 +371,7 @@ export default function BrowserPanel({
   const scrollTo = useCallback(
     async (x: number, y: number) => {
       try {
-        const info = await browserScrollTo(x, y);
+        const info = await browserScrollTo(sessionIdRef.current, x, y);
         setScroll(info);
         await refreshShot();
       } catch (e) {
@@ -414,7 +435,7 @@ export default function BrowserPanel({
       if (!pt) return;
       if (inspectTimer.current) clearTimeout(inspectTimer.current);
       inspectTimer.current = setTimeout(() => {
-        void browserInspectAt(pt.x, pt.y)
+        void browserInspectAt(sessionIdRef.current, pt.x, pt.y)
           .then((el) => setHovered(el))
           .catch(() => setHovered(null));
       }, 60);
@@ -433,10 +454,10 @@ export default function BrowserPanel({
       if (!pt) return;
       try {
         if (pickMode) {
-          const el = await browserPickAt(pt.x, pt.y);
+          const el = await browserPickAt(sessionIdRef.current, pt.x, pt.y);
           if (el) setSelected(el);
         } else {
-          await browserClickAt(pt.x, pt.y);
+          await browserClickAt(sessionIdRef.current, pt.x, pt.y);
           setTimeout(() => {
             void refreshShot();
             void refreshScrollInfo();
@@ -465,13 +486,13 @@ export default function BrowserPanel({
       const printable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
       if (printable) {
         e.preventDefault();
-        void browserInsertText(e.key).then(refreshSoon, (err) => setError(String(err)));
+        void browserInsertText(sessionIdRef.current, e.key).then(refreshSoon, (err) => setError(String(err)));
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key.length === 1) return; // let paste/copy shortcuts reach onPaste
       if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") return;
       e.preventDefault();
-      void browserPressKey(e.key, mods).then(refreshSoon, () => {});
+      void browserPressKey(sessionIdRef.current, e.key, mods).then(refreshSoon, () => {});
     },
     [pickMode, refreshSoon],
   );
@@ -481,14 +502,14 @@ export default function BrowserPanel({
       const text = e.clipboardData.getData("text/plain");
       if (!text) return;
       e.preventDefault();
-      void browserInsertText(text).then(refreshSoon, (err) => setError(String(err)));
+      void browserInsertText(sessionIdRef.current, text).then(refreshSoon, (err) => setError(String(err)));
     },
     [refreshSoon],
   );
 
   const historyStep = useCallback(
     (delta: number) => {
-      void browserHistoryStep(delta)
+      void browserHistoryStep(sessionIdRef.current, delta)
         .then(() => new Promise((r) => setTimeout(r, 400)))
         .then(() => Promise.all([refreshShot(), syncAddressFromBackend(), refreshScrollInfo()]))
         .catch((err) => setError(String(err)));
@@ -498,7 +519,7 @@ export default function BrowserPanel({
 
   const screenshotToChat = useCallback(async () => {
     try {
-      const b64 = await browserScreenshot();
+      const b64 = await browserScreenshot(sessionIdRef.current);
       onScreenshotToChat(b64);
     } catch (e) {
       setError(String(e));
@@ -511,7 +532,7 @@ export default function BrowserPanel({
         const ok = await onRequestClose();
         if (!ok) return;
       }
-      void browserClose().catch(() => {});
+      void browserClose(sessionIdRef.current).catch(() => {});
       setPickMode(false);
       setHovered(null);
       setSelected(null);

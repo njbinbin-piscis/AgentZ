@@ -55,7 +55,7 @@ import SettingsPanel from "./workspaces/codez/SettingsPanel";
 import { OPEN_SETTINGS_EVENT, SETTINGS_CLOSED_EVENT } from "./workspaces/codez/firstRun";
 import { modeShortcutLabel, modeShortcutTarget } from "./utils/modeShortcut";
 import ZLogo from "./components/ZLogo";
-import { browserClose, browserCloseGuard, type PickedElement } from "./services/tauri/browser";
+import { browserCloseAll, browserCloseGuard, type PickedElement } from "./services/tauri/browser";
 import type { ChatAttachment } from "./services/tauri/chat";
 import { terminalSnippetPut } from "./services/tauri/terminal";
 import {
@@ -723,7 +723,7 @@ export default function App() {
       setIdeWikiOpenPath(null);
       setBrowserOpen(false);
       setChatInsertElement(null);
-      void browserClose().catch(() => {});
+      void browserCloseAll().catch(() => {});
       setProjectDir(null);
     } catch (e) {
       console.error("closeProject failed:", e);

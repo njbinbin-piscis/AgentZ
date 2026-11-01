@@ -1518,7 +1518,8 @@ const zh = {
     needsProject: "请先打开项目文件夹",
     zoomReset: "重置缩放 (Ctrl+0)",
     zoomLevel: "缩放 {{percent}}%",
-    closeConfirm: "Agent 可能正在使用浏览器。确定关闭吗？这将结束浏览器会话。",
+    closeConfirm: "Agent 可能正在使用这个会话的浏览器。确定关闭吗？只会关闭本会话的页面，其他会话不受影响。",
+    needsSession: "先打开或发送一个任务，再打开浏览器。",
     agentAction: "Agent：{{action}}",
   },
 

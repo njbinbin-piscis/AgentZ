@@ -2,6 +2,9 @@ import TaskPanel from "../../components/TaskPanel";
 import SessionSkillRevisions from "./SessionSkillRevisions";
 import AgentTaskReview from "./AgentTaskReview";
 import AgentFilePreview from "./AgentFilePreview";
+import BrowserPanel from "../codez/BrowserPanel";
+import { BROWSER_TAB_PATH } from "../codez/browserTab";
+import { browserElementPlaceholder } from "../../services/tauri/browser";
 import CollabBoard from "./CollabBoard";
 import WorkflowRunPanel from "./WorkflowRunPanel";
 import WorkflowRunsList from "./WorkflowRunsList";
@@ -105,7 +108,21 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
             onShowToast={s.showToast}
             onSetError={s.setError}
           />
-          {s.previewPath && s.projectDir && (
+          {s.previewPath === BROWSER_TAB_PATH && s.selectedId && (
+            <div className="agentz-workz-preview browser">
+              <BrowserPanel
+                sessionId={s.selectedId}
+                onClose={() => s.setPreviewPath(null)}
+                onSendElementToChat={(el) => {
+                  const token = browserElementPlaceholder(el);
+                  s.setGoal((prev) => (prev.trim() ? `${prev.trim()}\n${token} ` : `${token} `));
+                }}
+                onScreenshotToChat={() => {}}
+                chatEnabled={Boolean(s.projectDir)}
+              />
+            </div>
+          )}
+          {s.previewPath && s.previewPath !== BROWSER_TAB_PATH && s.projectDir && (
             <AgentFilePreview
               projectDir={s.projectDir}
               path={s.previewPath}
@@ -177,6 +194,13 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
           onOpenWorkflow={() => s.setWorkflowOpen(true)}
           onOpenRuns={() => s.setRunsOpen(true)}
           worktree={s.worktree}
+          onOpenBrowser={() => {
+            if (!s.selectedId) {
+              s.showToast(s.t("browser.needsSession"));
+              return;
+            }
+            s.setPreviewPath(BROWSER_TAB_PATH);
+          }}
           onOpenReview={(wt) => s.setReviewTask(wt)}
           selectedId={s.selectedId}
           hasSteps={s.steps.length > 0}

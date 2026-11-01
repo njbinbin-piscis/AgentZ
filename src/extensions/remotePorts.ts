@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import i18n from "../i18n";
 import { extensionUiStore } from "./extensionUiStore";
 import { browserNavigate } from "../services/tauri/browser";
+import { getActiveChatSession } from "../services/activeChatSession";
 
 interface ListeningPort {
   port: number;
@@ -51,7 +52,7 @@ export function useRemotePortWatch(active: boolean): Forward[] {
                 i18n.t("remote.ports.openPreview"),
               ])
               .then((choice) => {
-                if (choice) void browserNavigate(url);
+                if (choice) void browserNavigate(getActiveChatSession() ?? "", url);
               });
           }
         }
