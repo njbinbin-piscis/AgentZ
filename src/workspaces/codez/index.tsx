@@ -415,6 +415,7 @@ export default function CodeZWorkspace(props: IDEProps) {
         onOpenPanel={s.openBottomPanel}
         onOpenExtensions={s.openExtensionsSidebar}
         onOpenRemote={() => s.setRemoteDialogOpen(true)}
+        onOpenFile={(path) => void s.openFile(path)}
       />
       {s.remoteDialogOpen && (
         <RemoteConnectDialog

@@ -10,7 +10,7 @@
   margin: 10px 12px 0;
   border: 1px solid var(--border, #2a2a38);
   border-radius: 10px;
-  background: var(--bg-elev-2, #1b1b26);
+  background: var(--bg-popup, #242432);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -22,7 +22,7 @@
 .agentz-task-panel-header-row {
   display: flex;
   align-items: center;
-  background: var(--bg, #0e0e14);
+  background: transparent;
 }
 
 .agentz-task-panel-header {

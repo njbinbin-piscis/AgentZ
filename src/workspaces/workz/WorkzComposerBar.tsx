@@ -12,6 +12,7 @@ import type { TeamInfo } from "../../services/tauri/teams";
 import type { AgentInfo } from "../../services/tauri/agents";
 import type { WorkflowStatus } from "../../services/tauri/workflow";
 import type { LibraryInitialState } from "../codez/resources/types";
+import BackgroundTasksButton from "../../components/BackgroundTasksButton";
 
 export interface WorkzComposerBarProps {
   projectDir: string | null;
@@ -49,6 +50,7 @@ export interface WorkzComposerBarProps {
   onOpenReview: (wt: AgentTaskInfo) => void;
   selectedId: string | null;
   onOpenBrowser?: () => void;
+  onOpenFile?: (path: string) => void;
   hasSteps: boolean;
   onShowToast: (msg: string) => void;
   onSetError: (err: string) => void;
@@ -122,6 +124,7 @@ export default function WorkzComposerBar({
   onOpenReview,
   selectedId,
   onOpenBrowser,
+  onOpenFile,
   hasSteps,
   onShowToast,
   onSetError,
@@ -311,6 +314,13 @@ export default function WorkzComposerBar({
         </div>
 
         <div className="agentz-workz-bar-right">
+          <BackgroundTasksButton
+            projectDir={projectDir}
+            className="agentz-workz-review-btn"
+            preferredSource="workz"
+            currentSessionId={selectedId}
+            onOpenFile={onOpenFile}
+          />
           {onOpenBrowser && (
             <button
               type="button"

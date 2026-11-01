@@ -128,8 +128,8 @@ impl Tool for RemoteCodeRun {
         "Run a build / test / script command on the remote machine that hosts the workspace \
          (sh -c, cwd defaults to the remote workspace root; per-user tool dirs such as \
          ~/.cargo/bin and node_modules/.bin are on PATH). Returns exit_code, duration_ms, \
-         stdout and stderr. Background mode is not available for remote workspaces: for \
-         servers, use shell with nohup and poll the log."
+         stdout and stderr. background=true registers the command in the same background-task \
+         list as local commands."
     }
     fn input_schema(&self) -> Value {
         json!({
@@ -137,8 +137,13 @@ impl Tool for RemoteCodeRun {
             "properties": {
                 "command": { "type": "string", "description": "Command to run (e.g. \"cargo test\")." },
                 "cwd": { "type": "string", "description": "Working directory (relative to the remote workspace root, or absolute)." },
-                "timeout_secs": { "type": "integer", "description": "Timeout in seconds (default 60, max 300)." },
-                "env": { "type": "object", "description": "Extra environment variables." }
+                "timeout_secs": { "type": "integer", "description": "Timeout in seconds (default 60, max 300). Ignored when background=true." },
+                "env": { "type": "object", "description": "Extra environment variables." },
+                "background": { "type": "boolean", "description": "Start on the remote host and return immediately with a background task id." },
+                "service": { "type": "boolean", "description": "With background=true: a long-lived process. No runtime cap." },
+                "notify_on": { "type": "string", "description": "For background tasks: exit (default) or ready." },
+                "ready_port": { "type": "integer", "description": "Background task is ready when this port accepts connections on the remote host." },
+                "ready_log": { "type": "string", "description": "Background task is ready when this text appears in its output." }
             },
             "required": ["command"]
         })
@@ -150,13 +155,12 @@ impl Tool for RemoteCodeRun {
         let Some(command) = input["command"].as_str().filter(|c| !c.trim().is_empty()) else {
             return Ok(ToolResult::err("Missing required parameter: command"));
         };
-        if input["background"].as_bool().unwrap_or(false) {
-            return Ok(ToolResult::err(
-                "background=true is not available for remote workspaces; run it with shell \
-                 (`nohup <cmd> > /tmp/<name>.log 2>&1 &`) and read the log.",
-            ));
-        }
         let cwd = resolve_path(ctx, &input, "cwd").await?;
+        if let Some(started) =
+            crate::tools::remote_background::start_if_background(ctx, command, &cwd, &input)?
+        {
+            return Ok(started);
+        }
         let timeout = input["timeout_secs"].as_u64().unwrap_or(60).clamp(1, 300);
         let mut script = format!("{}; ", remote::TOOL_PATH_SETUP);
         if let Some(env) = input["env"].as_object() {

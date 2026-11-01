@@ -199,7 +199,7 @@
   max-height: 220px;
   overflow-y: auto;
   border-bottom: 1px solid var(--border, #2a2a38);
-  background: var(--bg, #0e0e14);
+  background: var(--bg-popup, #242432);
   flex-shrink: 0;
 }
 
@@ -220,12 +220,12 @@
 }
 
 .agentz-session-row:hover {
-  background: var(--bg-elev-2, #1b1b26);
+  background: var(--bg-popup-hover, #2e2e3e);
 }
 
 .agentz-session-row.active {
   border-left-color: var(--accent, #7c6af7);
-  background: var(--bg-elev-2, #1b1b26);
+  background: var(--bg-popup-hover, #2e2e3e);
 }
 
 /* Per-session status LED, mirroring the WorkZ task list: amber pulsing
@@ -264,13 +264,22 @@
   background: #ef4444;
 }
 
-/* Background tasks (builds / tests / dev servers) registered for the project. */
+/* Background tasks open from the status bar, above the bar. */
+.agentz-bg-popover {
+  position: fixed;
+  z-index: 100100;
+  width: min(560px, calc(100vw - 16px));
+  max-height: min(360px, 50vh);
+  overflow: auto;
+  box-sizing: border-box;
+  border: 1px solid var(--border, #2a2a38);
+  border-radius: 10px;
+  background: var(--bg-popup, #242432);
+  box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.45);
+}
+
 .agentz-bg-panel {
-  border-bottom: 1px solid var(--border, #2a2a38);
-  background: var(--bg, #0e0e14);
-  flex-shrink: 0;
-  max-height: 180px;
-  overflow-y: auto;
+  background: transparent;
 }
 
 .agentz-bg-head {
@@ -281,8 +290,7 @@
   color: var(--text-dim, #9a9ab0);
   font-size: 12px;
   font-weight: 600;
-  padding: 6px 12px;
-  cursor: pointer;
+  padding: 8px 12px;
 }
 
 .agentz-bg-count {
@@ -303,6 +311,17 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.agentz-bg-source {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text, #e8e8f0);
+  background: var(--bg-popup-hover, #2e2e3e);
+  border-radius: 999px;
+  padding: 1px 6px;
 }
 
 .agentz-bg-label {
@@ -694,7 +713,7 @@
   bottom: calc(100% + 4px);
   max-height: min(200px, calc(100vh / var(--ui-font-scale, 1) - 160px));
   overflow-y: auto;
-  background: var(--bg-elev, #14141c);
+  background: var(--bg-popup, #242432);
   border: 1px solid var(--border, #2a2a38);
   border-radius: 10px;
   box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.4);
@@ -727,7 +746,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border, #2a2a38);
-  background: var(--bg-elev-2, #1b1b26);
+  background: var(--bg-popup, #242432);
   color: var(--text, #e8e8f0);
   font-size: 12px;
   line-height: 1.45;

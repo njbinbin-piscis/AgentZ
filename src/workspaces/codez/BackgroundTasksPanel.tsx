@@ -6,6 +6,7 @@ import {
 } from "../../services/tauri/backgroundTasks";
 import { redirectTargets } from "./bgRedirect";
 import { openBgTerminal } from "../../services/bgTerminal";
+import "./AssistantPanel.css";
 
 function formatElapsed(ms: number): string {
   const secs = Math.floor(ms / 1000);
@@ -34,24 +35,51 @@ function statusLabel(
 
 /**
  * Background tasks (builds, tests, dev servers) registered for this
- * project. The current session's tasks come first; tasks owned by other
- * sessions stay visible so nothing runs invisibly.
+ * project, from any mode. The current session's tasks come first; tasks
+ * owned by other sessions stay visible so nothing runs invisibly.
  */
+export function backgroundSourceLabel(
+  t: ReturnType<typeof useTranslation>["t"],
+  source: string | null | undefined,
+): string {
+  switch (source) {
+    case "codez":
+    case "agentz":
+      return t("chat.bgSourceCodez");
+    case "workz":
+      return t("chat.bgSourceWorkz");
+    case "workz-team":
+      return t("chat.bgSourceWorkzTeam");
+    case "pool":
+    case "piscis-heartbeat-pool":
+      return t("chat.bgSourcePool");
+    default:
+      return source?.trim() ? source : t("chat.bgSourceUnknown");
+  }
+}
+
+function sourceFirst(source: string | null | undefined, preferred: "codez" | "workz"): boolean {
+  if (preferred === "workz") return source === "workz" || source === "workz-team";
+  return source === "codez" || source === "agentz";
+}
+
 export default function BackgroundTasksPanel({
   tasks,
   currentSessionId,
+  preferredSource = "codez",
   onKill,
   onOpenSession,
   onOpenFile,
 }: {
   tasks: BackgroundTask[];
   currentSessionId: string | null;
+  /** Tasks started in this mode are listed first. */
+  preferredSource?: "codez" | "workz";
   onKill: (bgId: string) => void;
-  onOpenSession?: (sessionId: string) => void;
+  onOpenSession?: (task: BackgroundTask) => void;
   onOpenFile?: (path: string) => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [output, setOutput] = useState<string>("");
   const [redirects, setRedirects] = useState<string[]>([]);
@@ -59,6 +87,9 @@ export default function BackgroundTasksPanel({
   if (tasks.length === 0) return null;
 
   const sorted = tasks.slice().sort((a, b) => {
+    const aHere = sourceFirst(a.session_source, preferredSource) ? 0 : 1;
+    const bHere = sourceFirst(b.session_source, preferredSource) ? 0 : 1;
+    if (aHere !== bHere) return aHere - bHere;
     const aMine = a.session_id === currentSessionId ? 0 : 1;
     const bMine = b.session_id === currentSessionId ? 0 : 1;
     if (aMine !== bMine) return aMine - bMine;
@@ -89,20 +120,15 @@ export default function BackgroundTasksPanel({
 
   return (
     <div className="agentz-bg-panel">
-      <button
-        type="button"
-        className="agentz-bg-head"
-        onClick={() => setOpen((v) => !v)}
-      >
+      <div className="agentz-bg-head">
         <span>
-          {open ? "▾" : "▸"} {t("chat.bgTitle")}
+          {t("chat.bgTitle")}
           {runningCount > 0 && (
             <span className="agentz-bg-count">{runningCount}</span>
           )}
         </span>
-      </button>
-      {open &&
-        sorted.map((task) => (
+      </div>
+      {sorted.map((task) => (
           <div key={task.id} className="agentz-bg-row">
             <div className="agentz-bg-main">
               <span
@@ -116,6 +142,7 @@ export default function BackgroundTasksPanel({
                         : ""
                 }`}
               />
+              <span className="agentz-bg-source">{backgroundSourceLabel(t, task.session_source)}</span>
               <span className="agentz-bg-label" title={task.label}>
                 {task.label}
               </span>
@@ -127,7 +154,7 @@ export default function BackgroundTasksPanel({
                     <button
                       type="button"
                       className="agentz-bg-link"
-                      onClick={() => onOpenSession?.(task.session_id)}
+                      onClick={() => onOpenSession?.(task)}
                     >
                       {t("chat.bgOtherSession")}
                     </button>
@@ -179,7 +206,7 @@ export default function BackgroundTasksPanel({
               </div>
             )}
           </div>
-        ))}
+      ))}
     </div>
   );
 }

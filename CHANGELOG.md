@@ -5,6 +5,19 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.38] - 2026-11-01
+
+### Fixed
+
+- **Popups used the same background as the panel behind them.** Menus, the session list, task and todo cards, and dialogs now share one slightly lighter popup background.
+- **`file_list` with `dirs_only` reported a directory of files as empty.** A readable directory with no subdirectories now says there are no subdirectories and that the file count is unknown. A failed directory read is an error.
+- **Closing AgentZ dropped the remote server without notice.** A connected remote agentz-server is asked to stop its own processes before the SSH session is closed.
+
+### Changed
+
+- **Background tasks are listed from both CodeZ and WorkZ.** The CodeZ chat header list is gone. The same popover opens upward from the CodeZ status bar and from the WorkZ task bar. Each row is labeled with the mode that started it (CodeZ, WorkZ, WorkZ team, or collaborator), and opening the owning session stays in that mode.
+- **Remote `shell` and `code_run` accept `background=true`.** The process is started on the remote host and registered in the same task list, including output, readiness, and stop.
+
 ## [1.0.37] - 2026-11-01
 
 ### Fixed

@@ -633,6 +633,14 @@ impl BackgroundRegistry {
         hit
     }
 
+    /// Record readiness discovered by a host runner (for example a port check
+    /// performed on a remote machine, where the local probe would be wrong).
+    pub fn note_ready(self: &Arc<Self>, entry: &BgEntry) {
+        if entry.mark_ready() {
+            self.fire(BgEvent::Ready(entry.snapshot()));
+        }
+    }
+
     pub fn get(&self, id: &str) -> Option<Arc<BgEntry>> {
         self.entries.lock().unwrap().get(id).cloned()
     }

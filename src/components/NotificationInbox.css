@@ -1,11 +1,11 @@
 .agentz-notification-inbox { position: relative; }
 .agentz-notification-count { position: absolute; top: 0; right: 0; min-width: 15px; height: 15px; border-radius: 8px; background: var(--accent, #7466e6); color: white; font-size: 10px; line-height: 15px; }
-.agentz-notification-popover { position: absolute; right: 0; top: 34px; z-index: 100100; width: min(360px, calc(90vw / var(--ui-font-scale, 1))); max-height: min(420px, calc(100vh / var(--ui-font-scale, 1) - 56px)); overflow: auto; padding: calc(12px * var(--ui-font-scale, 1)); box-sizing: border-box; font-size: calc(12px * var(--ui-font-scale, 1)); border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elev); box-shadow: 0 12px 32px #0004; }
+.agentz-notification-popover { position: absolute; right: 0; top: 34px; z-index: 100100; width: min(360px, calc(90vw / var(--ui-font-scale, 1))); max-height: min(420px, calc(100vh / var(--ui-font-scale, 1) - 56px)); overflow: auto; padding: calc(12px * var(--ui-font-scale, 1)); box-sizing: border-box; font-size: calc(12px * var(--ui-font-scale, 1)); border: 1px solid var(--border); border-radius: 10px; background: var(--bg-popup, #242432); box-shadow: 0 12px 32px #0004; }
 .agentz-notification-popover.is-fixed { position: fixed; top: auto; bottom: auto; left: auto; right: auto; width: auto; }
 .agentz-notification-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: calc(13px * var(--ui-font-scale, 1)); }
 .agentz-notification-heading button { color: var(--text); font-size: calc(12px * var(--ui-font-scale, 1)); }
 .agentz-notification-row { display: block; width: 100%; padding: calc(9px * var(--ui-font-scale, 1)); text-align: left; color: var(--text); font-size: calc(12px * var(--ui-font-scale, 1)); border: 0; border-radius: 6px; background: transparent; }
-.agentz-notification-row:hover { background: var(--bg-elev-2); }
+.agentz-notification-row:hover { background: var(--bg-popup-hover, #2e2e3e); }
 .agentz-notification-main { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
 .agentz-notification-icon { position: relative; flex: none; display: inline-flex; margin-top: 1px; color: var(--text-dim); }
 .agentz-notification-icon.ok { color: var(--success, #4ade80); }

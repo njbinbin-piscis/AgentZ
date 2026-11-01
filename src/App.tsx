@@ -56,6 +56,7 @@ import { OPEN_SETTINGS_EVENT, SETTINGS_CLOSED_EVENT } from "./workspaces/codez/f
 import { modeShortcutLabel, modeShortcutTarget } from "./utils/modeShortcut";
 import ZLogo from "./components/ZLogo";
 import { browserCloseAll, browserCloseGuard, type PickedElement } from "./services/tauri/browser";
+import { OPEN_WORKZ_TASK_EVENT, SHOW_MODE_EVENT } from "./components/BackgroundTasksButton";
 import type { ChatAttachment } from "./services/tauri/chat";
 import { terminalSnippetPut } from "./services/tauri/terminal";
 import {
@@ -122,6 +123,24 @@ export default function App() {
     };
     window.addEventListener("keydown", onModeKey);
     return () => window.removeEventListener("keydown", onModeKey);
+  }, []);
+  useEffect(() => {
+    const onWorkzTask = (event: Event) => {
+      const detail = (event as CustomEvent<{ projectDir: string; taskId: string; nonce: number }>).detail;
+      if (!detail?.projectDir || !detail.taskId) return;
+      setInboxTaskRoute(detail);
+      setMode("workz");
+    };
+    const onShowMode = (event: Event) => {
+      const next = (event as CustomEvent<Mode>).detail;
+      if (next === "codez" || next === "workz" || next === "botz") setMode(next);
+    };
+    window.addEventListener(OPEN_WORKZ_TASK_EVENT, onWorkzTask);
+    window.addEventListener(SHOW_MODE_EVENT, onShowMode);
+    return () => {
+      window.removeEventListener(OPEN_WORKZ_TASK_EVENT, onWorkzTask);
+      window.removeEventListener(SHOW_MODE_EVENT, onShowMode);
+    };
   }, []);
   const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
   const [projectDir, setProjectDir] = useState<string | null>(null);

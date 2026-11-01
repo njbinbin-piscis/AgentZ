@@ -17,6 +17,8 @@ export interface BackgroundTask {
   elapsed_ms: number;
   stdout_total: number;
   stderr_total: number;
+  /** Chat mode that started the task: codez, workz, workz-team, pool, … */
+  session_source?: string | null;
 }
 
 export interface BackgroundOutput {

@@ -6,6 +6,9 @@
   --bg-elev: #14141c;
   --bg-elev-1: #12121a;
   --bg-elev-2: #1b1b26;
+  /* Floating menus, session lists, task/todo cards: one step lighter than the panel they sit on. */
+  --bg-popup: #242432;
+  --bg-popup-hover: #2e2e3e;
   --bg-panel: #14141c;
   --bg-elevated: #1b1b26;
   --bg-input: #161622;
@@ -46,6 +49,8 @@
   --bg-elev: #ffffff;
   --bg-elev-1: #f8f8fc;
   --bg-elev-2: #ececf4;
+  --bg-popup: #e8e6f2;
+  --bg-popup-hover: #ddd9ec;
   --bg-panel: #ffffff;
   --bg-elevated: #ececf4;
   --bg-input: #ffffff;

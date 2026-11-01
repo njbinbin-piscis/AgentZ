@@ -677,31 +677,56 @@ pub async fn ext_host_send(state: State<'_, AppState>, message: String) -> Resul
     state.ext_host.write_line(message).await
 }
 
-/// Stop the extension host (kills the child via kill_on_drop).
+/// Stop the extension host. A remote server is asked to shut down first so
+/// it can stop the processes it started; the local child is dropped after.
 #[tauri::command]
 pub async fn ext_host_stop(state: State<'_, AppState>) -> Result<(), String> {
-    let mgr = state.ext_host.clone();
-    let _lifecycle = mgr.lifecycle.lock().await;
-    let generation = {
-        let mut current = mgr.generation.lock().unwrap();
-        *current += 1;
-        *current
-    };
-    mgr.connected.store(false, Ordering::Release);
-    let mut inner = mgr.inner.lock().await;
-    inner.child = None;
-    inner.project_dir = None;
-    inner.target = None;
-    inner.server = None;
-    drop(inner);
-    *mgr.stdin.lock().await = None;
-    remote::forward::stop_all();
-    remote::forward::begin_generation(generation);
-    remote::forward::end_generation(generation);
-    remote::lsp::stop_all();
-    ExtHostManager::fail_pending(&mgr.pending, "extension host stopped");
-    info!("extension host stopped");
+    state.ext_host.shutdown_graceful().await;
     Ok(())
+}
+
+impl ExtHostManager {
+    /// Ask a connected remote agentz-server to exit, then drop the transport.
+    pub async fn shutdown_graceful(&self) {
+        let remote = self
+            .inner
+            .lock()
+            .await
+            .target
+            .as_ref()
+            .is_some_and(|target| !target.is_local());
+        if remote && self.connected.load(Ordering::Acquire) {
+            let _ = tokio::time::timeout(
+                Duration::from_secs(3),
+                self.request("shutdown", serde_json::json!({})),
+            )
+            .await;
+        }
+        self.stop_transport().await;
+    }
+
+    async fn stop_transport(&self) {
+        let _lifecycle = self.lifecycle.lock().await;
+        let generation = {
+            let mut current = self.generation.lock().unwrap();
+            *current += 1;
+            *current
+        };
+        self.connected.store(false, Ordering::Release);
+        let mut inner = self.inner.lock().await;
+        inner.child = None;
+        inner.project_dir = None;
+        inner.target = None;
+        inner.server = None;
+        drop(inner);
+        *self.stdin.lock().await = None;
+        remote::forward::stop_all();
+        remote::forward::begin_generation(generation);
+        remote::forward::end_generation(generation);
+        remote::lsp::stop_all();
+        ExtHostManager::fail_pending(&self.pending, "extension host stopped");
+        info!("extension host stopped");
+    }
 }
 
 /// Report whether the host is running.

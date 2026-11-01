@@ -630,7 +630,9 @@ impl Tool for RemoteShell {
     }
     fn description(&self) -> &str {
         "Execute a POSIX shell command (sh -c) on the remote machine that hosts the workspace. \
-         Working directory defaults to the remote workspace root."
+         Working directory defaults to the remote workspace root. background=true registers the \
+         command in the same background-task list as local commands (output, ready_port/ready_log, \
+         and process_kill)."
     }
     fn input_schema(&self) -> Value {
         json!({
@@ -638,8 +640,13 @@ impl Tool for RemoteShell {
             "properties": {
                 "command": { "type": "string" },
                 "cwd": { "type": "string", "description": "Working directory (relative to the remote workspace root, or absolute)." },
-                "timeout": { "type": "integer", "description": "Timeout in seconds (default 120)." },
-                "env": { "type": "object", "description": "Extra environment variables." }
+                "timeout": { "type": "integer", "description": "Timeout in seconds (default 120). Ignored when background=true." },
+                "env": { "type": "object", "description": "Extra environment variables." },
+                "background": { "type": "boolean", "description": "Start on the remote host and return immediately with a background task id." },
+                "service": { "type": "boolean", "description": "With background=true: a long-lived process (dev server). No runtime cap." },
+                "notify_on": { "type": "string", "description": "For background tasks: exit (default) or ready." },
+                "ready_port": { "type": "integer", "description": "Background task is ready when this port accepts connections on the remote host." },
+                "ready_log": { "type": "string", "description": "Background task is ready when this text appears in its output." }
             },
             "required": ["command"]
         })
@@ -652,6 +659,9 @@ impl Tool for RemoteShell {
             return Ok(ToolResult::err("Missing required parameter: command"));
         };
         let cwd = resolve_path(ctx, &input, "cwd").await?;
+        if let Some(started) = super::remote_background::start_if_background(ctx, command, &cwd, &input)? {
+            return Ok(started);
+        }
         let mut script = String::new();
         if let Some(env) = input["env"].as_object() {
             for (k, v) in env {

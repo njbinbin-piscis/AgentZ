@@ -42,6 +42,24 @@ pub fn manager() -> Option<std::sync::Arc<crate::commands::ext_host::ExtHostMana
     MANAGER.get().cloned()
 }
 
+static BACKGROUND: std::sync::OnceLock<
+    std::sync::Arc<piscis_kernel::background::BackgroundRegistry>,
+> = std::sync::OnceLock::new();
+
+/// The process registry the IDE panel and agent tools share. Remote
+/// background commands register here too.
+pub fn register_background(
+    registry: std::sync::Arc<piscis_kernel::background::BackgroundRegistry>,
+) -> std::sync::Arc<piscis_kernel::background::BackgroundRegistry> {
+    let _ = BACKGROUND.set(registry.clone());
+    registry
+}
+
+pub fn background_registry()
+-> Option<std::sync::Arc<piscis_kernel::background::BackgroundRegistry>> {
+    BACKGROUND.get().cloned()
+}
+
 /// If `path` is an `agentz-remote://` URI for the connected remote, return the
 /// remote path; error if it names a remote that is not connected.
 pub async fn resolve(path: &str) -> Result<Option<String>, String> {

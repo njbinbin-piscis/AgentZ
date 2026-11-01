@@ -485,9 +485,19 @@ pub fn run() {
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app.try_state::<state::AppState>() {
+                    // The remote agentz-server is asked to stop its own children
+                    // before the SSH session is dropped. Run off this thread so a
+                    // stuck transport cannot pin process exit.
+                    let host = state.ext_host.clone();
+                    let (done_tx, done_rx) = std::sync::mpsc::channel();
+                    std::thread::spawn(move || {
+                        tauri::async_runtime::block_on(host.shutdown_graceful());
+                        let _ = done_tx.send(());
+                    });
+                    let _ = done_rx.recv_timeout(std::time::Duration::from_secs(4));
                     if state.background_runs.kill_all() > 0 {
-                        // Give the exec threads a moment to tear down process trees.
-                        std::thread::sleep(std::time::Duration::from_millis(800));
+                        // Local process trees, and remote kills sent over SSH.
+                        std::thread::sleep(std::time::Duration::from_millis(2000));
                     }
                 }
             }

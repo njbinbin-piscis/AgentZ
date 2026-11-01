@@ -15,7 +15,7 @@
   flex-direction: column;
   width: min(900px, calc(92vw / var(--ui-font-scale, 1)), 100%);
   height: min(680px, calc(88vh / var(--ui-font-scale, 1)), 100%);
-  background: var(--bg, #0e0e14);
+  background: var(--bg-popup, #242432);
   border: 1px solid var(--border, #2a2a38);
   border-radius: 12px;
   overflow: hidden;

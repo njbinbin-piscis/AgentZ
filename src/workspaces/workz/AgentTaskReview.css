@@ -13,7 +13,7 @@
 .agentz-task-review {
   width: min(1000px, calc(92vw / var(--ui-font-scale, 1)), 100%);
   height: min(720px, calc(88vh / var(--ui-font-scale, 1)), 100%);
-  background: var(--bg-elev);
+  background: var(--bg-popup, #242432);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 8px;

@@ -261,9 +261,21 @@ export class AgentzServer {
   private nextProc = 1;
 
   constructor(private readonly emit: Emit) {
-    process.on("exit", () => {
-      for (const child of this.procs.values()) child.kill();
-    });
+    process.on("exit", () => this.stopChildren());
+  }
+
+  /** Stop processes, watchers and sockets this server started. */
+  private finishShutdown(): void {
+    this.stopChildren();
+    for (const watcher of this.watchers.values()) watcher.close();
+    this.watchers.clear();
+    for (const socket of this.sockets.values()) socket.destroy();
+    this.sockets.clear();
+  }
+
+  private stopChildren(): void {
+    for (const child of this.procs.values()) child.kill();
+    this.procs.clear();
   }
 
   static isControl(msg: unknown): msg is ControlRequest {
@@ -274,6 +286,7 @@ export class AgentzServer {
     try {
       const result = await this.dispatch(req.method, req.params ?? {});
       this.emit({ $agentz: "res", id: req.id, result: result ?? null });
+      if (req.method === "shutdown") setTimeout(() => process.exit(0), 50);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       this.emit({ $agentz: "res", id: req.id, error: { message: e?.message ?? String(err), code: e?.code ?? null } });
@@ -365,6 +378,9 @@ export class AgentzServer {
         this.procs.get(p.pid as number)?.kill();
         return true;
       }
+      case "shutdown":
+        this.finishShutdown();
+        return { ok: true };
       default:
         throw new Error(`unknown agentz method: ${method}`);
     }

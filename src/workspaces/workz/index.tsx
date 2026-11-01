@@ -201,6 +201,7 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
             }
             s.setPreviewPath(BROWSER_TAB_PATH);
           }}
+          onOpenFile={(path) => s.setPreviewPath(path)}
           onOpenReview={(wt) => s.setReviewTask(wt)}
           selectedId={s.selectedId}
           hasSteps={s.steps.length > 0}

@@ -121,7 +121,7 @@
   padding: 4px;
   border: 1px solid var(--border, #3a3a4a);
   border-radius: 10px;
-  background: var(--bg-elev, #14141c);
+  background: var(--bg-popup, #242432);
   color: var(--text, #e8e8f0);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }

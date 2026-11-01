@@ -188,7 +188,9 @@ impl AppState {
             chat_cancel: Arc::new(Mutex::new(None)),
             task_cancel: Arc::new(Mutex::new(HashMap::new())),
             agent_slots: Arc::new(Semaphore::new(agent_concurrency())),
-            background_runs: Arc::new(piscis_kernel::background::BackgroundRegistry::new()),
+            background_runs: crate::remote::register_background(Arc::new(
+                piscis_kernel::background::BackgroundRegistry::new(),
+            )),
             bg_hub: Arc::new(
                 crate::runtime::background_continuation::BgContinuationHub::new(),
             ),

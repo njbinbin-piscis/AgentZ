@@ -4,7 +4,6 @@ import ChatComposer from "../../components/ChatComposer";
 import TaskPanel from "../../components/TaskPanel";
 import ContextUsageRing from "../../components/ContextUsageRing";
 import AssistantMessageList from "./AssistantMessageList";
-import BackgroundTasksPanel from "./BackgroundTasksPanel";
 import { useBackgroundTasks } from "../../hooks/useBackgroundTasks";
 import { useAssistantSession } from "./useAssistantSession";
 import "./AssistantPanel.css";
@@ -116,17 +115,6 @@ export default function AssistantPanel(props: AssistantPanelProps) {
           ))}
         </div>
       )}
-
-      <BackgroundTasksPanel
-        tasks={bg.tasks}
-        currentSessionId={s.sessionRef.current}
-        onKill={(id) => void bg.kill(id)}
-        onOpenFile={s.onSelectPath}
-        onOpenSession={(id) => {
-          const meta = s.sessions.find((x) => x.id === id);
-          void s.switchSession(id, meta?.source);
-        }}
-      />
 
       <TaskPanel
         planItems={s.planItems}

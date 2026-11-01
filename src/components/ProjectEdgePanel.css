@@ -67,7 +67,7 @@
   right: 26px;
   width: 256px;
   max-height: min(420px, 70vh);
-  background: var(--bg-elev, #14141c);
+  background: var(--bg-popup, #242432);
   border: 1px solid var(--border, #2a2a38);
   border-radius: 8px 0 0 8px;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.35);

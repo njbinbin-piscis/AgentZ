@@ -586,7 +586,7 @@
 
 /* Tab header right-click context menu (VS Code style) */
 .ide-tab-context-menu {
-  background: var(--bg-secondary);
+  background: var(--bg-popup, #242432);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm, 4px);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
@@ -1827,7 +1827,7 @@
   max-height: min(440px, calc(100vh / var(--ui-font-scale, 1) - 64px), 100%);
   display: flex;
   flex-direction: column;
-  background: var(--bg-secondary);
+  background: var(--bg-popup, #242432);
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--shadow-lg);

@@ -14,10 +14,10 @@ import {
 } from "../../services/tauri/chat";
 import { getActiveChatSession, subscribeActiveChatSession } from "../../services/activeChatSession";
 import { useAppSettings } from "../../hooks/useAppSettings";
-import { useBackgroundTasks } from "../../hooks/useBackgroundTasks";
 import { loadScopedModelId, saveScopedModelId, subscribeScopedModelId } from "../../utils/modelPrefs";
 import { summarizeUsage, type UsageSummaryView } from "../../utils/modelPricing";
 import type { BottomTab } from "./BottomPanel";
+import BackgroundTasksButton from "../../components/BackgroundTasksButton";
 
 interface IdeStatusBarProps {
   projectDir: string | null;
@@ -26,6 +26,8 @@ interface IdeStatusBarProps {
   onOpenExtensions: () => void;
   /** Open the remote connection dialog. */
   onOpenRemote: () => void;
+  /** Open a file named by a background task (redirected output). */
+  onOpenFile?: (path: string) => void;
 }
 
 const CODICON_GLYPHS: Record<string, string> = {
@@ -90,9 +92,8 @@ export function formatCompactTokens(tokens: number): string {
  * the Extensions sidebar (marketplace + installed extensions); extension
  * output lives in the bottom panel and is opened from there, not from here.
  */
-export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions, onOpenRemote }: IdeStatusBarProps) {
+export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions, onOpenRemote, onOpenFile }: IdeStatusBarProps) {
   const { t } = useTranslation();
-  const bg = useBackgroundTasks(projectDir);
   const { statusBar, running, scm, hostError } = useExtensionUi();
   const { appSettings, llmProviders, defaultModelLabel } = useAppSettings();
   const [selectedModelId, setSelectedModelId] = useState<string>(() => loadScopedModelId("codez"));
@@ -244,14 +245,12 @@ export default function IdeStatusBar({ projectDir, onOpenPanel, onOpenExtensions
         {running ? t("extensions.nav") : t("extensions.hostOff")}
       </button>
 
-      {bg.running.length > 0 && (
-        <span
-          className="ide-status-item"
-          title={bg.running.map((x) => x.label).join("\n")}
-        >
-          <span className="agentz-session-dot running" /> {t("chat.bgRunningCount", { count: bg.running.length })}
-        </span>
-      )}
+      <BackgroundTasksButton
+        projectDir={projectDir}
+        className="ide-status-item"
+        preferredSource="codez"
+        onOpenFile={onOpenFile}
+      />
 
       {scm.length > 0 && (
         <button className="ide-status-item" title={t("ide.sourceControl")} onClick={() => onOpenPanel("scm")}>

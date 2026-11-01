@@ -38,7 +38,7 @@
   padding: 9px 14px;
   border-radius: 10px;
   border: 1px solid var(--border, #2a2a38);
-  background: var(--bg-elev-2, #1b1b26);
+  background: var(--bg-popup, #242432);
   color: var(--text, #e8e8f0);
   font-size: 12px;
   line-height: 1.45;
@@ -656,7 +656,7 @@
   right: 28px;
   width: 240px;
   max-height: min(360px, 70%);
-  background: var(--bg-elev, #14141c);
+  background: var(--bg-popup, #242432);
   border: 1px solid var(--border, #2a2a38);
   border-radius: 8px 0 0 8px;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.35);
