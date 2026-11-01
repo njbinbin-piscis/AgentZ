@@ -2,6 +2,16 @@
 
 Static verification from source. Live baseline (T0.2) is NOT collected here; see bottom.
 
+> **Status note (2026-11-02, 1.0.40).** Conclusions stand, with one change to T0.1:
+> registration now also depends on the global delegation mode in
+> `{config}/delegation.json` (`src-tauri/src/commands/delegation.rs`, default `auto`).
+> `off` registers none of the three tools, `research` registers only `delegate` /
+> `call_fish`, `auto` adds `task`; plan mode registers `delegate` only when the mode
+> is not `off`. The strip list in `subagent_policy.rs` is `DELEGATION_TOOLS`
+> (`delegate`, `call_fish`, `task`) + `TEAM_POOL_TOOLS` (`pool_chat`, `pool_org`), and
+> sub-agents also never get `SUBAGENT_NEVER_TOOLS` (`chat_ui*`, `plan_mode_ui`,
+> `plan_write`, `plan_todo`, `memory_store`).
+
 ## T0.1 Tool registration by path
 
 `build_tool_registry` (`src-tauri/src/commands/chat_turn/tool_approval.rs`) builds

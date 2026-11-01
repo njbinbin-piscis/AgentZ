@@ -1,240 +1,257 @@
-# AgentZ 产品成熟度与工程审查
+# AgentZ Product Maturity and Engineering Review
 
-日期：2026-10-04。审查对象：AgentZ 桌面应用及 Cargo.lock 固定的 piscis-engine v0.8.68。
+**English** | [简体中文](agentz-product-maturity-review-2026-10-04.zh-CN.md)
 
-审查开始时版本为 0.9.5；期间其他工作更新到 0.9.6（a787b6d）。这是活动工作区审查，不是冻结提交的认证。审查未修改产品代码。
+> Status (2026-11-02): re-checked against AgentZ 1.0.40 with piscis-engine pinned at v0.8.71 (`Cargo.toml`). The original findings and conclusions below are kept as written; file/line references in the evidence describe the 0.9.5/0.9.6 code at review time and many have since moved. Current state, as far as it can be confirmed in code:
+>
+> - **F01 fixed (in code)**: tasks now have a persisted `TaskEnvironment` record (`environment_id`, `project_root`, `workspace_root`, `branch`, `base_ref`, `base_sha`) registered in `src-tauri/src/commands/agent_task.rs` (`agent_task_create`), and `chat.rs` resolves the run directory via `resolve_task_workspace` instead of trusting a frontend ref. Not re-verified through desktop interaction.
+> - **F02 fixed**: `agent_task_change_set` / `agent_task_file_view` collect changes from the task's actual `workspace_root` against the frozen `base_sha` (`agentz_task_state::changes`) and return typed errors. The legacy branch-only `agent_task_changed_files` / `agent_task_file_diff` still exist and still use `unwrap_or_default()`.
+> - **F03 fixed**: `src-tauri/src/commands/journal.rs` (`open_task_journal`) resolves the task workspace before opening storage.
+> - **F04 fixed**: `agent_task_discard` now archives (`agentz_task_state::cleanup::retain_task`), requires a stable task id, holds the cleanup lease and returns a receipt; `agent_task_archive_snapshot` / `agent_task_restore_snapshot` exist.
+> - **F05 partially fixed**: task creation takes a `start_mode` (default `commit`) and records `base_sha`; merge is a versioned transaction (`agent_task_merge_preview` / `agent_task_merge` with expected task/target heads and a repository lock). Implicit `git init` / empty-commit behaviour was not re-checked.
+> - **F06 partially fixed**: isolation is now on by default (`src/workspaces/workz/useWorkzSessionStore.ts`, `agentz-workz-isolate !== "0"`). An enforced process/network/desktop sandbox was not confirmed.
+> - **F07 partially fixed**: the Webview iframe now uses `sandbox="allow-scripts"` without `allow-same-origin` (`src/extensions/ui/WebviewHost.tsx`), and the CSP uses `frame-src 'self'` (`src-tauri/tauri.conf.json`). Functional verification in a real Tauri build is still required.
+> - **F08 fixed in the kernel**: `Settings::save` in `vendor/piscis-engine/piscis-kernel/src/store/settings.rs` now fails closed (SecretStore and per-field encryption errors propagate), writes atomically via a temp file, and the master key can be protected by the OS credential store (`security/secrets.rs`).
+> - **F09 partially fixed**: `chatSend` rejects `clearPlan: true` and continuation preserves the plan (`src/services/tauri/chat.ts`). A unified durable Task/Run/Attempt model was not fully verified.
+> - **F10 open**: the WorkZ logic moved into `useWorkzSessionStore.ts` (about 1650 lines); `chat_turn` is now a module (`mod.rs` ~940, `tool_approval.rs` ~1140, `prompt_assembly.rs` ~900 lines).
+> - **F11 partially addressed**: the frontend now has 69 test files (vs 7 at review time). No full desktop E2E for the task lifecycle was found.
+> - **F12 open**: no updater is configured in `src-tauri/tauri.conf.json`.
 
-## 判断与范围
+Date: 2026-10-04. Subject: the AgentZ desktop application and piscis-engine v0.8.68 as pinned by Cargo.lock.
 
-AgentZ 已有实质性的桌面 Agent 产品基础：Tauri/Rust 宿主、React/Monaco 工作台、共享 Agent 内核、Node 扩展宿主、远程开发、工具权限、文件变更 journal、任务与团队。它超过了单纯聊天框加工具的原型，但当前更适合定位为功能丰富的开发者预览版；尚不能凭现有证据宣称是可放心交付长期任务的成熟桌面产品。
+The version was 0.9.5 when the review started; other work during the review moved it to 0.9.6 (a787b6d). This is a review of an active working tree, not certification of a frozen commit. The review did not modify product code.
 
-主要差距在任务身份、执行环境、变更评审、恢复与授权之间的契约，而非再增加功能入口。建议先完成单任务的可靠闭环，再扩大团队、渠道和自动化。
+## Verdict and scope
 
-本次覆盖架构、核心执行路径、任务隔离与评审、权限与凭据、扩展集成、持久化、CI、发布及产品定位。采用源码交叉检查、前端检查、宿主编译检查和临时 Git 仓库实验。未实际操作桌面 UI，未运行真实模型长任务、远程主机、安装器和平台故障注入，因此视觉体验、实际漏洞可利用性、长期稳定性和跨平台兼容性仍需专项验证。
+AgentZ already has a substantial foundation for a desktop Agent product: a Tauri/Rust host, a React/Monaco workbench, a shared Agent kernel, a Node extension host, remote development, tool permissions, a file-change journal, tasks and teams. It is beyond a prototype of a chat box plus tools, but it is currently best positioned as a feature-rich developer preview; the existing evidence does not yet support claiming it is a mature desktop product to which long-running tasks can be confidently delegated.
 
-## 产品定义
+The main gaps are in the contracts between task identity, execution environment, change review, recovery and authorization, not in adding more feature entry points. We recommend first completing a reliable end-to-end loop for a single task, then expanding teams, channels and automation.
 
-建议定位为：以开发者为首批用户，让人与 Agent 在同一个工作空间里完成代码、研究和文档交付的桌面工作台。
+This review covered architecture, the core execution path, task isolation and review, permissions and credentials, extension integration, persistence, CI, release and product positioning. Methods: source cross-checking, frontend checks, host compile checks and experiments in a temporary Git repository. We did not drive the desktop UI, and did not run long real-model tasks, remote hosts, installers or platform fault injection, so visual experience, real-world exploitability, long-term stability and cross-platform compatibility still need dedicated verification.
 
-CodeZ 是人直接操作工作的视图：阅读、编辑、调试、测试、检查细节。WorkZ 是人委派工作的视图：提出目标、观察进展、补充约束、处理阻塞、评审交付。两者共用任务、执行环境、授权、上下文、产物和历史。
+## Product definition
 
-关键体验应是：用户交给 WorkZ 修复问题 → Agent 在指定环境执行 → 用户在 CodeZ 打开同一环境接手 → 人的编辑成为后续上下文 → Agent 继续同一任务 → 用户检查完整变更和验证证据 → 应用或开 PR → 环境可以安全归档与恢复。
+Recommended positioning: a desktop workbench, with developers as the first users, where people and Agents deliver code, research and documentation together in the same workspace.
 
-当前 README 的 Cursor/Codex 类比可以解释入口，但不能替代产品定义。官方 Worktrees 文档展示了同一聊天关联稳定工作区、Local/Worktree 交接、归档前快照与恢复；这些可以作为生命周期设计参照，而无需照搬界面：https://learn.chatgpt.com/docs/environments/git-worktrees 。
+CodeZ is the view where a person works directly: reading, editing, debugging, testing, inspecting details. WorkZ is the view where a person delegates work: stating goals, watching progress, adding constraints, handling blockers, reviewing deliverables. Both share tasks, execution environments, authorization, context, artifacts and history.
 
-### 产品应对用户作出的承诺
+The key experience should be: the user hands WorkZ a bug fix → the Agent runs in a designated environment → the user opens the same environment in CodeZ and takes over → the human's edits become subsequent context → the Agent continues the same task → the user reviews the full change set and verification evidence → applies it or opens a PR → the environment can be safely archived and restored.
 
-1. 始终能看到 Agent 在哪个目录、哪个分支、用什么模型和授权运行。
-2. 切换任务或视图不会改变任务的执行环境。
-3. 停止能够停止后续动作；重新打开能够解释已完成、未完成和待确认的工作。
-4. 评审覆盖实际改动，包括未提交文件和新文件；“没有改动”不能掩盖读取失败。
-5. 删除、发布、发送、合并等动作具有明确对象、状态反馈和恢复策略。
-6. Agent 完成意味着交付目标与验证证据满足要求，不能仅以模型结束输出作为成功。
+The current README's Cursor/Codex analogy explains the entry points but cannot replace a product definition. The official Worktrees documentation shows a chat bound to a stable workspace, Local/Worktree handoff, and snapshot-before-archive with restore; these can serve as a lifecycle design reference without copying the UI: https://learn.chatgpt.com/docs/environments/git-worktrees .
 
-## 已有基础的价值
+### Promises the product should make to users
 
-| 领域 | 已有实现与意义 | 成熟化缺口 |
+1. The user can always see which directory, branch, model and authorization the Agent is running with.
+2. Switching tasks or views never changes a task's execution environment.
+3. Stop actually stops subsequent actions; reopening explains what was completed, what was not, and what awaits confirmation.
+4. Review covers the actual changes, including uncommitted and new files; "no changes" must never mask a read failure.
+5. Delete, publish, send, merge and similar actions have an explicit target, status feedback and a recovery strategy.
+6. An Agent being "done" means the delivery goal and verification evidence meet the requirements; the model finishing its output is not success by itself.
+
+## Value of the existing foundation
+
+| Area | Existing implementation and its value | Maturity gap |
 | --- | --- | --- |
-| 桌面宿主 | Tauri 2、Rust 命令、PTY、LSP/DAP、浏览器 | 子进程故障恢复、资源治理和平台验证 |
-| CodeZ | Monaco、Git、搜索、终端、语言功能、行内编辑 | 真实工程基准、扩展兼容证据、人与 Agent 并发编辑契约 |
-| WorkZ | 会话任务、并发槽、任务取消、可选 worktree | 任务与环境持久绑定、重启对账、可靠评审 |
-| 内核 | 固定版本共享执行循环、策略门禁、工具、上下文能力 | 宿主与内核的版本化契约和故障测试 |
-| 恢复 | 会话数据库、文件 journal、编辑器未保存缓冲恢复 | 普通任务计划/运行状态/环境统一恢复 |
-| 团队 | Pool 蜂群、可视工作流、workflow run JSON | 成员隔离、预算分配、集成验收、跨任务资源治理 |
-| 扩展 | 执行扩展 JS 的 Node 宿主及 smoke | 扩展兼容矩阵、Webview 安全与功能专项测试 |
-| 交付 | lint、typecheck、Vitest、Rust clippy/test CI、多平台构建 | 签名、更新、迁移、安装后运行验收 |
+| Desktop host | Tauri 2, Rust commands, PTY, LSP/DAP, browser | Child-process failure recovery, resource governance and platform verification |
+| CodeZ | Monaco, Git, search, terminal, language features, inline edit | Real-project benchmarks, extension compatibility evidence, a contract for concurrent human/Agent editing |
+| WorkZ | Session tasks, concurrency slots, task cancellation, optional worktree | Durable task–environment binding, restart reconciliation, reliable review |
+| Kernel | Pinned shared execution loop, policy gates, tools, context capabilities | Versioned host–kernel contract and fault tests |
+| Recovery | Session database, file journal, recovery of unsaved editor buffers | Unified recovery of plan/run state/environment for ordinary tasks |
+| Teams | Pool swarm, visual workflows, workflow run JSON | Member isolation, budget allocation, integration acceptance, cross-task resource governance |
+| Extensions | Node host that executes extension JS, plus smoke tests | Extension compatibility matrix, dedicated Webview security and functional tests |
+| Delivery | lint, typecheck, Vitest, Rust clippy/test CI, multi-platform builds | Signing, updates, migration, post-install run acceptance |
 
-已有 CI 相当有价值，不能把项目误判为“没有测试”。但 CI 主要在 Ubuntu 执行；打包多个平台不等于在各平台验证桌面行为。
+The existing CI is genuinely valuable; the project must not be misjudged as "having no tests". However, CI runs mainly on Ubuntu, and packaging for several platforms is not the same as verifying desktop behaviour on each.
 
-## 代码审查发现
+## Code review findings
 
-优先级：P0 为应阻断更广泛用户交付的高影响正确性问题；P1 为下一成熟化里程碑必须解决；P2 为持续治理。下述“已确认”指源码行为，只有明确注明实验的项目具有运行复现证据。
+Priorities: P0 is a high-impact correctness issue that should block wider user delivery; P1 must be solved in the next maturity milestone; P2 is ongoing governance. "Confirmed" below refers to source behaviour; only items explicitly marked as experiments have runtime reproduction evidence.
 
-### F01 / P0：worktree 绑定属于视图状态，任务切换可串用环境
+### F01 / P0: worktree binding is view state, so switching tasks can reuse the wrong environment
 
-证据：`src/workspaces/workz/index.tsx:192` 将 worktree 保存在组件 state；303–304 将其映射为一个全局 ref；784–789 下一轮从该 ref 取环境；978 附近的 `openTask` 恢复聊天与 cwd，却不恢复对应 worktree。创建新任务和项目切换会清空该状态，重新打开旧任务不会从持久任务记录恢复。
+Evidence: `src/workspaces/workz/index.tsx:192` kept the worktree in component state; lines 303–304 mapped it to a single global ref; lines 784–789 took the environment for the next turn from that ref; `openTask` around line 978 restored chat and cwd but not the matching worktree. Creating a new task and switching projects cleared that state, and reopening an old task did not restore it from a persisted task record.
 
-触发路径：隔离任务 A 创建 worktree A → 新建 B 清空 worktree → B 创建 worktree B → 打开 A → 给 A 发送后续消息。代码仍取当前 ref 的 worktree B。重启后打开 A 也可能创建另一环境，而非回到 A 的原环境。这是代码路径推导，尚未通过桌面交互复现。
+Trigger path: isolated task A creates worktree A → creating B clears the worktree → B creates worktree B → open A → send a follow-up message to A. The code still takes worktree B from the current ref. After a restart, opening A may also create another environment instead of returning to A's original one. This is derived from the code path and has not been reproduced through desktop interaction.
 
-修复：为每个任务持久化 environment_id、project_id、路径、分支和起点 SHA；后端根据 task_id 解析执行环境；前端不再作为运行路径的权威。启动每轮前校验所属仓库、登记的 worktree 和分支。
+Fix: persist environment_id, project_id, path, branch and starting SHA per task; the backend resolves the execution environment from task_id; the frontend is no longer the authority for the run path. Before each turn, validate the owning repository, the registered worktree and the branch.
 
-验收：A/B 连续切换、运行时切换、重启后续聊，均只在各自环境产生改动；失效环境必须阻塞并解释，不能悄悄换目录。
+Acceptance: repeated A/B switching, switching while running, and continuing after restart all produce changes only in each task's own environment; an invalid environment must block and explain, never silently switch directories.
 
-### F02 / P0：分支评审遗漏未提交与未跟踪改动，读取错误表现为空
+### F02 / P0: branch review misses uncommitted and untracked changes, and read errors appear as empty
 
-证据：`src-tauri/src/commands/agent_task.rs:240` 附近的 changed_files 使用 `git diff base...branch`；file_diff 使用 `git show branch:path`。两者只能读取提交树。Git 失败通过 `unwrap_or_default()` 转为空结果。WorkZ 结束路径未强制建立包含所有任务改动的快照，也未要求任务先提交。
+Evidence: around `src-tauri/src/commands/agent_task.rs:240`, changed_files used `git diff base...branch`; file_diff used `git show branch:path`. Both can only read committed trees. Git failures were turned into empty results via `unwrap_or_default()`. The WorkZ completion path did not force a snapshot containing all task changes, nor require the task to commit first.
 
-实际实验：在临时仓库创建任务分支，修改 tracked.txt 并新建 new.txt；与当前评审相同的分支 diff 输出为空，`git status --short` 显示一个修改和一个新文件。实验目录保留于 `%TEMP%/agentz-review-5e44bb8f19364728ae98d6b57ee99fb4`。
+Experiment: in a temporary repository, create a task branch, modify tracked.txt and create new.txt; a branch diff identical to the current review produced empty output, while `git status --short` showed one modification and one new file. The experiment directory was kept at `%TEMP%/agentz-review-5e44bb8f19364728ae98d6b57ee99fb4`.
 
-修复：评审明确区分已提交差异、暂存、未暂存、未跟踪；读取实际 worktree 或可恢复的完整快照。冻结 base SHA 与评审 snapshot SHA。Git 错误应返回明确错误；新文件/删除文件允许的不存在情况单独处理。
+Fix: review explicitly distinguishes committed diffs, staged, unstaged and untracked; read the actual worktree or a recoverable complete snapshot. Freeze the base SHA and the review snapshot SHA. Git errors must return explicit errors; the allowed "does not exist" cases for new/deleted files are handled separately.
 
-验收：仅编辑不提交、只新建文件、删除、改名、二进制、含特殊字符路径和非法 base 都有正确且可解释结果。
+Acceptance: edit-only-without-commit, new-file-only, deletion, rename, binary, paths with special characters and invalid base all produce correct and explainable results.
 
-### F03 / P1：隔离任务的 journal 写入位置与前端查询位置不一致
+### F03 / P1: journal write location for isolated tasks differs from where the frontend queries it
 
-证据：`src-tauri/src/commands/chat.rs:99` 用 agent_workspace 打开 journal；隔离模式下 journal 位于 worktree 的 `.agentz/journal.db`。`src/workspaces/workz/index.tsx:869` 附近用主 projectDir 调用 journalListChanges；`src-tauri/src/commands/journal.rs:18` 根据该 project 打开主目录 journal。
+Evidence: `src-tauri/src/commands/chat.rs:99` opened the journal using agent_workspace; in isolated mode the journal lives in the worktree's `.agentz/journal.db`. Around `src/workspaces/workz/index.tsx:869`, journalListChanges was called with the main projectDir; `src-tauri/src/commands/journal.rs:18` opened the main-directory journal for that project.
 
-影响：隔离任务真实有文件改动，回合后的 journal 评审仍可能为空。Git 分支评审与 journal 评审的两个缺口叠加，削弱交付可信度。
+Impact: an isolated task with real file changes may still show an empty journal review after the turn. Combined with the Git branch review gap, this weakens trust in delivery.
 
-修复：按 task/environment 解析 journal 的存储与文件根；查询和 Undo 使用同一绑定；统一 task artifact API，不要求 UI 猜存储路径。
+Fix: resolve journal storage and file root by task/environment; queries and Undo use the same binding; unify a task artifact API so the UI does not guess storage paths.
 
-### F04 / P1：丢弃任务强制删除且无恢复，错误被吞掉
+### F04 / P1: discarding a task force-deletes with no recovery, and errors are swallowed
 
-证据：`src-tauri/src/commands/agent_task.rs:329` 附近连续执行 worktree remove --force 与 branch -D，忽略两次错误后返回成功。前端有确认弹窗，因此这是已确认的破坏性设计及反馈问题，不应描述为无确认自动删除。
+Evidence: around `src-tauri/src/commands/agent_task.rs:329`, `worktree remove --force` and `branch -D` ran back to back, both errors were ignored and success was returned. The frontend has a confirmation dialog, so this is a confirmed destructive-design and feedback issue; it should not be described as deletion without confirmation.
 
-影响：未提交文件可能永久丢失；删除失败也可能显示任务已解决；接口没有验证传入路径、分支是否属于该任务。
+Impact: uncommitted files may be permanently lost; a failed deletion may still show the task as resolved; the API did not validate that the given path and branch belong to the task.
 
-修复：默认归档，删除前保存包括未提交和非忽略新文件的可恢复快照；忽略文件明确提示保留规则。验证登记的任务环境，顺序执行并返回各步状态，运行中的任务先停止和等待。永久删除作为独立操作。
+Fix: archive by default; before deletion, save a recoverable snapshot including uncommitted and non-ignored new files; state the retention rules for ignored files explicitly. Validate the registered task environment, execute steps in order and return per-step status; stop and wait for a running task first. Make permanent deletion a separate operation.
 
-### F05 / P1：任务创建和合并存在隐式工作区副作用
+### F05 / P1: task creation and merge have implicit workspace side effects
 
-证据：ensure_git_repo 自动 git init；不存在 HEAD 时 `git commit --allow-empty`。如果已有暂存内容，该提交也可能包含暂存文件。默认 base 是当前分支名，未冻结创建时 commit；新 worktree 不包含主目录未提交修改。merge 直接在用户主目录 checkout base，再 no-ff merge；成功路径不恢复 original，失败恢复为 best effort；缺少仓库级事务/互斥与完整预检。
+Evidence: ensure_git_repo ran `git init` automatically; when there was no HEAD it ran `git commit --allow-empty`. If content was already staged, that commit could include the staged files. The default base was the current branch name, not a commit frozen at creation; a new worktree does not contain uncommitted changes from the main directory. Merge checked out base directly in the user's main directory and then did a no-ff merge; the success path did not restore the original branch, and restoring on failure was best effort; there was no repository-level transaction/mutex or complete pre-check.
 
-修复：非 Git 项目采用明确的文件快照环境；创建 Git 管理作为显式项目设置。起点提供“分支提交”与“含当前未提交工作”选项，并记录 SHA。合并使用明确目标与工作区互斥，预检脏文件、当前运行、冲突和 HEAD 变化；不要让 Agent 推理决定这些底层保证。
+Fix: non-Git projects use an explicit file-snapshot environment; creating Git management becomes an explicit project setting. Offer "branch commit" and "include current uncommitted work" as starting options and record the SHA. Merge uses an explicit target and a workspace mutex, and pre-checks dirty files, current runs, conflicts and HEAD changes; do not let Agent reasoning decide these low-level guarantees.
 
-### F06 / P1：默认隔离行为与宣传不一致；worktree 不构成系统沙箱
+### F06 / P1: default isolation does not match what is advertised; a worktree is not a system sandbox
 
-证据：`src/workspaces/workz/index.tsx:190` 只有 localStorage 值为 1 才开启隔离，首次运行默认关闭；README 却把任务隔离作为常规能力描述。执行 registry 包含 shell 等有副作用工具；Git worktree 提供代码副本，但不能限制 shell 访问其他目录、网络或桌面。
+Evidence: `src/workspaces/workz/index.tsx:190` enabled isolation only when the localStorage value was 1, so it was off on first run, while the README described task isolation as a standard capability. The execution registry includes side-effecting tools such as shell; a Git worktree provides a code copy but cannot restrict shell access to other directories, the network or the desktop.
 
-修复：将运行目标清楚呈现在输入区域；自治代码任务优先提供隔离环境。建立文件范围、进程、网络、桌面和连接器权限的实际执行边界；让“宽松权限”成为有明确范围的配置。README 的“无法损坏主工作区”式保证应改为准确描述。
+Fix: show the run target clearly in the input area; prefer isolated environments for autonomous coding tasks. Build actual enforcement boundaries for file scope, processes, network, desktop and connector permissions; make "permissive permissions" a configuration with an explicit scope. README guarantees of the "cannot damage the main workspace" kind should be rewritten accurately.
 
-### F07 / P1：Webview 实现与全局 CSP 存在冲突，并留有隔离风险
+### F07 / P1: the Webview implementation conflicts with the global CSP and leaves isolation risks
 
-证据：`src/extensions/ui/WebviewHost.tsx:35` 注入 inline script；52 行使用 srcDoc iframe 与 allow-scripts、allow-same-origin。`src-tauri/tauri.conf.json:26` 设置 frame-src none、script-src self。
+Evidence: `src/extensions/ui/WebviewHost.tsx:35` injected an inline script; line 52 used a srcDoc iframe with allow-scripts and allow-same-origin. `src-tauri/tauri.conf.json:26` set frame-src none and script-src self.
 
-功能风险：当前 CSP 与 iframe/inline shim 预期冲突，扩展 Webview 需要真实 Tauri 验证。安全风险：若直接放开 CSP，同源 srcdoc 同时允许脚本和同源会削弱 iframe 隔离；不能为修功能简单启用 unsafe-inline。尚未证实在当前构建中可利用。
+Functional risk: the CSP at that time conflicted with what the iframe/inline shim expected, so extension Webviews need real Tauri verification. Security risk: if the CSP were simply opened up, a same-origin srcdoc that allows both scripts and same-origin weakens iframe isolation; unsafe-inline must not be enabled just to make it work. Exploitability in the then-current build was not confirmed.
 
-修复：独立 origin 或去掉同源权限、每面板独立 state、nonce CSP、受控资源映射和严格消息协议。增加“能够渲染”和“无法访问宿主 DOM/IPC/其他面板”两类验收。
+Fix: a separate origin or removal of the same-origin permission, independent state per panel, nonce CSP, controlled resource mapping and a strict messaging protocol. Add two kinds of acceptance: "can render" and "cannot access host DOM/IPC/other panels".
 
-### F08 / P1：已有凭据加密，但加密失败可能降级到明文保存
+### F08 / P1: credentials are encrypted, but encryption failure may fall back to plaintext storage
 
-证据：Cargo.lock 固定的 `527e554` 内核中 Settings::save 在 SecretStore 创建失败时跳过加密，encrypt_field 在加密失败时保留原字段，随后序列化写入。SecretStore 用 ChaCha20-Poly1305，密钥位于配置目录 `.secret_key`；这不是“完全没有加密”。
+Evidence: in the `527e554` kernel pinned by Cargo.lock, Settings::save skipped encryption when creating the SecretStore failed, encrypt_field kept the original field when encryption failed, and the result was then serialized and written. SecretStore uses ChaCha20-Poly1305 with the key in `.secret_key` in the config directory; this is not "no encryption at all".
 
-影响：密钥文件损坏或不可用等情况仍可能保存明文；配置和密钥一起复制时，本地加密保护有限。设置通过前端传递密钥，还需专项检查日志、导出和 app_control 返回值的脱敏。
+Impact: in cases such as a corrupted or unavailable key file, plaintext may still be saved; if the config and key are copied together, local encryption offers limited protection. Settings pass secrets through the frontend; redaction in logs, exports and app_control return values needs a dedicated check.
 
-正面事实：app_control 的 get_settings 已调用 redact_secrets；后续验证应检查脱敏覆盖与其他数据出口，不能将该接口描述为直接向模型返回原始密钥。
+Positive fact: app_control's get_settings already calls redact_secrets; follow-up verification should check redaction coverage and other data exits, and must not describe that interface as returning raw keys to the model.
 
-修复：加密失败即拒绝保存；使用系统凭据库保护主密钥；新建密钥和配置采用原子写入与访问控制。凭据模型仅传 secret reference，读取设置返回存在状态/掩码，替换与删除分开。此项需在 piscis-engine 修复并发布新的固定版本。
+Fix: refuse to save when encryption fails; protect the master key with the OS credential store; create keys and config with atomic writes and access control. The credential model should pass only secret references; reading settings returns presence/mask; replace and delete are separate. This needs to be fixed in piscis-engine and released as a new pinned version.
 
-### F09 / P1：普通任务运行状态尚未形成耐久的统一模型
+### F09 / P1: ordinary task run state does not yet form a durable unified model
 
-证据：AppState 的取消、权限回复和计划 store 位于内存；WorkZ runningSessionsRef 属于前端；已有会话数据库、workspace-state 与 workflow run JSON，各自存储部分状态。重启打开历史不是恢复执行。
+Evidence: AppState's cancellation, permission replies and plan store live in memory; WorkZ runningSessionsRef belongs to the frontend; there are a session database, workspace-state and workflow run JSON, each storing part of the state. Opening history after a restart is not resuming execution.
 
-另一个连续性缺口：`src/services/tauri/chat.ts:131` 默认 clearPlan=true；WorkZ 的 chatSend 未覆写该项；后端 chat_turn 在 clear_plan 时删除当前 session 的计划。普通任务续聊可能清除尚未结束的计划；应区分新目标与继续当前目标。
+Another continuity gap: `src/services/tauri/chat.ts:131` defaulted clearPlan=true; WorkZ's chatSend did not override it; backend chat_turn deleted the current session's plan when clear_plan was set. Continuing an ordinary task could clear an unfinished plan; a new goal must be distinguished from continuing the current goal.
 
-正面事实：应用已有退出时检查运行数量和取消所有聊天的处理；编辑器也保存未保存缓冲。不能说“完全没有退出保护”或“完全没有持久化”。
+Positive fact: the app already checks the number of running sessions on exit and cancels all chats; the editor also saves unsaved buffers. It is wrong to say there is "no exit protection at all" or "no persistence at all".
 
-修复：后端统一 Task/Run/Attempt 状态机，启动时对账为 interrupted 等实际状态；持久化计划、预算、待审批意图、环境和最后事件序号。重启后从 checkpoint 开新 attempt，外部动作先对账，禁止盲目重放发送/发布等非幂等工具。
+Fix: a unified backend Task/Run/Attempt state machine that reconciles to real states such as interrupted on startup; persist plans, budgets, pending approval intents, environment and the last event sequence number. After a restart, start a new attempt from a checkpoint, reconcile external actions first, and never blindly replay non-idempotent tools such as send/publish.
 
-### F10 / P2：核心组件集中承载过多职责，状态分散
+### F10 / P2: core components carry too many responsibilities, with scattered state
 
-证据：审查时 WorkZ index 约 1869 行、CodeZ index 1360 行、chat_turn.rs 2668 行。WorkZ 同时管理事件路由、流式 UI、任务状态、工作区、团队和评审；多个 ref、localStorage 与数据库承担不同权威。
+Evidence: at review time the WorkZ index was about 1869 lines, the CodeZ index 1360 lines and chat_turn.rs 2668 lines. WorkZ simultaneously managed event routing, streaming UI, task state, workspaces, teams and review; several refs, localStorage and databases each acted as different authorities.
 
-修复：围绕 domain 分离 TaskService、EnvironmentService、EventStore、ApprovalService 和 ArtifactService；前端保留展示状态，后端承担执行权威。按已发现的环境串用等问题逐步抽离，不需要大规模重写框架。
+Fix: separate TaskService, EnvironmentService, EventStore, ApprovalService and ArtifactService around the domain; the frontend keeps presentation state and the backend holds execution authority. Extract incrementally along the discovered problems such as environment mix-ups; a large framework rewrite is unnecessary.
 
-### F11 / P1：质量门禁尚不能证明用户旅程可靠
+### F11 / P1: quality gates cannot yet prove user journeys are reliable
 
-已有前端 7 文件/38 项测试主要覆盖 LSP、workflow 表达式与 API、i18n、路径过滤、扩展 UI store；Rust CI 有工作区 clippy/test，扩展宿主有 smoke。未找到覆盖“隔离任务创建→并行→重开→评审→应用/归档”的完整桌面 E2E。
+The existing 7 frontend test files / 38 tests mainly covered LSP, workflow expressions and API, i18n, path filtering and the extension UI store; Rust CI has workspace clippy/test, and the extension host has a smoke test. No complete desktop E2E covering "create isolated task → run in parallel → reopen → review → apply/archive" was found.
 
-修复：对高风险生命周期添加后端集成测试与桌面验收；真实 Windows/macOS/Linux 做安装后运行验证。建立扩展兼容矩阵，以实测记录“兼容某扩展及版本”，不以 API 名称齐全代替兼容证明。
+Fix: add backend integration tests and desktop acceptance for high-risk lifecycles; run post-install verification on real Windows/macOS/Linux. Build an extension compatibility matrix that records "compatible with extension X version Y" from real runs; a complete set of API names is not proof of compatibility.
 
-### F12 / P1-P2：发布与文档治理仍处于预览产品水平
+### F12 / P1-P2: release and documentation governance are still at preview-product level
 
-README 与 RELEASE.md 明确未签名、手动更新；tauri 配置未提供 updater 流程。版本、日志目录、超时和自动续跑文档存在历史描述。当前内核已出现指数退避重试、60 秒权限等待和工具超时路径；chat_turn 默认总时间预算约一年，旧“默认 600 秒”问题不适用于当前源码。
+README and RELEASE.md stated that builds are unsigned and updated manually; the tauri config provided no updater flow. Documentation on versions, log directories, timeouts and auto-continue contained historical descriptions. The kernel at that time already had exponential-backoff retries, a 60-second permission wait and tool timeout paths; chat_turn's default total time budget was about one year, so the old "default 600 seconds" issue did not apply to the source at the time.
 
-修复：签名、公证、更新验证、数据迁移测试、可回滚升级、诊断导出；对 old issue 加版本与关闭依据。发布前统一版本与用户文档，区分“已实现”“已验证”“规划”。
+Fix: signing, notarization, update verification, data migration tests, rollback-capable upgrades, diagnostic export; add version and closure rationale to old issues. Before release, align versions and user docs and distinguish "implemented", "verified" and "planned".
 
-## 推荐架构
+## Recommended architecture
 
-保持 Tauri + React + Rust + Node 宿主。没有证据支持通过换 Electron 或换编辑器解决当前主要问题。
+Keep Tauri + React + Rust + the Node host. There is no evidence that switching to Electron or another editor would solve the main current problems.
 
-建议建立以下实体及引用关系：
+Establish the following entities and references:
 
-- Project：仓库/非仓库身份和工作根。
-- Task：用户目标、验收标准、上下文与稳定身份。
-- Environment：host、路径、起点 SHA、worktree、权限范围和归档快照。
-- Run/Attempt：一次执行、模型/策略快照、资源预算和生命周期。
-- Approval：动作、对象、参数摘要、有效期、授权范围、执行状态。
-- Artifact/ChangeSet：产物、文件变更、验证结果和可发布版本。
-- Event：task/run/attempt/environment/tool_call 标识、递增序号和可恢复游标。
+- Project: repository/non-repository identity and working root.
+- Task: user goal, acceptance criteria, context and stable identity.
+- Environment: host, path, starting SHA, worktree, permission scope and archive snapshot.
+- Run/Attempt: one execution, model/policy snapshot, resource budget and lifecycle.
+- Approval: action, target, parameter summary, validity period, authorization scope, execution status.
+- Artifact/ChangeSet: artifacts, file changes, verification results and publishable versions.
+- Event: task/run/attempt/environment/tool_call identifiers, monotonically increasing sequence number and a resumable cursor.
 
-一个 Task 可以有多次 Run；各 Run 引用确定的 Environment。会话是交互记录；不能让会话 source 标签或当前面板 state 承担任务运行契约。
+A Task can have multiple Runs; each Run references a definite Environment. A session is an interaction record; neither the session source label nor current panel state should carry the task run contract.
 
-建议运行状态：queued、running、waiting_approval、waiting_input、paused、interrupted、failed、cancelled、succeeded。交付状态另行表示：draft、needs_review、accepted、applied、published、archived。完成执行不自动等于完成发布。
+Recommended run states: queued, running, waiting_approval, waiting_input, paused, interrupted, failed, cancelled, succeeded. Delivery state is represented separately: draft, needs_review, accepted, applied, published, archived. Finishing execution does not automatically mean finishing publication.
 
-Agent Runtime 在宿主控制下管理队列、取消、预算、重试与恢复，CodeZ/WorkZ 通过命令与事件读取它。初期可作为 Rust 内部服务；只有需要应用关闭仍执行、独立升级或强故障隔离时，才引入独立后台进程。
+The Agent Runtime manages queueing, cancellation, budgets, retries and recovery under host control, and CodeZ/WorkZ read it through commands and events. Initially it can be an internal Rust service; introduce an independent background process only when execution must continue after the app closes, independent upgrades are needed, or strong fault isolation is required.
 
-## CodeZ 与 WorkZ 的具体成熟化
+## Concrete maturity work for CodeZ and WorkZ
 
 ### CodeZ
 
-首要目标是人在自己的工程里可持续使用：脏缓冲与 Agent 写入冲突可解释；外部编辑不覆盖未保存内容；语言服务崩溃可恢复；Git 操作与 Agent 不争用同一工作区。每个编辑器、终端、调试和预览都应显示其 environment，不能只依赖全局 projectDir。
+The primary goal is sustainable use by a person in their own project: conflicts between dirty buffers and Agent writes are explainable; external edits never overwrite unsaved content; language-service crashes are recoverable; Git operations and the Agent do not contend for the same workspace. Every editor, terminal, debugger and preview should show its environment rather than relying only on a global projectDir.
 
-扩展支持建议按档说明：已验证、部分支持、未验证。首先保证用户真正依赖的语言、格式化、Git 和调试扩展；测试升级后的兼容回归。共享一份 VS Code API 名称并不能证明完整行为兼容。
+Describe extension support in tiers: verified, partially supported, unverified. First guarantee the language, formatting, Git and debugging extensions users actually rely on; test compatibility regressions after upgrades. Sharing a list of VS Code API names does not prove full behavioural compatibility.
 
 ### WorkZ
 
-输入时默认只呈现目标、运行环境、模型与授权摘要；高级技能和团队按需展开。执行中显示阶段、最近实际动作、阻塞原因和预算；流式 token 不应替代有效进展。
+By default the input area shows only the goal, run environment, model and authorization summary; advanced skills and teams expand on demand. During execution show the phase, the most recent real action, blocking reasons and budget; streaming tokens should not stand in for meaningful progress.
 
-评审页首屏回答：改了什么、产物在哪里、验证了什么、哪些未验证、需要用户做什么。工具日志在必要时展开。研究和文档任务采用可打开/版本化的产物，而非仅一段最终文本。
+The first screen of the review page answers: what changed, where the artifacts are, what was verified, what was not, and what the user needs to do. Tool logs expand when needed. Research and documentation tasks use openable/versioned artifacts rather than just a final block of text.
 
-多 Agent 应服务于可验证收益：只读研究并行、独立工作区实现、明确集成负责人。预算按整个任务控制，避免每个成员分别耗尽完整额度。先测单 Agent 基线，再证明团队提升成功率或时间。
+Multi-Agent should serve verifiable gains: parallel read-only research, implementation in independent workspaces, and a clear integration owner. Budgets are controlled for the whole task, so each member cannot exhaust a full quota separately. Measure a single-Agent baseline first, then prove that teams improve success rate or time.
 
-桌面操作优先顺序：目的明确的本地工具/连接器 → 浏览器结构化控制 → 原生桌面操作。桌面操作应定义可用应用、焦点、用户抢占、凭据区和失败恢复，不应通过增加一个 screenshot 工具就视为完成 Desktop Agent。
+Priority order for desktop operations: purpose-built local tools/connectors → structured browser control → native desktop operations. Desktop operations should define the usable apps, focus, user preemption, credential zones and failure recovery; adding a screenshot tool does not complete a Desktop Agent.
 
-## 成熟化路线与验收
+## Maturity roadmap and acceptance
 
-以下按里程碑组织，不承诺缺少团队规模依据的日期。
+Organized by milestone below, without committing to dates that lack a team-size basis.
 
-### M0：恢复正确性与可信评审
+### M0: restore correctness and trustworthy review
 
-范围：F01–F05，任务环境登记、完整变更评审、journal 路由、错误反馈、归档快照和合并预检。
+Scope: F01–F05 — task environment registration, complete change review, journal routing, error feedback, archive snapshots and merge pre-checks.
 
-验收：两个任务交叉续聊与重启不串环境；未提交和新文件均进入评审；无效 ref 显示错误；归档可恢复全部声明支持的数据；主工作区脏状态和冲突不会被意外改变。
+Acceptance: two tasks continued alternately and across restarts never mix environments; uncommitted and new files both enter review; an invalid ref shows an error; archives restore all data declared as supported; the main workspace's dirty state and conflicts are never changed unexpectedly.
 
-### M1：建立长期任务运行底座
+### M1: build the foundation for long-running tasks
 
-范围：持久 Task/Run/Environment/Event、恢复对账、取消确认、资源和费用预算、权限意图、秘密存储失败关闭。
+Scope: durable Task/Run/Environment/Event, recovery reconciliation, cancellation confirmation, resource and cost budgets, permission intents, fail-closed secret storage.
 
-验收：杀进程、断网、429/5xx、工具卡死、等待用户、睡眠唤醒后都能显示真实状态并安全续跑。外部副作用重试有去重/对账，不重复发送或发布。
+Acceptance: after process kill, network loss, 429/5xx, stuck tools, waiting for the user, and sleep/wake, the real state is shown and the task can safely continue. Retries of external side effects are deduplicated/reconciled, with no duplicate sends or publishes.
 
-### M2：完成两种视图的同任务交接
+### M2: same-task handoff between the two views
 
-范围：WorkZ→CodeZ 打开任务环境、人类编辑反馈、检查点、结构化产物与验证结果、工作台交互一致性。
+Scope: WorkZ→CodeZ opening the task environment, feedback from human edits, checkpoints, structured artifacts and verification results, consistent workbench interaction.
 
-验收：修复一个实际 bug 的整个旅程无需手工猜目录或切分支；用户能接手、继续、评审、应用、撤销。另完成一次非代码研究/文档任务的产物交付。
+Acceptance: the whole journey of fixing a real bug requires no manual guessing of directories or branch switching; the user can take over, continue, review, apply and undo. Additionally complete artifact delivery for one non-code research/documentation task.
 
-### M3：受控桌面能力与可支持的发行版
+### M3: controlled desktop capabilities and a supportable distribution
 
-范围：平台安装验收、签名/更新/迁移/恢复、连接器授权、Webview、远程重连、经过验证的桌面工具。
+Scope: platform install acceptance, signing/updates/migration/recovery, connector authorization, Webview, remote reconnection, verified desktop tools.
 
-验收：从安装到首次成功交付有端到端记录；升级和迁移失败可恢复；扩展/远程/桌面操作具备兼容与故障清单。
+Acceptance: an end-to-end record from installation to the first successful delivery; failed upgrades and migrations are recoverable; extensions/remote/desktop operations have compatibility and failure lists.
 
-### M4：扩大团队与自动化
+### M4: expand teams and automation
 
-范围：基于前述运行底座的团队治理、定时任务、通知收件箱、模板和市场资源来源治理。
+Scope: team governance on top of the run foundation above, scheduled tasks, notification inbox, templates and governance of marketplace resource sources.
 
-验收：相对单 Agent 基线有量化收益；无变化时自动化不重复打扰；活动受全任务预算和授权边界控制。
+Acceptance: quantified gains over the single-Agent baseline; automation does not repeatedly disturb the user when nothing has changed; activity is bounded by whole-task budgets and authorization boundaries.
 
-## 测量与发布门槛建议
+## Recommended measurement and release gates
 
-建立固定任务集，区分模型能力与宿主故障。至少包括前端 bug、Rust 修改、测试修复、重构、代码研究、非代码报告和浏览器任务；记录模型与版本、环境、成本、人工干预和验证证据。
+Build a fixed task set that separates model capability from host failures. Include at least a frontend bug, a Rust change, a test fix, a refactor, code research, a non-code report and a browser task; record model and version, environment, cost, human intervention and verification evidence.
 
-优先指标：任务环境串用/不可恢复数据丢失（测试中零容忍）；首次成功交付比例；中断可恢复比例；人工干预次数；每任务总成本；取消后的残留进程；首次可见进展；评审准确性。
+Priority metrics: task environment mix-ups / unrecoverable data loss (zero tolerance in testing); first-time successful delivery rate; interruption recovery rate; number of human interventions; total cost per task; leftover processes after cancellation; time to first visible progress; review accuracy.
 
-性能目标需先建立基线，再制定预算。建议测冷启动与可交互时间、闲置/编辑器/聊天/LSP/扩展/浏览器分项内存、长对话响应、索引峰值和两小时资源增长；单 WebView 使 Monaco、Markdown、图布局和扩展 RPC 争用渲染线程，应按测量决定 Worker、懒加载或服务拆分。
+Establish baselines before setting performance budgets. Measure cold start and time-to-interactive, memory broken down by idle/editor/chat/LSP/extensions/browser, long-conversation responsiveness, indexing peak and two-hour resource growth; with a single WebView, Monaco, Markdown, graph layout and extension RPC contend for the render thread, so decide on Workers, lazy loading or service splitting based on measurements.
 
-1.0 门槛建议：M0–M3 高影响缺口关闭；三平台核心旅程通过；签名发行与更新恢复验证；真实任务基准公开内部结果；无尚未解释的环境串用、评审遗漏或不可恢复丢失。版本号本身不构成成熟证明。
+Recommended 1.0 gate: high-impact gaps in M0–M3 closed; core journeys pass on all three platforms; signed releases and update recovery verified; internal results of real-task benchmarks published; no unexplained environment mix-ups, review omissions or unrecoverable losses. A version number alone is not proof of maturity.
 
-## 本次检查记录
+## Check log for this review
 
-- `npm run typecheck`：通过。
-- `npm test`：7 个测试文件、38 项测试通过。
-- `npm run lint`：0 errors、65 warnings；部分 Hook 依赖警告需要逐条判断，不能全部视为纯格式问题。
-- `npm run build`：通过；Vite 构建约 7 分 8 秒，4132 个模块。主 index JS 约 2.96 MB、Monaco chunk 约 3.83 MB（均为 minified 未 gzip）；存在大 chunk 与混合静态/动态导入警告。构建进程抽样工作集超过 3 GB；这不是桌面应用运行内存或冷启动基准，仍需单独测量。
-- `npm --prefix extension-host run typecheck` / `smoke`：通过，示例扩展命令、消息与补全断言通过；不代表所有第三方 VSIX 兼容。
-- `cargo check -p agentz-desktop --locked`：通过，耗时约 6 分 39 秒；启动时输出版本 0.9.5。未运行本地 Rust test/clippy，不能将 cargo check 表述为全套 Rust 验证。
-- Git 分支评审遗漏未提交/新文件实验：复现。
-- 桌面 UI、真实模型、远程与安装器运行验收：未执行。
+- `npm run typecheck`: passed.
+- `npm test`: 7 test files, 38 tests passed.
+- `npm run lint`: 0 errors, 65 warnings; some Hook dependency warnings need individual judgement and cannot all be treated as pure style issues.
+- `npm run build`: passed; the Vite build took about 7 min 8 s for 4132 modules. The main index JS was about 2.96 MB and the Monaco chunk about 3.83 MB (both minified, not gzipped); there were large-chunk and mixed static/dynamic import warnings. A sampled working set of the build process exceeded 3 GB; this is not a benchmark of desktop app runtime memory or cold start and must be measured separately.
+- `npm --prefix extension-host run typecheck` / `smoke`: passed; the sample extension's command, message and completion assertions passed; this does not imply all third-party VSIX are compatible.
+- `cargo check -p agentz-desktop --locked`: passed, about 6 min 39 s; reported version 0.9.5 at startup. Local Rust test/clippy were not run, so cargo check must not be described as full Rust verification.
+- Experiment showing branch review missing uncommitted/new files: reproduced.
+- Desktop UI, real model, remote and installer run acceptance: not performed.
 
-本报告给出审查与实施建议，不将发现标记为已修复。优先实施 M0，以一个可靠任务闭环作为后续成熟化的基础。
+This report provides review findings and implementation recommendations and did not mark any finding as fixed at the time (see the status note at the top for later changes). Implement M0 first, using one reliable task loop as the foundation for further maturity work.

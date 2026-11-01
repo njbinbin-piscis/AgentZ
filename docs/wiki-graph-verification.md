@@ -1,128 +1,134 @@
-# Wiki / 知识图谱 — 验收与测试指南
+# Wiki / Knowledge Graph — Acceptance and Test Guide
 
-本文用于验证 P0–P3 Wiki 自研路线是否正常工作，重点确认 **Agent 编码能力** 是否实质提升（而非仅 Dashboard 可视化）。
+**English** | [简体中文](wiki-graph-verification.zh-CN.md)
 
-## 一、自动化测试（推荐先跑）
+This guide verifies that the in-house Wiki roadmap (P0–P3) works, with the focus on whether **Agent coding ability** has materially improved (not just the Dashboard visualisation).
 
-在项目根目录执行：
+## 1. Automated tests (run these first)
+
+From the repository root:
 
 ```bash
 ./scripts/verify-wiki-graph.sh
 ```
 
-或手动：
+Or manually:
 
 ```bash
-cd AgentZ/src-tauri
+cd src-tauri
 cargo check
 cargo test graph_agent -- --nocapture
 cargo test graph:: -- --nocapture
+cargo test graph_db -- --nocapture
+cargo test graph_index -- --nocapture
 ```
 
-**通过标准**：无编译错误；`graph_agent` 全部测试 green（含 `search_graph`、`merge_deep_wiki`、编码简报）。
+The script also exports `CARGO_INCREMENTAL=0` and a local `CARGO_TARGET_DIR` (default `/tmp/agentz-cargo-target`). If `AGENTZ_VERIFY_PROJECT` points at a directory, it additionally runs `cargo run --example graph_verify <project>` (example source: `src-tauri/examples/graph_verify.rs`). The `graph_index` step is best-effort and does not fail the script.
+
+**Pass criteria**: no compile errors; all `graph_agent` tests green (including `search_graph`, `merge_deep_wiki` and the coding brief).
 
 ---
 
-## 二、本地功能验证（需启动 AgentZ）
+## 2. Local functional verification (requires running AgentZ)
 
-### 2.1 准备
+### 2.1 Preparation
 
-1. 用 AgentZ 打开一个**有源码**的项目（建议用 AgentZ 自身仓库或你的业务仓库）
-2. 等待索引完成（或 Wiki → 快速概览触发 index）
+1. Open a project **with source code** in AgentZ (the AgentZ repository itself or one of your business repositories is a good choice).
+2. Wait for indexing to finish (or trigger indexing via Wiki → Quick overview).
 
-### 2.2 P0 — 图谱与产物
+### 2.2 P0 — Graph and artifacts
 
-| 步骤 | 操作 | 预期 |
+| Step | Action | Expected |
 |------|------|------|
-| 1 | Wiki 菜单 → **重建图谱** | 无报错 |
-| 2 | 检查 `.agentz/` | 存在 `graph.json`、`tours.json`、`domain.json`、`AGENT_CODING_BRIEF.md` |
-| 3 | Wiki → **快速概览** | `REPO_WIKI.md` 含 Mermaid 模块依赖 |
-| 4 | 修改任意 `.rs`/`.ts` 文件并保存 | ~2s 后 `graph.json` 的 `generated_at` 更新（debounce） |
+| 1 | Wiki menu → **Rebuild graph** | No errors |
+| 2 | Inspect `.agentz/` | `graph.json`, `tours.json`, `domain.json`, `AGENT_CODING_BRIEF.md` exist (`graph.db` is built from `graph.json` on first `graph_explore` use) |
+| 3 | Wiki → **Quick overview** | `REPO_WIKI.md` contains a Mermaid module-dependency diagram |
+| 4 | Edit and save any `.rs`/`.ts` file | About 2 s later, `generated_at` in `graph.json` is updated (debounced) |
 
 ### 2.3 P1 — Dashboard
 
-| 步骤 | 操作 | 预期 |
+| Step | Action | Expected |
 |------|------|------|
-| 1 | CodeZ 侧栏 → **图谱** | 默认 **结构** 视图：目录 cluster 之间有 import 依赖边（非顶层 module 孤岛） |
-| 2 | 点击某目录节点 | 1-hop 上下游边与邻居高亮，其余 dim |
-| 3 | 双击目录或详情 **展开子目录** | 面包屑下钻，子目录 cluster 图 |
-| 4 | 详情 **查看文件依赖** | file 子图（hub 为中心，≤25 节点）；点击文件打开编辑器 |
-| 5 | 搜索框 | 过滤目录 cluster |
-| 6 | 切换 **顶层模块** / **分层** / **业务域** | 架构视图仍可用 |
-| 7 | WorkZ 有 worktree 时点 **影响分析** | diff overlay 高亮变更/波及 cluster 与 file |
+| 1 | CodeZ sidebar → **Graph** | Default **Structure** view: directory clusters connected by import-dependency edges (not isolated top-level modules) |
+| 2 | Click a directory node | 1-hop upstream/downstream edges and neighbours are highlighted; everything else is dimmed |
+| 3 | Double-click a directory, or **Expand subdirectories** in the details | Breadcrumb drill-down into a subdirectory cluster graph |
+| 4 | **View file dependencies** in the details | File subgraph (hub-centred, ≤25 nodes); clicking a file opens it in the editor |
+| 5 | Search box | Filters directory clusters |
+| 6 | Switch to **Top-level modules** / **Layers** / **Business domains** | Architecture views still work |
+| 7 | With a WorkZ worktree, click **Impact analysis** | Diff overlay highlights changed/affected clusters and files |
 
-### 2.4 P2 — Agent 编码增强（核心）
+### 2.4 P2 — Agent coding enhancements (core)
 
-| 步骤 | 操作 | 预期 |
+| Step | Action | Expected |
 |------|------|------|
-| 1 | CodeZ 或 WorkZ 发起 Agent 任务 | 系统上下文含 `Repository coding brief` |
-| 2 | 输入 `@graph auth` 或 `@graph 模块名` | turn 展开知识图谱子图（import/依赖） |
-| 3 | 输入 `@codebase 某功能` | 展开代码片段 |
-| 4 | 观察 Agent 工具调用 | 先 `graph_explore` / `graph_search`，再 `codebase_search`，再 `file_read`/`edit` |
-| 5 | 输入 `@g` 补全 | 出现 `@graph`、`@codebase`（WorkZ/CodeZ 均支持） |
+| 1 | Start an Agent task from CodeZ or WorkZ | System context contains `Repository coding brief` |
+| 2 | Type `@graph auth` or `@graph <module name>` | The turn expands a knowledge-graph subgraph (imports/dependencies) |
+| 3 | Type `@codebase <some feature>` | Code snippets are expanded |
+| 4 | Watch the Agent's tool calls | `graph_explore` / `graph_search` first, then `codebase_search`, then `file_read`/`edit` |
+| 5 | Type `@g` for completion | `@graph` and `@codebase` appear (supported in both WorkZ and CodeZ) |
 
-**Agent 质量检查问题（可复制到聊天）**：
+**Agent quality check prompt (copy into chat)**:
 
 ```
-在不修改代码的前提下，用 graph_search 找出与 chat_turn 相关的 hub 文件，
-再用 codebase_search 说明 wiki 上下文是如何注入的，最后给出应优先阅读的文件列表。
+Without modifying any code, use graph_search to find the hub files related to chat_turn,
+then use codebase_search to explain how wiki context is injected, and finally list the files that should be read first.
 ```
 
-预期：Agent 调用 `graph_search("chat_turn")`，引用 hub/importers，再 `codebase_search`，不会盲目 glob。
+Expected: the Agent calls `graph_search("chat_turn")`, cites hubs/importers, then calls `codebase_search`, and does not glob blindly.
 
-### 2.5 P3 — 团队规范与 Persona
+### 2.5 P3 — Team conventions and personas
 
-| 步骤 | 操作 | 预期 |
+| Step | Action | Expected |
 |------|------|------|
-| 1 | 阅读 [agentz-artifacts.md](./agentz-artifacts.md) | 明确哪些 `.agentz` 文件可提交 |
-| 2 | Dashboard → 视角 **初级开发** | 显示分层说明、Tour 提示 |
-| 3 | 视角 **产品经理** | 默认业务域视图，模块详情偏职责/域 |
-| 4 | 视角 **高级用户** | 显示 node id、依赖边统计、完整路径 |
-| 5 | 若存在 `.agentz/WIKI_DEEP.md` | 重建图谱后 module 节点 `summary` 非空；简报含 Module summaries |
+| 1 | Read [agentz-artifacts.md](./agentz-artifacts.md) | It is clear which `.agentz` files may be committed |
+| 2 | Dashboard → persona **Junior developer** | Shows layer explanations and Tour hints |
+| 3 | Persona **Product manager** | Business-domain view by default; module details focus on responsibilities/domains |
+| 4 | Persona **Power user** | Shows node ids, dependency-edge statistics and full paths |
+| 5 | If `.agentz/WIKI_DEEP.md` exists | After rebuilding the graph, module nodes have a non-empty `summary`; the brief contains Module summaries |
 
 ---
 
-## 三、深度 Wiki 联动（可选）
+## 3. Deep Wiki integration (optional)
 
-1. WorkZ 运行 `/ralph-loop-wiki`（或等价 slash）
-2. 确认输出 `.agentz/WIKI_DEEP.md`
-3. 再次 **重建图谱**
-4. 检查 `graph.json` 中对应 module 的 `summary` 字段
-5. 新开 Agent turn → 简报中出现 **Module summaries (from WIKI_DEEP)**
+1. Run `/ralph-loop-wiki` in WorkZ (or an equivalent slash command; bundled as `cb-ralph-loop-wiki`).
+2. Confirm `.agentz/WIKI_DEEP.md` is produced.
+3. **Rebuild graph** again.
+4. Check the `summary` field of the corresponding module in `graph.json`.
+5. Start a new Agent turn → the brief contains **Module summaries (from WIKI_DEEP)**.
 
 ---
 
-## 四、graph_validate
+## 4. graph_validate
 
-在 DevTools 或自定义脚本中调用：
+There is no dedicated frontend wrapper for this command (the `validateGraph` exported from `src/services/tauri/workflow.ts` validates team workflow graphs, not the knowledge graph). Call the Tauri command `graph_validate` directly from DevTools or a custom script:
 
 ```typescript
-import { validateGraph } from "./services/tauri/graph";
-const v = await validateGraph(projectDir);
-// v.ok === true 且无 warnings 为理想状态
+import { invoke } from "@tauri-apps/api/core";
+const v = await invoke<{ ok: boolean; warnings: string[] }>("graph_validate", { projectDir });
+// Ideal state: v.ok === true with no warnings
 ```
 
 ---
 
-## 五、常见问题
+## 5. FAQ
 
-| 现象 | 处理 |
+| Symptom | Resolution |
 |------|------|
-| `graph.json not found` | Wiki → 重建图谱 |
-| `@graph` 无内容 | 同上；mention 后需带查询词，如 `@graph src-tauri` |
-| Agent 未调用 graph_search | 确认是 Agent/WorkZ 模式；查看简报是否注入 |
-| `.agentz` 不在 git 中 | 用户项目按需提交，见 agentz-artifacts.md |
+| `graph.json not found` | Wiki → Rebuild graph |
+| `@graph` returns nothing | Same as above; the mention needs a query term, e.g. `@graph src-tauri` |
+| Agent does not call graph_search | Confirm you are in Agent/WorkZ mode; check whether the brief was injected |
+| `.agentz` is not in git | Commit per project as needed, see agentz-artifacts.md |
 
 ---
 
-## 六、验收清单（P0–P3 总表）
+## 6. Acceptance checklist (P0–P3 summary)
 
-- [ ] 自动化：`./scripts/verify-wiki-graph.sh` 通过
-- [ ] L1 `REPO_WIKI.md` 可用
+- [ ] Automated: `./scripts/verify-wiki-graph.sh` passes
+- [ ] L1 `REPO_WIKI.md` usable
 - [ ] L2 `graph.json` + Dashboard + Tour + diff overlay
-- [ ] L3 `WIKI_DEEP.md` 路径统一（ralph-loop）
-- [ ] Agent：`AGENT_CODING_BRIEF` 自动注入 + `graph_search` + `@graph`
-- [ ] WorkZ：`@graph` / `@codebase` 补全
-- [ ] P3：agentz-artifacts 文档 + Persona 三档 + domain 视图
+- [ ] L3 `WIKI_DEEP.md` path unified (ralph-loop)
+- [ ] Agent: `AGENT_CODING_BRIEF` auto-injected + `graph_search` + `@graph`
+- [ ] WorkZ: `@graph` / `@codebase` completion
+- [ ] P3: agentz-artifacts doc + three personas + domain view
 
-全部勾选即视为 Wiki 自研路线（方案 A）验收通过。
+When every item is checked, the in-house Wiki roadmap (option A) is accepted.

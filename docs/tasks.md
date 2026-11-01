@@ -1,5 +1,7 @@
 # AgentZ Task Tracker
 
+**English** | [简体中文](tasks.zh-CN.md)
+
 Use this file to track multi-step work across sessions. Keep it in sync with git history so humans and agents share the same source of truth.
 
 ## Status legend
@@ -16,7 +18,7 @@ Use this file to track multi-step work across sessions. Keep it in sync with git
 | ID | Title | Status | Owner | Notes |
 |----|-------|--------|-------|-------|
 | task-1 | Example: Explorer create-in-folder fix | done | — | Reference only |
-| upgrade-plan | 产品成熟化路线图与原子执行台账 | done | Codex | [路线图](upgrade/README.md)、[78项台账](upgrade/tasks.md)及本地CLI已交付；validate/render/门禁自检通过；实施项全部pending，状态权威在upgrade/plan.json。 |
+| upgrade-plan | Product maturity roadmap and atomic execution ledger | done | Codex | [Roadmap](upgrade/README.md), [task ledger](upgrade/tasks.md) and the local CLI were delivered; validate/render/gate self-checks pass. The ledger now has 83 items (65 `done`, 18 `deferred` as of 2026-11-02); the authoritative status lives in `upgrade/plan.json`. |
 
 Add rows as work begins. Remove or move to **Completed** when finished.
 

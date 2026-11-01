@@ -4,6 +4,15 @@ Automated: Rust `cargo test --lib` (30 tests: policy, task brief, delegation con
 concurrency, manifest compatibility, prompt rules) and vitest (subagent card, delegation
 settings, i18n parity) all pass. The steps below need a compiled build with a live model.
 
+> **Status note (2026-11-02, 1.0.40).** Re-checked against source; the guide still
+> matches. Settings are stored in `{config}/delegation.json`
+> (`src-tauri/src/commands/delegation.rs`): mode `auto` | `research` | `off`
+> (default `auto`), `max_concurrent` default 4, clamped to 1..16. Recovery refs
+> (`refs/agentz/subagent/<run>/{base,result,premerge}`) are written by
+> `runtime/subagent_worktree.rs`; conflict copies go to `.agentz/subagent-conflicts/`
+> (`tools/task.rs`); the budget refusal text comes from `delegation.rs`. The 30-test
+> count was not re-run. `skill_manage` is also in the "only when named" list.
+
 ## Manual verification on the built app
 
 1. **Settings > Sub-agent delegation.** Mode defaults to Auto. Switch to Off, start a new
@@ -30,7 +39,7 @@ settings, i18n parity) all pass. The steps below need a compiled build with a li
    no git rollback exists. `isolation: "direct"` edits in place after a checkpoint. Builtin
    presets (scout, summarizer, extractor) and `delegate` stay read-only and fully parallel.
    A delegated agent never gets `task`/`delegate`/`call_fish`, team-pool tools, chat_ui, plan or
-   memory-store tools; elevate/ssh/email/app_control/browser only when its allowlist names them.
+   memory-store tools; elevate/ssh/email/app_control/skill_manage/browser only when its allowlist names them.
 6. **Cache.** Repeat an identical `task` call without touching the repo: the card shows
    "cached". Edit any tracked file and repeat: no longer cached.
 7. **Metrics.** Settings > Sub-agent delegation shows runs, failures, tool calls, tokens and

@@ -380,7 +380,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Editor language server stayed unavailable after opening a file**:
   - The Monaco WebSocket bridge now forwards `initialize` to the real language server and reads stdout with `Content-Length` frames, so rust-analyzer and typescript-language-server complete the handshake.
   - The bridge listener is bound before the port is returned, removing the race where the editor connected before the socket was listening.
-  - LSP sessions start only for languages with a backend server (`rust`, `typescript`, `python`, `cpp`). JSON, Markdown, and other syntax-only files no longer show “语言服务不可用”.
+  - LSP sessions start only for languages with a backend server (`rust`, `typescript`, `python`, `cpp`). JSON, Markdown, and other syntax-only files no longer show “Language service unavailable”.
   - Python falls back to the bundled Jedi language server inside an installed `ms-python.python` extension when `pyright-langserver` is not on `PATH`.
 
 ## [1.0.4] - 2026-10-21
@@ -434,13 +434,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Cross-View WorkZ ↔ CodeZ Collaboration Loop (`R10-05`–`R10-09`)**:
   - Dirty buffer conflict guard in `CodeZ` (`EditorConflictTracker` + `[data-testid="editor-conflict-banner"]`) with one-click Diff view, Keep Mine, or Accept Disk resolution.
-  - One-click worktree handoff (`在 CodeZ 中打开`) from `AgentTaskReview` and `AgentFilePreview`, binding `CodeZ` file tree, editor, terminal, and search to the isolated worktree with a top return pill (`worktree-handoff-bar`).
+  - One-click worktree handoff (`Open in CodeZ`) from `AgentTaskReview` and `AgentFilePreview`, binding `CodeZ` file tree, editor, terminal, and search to the isolated worktree with a top return pill (`worktree-handoff-bar`).
   - Human edit feedback ledger (`recordUserRecentEdit`, `consumeUserRecentEdits`) that injects `<user_recent_edits>` into the next Agent turn after saving in `CodeZ` or `WorkZ`.
   - Automatic staging/committing of uncommitted worktree changes during `AgentTaskReview` merge (`commit_uncommitted_task_changes`) and non-Git folder task snapshot rollback (`agent_task_rollback_snapshot`).
-  - Editable preview canvas in `WorkZ` (`AgentFilePreview.tsx`) with `Preview / Edit / Diff` modes, `Ctrl+S` save, and `[基于最新修改继续对话]`.
+  - Editable preview canvas in `WorkZ` (`AgentFilePreview.tsx`) with `Preview / Edit / Diff` modes, `Ctrl+S` save, and `[Continue the conversation from the latest changes]`.
 - **Vibe Coding & Office Starter Experience (`R10-10`–`R10-14`)**:
   - Global Command Palette (`Ctrl+Shift+P`) and Quick Open (`Ctrl+P`) in `CodeZ` (`CommandPalette.tsx`).
-  - Per-turn file modification rollback (`[撤销本轮文件修改]`, `journalUndoTurn`) on assistant bubbles in both `CodeZ` and `WorkZ`.
+  - Per-turn file modification rollback (`[Undo this turn's file changes]`, `journalUndoTurn`) on assistant bubbles in both `CodeZ` and `WorkZ`.
   - 4 high-frequency starter scenario cards in `WorkzEmptyState.tsx` and streamlined sandbox controls (isolated by default, advanced SHA controls collapsed).
   - Unified side-channel LLM token/cost accounting (`background`, `inline_edit`) and status bar model switcher + Token/USD cost pill (`IdeStatusBar.tsx`).
   - 3-step first-run onboarding wizard (`OnboardingModal.tsx`) and `Beta` gating for Swarm / Workflow / Gateway surfaces.
@@ -830,67 +830,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Windows Release 构建**：新增 `tauri.windows.conf.json`，Windows 仅打 NSIS `.exe`，跳过 WiX MSI（preinstall 资源过多导致 `light.exe` 失败）。
+- **Windows release build**: add `tauri.windows.conf.json` so Windows builds only the NSIS `.exe` and skips the WiX MSI (the large preinstall resource set made `light.exe` fail).
 
 ## [0.6.1] - 2026-06-25
 
 ### Added
 
-- **Wiki 图谱索引状态指示**：标题栏 Wiki 图标按索引状态变色（琥珀=构建中、绿=已完成、红=失败）；菜单项显示节点数与状态标签。
+- **Wiki graph index status indicator**: the title-bar Wiki icon changes color with index state (amber = building, green = done, red = failed); the menu item shows the node count and a status label.
 
 ### Fixed
 
-- **重建图谱索引闪退**：Wiki 改为后台排队，不再阻塞 UI 轮询；`graph.db` 写入加锁与 `busy_timeout`；跳过 `bundled/` 扫描；worker `catch_unwind` 防 panic。
+- **Crash when rebuilding the graph index**: Wiki rebuilds are queued in the background and no longer block UI polling; `graph.db` writes are locked and use `busy_timeout`; `bundled/` is skipped during scanning; the worker uses `catch_unwind` to contain panics.
 
 ## [0.6.0] - 2026-06-28
 
 ### Added
 
-- **CodeGraph 式后台图谱索引**：移除 React Flow 图谱 UI；`graph_index` 单 worker + debounce 自动重建 `.agentz/graph.db`；Agent 工具 `graph_explore`（源码 + blast radius）与 `@graph` 改调 `explore_graph`。
-- **云市场源配置**：资源库可设置官方市场后端 URL；开发构建默认 `http://localhost:8137`，发布构建默认 `https://www.dimnuo.com`。
-- **Monaco 语言检测**：按文件扩展名自动切换语法高亮（TS/RS/Py 等）。
-- **CodeBuddy 预装资源**：首次启动将 bundled/preinstall 复制到全局配置（write-if-absent）；新增 100+ 智能体变体、40+ 斜杠命令与若干技能；兼容性审计流水线（`lint:preinstall` / `verify:preinstall`）。
-- **斜杠命令**：Composer `/` 补全；后端展开 prompt 并可选限制工具集。
-- **项目模板**：打开尚无 `.agentz` 的文件夹时可选应用 CodeBuddy 规则/钩子模板。
+- **CodeGraph-style background graph index**: remove the React Flow graph UI; a single debounced `graph_index` worker rebuilds `.agentz/graph.db` automatically; the agent tool `graph_explore` (source + blast radius) and `@graph` now call `explore_graph`.
+- **Cloud marketplace source setting**: the Resource Library can set the official marketplace backend URL; development builds default to `http://localhost:8137`, release builds to `https://www.dimnuo.com`.
+- **Monaco language detection**: syntax highlighting switches automatically by file extension (TS/RS/Py, etc.).
+- **CodeBuddy preinstalled resources**: on first launch, `bundled/preinstall` is copied into the global config (write-if-absent); adds 100+ agent variants, 40+ slash commands and several skills; compatibility audit pipeline (`lint:preinstall` / `verify:preinstall`).
+- **Slash commands**: Composer `/` completion; the backend expands the prompt and can optionally restrict the tool set.
+- **Project templates**: when opening a folder without `.agentz`, optionally apply a CodeBuddy rules/hooks template.
 
 ### Changed
 
-- **IDE 侧栏**：仅保留 Chat，移除图谱 Tab 与 Wiki「打开图谱」入口。
-- **Wiki「重建图谱」**：改为排队后台索引（`graph_index_rebuild`），不再打开 `graph.json`。
-- **资源库**：发现页增加云市场源设置；样式与布局优化。
-- **Kernel `piscis-engine v0.8.62`**、**RobotZ `v0.1.6`**：对齐合并后的 engine 发布。
-- 预装资源经 AgentZ 规范化；排除 142 条不兼容/重复资源（见 `bundled/codebuddy/exclude.json`）。
+- **IDE side panel**: keep only Chat; remove the graph tab and the Wiki "Open graph" entry.
+- **Wiki "Rebuild graph"**: now queues a background index build (`graph_index_rebuild`) instead of opening `graph.json`.
+- **Resource Library**: the Discover page gains the cloud marketplace source setting; style and layout polish.
+- **Kernel `piscis-engine v0.8.62`**, **RobotZ `v0.1.6`**: aligned with the merged engine release.
+- Preinstalled resources are normalized for AgentZ; 142 incompatible/duplicate resources are excluded (see `bundled/codebuddy/exclude.json`).
 
 ### Fixed
 
-- **CI**：eslint 忽略 `bundled/`、`scripts/`、`.cache/`；marketplace `dead_code` clippy。
+- **CI**: eslint ignores `bundled/`, `scripts/`, `.cache/`; fix the marketplace `dead_code` clippy warning.
 
 ## [0.5.10] - 2026-06-13
 
 ### Fixed
 
-- **Composer 技能说明 toast**：CodeZ / WorkZ 悬停技能项时的提示改用主题 CSS 变量（背景、文字、边框），浅色模式下不再显示黑底金字。
+- **Composer skill description toast**: the tooltip shown when hovering a skill in CodeZ / WorkZ now uses theme CSS variables (background, text, border), so light mode no longer shows gold text on black.
 
 ## [0.5.9] - 2026-06-13
 
 ### Fixed
 
-- **Composer 下拉菜单**：CodeZ / WorkZ 输入框下方模式、模型、技能等选择列表改用视口 `fixed` 定位，避免被聊天侧栏 `overflow` 裁切右侧。
+- **Composer dropdowns**: the mode, model, skill and other pickers below the CodeZ / WorkZ input now use viewport `fixed` positioning so the chat side panel's `overflow` no longer clips their right edge.
 
 ## [0.5.8] - 2026-06-13
 
 ### Added
 
-- **WorkZ 协作看板**：进行中任务卡片内嵌 2 行 CLI 窗，实时显示 Koi 流式输出。
-- **技能卸载保护**：已被「从技能生成」的匿名代理引用的技能，须先删除代理方可卸载。
+- **WorkZ collaboration board**: in-progress task cards embed a 2-line CLI window showing live Koi streaming output.
+- **Skill uninstall protection**: a skill referenced by an anonymous agent created via "Generate from skill" can only be uninstalled after that agent is deleted.
 
 ### Changed
 
-- **资源库 UI**：内容区内边距、书页式分类标签；修复发现页 `MarketGridView` 误用 pill 样式导致巨大圆角框；空列表改为轻量提示。
-- **Composer 技能列表**：列表仅显示名称，悬停以 toast 展示说明。
-- **匿名代理**：内置标签与名称同行；内置项操作改为「重定义」；钩子保存按钮文案缩短为「保存钩子」。
-- **工作流设计器**：打开与自动布局后自动适应视野并居中（等待宽面板动画完成后再 `fitView`）。
-- **WorkZ 文案**：副标题与团队模式空状态 i18n 更新（变更浮窗在右上角）。
+- **Resource Library UI**: content-area padding and book-tab category labels; fix the Discover page `MarketGridView` misusing the pill style (huge rounded boxes); empty lists show a lightweight hint.
+- **Composer skill list**: the list shows names only; descriptions appear in a toast on hover.
+- **Anonymous agents**: the built-in tag sits on the same line as the name; the action for built-in items is now "Redefine"; the hook save button label is shortened to "Save hook".
+- **Workflow designer**: fits and centers the view after opening and after auto-layout (waits for the wide-panel animation to finish before `fitView`).
+- **WorkZ copy**: subtitle and team-mode empty-state i18n updated (the changes popover is in the top-right corner).
 
 ## [0.5.7] - 2026-06-13
 
@@ -909,20 +909,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **统一资源库**：标题栏 Store 图标打开「资源库」面板，合并技能/工具/智能体/团队/连接器/匿名代理的已安装、发现与编排视图；设置仅保留模型、消息渠道、扩展、规则、钩子。
-- **WorkZ 通用智能体**：输入框下方技能/连接器多选；空列表可深链到资源库发现页。
-- **协作增强**：pool 按 `team_id` / `workflow_run_id` 隔离（`piscis-engine v0.8.59`）、depends_on 等待 UI、patrol/heartbeat、连接器白名单。
+- **Unified Resource Library**: the title-bar Store icon opens the "Resource Library" panel, merging the installed, discover and compose views for skills, tools, agents, teams, connectors and anonymous agents; Settings keeps only models, message channels, extensions, rules and hooks.
+- **WorkZ general agent**: skill/connector multi-select below the input; empty lists deep-link to the Resource Library Discover page.
+- **Collaboration improvements**: pools isolated by `team_id` / `workflow_run_id` (`piscis-engine v0.8.59`), depends_on waiting UI, patrol/heartbeat, connector allowlist.
 
 ### Changed
 
-- 设置「助理」改名为「消息渠道」；匿名代理文案与资源库 i18n 统一（中英文）。
-- 移除 MarketplacePanel、ClawHubPanel 及设置内技能/工作室/子代理/连接器 Tab。
+- Settings "Assistant" renamed to "Message channels"; anonymous-agent copy and Resource Library i18n unified (Chinese and English).
+- Remove MarketplacePanel, ClawHubPanel and the Skills/Studio/Sub-agents/Connectors tabs in Settings.
 
 ## [0.5.4] - 2026-06-12
 
 ### Added
 
-- **WorkZ 协作机制全面修复**：协调者 `pool_session_id` 绑定、`swarm_coordinator` 收敛协议、成员 Koi **Stop Gate** 六层 prompt、pool 按 `team_id` 隔离、workflow run 独立 pool、depends_on 等待 UI、patrol/heartbeat、workflow driver 互斥与 LLM 分支 fail-fast。
+- **WorkZ collaboration overhaul**: coordinator `pool_session_id` binding, `swarm_coordinator` convergence protocol, six-layer **Stop Gate** prompt for member Koi, pools isolated by `team_id`, a dedicated pool per workflow run, depends_on waiting UI, patrol/heartbeat, workflow driver mutual exclusion and fail-fast LLM branches.
 - **CodeZ Browser E2E**: `browser-changed` event sync, auto-open Browser tab on agent actions, close guard when agent is active.
 - **Browser automation**: RobotZ `snapshot`/`ref`/`lock`/`fill`, assert DSL (`assert_url`, `assert_visible`, `assert_text`), `wait_for_text`.
 - **Kernel alignment**: `piscis-engine v0.8.58` (`web_fetch`, `piscis-ide-tools`), shared `robotz-browser v0.1.2` with IDE panel.

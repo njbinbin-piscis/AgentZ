@@ -13,7 +13,8 @@ const versions = {
   packageLockRoot: JSON.parse(read("package-lock.json")).packages?.[""]?.version,
   tauri: JSON.parse(read("src-tauri/tauri.conf.json")).version,
   cargo: /^version\s*=\s*"([^"]+)"/m.exec(cargo ?? "")?.[1],
-  readme: /当前源码版本\s*\*\*(\d+\.\d+\.\d+)\*\*/u.exec(read("README.md"))?.[1],
+  readme: /current source version\s*\*\*(\d+\.\d+\.\d+)\*\*/u.exec(read("README.md"))?.[1],
+  readmeZh: /当前源码版本\s*\*\*(\d+\.\d+\.\d+)\*\*/u.exec(read("README.zh-CN.md"))?.[1],
   releaseDoc: /Current source version:\s*\*\*(\d+\.\d+\.\d+)\*\*/u.exec(read("RELEASE.md"))?.[1],
 };
 const expected = versions.package;
@@ -29,7 +30,7 @@ if (extensionHostLock.version !== extensionHostVersion || extensionHostLock.pack
 for (const filename of [`docs/upgrade/release-notes-${expected}.md`, `docs/upgrade/release-checklist-${expected}.md`]) {
   if (!existsSync(path.join(root, filename))) errors.push(`missing ${filename}`);
 }
-for (const filename of ["README.md", "RELEASE.md"]) {
+for (const filename of ["README.md", "README.zh-CN.md", "RELEASE.md", "CONTRIBUTING.md", "CONTRIBUTING.zh-CN.md"]) {
   for (const [, target] of read(filename).matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
     if (/^(?:[a-z][a-z\d+.-]*:|#)/i.test(target)) continue;
     const relative = target.split("#", 1)[0];

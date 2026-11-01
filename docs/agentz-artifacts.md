@@ -1,65 +1,69 @@
-# `.agentz/` 团队产物规范
+# `.agentz/` Team Artifact Conventions
 
-AgentZ 在每个打开的项目根目录下维护 `.agentz/` 运行时目录。其中 **Wiki / 知识图谱** 相关产物可提交到 Git，供团队 onboarding 与 Agent 编码上下文共享。
+**English** | [简体中文](agentz-artifacts.zh-CN.md)
 
-> AgentZ 自身仓库的 `.gitignore` 会忽略 `.agentz/`（本地开发数据库）。**用户项目**可按本文选择性提交结构化产物。
+AgentZ maintains a `.agentz/` runtime directory in the root of every opened project. The **Wiki / knowledge graph** artifacts in it can be committed to Git so the team shares them for onboarding and as agent coding context.
 
-## 建议提交（团队共享）
+> The AgentZ repository's own `.gitignore` ignores `.agentz/` (local development databases). **User projects** can selectively commit the structured artifacts described here.
 
-| 文件 | 用途 | 生成方式 |
-|------|------|----------|
-| `.agentz/graph.json` | 模块/文件依赖图谱 | Wiki → 重建图谱 |
-| `.agentz/tours.json` | 导览顺序 | 随图谱重建 |
-| `.agentz/domain.json` | 推断的业务域 | 随图谱重建 |
-| `.agentz/REPO_WIKI.md` | L1 人类快览 | Wiki → 快速概览 |
-| `.agentz/AGENT_CODING_BRIEF.md` | Agent 编码简报（自动注入） | 随图谱重建 |
-| `.agentz/WIKI_DEEP.md` | L3 深度 Wiki（可选） | `/ralph-loop-wiki` |
+## Recommended to commit (shared with the team)
 
-体积较大时：
+| File | Purpose | How it is generated |
+|------|---------|---------------------|
+| `.agentz/graph.json` | Module/file dependency graph | Built and kept in sync automatically by the background graph index (rebuilt on file changes); also refreshed by the Repo Wiki actions |
+| `.agentz/tours.json` | Guided-tour order | Rebuilt with the graph |
+| `.agentz/domain.json` | Inferred business domains | Rebuilt with the graph |
+| `.agentz/REPO_WIKI.md` | L1 quick overview for humans | Repo Wiki → **Fast architecture Wiki** |
+| `.agentz/AGENT_CODING_BRIEF.md` | Agent coding brief (auto-injected) | Rebuilt with the graph |
+| `.agentz/REPO_MEMORY.md` | Source-anchored repository memory notes | Repo Wiki → **Repository memory notes**, or the agent's `repo_memory` tool |
+| `.agentz/WIKI_DEEP.md` | L3 deep Wiki (optional) | Repo Wiki → **Incremental AI DeepWiki** |
 
-- `graph.json` > **10 MB** → 考虑 [Git LFS](https://git-lfs.com/)
-- `WIKI_DEEP.md` → 可仅在 CI 或 release 分支生成，日常开发不提交
+When they get large:
 
-## 建议忽略（本地/机器相关）
+- `graph.json` > **10 MB** → consider [Git LFS](https://git-lfs.com/)
+- `WIKI_DEEP.md` → can be generated only in CI or on release branches and left out of day-to-day commits
 
-将以下内容加入**项目** `.gitignore`（按需复制）：
+## Recommended to ignore (local / machine-specific)
+
+Add the following to the **project's** `.gitignore` (copy as needed):
 
 ```gitignore
 # AgentZ local runtime (do not commit)
 .agentz/index.db
 .agentz/piscis.db
 .agentz/journal.db
-.agentz/diff-overlay.json
+.agentz/graph.db
 .agentz/intermediate/
 .agentz/*.db
 .agentz/*.db-*
 ```
 
-保留提交：`graph.json`、`tours.json`、`domain.json`、`REPO_WIKI.md`、`AGENT_CODING_BRIEF.md`（以及可选的 `WIKI_DEEP.md`）。
+Keep committed: `graph.json`, `tours.json`, `domain.json`, `REPO_WIKI.md`, `AGENT_CODING_BRIEF.md`, `REPO_MEMORY.md` (and optionally `WIKI_DEEP.md`).
 
-## 更新流程
+## Update flow
 
-1. 拉取代码后：Agent 会自动读取已提交的 `AGENT_CODING_BRIEF.md` / `graph.json`
-2. 大改架构后：维护者执行 **Wiki → 重建图谱**，再提交更新的产物
-3. 需要深度文档：运行 `/ralph-loop-wiki`，输出到 `.agentz/WIKI_DEEP.md`；下次重建图谱会把模块摘要写回 `graph.json` 节点 `summary`
+1. After pulling: the agent automatically reads the committed `AGENT_CODING_BRIEF.md` / `graph.json`.
+2. After a major architecture change: the graph re-syncs automatically; a maintainer re-runs the Repo Wiki actions if needed and commits the updated artifacts.
+3. For deep documentation: run Repo Wiki → **Incremental AI DeepWiki** (`repo_wiki_generate_deep`), which writes `.agentz/WIKI_DEEP.md` using a per-module SHA-256 cache and writes module summaries back into the `summary` field of `graph.json` nodes, `graph.db` and `AGENT_CODING_BRIEF.md`.
 
-## Agent 如何使用这些产物
+## How the agent uses these artifacts
 
-| 机制 | 读取的产物 |
-|------|------------|
-| 每轮 Agent turn 自动注入 | `AGENT_CODING_BRIEF.md` |
-| `graph_search` 工具 | `graph.json` |
-| `@graph` mention | `graph.json` 子图检索 |
-| `@codebase` mention | `index.db`（本地，不提交） |
+| Mechanism | Artifact read |
+|-----------|---------------|
+| Auto-injected into every agent turn | `AGENT_CODING_BRIEF.md` (falls back to a pointer to `REPO_WIKI.md`) |
+| `graph_search` tool | `graph.json` |
+| `@graph` mention | Subgraph retrieval from `graph.json` |
+| `repo_memory` tool | `REPO_MEMORY.md` / `graph.db` |
+| `@codebase` mention | `index.db` (local, not committed) |
 
-推荐 Agent 工作流：`graph_search`（结构）→ `codebase_search`（实现）→ `file_read`（编辑）
+Recommended agent workflow: `graph_search` (structure) → `codebase_search` (implementation) → `file_read` (edit)
 
-## 冲突处理
+## Conflict handling
 
-- `graph.json` 合并冲突：以维护者 **重建图谱** 为准，勿手工编辑 JSON
-- `WIKI_DEEP.md` 冲突：按文档章节协商，或重新跑 `/ralph-loop-wiki`
+- `graph.json` merge conflicts: regenerate the graph and take that result; do not hand-edit the JSON
+- `WIKI_DEEP.md` conflicts: resolve section by section, or re-run the DeepWiki generation
 
-## 相关文档
+## Related docs
 
-- [graph-schema.md](./graph-schema.md) — `graph.json` 字段说明
-- [wiki-graph-verification.md](./wiki-graph-verification.md) — 功能验收与测试步骤
+- [graph-schema.md](./graph-schema.md) — `graph.json` field reference
+- [wiki-graph-verification.md](./wiki-graph-verification.md) — acceptance and test steps

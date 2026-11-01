@@ -1,115 +1,121 @@
-# BotZ 模式设计草案
+# BotZ Mode Design Draft
 
-2026-10-25。BotZ 是 CodeZ、WorkZ 之外的第三种模式：以代理（agent）为中心组织界面，而不是以会话为中心。底层沿用 WorkZ 的团队、资源池（pool）、巡检和心跳。
+**English** | [简体中文](botz-design-2026-10-25.zh-CN.md)
 
-## 1. 调研结论
+> Status (2026-11-02): this is the original 2026-10-25 proposal; §2 describes the code as it was then. Since then `botz` has shipped as the third mode (`type Mode = "codez" | "workz" | "botz"` in `src/App.tsx`, shortcut Ctrl/⌘+Shift+Alt+N in `src/utils/modeShortcut.ts`), with the room registry, bot profiles (memory, routines, daily/monthly token budgets), per-room concurrency, parent/child todos, an @mention inbox and one-click PRs in `src-tauri/src/commands/botz.rs`, `src-tauri/src/runtime/parent_wake.rs` and `src/workspaces/botz/`. Rooms now own their member list instead of only pointing at a team template. Some mechanisms landed differently from the plan — see §8. Not implemented: a dedicated `pool_todo_claim` command (atomic claiming is the kernel's `pool_org(action="claim_todo")`), `to_agent`/`read_at` columns, the `mailbox_read`/`mailbox_send` tools and a `bot_threads` table.
 
-| 项目 | 星数（约） | 可借鉴的机制 |
-|------|-----------|--------------|
-| Paperclip | 70k | 树形组织；任务原子领取（冲突即放弃）；心跳唤醒（定时 / 被指派 / 被 @ / 审批结果 / 手动）；每代理月度预算，80% 警告、100% 暂停 |
-| Claude Code Agent Teams | 官方 | lead + teammates；共享任务列表，带依赖阻塞；每代理一个 JSON 邮箱；计划审批、关闭请求等协议消息；人可直接和任一成员对话 |
-| Vibe Kanban | 28k | 看板卡片 → worktree → diff 行内评论回灌给代理 → 一键 PR |
-| Claude Squad / Conductor / Crystal | 3k–9k | 每个代理一个 worktree（加 tmux 或容器）；实例列表加状态 |
-| Pixel Agents | 10k | 用工具调用和权限事件驱动办公室角色动画（打字、阅读、等待时冒气泡）；办公室区域映射到目录 |
-| ChatDev / AI Town | 35k / 9k | 像素风公司或小镇，按角色和阶段对话 |
-| Letta | 25k | 持久身份；分层记忆，代理可自行编辑 |
-| Grok Bot | 闭源 | 侧栏是 Bot 名单而非聊天记录；每个 Bot 有身份、记忆、工具、在线状态；Routines 定时或由事件触发；只在需要审批时打扰人 |
+2026-10-25. BotZ is a third mode alongside CodeZ and WorkZ: the UI is organized around agents rather than sessions. Under the hood it reuses WorkZ's teams, resource pools, patrol and heartbeat.
 
-来源见第 7 节。
+## 1. Research findings
 
-## 2. AgentZ 现状（可复用）
+| Project | Stars (approx.) | Mechanisms worth borrowing |
+|---------|-----------------|----------------------------|
+| Paperclip | 70k | Tree-shaped org; atomic task claiming (give up on conflict); heartbeat wake-ups (timer / assigned / @mentioned / approval result / manual); per-agent monthly budget, warn at 80%, pause at 100% |
+| Claude Code Agent Teams | Official | Lead + teammates; shared task list with dependency blocking; one JSON mailbox per agent; protocol messages such as plan approval and shutdown requests; humans can talk directly to any member |
+| Vibe Kanban | 28k | Kanban card → worktree → inline diff comments fed back to the agent → one-click PR |
+| Claude Squad / Conductor / Crystal | 3k–9k | One worktree per agent (plus tmux or a container); instance list with status |
+| Pixel Agents | 10k | Tool calls and permission events drive office character animations (typing, reading, speech bubble while waiting); office areas map to directories |
+| ChatDev / AI Town | 35k / 9k | Pixel-art company or town; conversations by role and phase |
+| Letta | 25k | Persistent identity; layered memory the agent can edit itself |
+| Grok Bot | Closed source | The sidebar is a bot roster, not a chat history; each bot has an identity, memory, tools and presence; Routines run on a schedule or on events; it only interrupts the human when approval is needed |
 
-- 模式切换：`App.tsx` 中 `type Mode = "codez" | "workz"`，标题栏按钮、`modeShortcut.ts`、`LayoutSnapshot.mode` 持久化。
-- 团队：`teams.rs`，模板存于 `{config}/teams/<id>/team.json`，模式分 swarm 和 workflow。
-- 资源池：`teams_create_pool` 按团队加项目创建 pool；`pool_org`、`pool_chat` 已有；`poolTodos`、`poolMessages`、`agentz:pool-event` 已有。
-- 成员执行：`runtime/koi.rs` 的 `spawn_koi_turn`，会话 id 为合成的 `koi_task_{owner}_{todo8}`。
-- 巡检与心跳：`runtime/patrol.rs`（30 秒一次）、`runtime/heartbeat.rs`。
-- 看板：`CollabBoard.tsx`。worktree：`agentTask.ts`。并发：`agent_slots` 信号量，默认 3。
-- 代理定义：`{config}/agents/<id>/agent.json`，含 `icon`、`color`、`system_prompt`、`skills`、`tools`、`llm_provider_id`。
+Sources are in §7.
 
-缺口：
+## 2. Current state of AgentZ (reusable)
 
-1. 没有跨会话的“代理主页”。代理只是人设，身份散落在各会话里。
-2. 成员的 `koi_task_*` 会话没有持久的、可打开的线程，也没有“代理 → 会话”的索引。
-3. 没有 Room 概念。`App.tsx` 只有一个 `projectDir`，pool 绑定在当前项目上，无法同时运行多个相互隔离的团队。
-4. 没有每代理邮箱、任务领取锁、预算、Routines 界面。
+- Mode switching: `type Mode = "codez" | "workz"` in `App.tsx`, title-bar buttons, `modeShortcut.ts`, persisted in `LayoutSnapshot.mode`.
+- Teams: `teams.rs`; templates stored at `{config}/teams/<id>/team.json`; two modes, swarm and workflow.
+- Resource pools: `teams_create_pool` creates a pool per team + project; `pool_org`, `pool_chat` already exist; so do `poolTodos`, `poolMessages` and `agentz:pool-event`.
+- Member execution: `spawn_koi_turn` in `runtime/koi.rs`; the session id is the synthesized `koi_task_{owner}_{todo8}`.
+- Patrol and heartbeat: `runtime/patrol.rs` (every 30 s), `runtime/heartbeat.rs`.
+- Kanban: `CollabBoard.tsx`. Worktrees: `agentTask.ts`. Concurrency: the `agent_slots` semaphore, default 3.
+- Agent definitions: `{config}/agents/<id>/agent.json`, with `icon`, `color`, `system_prompt`, `skills`, `tools`, `llm_provider_id`.
 
-## 3. 概念模型
+Gaps:
 
-- **Bot**：持久代理实例 = 代理定义（`agent.json`）+ 身份（名字、头像、颜色）+ 长期记忆 + Routines + 主线程。全局唯一，跨项目。
-- **Room**：隔离的团队工作空间 = 名称 + 工作目录（本地或 `agentz-remote://`）+ 团队模板 + 一个 pool + 桌位布局。每个 Room 有自己的 pool 数据库作用域、看板和 worktree，Room 之间互不可见。
-- **Desk**：Room 里一个成员的座位，绑定 Bot 和成员在该 Room 的线程会话（`botz-member` 源）。
-- **Task**：沿用 `pool_todos`，统一状态机为 `backlog → todo → in_progress → in_review → done`，另有 `blocked`（必须填原因）和 `cancelled`；支持 `parent_id` 和 `depends_on`。
-- **Mailbox**：每个 Bot 在每个 Room 一个收件箱，基于 `pool_messages` 加收件人和已读字段；支持 @提及。
+1. There is no cross-session "agent home page". An agent is just a persona; its identity is scattered across sessions.
+2. Members' `koi_task_*` sessions have no persistent thread you can open, and there is no "agent → session" index.
+3. There is no Room concept. `App.tsx` has a single `projectDir` and the pool is bound to the current project, so several mutually isolated teams cannot run at the same time.
+4. There are no per-agent mailboxes, task claim locks, budgets or a Routines UI.
 
-## 4. 两个视图
+## 3. Concept model
 
-### 4.1 Bot 视图（类 Grok Bot，全局单代理）
+- **Bot**: a persistent agent instance = agent definition (`agent.json`) + identity (name, avatar, color) + long-term memory + Routines + a main thread. Globally unique, across projects.
+- **Room**: an isolated team workspace = name + working directory (local or `agentz-remote://`) + team template + one pool + desk layout. Each Room has its own pool database scope, kanban board and worktrees; Rooms cannot see each other.
+- **Desk**: a member's seat in a Room, bound to a Bot and to that member's thread session in the Room (source `botz-member`).
+- **Task**: reuses `pool_todos` with a unified state machine `backlog → todo → in_progress → in_review → done`, plus `blocked` (a reason is required) and `cancelled`; supports `parent_id` and `depends_on`.
+- **Mailbox**: one inbox per Bot per Room, built on `pool_messages` plus recipient and read fields; supports @mentions.
 
-- 左栏是 Bot 名单：头像、在线状态（空闲 / 工作中 / 等待审批 / 出错 / 暂停）、当前任务、今日花费。
-- 中间是 Bot 主线程：一个持久对话，复用 CodeZ/WorkZ 的消息列表、工具卡片、文件修改卡片。上下文过长时按现有压缩机制处理，不再新建会话。
-- 右栏是 Bot 主页：
-  - 人设与记忆块（可编辑，代理也可自行更新）。
-  - Routines：cron 或事件触发，执行一个提示词或技能，带“试运行”按钮。
-  - 所在 Room 列表与运行历史（来自 run events）。
-- Bot 在 Room 里收到 @ 或被指派任务时，主线程显示一条摘要，点击可跳到对应 Room 的桌位。
+## 4. Two views
 
-### 4.2 Room 视图（团队拟人办公室）
+### 4.1 Bot view (Grok Bot–style, one global agent)
 
-- 顶部是 Room 标签：可建多个，每个绑定一个目录和团队模板。显示运行中的代理数和待审批数。
-- 主区是办公室平面：
-  - 每个成员一张办公桌，坐着卡通化身，用代理的 icon 和 color 生成，先用 SVG 和 CSS 动画，不引入游戏引擎。
-  - 化身状态由事件驱动：写文件时打字，读文件或搜索时翻书，运行命令时看屏幕，等待审批时头顶冒“！”气泡，空闲时喝咖啡，出错时冒红色气泡。
-  - 点桌位会从右侧抽屉打开该成员在本 Room 的会话，可直接对话（人可以和任一成员说话）。
-  - 协调者坐在“主管位”。
-- 侧栏或底栏是团队看板：复用 CollabBoard，按 Room 的 pool 过滤；卡片显示负责人头像，可拖拽改状态或负责人；`in_review` 卡片可打开 diff 评审，评论回灌给负责人。
-- 动态流：成员之间的消息（`pool_messages`）以气泡形式短暂显示在桌位之间，完整记录在动态流面板。
+- The left column is the Bot roster: avatar, presence (idle / working / awaiting approval / error / paused), current task, today's spend.
+- The center is the Bot's main thread: one persistent conversation reusing the CodeZ/WorkZ message list, tool cards and file-change cards. When context grows too long the existing compaction handles it; no new session is created.
+- The right column is the Bot home page:
+  - Persona and memory blocks (editable; the agent can update them too).
+  - Routines: cron- or event-triggered, run a prompt or skill, with a "dry run" button.
+  - The Rooms it belongs to and its run history (from run events).
+- When a Bot is @mentioned or assigned a task in a Room, its main thread shows a summary; clicking it jumps to the corresponding desk in that Room.
 
-## 5. 调度机制（在现有 pool 上补齐）
+### 4.2 Room view (anthropomorphic team office)
 
-1. **原子领取**：`pool_todo_claim(todo_id, agent)` 用条件 UPDATE 实现；失败返回冲突，代理换下一个任务，不重试。
-2. **依赖阻塞**：前置任务完成后，自动把依赖它的任务从 `blocked` 解锁为 `todo`，并唤醒负责人。
-3. **心跳唤醒**：扩展 `heartbeat.rs`，触发源为定时、被指派、被 @、审批有结果、手动。每次唤醒只跑一个短回合，固定流程是读收件箱、选任务、领取、执行、写进度、更新状态。
-4. **邮箱**：`pool_messages` 增加 `to_agent` 和 `read_at`。新增工具 `mailbox_read` 和 `mailbox_send`，或在 `pool_chat` 上扩展。
-5. **结构化审批**：计划审批和危险操作复用 PermissionCard 与 InteractiveCard；审批结果作为唤醒事件。
-6. **并发与预算**：每个 Room 有并发上限（在全局 `agent_slots` 之下再分配）；每个 Bot 有每日和每月 token 或费用上限，80% 警告，100% 暂停该 Bot。
-7. **隔离**：Room 的 pool 作用域为 `room.dir`；每个领取的任务一个 worktree（沿用 `agentTask`）；`in_review` 时出 diff，合并由人确认。
-8. **父子任务**：协调者拆分任务时带 `parent_id`；子任务全部完成后唤醒父任务负责人汇总。
+- Room tabs on top: you can create several, each bound to a directory and a team template. Each shows the number of running agents and pending approvals.
+- The main area is the office floor plan:
+  - Each member has a desk with a cartoon avatar generated from the agent's icon and color — SVG and CSS animations first, no game engine.
+  - Avatar state is event-driven: typing while writing files, flipping a book while reading or searching, watching the screen while running commands, a "!" bubble while awaiting approval, drinking coffee while idle, a red bubble on error.
+  - Clicking a desk opens that member's session in this Room in a right-hand drawer, where you can talk to it directly (humans can talk to any member).
+  - The coordinator sits at the "manager desk".
+- The sidebar or bottom bar holds the team kanban: reuses CollabBoard filtered by the Room's pool; cards show the owner's avatar and can be dragged to change status or owner; `in_review` cards open a diff review, and comments are fed back to the owner.
+- Activity feed: messages between members (`pool_messages`) briefly appear as bubbles between desks, with the full record in the activity feed panel.
 
-## 6. 实施分期
+## 5. Scheduling mechanisms (filling gaps on top of the existing pool)
 
-| 阶段 | 内容 | 主要改动 |
-|------|------|----------|
-| P1 骨架 | 新增 `botz` 模式（标题栏、快捷键、布局持久化）；Room 注册表，存于 `{config}/botz/rooms.json`（目录、团队、pool id）；Room 视图静态桌位，点击打开成员会话（建立成员 → 会话索引）；Room 内嵌 CollabBoard | `App.tsx`、`src/workspaces/botz/*`、`src-tauri/src/commands/botz.rs` |
-| P2 动起来 | 事件驱动的化身状态、消息气泡、等待审批提醒；多 Room 同时运行（pool、巡检、心跳按 Room 目录各自启动） | 复用 `onChatEvent` 和 `onPoolEvent`，按 Room 分流 |
-| P3 调度 | 原子领取、依赖阻塞、收件人邮箱、扩展心跳触发源、Room 并发上限 | kernel `pool`、`heartbeat.rs`、`patrol.rs` |
-| P4 Bot 视图 | Bot 名单、主线程、记忆块、Routines（复用 automationReminder 的调度）、预算 | `agents.rs` 扩展 bot 状态，新增 `bot_threads` 表 |
-| P5 评审闭环 | 看板 `in_review` 时打开 diff 行内评论并回灌；一键合并或开 PR | 复用 GitPanel 和 agentTask 的合并逻辑 |
+1. **Atomic claiming**: `pool_todo_claim(todo_id, agent)` implemented with a conditional UPDATE; on failure it returns a conflict and the agent moves on to the next task without retrying.
+2. **Dependency blocking**: when a prerequisite task completes, tasks depending on it are automatically unblocked from `blocked` to `todo` and their owners are woken.
+3. **Heartbeat wake-ups**: extend `heartbeat.rs` with triggers for timer, assigned, @mentioned, approval result and manual. Each wake-up runs only one short turn with a fixed flow: read inbox, pick a task, claim it, execute, write progress, update status.
+4. **Mailbox**: add `to_agent` and `read_at` to `pool_messages`. Add `mailbox_read` and `mailbox_send` tools, or extend `pool_chat`.
+5. **Structured approval**: plan approval and dangerous operations reuse PermissionCard and InteractiveCard; the approval result is a wake-up event.
+6. **Concurrency and budget**: each Room has a concurrency cap (allocated under the global `agent_slots`); each Bot has daily and monthly token or cost caps, warn at 80%, pause that Bot at 100%.
+7. **Isolation**: a Room's pool is scoped to `room.dir`; each claimed task gets one worktree (reusing `agentTask`); `in_review` produces a diff and a human confirms the merge.
+8. **Parent/child tasks**: the coordinator sets `parent_id` when splitting a task; once all subtasks are done, the parent task's owner is woken to summarize.
 
-每个阶段单独可用、单独发布。
+## 6. Implementation phases
 
-## 7. 来源
+| Phase | Content | Main changes |
+|-------|---------|--------------|
+| P1 Skeleton | Add the `botz` mode (title bar, shortcut, layout persistence); Room registry stored in `{config}/botz/rooms.json` (directory, team, pool id); static desks in the Room view, clicking opens the member session (build the member → session index); CollabBoard embedded in the Room | `App.tsx`, `src/workspaces/botz/*`, `src-tauri/src/commands/botz.rs` |
+| P2 Bring it to life | Event-driven avatar states, message bubbles, awaiting-approval alerts; multiple Rooms running at once (pool, patrol and heartbeat started per Room directory) | Reuse `onChatEvent` and `onPoolEvent`, routed per Room |
+| P3 Scheduling | Atomic claiming, dependency blocking, recipient mailboxes, extended heartbeat triggers, Room concurrency caps | kernel `pool`, `heartbeat.rs`, `patrol.rs` |
+| P4 Bot view | Bot roster, main thread, memory blocks, Routines (reusing automationReminder scheduling), budgets | Extend `agents.rs` with bot state, add a `bot_threads` table |
+| P5 Review loop | Open inline diff comments on `in_review` kanban cards and feed them back; one-click merge or PR | Reuse GitPanel and agentTask merge logic |
 
-- Paperclip：https://github.com/paperclipai/paperclip
-- Claude Code Agent Teams：https://code.claude.com/docs/en/agent-teams
-- Vibe Kanban：https://github.com/BloopAI/vibe-kanban
-- Claude Squad：https://github.com/smtg-ai/claude-squad
-- Pixel Agents：https://github.com/pixel-agents-hq/pixel-agents
-- Grok Bot：https://x.ai/news/designing-grok-bot 、https://docs.x.ai/grok-bot/skills-routines-and-automations
-- Letta：https://github.com/letta-ai/letta
-- ChatDev：https://github.com/OpenBMB/ChatDev
+Each phase is usable and releasable on its own.
 
-## 8. ????(2026-10-26,1.0.25)
+## 7. Sources
 
-| ? | ?? | ?? |
-|----|------|------|
-| P1 ???P2 ??? | ?? | Room???????????? |
-| ???? | ?? | todo ? depends_on |
-| Room ???? | ?? | Room ??? max_concurrency,patrol ? pool ?? |
-| ???? | ?? | ????????/????,80% ??,100% ?? |
-| ???? | ??(??) | ??? Parent: <id>,????????????????;? parent_id ? |
-| ?? | ?? | ?? @ ??????,? to_agent/read_at ?? |
-| ??? | ?? | ????????????????? patrol ????;@! ? coordinator ??;?? @ ??? |
-| Open PR | ?? | ?????? gh |
-| ?? pool ?? | ??? | 1.0.25 ????? pool_chat/pool_org |
+- Paperclip: https://github.com/paperclipai/paperclip
+- Claude Code Agent Teams: https://code.claude.com/docs/en/agent-teams
+- Vibe Kanban: https://github.com/BloopAI/vibe-kanban
+- Claude Squad: https://github.com/smtg-ai/claude-squad
+- Pixel Agents: https://github.com/pixel-agents-hq/pixel-agents
+- Grok Bot: https://x.ai/news/designing-grok-bot , https://docs.x.ai/grok-bot/skills-routines-and-automations
+- Letta: https://github.com/letta-ai/letta
+- ChatDev: https://github.com/OpenBMB/ChatDev
 
+## 8. Implementation status (2026-10-26, 1.0.25)
+
+> The original Chinese text of this section was lost to an encoding error before this revision; the table below was reconstructed from the 1.0.25 release ("BotZ room concurrency, member budgets, parent tasks, mentions inbox, open PR") and the current code.
+
+| Item | Status | Notes |
+|------|--------|-------|
+| P1 skeleton, P2 animation | Done | Room registry `{config}/botz/rooms.json` (`botz_list_rooms` / `botz_save_room` / `botz_open_room`); event-driven desks and bubbles in `src/workspaces/botz/RoomView.tsx` |
+| Dependency blocking | Done | Via the kernel todo's `depends_on`; patrol activates pending todos once upstream is done (`pool/coordinator.rs`) |
+| Room concurrency cap | Done | `BotzRoom.max_concurrency`; patrol uses `room_max_concurrency` for that pool, falling back to the global pool cap (`runtime/patrol.rs`) |
+| Budgets | Done | `BotProfile.daily_token_budget` / `monthly_token_budget`; `budget_block` refuses new member turns once a cap is reached (`commands/botz.rs`) |
+| Parent/child tasks | Done (by convention) | The kernel todo has no parent column; the coordinator writes a `Parent: <id>` line in each subtask description, and when all subtasks finish patrol wakes the parent's owner once with an `@!` mention (`runtime/parent_wake.rs`); no `parent_id` column |
+| Mailbox | Done | A member's inbox is the pool messages that @mention it; read state is kept per room in the renderer's `localStorage` (`botz-mail-<room id>`), not in `to_agent`/`read_at` columns |
+| Wake-ups | Partial | Assignment and @mentions wake members through the existing pool/patrol path; `@!` targets a member directly; no separate heartbeat trigger types were added |
+| Open PR | Done | `botz_open_pr` runs `gh pr create` and returns the PR URL |
+| Atomic claiming | Existing kernel feature | Provided by `pool_org(action="claim_todo")`; no new `pool_todo_claim` command |
+| Bot view | Done | `BotHomePage.tsx`, `BotPicker.tsx`, `BotRoutineRunner.tsx`; profiles via `botz_get_bot` / `botz_save_bot` (no `bot_threads` table) |

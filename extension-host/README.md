@@ -1,5 +1,7 @@
 # AgentZ Extension Host
 
+**English** | [简体中文](README.zh-CN.md)
+
 A clean-room, VS Code–compatible **extension host** for AgentZ. It runs real
 `.vsix` extension JavaScript against a `vscode` API implementation and talks to
 the AgentZ renderer (Monaco + React) over a structured RPC protocol — the
@@ -40,20 +42,27 @@ npm run typecheck
 
 `dist/host.js` is what the Rust host launches:
 `node <resources>/extension-host/host.js`. Resolution order in
-`ext_host.rs`: explicit arg → `$CODEZ_EXT_HOST_JS` → bundled resource → dev
-paths (`extension-host/dist/host.js`). Override the Node binary with
-`$CODEZ_NODE`.
+`ext_host.rs` (`resolve_host_js`): explicit arg → `$CODEZ_EXT_HOST_JS` → dev
+build (`extension-host/dist/host.js` next to the crate, preferred whenever it
+exists) → bundled resource (`extension-host/host.js`) → legacy paths relative
+to the executable / cwd. Node binary (`node_bin()`): `$CODEZ_NODE` → bundled
+pinned runtime (`resources/node/<platform>-<arch>/node[.exe]`) → system `node`.
 
 ## Packaging (Node runtime)
 
 Tauri does not embed Node. For shipped builds:
 
-1. `tauri.conf.json` bundles `dist/host.js` into app resources
-   (`bundle.resources`), and `beforeBuildCommand` runs `npm run build:exthost`.
-2. The app currently launches the host with the system `node` (or `$CODEZ_NODE`).
-   To make installs fully self-contained, add a per-platform Node binary as a
-   Tauri **externalBin** sidecar and point `node_bin()` at it. (Tracked as the
-   remaining hardening item — see milestone M17.)
+1. `tauri.conf.json` bundles `dist/host.js` (and its source map) into app
+   resources as `extension-host/host.js` (`bundle.resources`), and
+   `beforeBuildCommand` runs `npm run build:exthost`.
+2. `npm run fetch-node` (`scripts/fetch-node.mjs --remote`) downloads the pinned
+   Node.js runtime (`NODE_VERSION`, currently 22.11.0) into
+   `src-tauri/resources/node/`: an extracted runtime for the host platform plus
+   linux-x64 / linux-arm64 tarballs for remote targets. That directory is
+   bundled as an app resource, and the release workflow runs `fetch-node` in
+   every bundle job, so release builds ship their own Node. Without it (for
+   example a local build that skipped `fetch-node`) the host falls back to the
+   system `node`.
 
 ## Licensing strategy
 
@@ -80,7 +89,8 @@ Known limits: native (`.node`) modules require ABI-matching prebuilds.
 
 The same `host.js` doubles as **agentz-server**: stdin lines carrying a
 `$agentz` key are a control plane (`src/server/agentzServer.ts`: `info`,
-`fs.*`, `exec`, `proc.*`) answered on stdout as `{"$agentz":"res"|"event"}`,
+`fs.*`, `search`, `git.discover`, `ports.list`, `tcp.*`, `exec`, `proc.*`,
+`shutdown`) answered on stdout as `{"$agentz":"res"|"event"}`,
 everything else is extension RPC. The Rust broker (`commands/ext_host.rs`,
 `remote/`) launches it over one of:
 
@@ -116,7 +126,7 @@ and routes it (`crate::remote::resolve`):
 | Language features | extensions on the remote host, plus built-in LSP (`remote/lsp.rs`): the server is spawned on the remote via the target transport, URIs rewritten `agentz-remote://` ↔ `file://` at the bridge |
 | Agent tools | `tools/remote_fs.rs` replaces `file_*` / `shell` with remote versions |
 | Debugging | `dap_start` with `remoteDir` spawns the adapter on the remote (target transport); `dapClient` maps `agentz-remote://` ↔ POSIX paths for breakpoints / stack frames |
-| Code index | `remote/mirror.rs` keeps an incremental local source mirror (`~/.agentz/remote-mirror/<hash>`, files <512 KB, vendored dirs pruned); codebase / graph / symbol indexes, their agent tools and `@codebase` / `@graph` run on it |
+| Code index | `remote/mirror.rs` keeps an incremental local source mirror (`~/.agentz/remote-mirror/v2-<hash>`, files <512 KB, vendored dirs pruned); codebase / graph / symbol indexes, their agent tools and `@codebase` / `@graph` run on it |
 | Agent context | `.agentz/rules` / `.cursor/rules` and `@file` mentions are read from the remote |
 | Port forwarding | `ports.list` (Linux `/proc/net/tcp`); SSH uses `ssh -N -L`, Docker/WSL tunnel over the server (`tcp.*`). Ports ≥1024 that open after connect are auto-forwarded with a notification |
 | Password hosts | "Set up key login" installs your public key once (`remote/ssh_setup.rs`) |

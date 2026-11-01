@@ -1,259 +1,280 @@
-# 后台任务、回合状态与消息流:调查结论与重设计
+# Background Tasks, Turn State and the Message Stream: Findings and Redesign
 
-状态:草案,待评审。日期:2026-10-27。
+**English** | [简体中文](background-tasks-and-turn-stream.zh-CN.md)
 
-本文基于对当前代码的通读(行号以 2026-10-27 工作区为准),记录已确认的缺陷、尚未定位的问题,以及建议的目标设计和分阶段实施计划。凡标注"已确认"的结论都有代码证据;标注"推测"的需要埋点或复现才能定论。
+Status: draft, pending review. Date: 2026-10-27. Re-verified against the code on 2026-11-02 (AgentZ 1.0.40, piscis-engine v0.8.71); see "Implementation status" below.
+
+This document is based on a full read of the code at the time (line numbers refer to the 2026-10-27 workspace unless stated otherwise). It records confirmed defects, open problems, the proposed target design and a phased implementation plan. Conclusions marked "confirmed" are backed by code evidence; conclusions marked "suspected" need instrumentation or a reproduction to settle.
+
+### Implementation status (2026-11-02)
+
+Several parts of the target design have since landed. The investigation sections below are kept as the historical record, with inline notes where the code has changed.
+
+| Item | Status in code |
+|------|----------------|
+| Unix detached reader threads bounded | Done: `spawn_std_detached` waits at most 5 s for the reader threads (`tools/background_process.rs` L136, L216–222) |
+| Job/service intent | Done, but as a `service: true` boolean next to `background: true` (`BgKind::Job` / `BgKind::Service`, `background.rs` L207–226), not as a `mode` field |
+| Kills never trigger a continuation | Done: `should_notify` returns `false` for any killed task (`background_continuation.rs` L63–86) |
+| A service only reports ready / unexpected exit; a job that already reported ready only reports failure | Done (`should_notify`) |
+| Notice delivered into a running turn instead of a new turn | Done: `turn_inbox::try_deliver` (`background_continuation.rs` L297–313); unconsumed notices are re-routed by `on_turn_closed` |
+| Kill background processes on app exit / session delete | Done: `kill_all()` on exit (`src-tauri/src/lib.rs` L498), `kill_session()` on session delete (`commands/session.rs` L1263) |
+| Tool-call timeout vs shell foreground wait conflict | Fixed: the loop timeout is now the tool's own timeout + 30 s slack (`agent/loop_.rs` L55–75) |
+| Remote background tasks | Supported: `remote_dev` accepts `background` / `service` (`src-tauri/src/tools/remote_dev.rs` L131–160, `tools/remote_background.rs`) |
+| Session scheduler, `session_state` event, stop by `turn_id` | Not implemented |
+| Output written straight to files; handle-inheritance lockdown | Not implemented |
+| `task_wait` / `task_output` / `task_stop` / `task_list` naming | Not implemented (tools are still `wait`, `process_wait`, `process_output`, `process_kill`) |
+| Event sequence numbers, single reducer, segment-based persistence | Not implemented; CodeZ still records `textOffset` without flushing first |
 
 ---
 
-## 1. 背景:近期暴露的问题
+## 1. Background: recently observed problems
 
-| # | 现象 | 当前判断 |
-|---|------|----------|
-| P1 | 用户发消息报 `task queued/running or goal mutation active`,界面看不到任何运行中的会话 | 已确认:后台任务完成后自动发起的续跑回合(`host-bg-*`)占着会话门禁,但对前端不可见(1.0.27 已加 `host_turn_started` 缓解) |
-| P2 | 后台任务启动了 dev server 后,agent 在同一回合里输出一句话就永久卡住;关掉 server 后 agent 继续迭代 | 高度怀疑:前台命令结束后在等管道 EOF,而写端被 Job 之外的进程(server)持有。已加 5 秒上限,未复现验证 |
-| P3 | 点停止要近一分钟才停下 | 未定位。代码上可确认的上限约 8s(工具宽限)+10s(取消确认),其余耗时来源不明 |
-| P4 | 助手文字被工具卡片从词中间切开,后续段落之间反而没有工具 | 未定位根因(见 §4.3)。已排除"切换会话"(用户确认未切换) |
+| # | Symptom | Current assessment |
+|---|---------|--------------------|
+| P1 | Sending a message fails with `task queued/running or goal mutation active`, while the UI shows no running session | Confirmed: the continuation turn started automatically after a background task finishes (`host-bg-*`) holds the session gate but is invisible to the frontend (1.0.27 added `host_turn_started` as a mitigation) |
+| P2 | After a background task starts a dev server, the agent prints one sentence in the same turn and then hangs forever; once the server is closed, the agent keeps iterating | Strongly suspected: after the foreground command ends we wait for pipe EOF, but the write end is held by a process outside the Job (the server). A 5-second cap has been added; not verified by reproduction |
+| P3 | Pressing stop takes almost a minute to take effect | Not located. The bounds provable from code are about 8 s (tool grace) + 10 s (cancellation confirmation); the rest of the time is unexplained |
+| P4 | Assistant text is cut mid-word by tool cards, while later paragraphs have no tools between them | Root cause not located (see §4.3). "Switching sessions" ruled out (user confirmed no switch) |
 
-这些问题有一个共同点:**状态分散在多处、各自推进,没有单一事实来源**。进程状态在内核注册表,回合状态在门禁 + 前端内存集合 + 数据库会话行,消息流位置靠前端计数器推断。任何一处不同步都会表现为"卡死"或"错乱"。
+These problems share one trait: **state is spread across several places that advance independently, with no single source of truth**. Process state lives in the kernel registry; turn state lives in the gate + a frontend in-memory set + the database session row; the message-stream position is inferred from a frontend counter. Any of them falling out of sync shows up as a "hang" or "garbling".
 
 ---
 
-## 2. 现状调查
+## 2. Investigation of the current state
 
-### 2.1 进程启动路径
+### 2.1 Process launch paths
 
-| 路径 | 位置 | 输出 | 进程树控制 | 等待 EOF 是否有上限 |
-|------|------|------|-----------|---------------------|
-| Windows 沙箱(`shell` / `code_run`) | `vendor/piscis-engine/piscis-kernel/src/proc_windows_sandbox.rs` `spawn_sandboxed_command` L451–638 | 匿名管道,`CreatePipe` 时 `bInheritHandle: true`(L517–524),子进程用 `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` 只继承三个句柄(L538–559) | Job + `KILL_ON_JOB_CLOSE`(L505–515) | 原先无上限(`t.join()`);现在 `CAPTURE_DRAIN_TIMEOUT = 5s` |
-| Unix 后台(`shell`/`code_run` 仅允许 `background: true`) | `tools/background_process.rs` `spawn_std_detached` L129–214 | 管道 | `setsid` 新会话,`killpg` | **无上限**:读线程 `join()`(L207–212) |
-| `process_control` 启动 | `tools/process_control.rs` L204–237 | 管道或 null | 无 Job;无注册表时完全不跟踪 | 无上限 |
-| IDE 终端 | `src-tauri/src/commands/ide.rs` L1706–1895 | PTY | Windows Job | 不涉及 |
-| 其他(git、LSP、rg、远程等) | `piscis_kernel::proc::tokio_command`/`std_command`,少量直接 `Command::new` | 各异 | 无 | — |
+| Path | Location | Output | Process-tree control | Bounded EOF wait? |
+|------|----------|--------|----------------------|-------------------|
+| Windows sandbox (`shell` / `code_run`) | `vendor/piscis-engine/piscis-kernel/src/proc_windows_sandbox.rs` `spawn_sandboxed_command` L451–638 | Anonymous pipes, `CreatePipe` with `bInheritHandle: true` (L517–524); the child inherits only three handles via `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` (L538–559) | Job + `KILL_ON_JOB_CLOSE` (L505–515) | Originally unbounded (`t.join()`); now `CAPTURE_DRAIN_TIMEOUT = 5s` (L862) |
+| Unix background (`shell`/`code_run` only allow `background: true`) | `tools/background_process.rs` `spawn_std_detached` (L136 as of 2026-11-02) | Pipes | `setsid` new session, `killpg` | Was **unbounded** (reader-thread `join()`). *Update 2026-11-02: now bounded to 5 s per drain (L216–222)* |
+| `process_control` launch | `tools/process_control.rs` L204–237 | Pipe or null | No Job; not tracked at all without a registry | Unbounded |
+| IDE terminal | `src-tauri/src/commands/ide.rs` L1706–1895 | PTY | Windows Job | N/A |
+| Others (git, LSP, rg, remote, …) | `piscis_kernel::proc::tokio_command`/`std_command`, a few direct `Command::new` | Varies | None | — |
 
-**已确认的结构性问题**:沙箱的子进程侧管道句柄在父进程中短暂处于"可继承"状态。沙箱自己的 `CreateProcessW` 用了句柄白名单,但同一进程里其他地方用 `std::process::Command`(Rust 标准库在 Windows 上 `bInheritHandles = TRUE` 且不使用白名单)启动的进程,只要恰好落在这个窗口内,就会继承这些写端。被继承者不在命令的 Job 里,命令结束时杀不掉它,于是读端永远收不到 EOF。
+**Confirmed structural problem**: the child-side pipe handles of the sandbox are briefly "inheritable" in the parent process. The sandbox's own `CreateProcessW` uses a handle allow-list, but any process started elsewhere in the same process with `std::process::Command` (on Windows the Rust standard library uses `bInheritHandles = TRUE` and no allow-list) that happens to land in this window inherits those write ends. The inheritor is not in the command's Job, cannot be killed when the command ends, and so the read end never sees EOF.
 
-这与 P2 的"关掉 server 才继续"一致,但时序(server 是否恰好在那个窗口启动)尚未证实。另一种同样会导致 P2 的情况是:命令自己把一个进程启动到 Job 之外(例如通过 `start`/服务管理器脱离)。
+This is consistent with P2's "it continues only after the server is closed", but the timing (whether the server really started inside that window) is unproven. Another way to get P2 is a command that itself starts a process outside the Job (for example detaching via `start` or a service manager).
 
-### 2.2 后台任务模型(内核)
+### 2.2 Background task model (kernel)
 
-核心在 `vendor/piscis-engine/piscis-kernel/src/background.rs`:
+The core is in `vendor/piscis-engine/piscis-kernel/src/background.rs`:
 
-- `BackgroundRegistry`:每工作区默认最多 4 个(`AGENTZ_BG_MAX_PER_WORKSPACE`),默认 `max_runtime` 3600s(`AGENTZ_BG_MAX_RUNTIME_SECS`)。
-- `BgEntry`:会话、工作区、标签、`notify_on`(`Exit`/`Ready`)、`ReadySpec`(`Port`/`LogSubstring`)、kill 标志、stdout/stderr 的 `SharedStream`(256 KiB 内存环 + 8 MiB 日志文件 `.agentz/logs/bg/{id}.log`)。
-- 事件:`BgEvent::Ready` 来自 `probe_ready`,`BgEvent::Terminal` 来自执行线程结束。
-- **注册表条目永不删除**(没有 `remove`),只是状态变为终态。
+- `BackgroundRegistry`: by default at most 4 per workspace (`AGENTZ_BG_MAX_PER_WORKSPACE`), default `max_runtime` 3600 s (`AGENTZ_BG_MAX_RUNTIME_SECS`).
+- `BgEntry`: session, workspace, label, `notify_on` (`Exit`/`Ready`), `ReadySpec` (`Port`/`LogSubstring`), kill flag, `SharedStream` for stdout/stderr (256 KiB in-memory ring + 8 MiB log file `.agentz/logs/bg/{id}.log`).
+- Events: `BgEvent::Ready` from `probe_ready`, `BgEvent::Terminal` when the execution thread ends.
+- **Registry entries were never removed** (no `remove`); they only switch to a terminal state. *Update 2026-11-02: terminal entries beyond `MAX_RETAINED_TERMINAL = 64` are now pruned (`background.rs` L231, L556–557). Entries also carry a `kind` (`BgKind::Job` / `BgKind::Service`); services get an effectively unbounded runtime (`SERVICE_MAX_RUNTIME` = 30 days, L229).*
 
-agent 可见的工具(描述摘自 schema):
+Tools visible to the agent (descriptions taken from the schemas):
 
-| 工具 | 行为 |
-|------|------|
-| `shell` / `code_run` | 前台默认 120s / 60s,上限 300s;"超时后转入后台注册表,不杀";`background: true` 立即后台;可带 `ready_port`/`ready_log`/`notify_on` |
-| `wait` | 宿主侧一次性等待后台任务结束或就绪,默认 120s,上限 600s;也可纯延时 |
-| `process_wait` | 单任务等待,默认 60s,上限 600s |
-| `process_output` | 按游标增量读取输出 |
-| `process_kill` | 杀进程树,最多等 30s 确认 |
+| Tool | Behaviour |
+|------|-----------|
+| `shell` / `code_run` | Foreground default 120 s / 60 s, max 300 s; "on timeout the command moves to the background registry and is not killed"; `background: true` goes to the background immediately; accepts `ready_port`/`ready_log`/`notify_on`, and (added since) `service: true` for long-lived processes |
+| `wait` | Host-side one-shot wait for background tasks to finish or become ready, default 120 s, max 600 s; can also be a plain delay |
+| `process_wait` | Single-task wait, default 60 s, max 600 s |
+| `process_output` | Incremental output reads by cursor |
+| `process_kill` | Kills the process tree, waits up to 30 s for confirmation |
 
-这套工具的**能力**已经接近目标设计,问题在于语义不清和上层策略(见 2.4、2.5)。
+The **capabilities** of this tool set are already close to the target design; the problem is unclear semantics and higher-level policy (see 2.4, 2.5).
 
-### 2.3 时间参数一览
+### 2.3 Timing parameters
 
-| 机制 | 默认 | 位置 |
-|------|------|------|
-| 单个工具调用超时 | 120s | `loop_.rs` L55 `TOOL_TIMEOUT_SECS` |
-| shell 前台等待 | 120s(≤300s) | `shell.rs` L21–23 |
-| code_run 前台等待 | 60s(≤300s) | `code_run.rs` L14–15 |
-| 取消宽限 | 8s | `loop_.rs` L58 `CANCEL_GRACE_SECS` |
-| 取消确认 | 10s | `post_turn.rs` L527–528 |
-| 回合总时长 | 未设置时约 1 年 | `chat_turn/mod.rs` L856–858 |
-| 后台最长运行 | 3600s | `background.rs` L28 |
-| 续跑停泊 | 30min,每 2s 轮询 | `background_continuation.rs` L30 |
-| 每会话自动续跑预算 | 6 次 | `background_continuation.rs` L28 |
+| Mechanism | Default | Location |
+|-----------|---------|----------|
+| Single tool-call timeout | 120 s (2026-10-27). *Now: the tool's own `timeout`/`timeout_secs`/`timeout_ms` + 30 s slack, at least 120 s, capped at 3600 + 30 s; 150 s when the call sets none* | `agent/loop_.rs` L55 `TOOL_TIMEOUT_SECS`, L61–75 `tool_timeout_for` |
+| shell foreground wait | 120 s (≤300 s) | `shell.rs` L21–23 |
+| code_run foreground wait | 60 s (≤300 s) | `code_run.rs` L14–15 |
+| Cancellation grace | 8 s | `loop_.rs` L58 `CANCEL_GRACE_SECS` |
+| Cancellation confirmation | 10 s | `post_turn.rs` L527–528 |
+| Total turn duration | ~1 year when unset | `chat_turn/mod.rs` L856–858 |
+| Max background runtime | 3600 s (jobs); 30 days for services | `background.rs` L28, L229 |
+| Continuation parking | 30 min, polled every 2 s | `background_continuation.rs` L30 |
+| Automatic continuation budget per session | 6 | `background_continuation.rs` L28 |
 
-**已确认的冲突**:工具调用超时(120s)与 shell 前台默认等待(120s)相同。工具层先超时时,沙箱工作线程可能仍在 `wait_foreground`/`finish` 中,前台转后台的交接可能被打断。
+**Confirmed conflict (fixed since)**: the tool-call timeout (120 s) equalled the shell foreground default wait (120 s). If the tool layer timed out first, the sandbox worker could still be in `wait_foreground`/`finish`, interrupting the foreground-to-background hand-off. *The 30 s slack in `tool_timeout_for` now gives the tool time to finish moving the command to the background.*
 
-### 2.4 后台任务完成后的自动续跑
+### 2.4 Automatic continuation after a background task finishes
 
 `src-tauri/src/runtime/background_continuation.rs`:
 
-1. `on_event` 发 `background_task` UI 事件,再异步 `handle_completion`。
-2. `notify_on == Ready` 时就绪触发续跑;任何任务结束都会触发续跑。
-3. `try_claim("{bg_id}:{kind}")` 去重,`claim_budget` 扣预算(每会话 6 次)。
-4. 生成合成提示 `<background_task_completed>`,持久化为 pending,`dispatch_when_idle` 轮询门禁空闲后以 `task_key = host-bg-{bg_id}` 发起一个完整的 agent 回合。
+1. `on_event` emits a `background_task` UI event, then runs `handle_completion` asynchronously.
+2. With `notify_on == Ready`, readiness triggers a continuation; any task ending triggers one. *Now gated by `should_notify` (see below).*
+3. `try_claim("{bg_id}:{kind}")` deduplicates; `claim_budget` takes from the budget (6 per session, reset by any user turn).
+4. A synthetic `<background_task_completed>` prompt is built, persisted as pending, and `dispatch_when_idle` polls until the gate is idle, then starts a full agent turn with `task_key = host-bg-{bg_id}`. *Now: if a turn is already running in the session, the notice is first delivered into that turn via `turn_inbox::try_deliver` and a `background_task_injected` event is emitted; only notices the turn never consumed are re-routed to a continuation turn (`on_turn_closed`).*
 
-已确认的缺陷:
+Confirmed defects (with status as of 2026-11-02):
 
-- **续跑回合就是一个普通回合**,持有会话门禁直到结束,期间用户消息被拒(P1)。1.0.27 起前端通过 `host_turn_started` 显示运行中并排队,但只有 CodeZ 处理了这个事件,WorkZ 等界面没有。
-- **一个服务消耗两次预算**:`ready` 和 `terminal` 是两个 claim key,各扣一次。
-- **重启恢复的去重键不一致**:`restore_pending` 固定用 `terminal`(L336–337),可能重复续跑。
-- **服务也会触发续跑**:dev server 被杀(哪怕是用户手动杀)也会开一轮新回合,这正是 P1 那次的触发方式。
-- 应用退出时没有清理后台进程(未找到对 `background_runs` 的全局 kill),下次打开时数据库里标为 `interrupted`,但操作系统进程可能还活着。
+- **The continuation turn is an ordinary turn**: it holds the session gate until it ends, and user messages are rejected meanwhile (P1). Since 1.0.27 the frontend shows it as running and queues via `host_turn_started`, but only CodeZ (`src/workspaces/codez/useAssistantSession.ts`) handles that event; WorkZ and other surfaces do not. *Still true.*
+- **One service consumes the budget twice**: `ready` and `terminal` are separate claim keys, each charged once. *Mostly fixed: a service only reports `terminal` on an unexpected exit, and a job that already reported `ready` only reports a failed exit. The keys are still separate, so a ready-then-crashed service still uses two continuations.*
+- **Inconsistent dedup key on restart restore**: `restore_pending` used a fixed `terminal` key (L336–337), which can cause duplicate continuations. *Now it uses `"{bg_id}:restored"` (L467), which is still a different key from `ready`/`terminal`, so the inconsistency remains.*
+- **Services also trigger continuations**: a dev server being killed (even manually by the user) starts a new turn, which is exactly how the P1 incident was triggered. *Fixed: killed tasks never notify.*
+- No background processes are cleaned up on app exit (no global kill of `background_runs` found); on the next launch the database marks them `interrupted`, but the OS processes may still be alive. *Fixed: `background_runs.kill_all()` runs on exit (`src-tauri/src/lib.rs` L498); pid/pgid-based cleanup of leftovers after a crash is still not implemented.*
 
-### 2.5 回合状态:三份互不同步的"事实"
+### 2.5 Turn state: three unsynchronised "truths"
 
-| 状态 | 所在 | 谁写 |
-|------|------|------|
-| 门禁 `TaskActivity` | 后端内存,`(项目, session_id)` 一把锁 | `chat.rs` 回合入口、心跳、计划变更 |
-| 会话行 `status = running` | 项目数据库 | 回合开始/结束;读取时用 `is_active` 修正"数据库说在跑但门禁空闲"这一个方向 |
-| `SessionTurnBookkeeping.running` | 前端内存 | 只在前端自己调用 `chatSend` 时设置 |
+| State | Where | Written by |
+|-------|-------|------------|
+| Gate `TaskActivity` | Backend memory, one lock per `(project, session_id)` | `chat.rs` turn entry, heartbeat, plan changes |
+| Session row `status = running` | Project database | Turn start/end; on read, `is_active` corrects only the "database says running but gate idle" direction |
+| `SessionTurnBookkeeping.running` | Frontend memory | Set only when the frontend itself calls `chatSend` |
 
-前端决定"排队还是直接发送"只看自己那份。任何后端发起的回合(续跑、心跳)、页面刷新、多窗口,都会让前端认为空闲而直接发送,然后被门禁拒绝。1.0.27 的 `host_turn_started` 只补了续跑这一种来源。
+The frontend decides "queue or send now" using only its own copy. Any backend-initiated turn (continuation, heartbeat), page reload or second window makes the frontend think the session is idle, send directly, and be rejected by the gate. The `host_turn_started` added in 1.0.27 only covers the continuation source.
 
-### 2.6 消息流(CodeZ)
+### 2.6 Message stream (CodeZ)
 
-- 文字增量:`text_delta` 先进 `streamPendingRef`,每 80ms 由 `flushStreamDelta` 追加到最后一条助手消息;`streamLenRef` 在收到时立即累加(`useAssistantSession.ts` 约 L754–759)。
-- 工具位置:`tool_start` 时 `upsertToolStep(prev, evt, streamLenRef.current)` 记录 `textOffset`(约 L761–763),**没有先 flush**,并且偏移量是在 React 执行 updater 时才读取 ref,而不是事件到达时。
-- 渲染:`AssistantMessageList.tsx` 对运行中的最后一条消息使用实时 `toolSteps`(替换已持久化的工具);`ToolTrace.tsx` `interleaveTools` 用 `min(text.length, offset)` 切分文字。
-- 历史:`src-tauri/src/commands/session.rs` 合并相邻助手行时插入 `\n\n`,偏移量用 Rust `chars().count()`(Unicode 标量),前端切分用 UTF-16 下标。
-- 对照:WorkZ(`useWorkzSessionStore.ts` L738–768)在任何非 `text_delta` 事件前先 flush,并用已提交文字的 `length` 作为偏移;BotZ 逐事件同步追加,都没有这个"计数器领先于已显示文字"的结构。
-
----
-
-## 3. 参考模型:Cursor 的 shell 工具约定
-
-以下是 Cursor 对 agent 暴露的 shell 工具的外部约定(内部实现不在本文范围):
-
-1. **"等多久"和"进程活多久"是两个参数。** 每条命令带"最多阻塞多久"的值,超过后命令转入后台继续跑,不会被杀;启动服务直接设为 0。
-2. **输出写入文件,而不是靠管道读到 EOF。** 每个终端的输出持续写入一个文件,agent 随时读取。调用方从不需要"等管道关闭"才能返回。
-3. **监视是主动且有上限的。** 有专门的等待工具:等某个后台任务结束,或等输出出现某个模式,自带超时。也可以只在输出匹配时通知。
-4. **结束时通知,不自动开回合。** 后台任务结束发一条通知,由正在进行或下一次的 agent 回合消费,不会自己抢占会话。
-5. **停止是显式操作。** 长时运行进程不会因等待超时被杀;需要硬上限时由 agent 在命令本身设(如 `timeout`),或主动结束。
-
-AgentZ 已经具备第 1、3、5 条的大部分能力,缺的是第 2 条(底层仍依赖管道 EOF)和第 4 条(结束即自动开新回合)。
+- Text deltas: `text_delta` goes into `streamPendingRef` and is appended to the last assistant message by `flushStreamDelta` every 80 ms; `streamLenRef` is incremented immediately on receipt (`useAssistantSession.ts` ~L754–759; L800–806 as of 2026-11-02).
+- Tool position: on `tool_start`, `upsertToolStep(prev, evt, streamLenRef.current)` records `textOffset` (~L761–763; L808 as of 2026-11-02) **without flushing first**, and the offset is read from the ref when React runs the updater, not when the event arrives. *Still true.*
+- Rendering: `AssistantMessageList.tsx` uses the live `toolSteps` for the running last message (replacing the persisted tools); `ToolTrace.tsx` `interleaveTools` splits text at `min(text.length, offset)`.
+- History: `src-tauri/src/commands/session.rs` inserts `\n\n` when merging adjacent assistant rows; offsets use Rust `chars().count()` (Unicode scalar values) while the frontend splits with UTF-16 indices.
+- Comparison: WorkZ (`useWorkzSessionStore.ts` L738–768) flushes before any non-`text_delta` event and uses the committed text's `length` as the offset; BotZ appends synchronously per event. Neither has this "counter ahead of displayed text" structure.
 
 ---
 
-## 4. 问题定位状态
+## 3. Reference model: Cursor's shell tool contract
 
-### 4.1 P2:前台命令卡死(已缓解,待验证)
+The following is the external contract of the shell tool Cursor exposes to its agent (internal implementation is out of scope):
 
-- 已做:`finish()` 在 Job 清空后最多再等 5 秒 EOF,超时则返回已捕获输出并记 warn(`proc_windows_sandbox.rs` `join_capture`)。
-- 未做:`spawn_std_detached` 的读线程 `join()` 仍无上限;句柄继承窗口仍在。
-- 验证方法:复现时检查日志中是否出现 "pipe still held open by a process outside the command's Job"。
+1. **"How long to wait" and "how long the process lives" are two parameters.** Each command carries a "maximum blocking time"; beyond it the command keeps running in the background and is not killed. Starting a server sets it to 0.
+2. **Output goes to a file, not read from a pipe until EOF.** Each terminal's output is continuously written to a file the agent can read at any time. Callers never need to "wait for the pipe to close" to return.
+3. **Monitoring is active and bounded.** A dedicated wait tool waits for a background task to finish, or for a pattern to appear in output, with its own timeout. It can also notify only when output matches.
+4. **Completion notifies; it does not start a turn on its own.** A finished background task posts a notification consumed by the current or next agent turn; it never seizes the session itself.
+5. **Stopping is explicit.** Long-running processes are not killed by wait timeouts; if a hard limit is needed the agent sets it in the command itself (e.g. `timeout`) or ends it explicitly.
 
-### 4.2 P3:停止耗时(未定位)
-
-可确认的上限约 18 秒,用户观察约 60 秒。候选:
-
-- 一批并发只读工具(`READ_TOOL_MAX_CONCURRENCY`)或串行写工具,每个都消耗自己的宽限期;
-- 不检查取消标志的工具(等待子任务、`wait`/`process_wait` 的阻塞等待)只能等到宽限期结束;
-- 前台命令结束后的 `finish()`(root 退出 5s + Job 清空 5s + EOF 5s)在宽限期之外执行;
-- `cancellation_completion.wait_requested` 等满上限。
-
-需要埋点:取消请求时间、每个在途工具的名称与结束时间、`agent turn finished` 时间。
-
-### 4.3 P4:文字被工具切开(未定位)
-
-已排除:
-
-- 切换会话(用户确认未切换)。
-- 后端事件乱序:内核按"本轮全部文字增量 → 工具开始"顺序发送(`loop_.rs` `llm_call_unified` L2228–2286,`ToolStart` 在 `execute_single_tool` L2505–2511),宿主收集器按序转发(`post_turn.rs` L323–435)。
-- 80ms 合并导致的偏移领先:它只会让工具**暂时**排在已刷新文字的末尾,刷新后 `text.length` 追上偏移,位置自动恢复正确。这是闪烁,不是持久错位。
-
-截图的持久错位要求偏移量**小于**它真实的位置,即:文字里有一段内容没有计入 `streamLenRef`,或者 `streamLenRef` 在回合中途被归零而文字保留。代码中 `streamLenRef` 被归零的位置只有回合开始、`host_turn_started`、会话切换/新建三处,文字被整体替换的位置有 `syncMessagesFromDb`(回合结束、续跑结束、错误路径)。尚未找到能在不切换会话的运行中回合里触发它们的路径。
-
-待验证的假设:
-
-1. 错误路径:用户在回合进行中发送的消息被门禁拒绝后,`runTurn` 的 `finally` 在"队列为空且正在查看"时调用 `syncMessagesFromDb`,把运行中回合已持久化的内容加载进来,但运行中回合的计数器没有同步。
-2. 两个生产者向同一会话发事件:例如委托/子任务工具的事件与父回合交错。
-3. 回合中途的模型重试或降级重新流式输出,导致计数与显示不一致。
-
-需要埋点:为每个 `agent_event` 记录序号、类型、`streamLenRef`、最后一条消息 `text.length`、当前 `taskKey`,以及所有 `setMessages` 整体替换的调用点。下次复现时导出这段日志即可定论。
+AgentZ already has most of points 1, 3 and 5. It lacks point 2 (the lower layer still depends on pipe EOF) and point 4 (completion automatically starts a new turn). *As of 2026-11-02, point 4 is partly covered: notices go into a running turn when there is one; an idle session still gets an automatic continuation turn.*
 
 ---
 
-## 5. 目标设计
+## 4. Problem localisation status
 
-### 5.1 原则
+### 4.1 P2: foreground command hang (mitigated, pending verification)
 
-1. **后端是唯一事实来源。** 回合是否在跑、在跑哪个、后台任务状态,都由后端推送快照;前端只渲染,不推断。
-2. **等待与生命周期分离。** "agent 等多久"永远不决定"进程活多久"。
-3. **永不无界等待。** 任何等待(锁、EOF、进程退出、回合)都有上限和可观察的超时结果。
-4. **后台事件是输入,不是触发器。** 后台任务结束产生通知,由回合调度器决定何时、以何种方式交给 agent,而不是直接开一个新回合抢占会话。
+- Done: after the Job is empty, `finish()` waits at most another 5 seconds for EOF; on timeout it returns the captured output and logs a warning (`proc_windows_sandbox.rs` `join_capture`, L868).
+- Not done: the reader-thread `join()` in `spawn_std_detached` is still unbounded; the handle-inheritance window still exists. *Update 2026-11-02: `spawn_std_detached` is now bounded to 5 s; the handle-inheritance window still exists.*
+- Verification: when reproducing, check the log for "pipe still held open by a process outside the command's Job".
 
-### 5.2 进程层
+### 4.2 P3: slow stop (not located)
 
-- **输出一律落盘**:每个进程的 stdout/stderr 直接重定向到日志文件(Windows 用文件句柄作为子进程标准句柄,Unix 用 `File`),宿主通过跟随文件读取。前台命令"完成"的判定只看进程(Job)状态,不再依赖管道 EOF。这从根上消除 P2 一类问题。
-- **句柄继承收口**:所有启动进程的地方统一走 `piscis_kernel::proc` 的封装;Windows 上统一使用 `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`,并在一个进程内全局锁住"创建可继承句柄 → 启动 → 关闭"这一窗口,禁止裸 `std::process::Command`(CI 加 lint/grep 检查)。
-- **进程树归属**:Windows 一律 Job,Unix 一律新进程组;记录 pid/pgid 以便应用重启后清理残留。
+The provable upper bound is about 18 seconds; the user observed about 60 seconds. Candidates:
 
-### 5.3 任务模型:三种意图
+- A batch of concurrent read-only tools (`READ_TOOL_MAX_CONCURRENCY`) or serial write tools, each consuming its own grace period;
+- Tools that do not check the cancellation flag (waiting on subtasks, blocking waits in `wait`/`process_wait`) can only wait for the grace period to expire;
+- `finish()` after a foreground command ends (root exit 5 s + Job empty 5 s + EOF 5 s) runs outside the grace period;
+- `cancellation_completion.wait_requested` running to its full limit.
 
-agent 启动命令时必须声明意图,工具 schema 用一个 `mode` 字段表达:
+Instrumentation needed: time of the cancel request, name and end time of every in-flight tool, time of `agent turn finished`.
 
-| 模式 | 用途 | 等待 | 寿命 | 结束时 |
-|------|------|------|------|--------|
-| `foreground` | 一次性命令(构建、测试、脚本) | 最多 `wait_secs`(默认 60,上限 300) | 超过等待时间**自动转为 `job`**,不杀 | 返回结果 |
-| `job` | 有限时长的长任务 | 立即返回 `bg_id` | `max_runtime_secs`(必填,默认 1800,上限 4h),到期杀进程树 | 产生 `task_finished` 通知 |
-| `service` | 长期运行的服务(dev server、watch) | 立即返回,或等到 `ready`(端口/日志模式,带上限) | 不设上限;绑定会话或应用,会话关闭或应用退出时清理 | 只在**异常退出**时通知;用户/agent 主动停止不通知 |
+### 4.3 P4: text cut by tools (not located)
 
-监视工具保持现有能力,统一命名与语义:
+Ruled out:
 
-- `task_wait(ids | scope, until = exit | ready | pattern, timeout_secs)`:宿主侧阻塞等待,检查取消标志(200ms 粒度),返回"满足/超时/取消"之一。
-- `task_output(id, cursor, max_bytes)`:读日志文件增量。
-- `task_stop(id)`:杀进程树,有确认上限。
-- `task_list()`:当前会话的任务快照。
+- Session switching (user confirmed no switch).
+- Backend event reordering: the kernel sends "all text deltas for this round → tool start" in order (`loop_.rs` `llm_call_unified` L2228–2286, `ToolStart` in `execute_single_tool` L2505–2511), and the host collector forwards in order (`post_turn.rs` L323–435).
+- Offset running ahead due to 80 ms coalescing: this only places the tool **temporarily** at the end of the flushed text; after the flush `text.length` catches up with the offset and the position corrects itself. That is flicker, not persistent misplacement.
 
-工具描述里明确写出:启动服务用 `service`,不要在前台命令里用 `&`/`start` 启动服务;等待用 `task_wait`,不要用 `sleep` 轮询。宿主侧检测到前台命令里出现常见的后台化写法时,返回提示而不是执行。
+Persistent misplacement as in the screenshot requires the offset to be **smaller** than its true position: either some text was never counted in `streamLenRef`, or `streamLenRef` was reset mid-turn while the text was kept. In the code, `streamLenRef` is reset only at turn start, on `host_turn_started`, and on session switch/creation; the text is replaced wholesale only by `syncMessagesFromDb` (turn end, continuation end, error paths). No path has been found that triggers these during a running turn without switching sessions.
 
-### 5.4 后台通知如何交给 agent
+Hypotheses to verify:
 
-取消"任务结束即开新回合"的默认行为,改为:
+1. Error path: a message the user sends during a running turn is rejected by the gate; `runTurn`'s `finally` then calls `syncMessagesFromDb` when "the queue is empty and the session is being viewed", loading the running turn's persisted content without syncing the running turn's counter.
+2. Two producers emitting events to the same session, e.g. delegation/subtask tool events interleaved with the parent turn.
+3. A mid-turn model retry or fallback re-streaming output, so the count and the display diverge.
 
-1. **回合进行中**:通知进入该会话的通知队列,在下一次工具结果返回时以系统消息附加给模型("后台任务 X 已结束,退出码 Y,输出尾部……")。agent 在同一回合内处理,不需要新回合。
-2. **会话空闲**:
-   - `job` 结束:默认只在界面和会话里显示通知卡片,由用户决定是否"让 agent 处理";可在设置里开启"自动继续",开启后才发起续跑回合。
-   - `service` 异常退出:同上,只显示,不自动继续。
-3. 自动续跑回合与用户回合走**同一个调度队列**(见 5.5),绝不绕过排队直接抢门禁。
-4. 去重键为 `bg_id`(一个任务至多一次续跑),预算只在真正发起回合时扣。
-
-### 5.5 回合调度与状态同步
-
-- **后端会话调度器**:每个 `(项目, session_id)` 一个 FIFO 队列。用户消息、续跑、心跳都作为条目入队;队首获得门禁执行。`chat_send` 不再因门禁被占而报错,而是返回"已排队"及其位置。门禁变为调度器的内部实现。
-- **会话状态事件**:调度器在任何变化时广播 `session_state { session_id, running: { turn_id, task_key, origin: user|bg|heartbeat, started_at }, queue: [...] }`。前端的 `running`/队列显示完全由它驱动;前端启动时调用一次 `session_state_list` 获取快照。
-- **停止**:针对 `turn_id` 而不是前端记住的 `taskKey`,这样停止对任何来源的回合都有效。停止请求立即广播 `stopping` 状态,让界面马上有反馈。
-
-### 5.6 消息流
-
-- **事件带序号**:每个回合的 `agent_event` 带 `(turn_id, seq)`。前端按序号应用,检测到缺口时从持久化流(`durable_stream`)补齐,而不是猜测。
-- **单一 reducer**:回合的文字和工具放在同一个状态对象里,由一个纯函数 `reduce(turnState, event)` 推进(参考 WorkZ/BotZ 的做法):
-  - `text_delta` 追加到当前文字段;
-  - `tool_start` 结束当前文字段并开启工具段;
-  - 下一个 `text_delta` 开启新的文字段。
-  这样不再需要"文字偏移量"。显示合并(80ms 节流)只作用于渲染,不影响 reducer 状态。
-- **持久化同构**:后端历史也以"段列表"(文字段、工具段)返回,取代 `text_offset`,消除 `\n\n` 和 UTF-16/Unicode 标量的差异。
-- **整体替换只在回合边界**:`syncMessagesFromDb` 只在没有运行中回合时调用;回合运行中重新进入会话时,先加载持久化段,再从持久化流的最后序号继续订阅。
+Instrumentation needed: for every `agent_event`, record the sequence number, type, `streamLenRef`, the last message's `text.length` and the current `taskKey`, plus every call site that replaces `setMessages` wholesale. Exporting this log at the next reproduction will settle it.
 
 ---
 
-## 6. 分阶段实施
+## 5. Target design
 
-| 阶段 | 内容 | 风险 | 验收 |
-|------|------|------|------|
-| 0 埋点 | §4.2、§4.3 的事件日志;取消耗时日志;`join_capture` 超时 warn 已有 | 低 | 下次复现能从日志定位 P3/P4 |
-| 1 止血 | 前台读线程等待上限补齐到 `spawn_std_detached`;CodeZ 在非 `text_delta` 事件前先 flush 并在事件到达时同步捕获偏移;服务被停止不触发续跑;`ready` 与 `terminal` 共用一个续跑名额;`restore_pending` 去重键修正 | 低 | 单元测试 + 手工场景 |
-| 2 回合调度器 | 后端会话队列、`session_state` 事件、按 `turn_id` 停止;前端移除自有的 running 推断,改为订阅 | 中 | 用户消息在任何后端回合运行时都排队而非报错;多窗口一致 |
-| 3 进程层 | 输出落盘;句柄继承收口与 lint;应用退出清理与重启残留清理 | 中高(跨平台) | 前台命令在有 Job 外持有者时仍按时返回;无孤儿进程 |
-| 4 任务模型 | `foreground/job/service` 模式、统一工具命名与描述、通知交付改为回合内附加 | 中 | agent 能启动服务后继续对话,并通过 `task_wait`/`task_output` 监视 |
-| 5 消息流 | 事件序号、单一 reducer、段式持久化 | 中 | 文字与工具顺序在实时与历史中一致 |
+### 5.1 Principles
 
-阶段 1 与阶段 0 可以同时做;阶段 2 是后续所有界面状态问题的前提,建议优先于 3–5。
+1. **The backend is the single source of truth.** Whether a turn is running, which one, and background task state are all pushed as snapshots by the backend; the frontend only renders and never infers.
+2. **Waiting is separate from lifetime.** "How long the agent waits" never decides "how long the process lives".
+3. **Never wait unboundedly.** Every wait (locks, EOF, process exit, turns) has a limit and an observable timeout result.
+4. **Background events are inputs, not triggers.** A finished background task produces a notification; the turn scheduler decides when and how to hand it to the agent, rather than directly starting a new turn that seizes the session.
+
+### 5.2 Process layer (proposal, not implemented)
+
+- **All output goes to disk**: each process's stdout/stderr is redirected straight to a log file (on Windows a file handle as the child's standard handle; on Unix a `File`), and the host reads by following the file. A foreground command is "done" based solely on process (Job) state, no longer on pipe EOF. This removes the P2 class of problems at the root.
+- **Lock down handle inheritance**: every process launch goes through the `piscis_kernel::proc` wrappers; on Windows always use `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, and globally lock the "create inheritable handles → launch → close" window within a process; forbid bare `std::process::Command` (enforced by a CI lint/grep check).
+- **Process-tree ownership**: always a Job on Windows, always a new process group on Unix; record pid/pgid so leftovers can be cleaned up after an app restart.
+
+### 5.3 Task model: three intents
+
+The agent must declare intent when launching a command; the tool schema expresses it with a `mode` field. *Implementation note (2026-11-02): implemented in a reduced form as `background: true` (job) plus `service: true` (service) booleans on `shell`, `code_run` and `remote_dev`; there is no `mode` field and no `max_runtime_secs` parameter (jobs use the registry default of 3600 s).*
+
+| Mode | Purpose | Wait | Lifetime | On end |
+|------|---------|------|----------|--------|
+| `foreground` | One-off commands (build, test, script) | Up to `wait_secs` (default 60, max 300) | **Automatically becomes a `job`** past the wait time; not killed | Return the result |
+| `job` | Long but bounded tasks | Return `bg_id` immediately | `max_runtime_secs` (required, default 1800, max 4h); the process tree is killed on expiry | Emit a `task_finished` notification |
+| `service` | Long-running services (dev server, watch) | Return immediately, or wait until `ready` (port/log pattern, bounded) | No limit; bound to the session or app and cleaned up when the session closes or the app exits | Notify only on **unexpected exit**; no notification when the user/agent stops it |
+
+Monitoring tools keep their current capabilities, with unified naming and semantics (proposal, not implemented):
+
+- `task_wait(ids | scope, until = exit | ready | pattern, timeout_secs)`: host-side blocking wait that checks the cancellation flag (200 ms granularity) and returns one of "satisfied / timed out / cancelled".
+- `task_output(id, cursor, max_bytes)`: read log-file increments.
+- `task_stop(id)`: kill the process tree with a bounded confirmation.
+- `task_list()`: snapshot of the current session's tasks.
+
+The tool descriptions state explicitly: start services with `service`, do not start services with `&`/`start` in foreground commands; wait with `task_wait`, do not poll with `sleep`. When the host detects common backgrounding idioms in a foreground command it returns a hint instead of executing.
+
+### 5.4 How background notifications reach the agent
+
+Drop the default "task finished → start a new turn" behaviour and instead:
+
+1. **During a turn**: the notification enters the session's notification queue and is attached to the model as a system message with the next tool result ("background task X finished, exit code Y, output tail …"). The agent handles it within the same turn without a new one. *Implemented via `turn_inbox` (2026-11-02).*
+2. **Session idle** (not implemented; an idle session still gets an automatic continuation turn):
+   - `job` finished: by default only show a notification card in the UI and the session, and let the user decide whether to "let the agent handle it"; an "auto-continue" setting enables continuation turns.
+   - `service` unexpected exit: same, show only, no automatic continuation.
+3. Automatic continuation turns and user turns share **the same scheduling queue** (see 5.5) and never bypass the queue to seize the gate. *Not implemented: continuations still poll the gate and retry on `task queued/running`.*
+4. The dedup key is `bg_id` (at most one continuation per task); the budget is charged only when a turn is actually started. *Partly: the budget is charged in `park_and_dispatch` (only when a turn is about to be dispatched), but dedup keys are still per event kind.*
+
+### 5.5 Turn scheduling and state sync (proposal, not implemented)
+
+- **Backend session scheduler**: one FIFO queue per `(project, session_id)`. User messages, continuations and heartbeats are all enqueued; the head of the queue gets the gate. `chat_send` no longer errors when the gate is taken; it returns "queued" with a position. The gate becomes an internal detail of the scheduler.
+- **Session state event**: the scheduler broadcasts `session_state { session_id, running: { turn_id, task_key, origin: user|bg|heartbeat, started_at }, queue: [...] }` on every change. The frontend's `running`/queue display is driven entirely by it; on startup the frontend calls `session_state_list` once for a snapshot.
+- **Stop**: targets a `turn_id` rather than the `taskKey` the frontend remembers, so stop works for turns of any origin. A stop request immediately broadcasts a `stopping` state so the UI reacts at once.
+
+### 5.6 Message stream (proposal, not implemented)
+
+- **Events carry sequence numbers**: each turn's `agent_event` carries `(turn_id, seq)`. The frontend applies events in order and fills gaps from the persisted stream (`durable_stream`) instead of guessing.
+- **Single reducer**: a turn's text and tools live in one state object advanced by a pure function `reduce(turnState, event)` (following WorkZ/BotZ):
+  - `text_delta` appends to the current text segment;
+  - `tool_start` closes the current text segment and opens a tool segment;
+  - the next `text_delta` opens a new text segment.
+  This removes the need for a "text offset". Display coalescing (80 ms throttle) affects rendering only, not reducer state.
+- **Isomorphic persistence**: backend history is also returned as a "segment list" (text segments, tool segments), replacing `text_offset` and eliminating the `\n\n` and UTF-16 vs Unicode-scalar discrepancies.
+- **Wholesale replacement only at turn boundaries**: `syncMessagesFromDb` is called only when no turn is running; when re-entering a session with a running turn, load the persisted segments first, then continue subscribing from the persisted stream's last sequence number.
 
 ---
 
-## 7. 测试计划
+## 6. Phased implementation
 
-- **进程层**(Windows 为主):启动一个继承了前台命令管道写端的外部进程,断言前台命令在上限内返回;命令内用 `start` 脱离 Job 启动进程,断言不卡;应用退出后无残留进程。
-- **调度器**:续跑回合运行时用户发送,断言排队且按序执行;停止对续跑回合生效;前端刷新后状态从快照恢复。
-- **续跑策略**:服务被 `task_stop` 停止不产生续跑;`ready` + `terminal` 只扣一次预算;重启恢复不重复续跑。
-- **消息流**:reducer 对"文字—工具—文字"、并发只读工具、重试重新流式、缺口补齐的单元测试;实时渲染与历史加载对同一回合产生相同的段列表。
-- **取消**:多个在途工具时停止的端到端耗时上限(目标 ≤ 10s)。
+| Phase | Content | Risk | Acceptance |
+|-------|---------|------|------------|
+| 0 Instrumentation | Event log for §4.2 and §4.3; cancellation timing log; `join_capture` timeout warning already exists | Low | Next reproduction can locate P3/P4 from logs |
+| 1 Stop the bleeding | Bound the reader-thread wait in `spawn_std_detached` too *(done)*; CodeZ flushes before non-`text_delta` events and captures the offset synchronously on arrival *(not done)*; stopping a service does not trigger a continuation *(done)*; `ready` and `terminal` share one continuation slot *(partly)*; fix the `restore_pending` dedup key *(not done)* | Low | Unit tests + manual scenarios |
+| 2 Turn scheduler | Backend session queue, `session_state` event, stop by `turn_id`; frontend drops its own running inference and subscribes instead | Medium | User messages are queued, not rejected, whenever any backend turn is running; consistent across windows |
+| 3 Process layer | Output to disk; handle-inheritance lockdown and lint; cleanup on app exit *(done)* and of leftovers after restart | Medium-high (cross-platform) | Foreground commands return on time even with holders outside the Job; no orphan processes |
+| 4 Task model | `foreground/job/service` modes *(partly, as booleans)*, unified tool naming and descriptions, notification delivery attached within the turn *(done)* | Medium | The agent can start a service and keep talking, monitoring via `task_wait`/`task_output` |
+| 5 Message stream | Event sequence numbers, single reducer, segment-based persistence | Medium | Text and tool order identical live and in history |
+
+Phases 0 and 1 can run in parallel; phase 2 is the prerequisite for all later UI-state issues and should take priority over 3–5.
 
 ---
 
-## 8. 未决问题
+## 7. Test plan
 
-1. `service` 的生命周期绑定到会话还是项目窗口?会话切换时服务是否保留?
-2. 自动续跑默认是否关闭?关闭会改变现有用户的体验。
-3. 输出落盘后,大输出的磁盘占用与轮转策略(当前日志上限 8 MiB)。
-4. 远程开发(`remote_dev.rs` 目前拒绝后台任务)是否纳入同一模型。
+- **Process layer** (Windows first): start an external process that inherits the foreground command's pipe write end, assert the foreground command returns within the limit; start a process outside the Job with `start` inside the command, assert no hang; assert no leftover processes after app exit.
+- **Scheduler**: user sends while a continuation turn runs, assert it is queued and executed in order; stop works on continuation turns; after a frontend reload, state is restored from the snapshot.
+- **Continuation policy**: a service stopped with `task_stop` produces no continuation; `ready` + `terminal` charge the budget once; restart restore does not duplicate continuations.
+- **Message stream**: reducer unit tests for "text—tool—text", concurrent read-only tools, retry re-streaming and gap filling; live rendering and history loading produce the same segment list for the same turn.
+- **Cancellation**: end-to-end stop time with several in-flight tools stays within a limit (target ≤ 10 s).
+
+---
+
+## 8. Open questions
+
+1. Is a `service`'s lifetime bound to the session or to the project window? Does it survive a session switch? *(Current code: services live until killed, the session is deleted, or the app exits.)*
+2. Should automatic continuation be off by default? Turning it off changes the experience for existing users.
+3. With output on disk, what is the disk usage and rotation policy for large output (the current log cap is 8 MiB)?
+4. Should remote development be part of the same model? *(Update 2026-11-02: `remote_dev` no longer rejects background tasks; it registers them in the same background registry via `tools/remote_background.rs`.)*

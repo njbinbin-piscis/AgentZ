@@ -1,38 +1,62 @@
-# AgentZ AI IDE 工程审计与修复指南
+# AgentZ AI IDE Engineering Audit and Remediation Guide
 
-> 审计日期：2026-09-28  
-> 审计范围：编辑器、Git 版本控制、Hint/AI Completion、LSP、性能、Extension Host、Agent Harness、安全边界、测试与工程维护性  
-> 项目版本：`0.6.3`  
-> 审计性质：只读代码审计与本地构建验证；审计过程中未修改产品代码
+**English** | [简体中文](ai-ide-engineering-audit.zh-CN.md)
 
-## 1. 执行摘要
+> Audit date: 2026-09-28  
+> Scope: editor, Git version control, Hint/AI Completion, LSP, performance, Extension Host, Agent Harness, security boundaries, testing and engineering maintainability  
+> Project version at audit time: `0.6.3`  
+> Nature of the audit: read-only code audit plus local build verification; no product code was modified during the audit
 
-AgentZ 已经形成一个较完整的桌面 AI IDE 技术体系：Tauri/Rust 后端、React/Monaco 编辑器、独立 Extension Host、LSP、Git、多 Agent、工作流、上下文压缩、文件 journal、代码索引和知识图谱等模块均已落地。
+> **Status (2026-11-02, v1.0.40, piscis-engine v0.8.71):** The findings below are preserved as written for `0.6.3`. File/line references in the body point at the 0.6.3 code and no longer match current line numbers. Per-finding status against the current code:
+>
+> | ID | Status | Where it stands now |
+> | --- | --- | --- |
+> | LSP-01 | Fixed | `CodeEditor.tsx` passes a file-URI `path` to Monaco (comment near line 729); shared URI helper in `src/services/tauri/editorUri.ts` (matches `monaco.Uri.file`). |
+> | LSP-02 | Fixed | Project/language session reuse in `src/services/tauri/lspSession.ts` (+ `lspSession.test.ts`). |
+> | LSP-03 | Fixed | `LspClient` in `src/services/tauri/lsp.ts` uses a single `ws.onmessage` dispatcher, pending map with timeouts, and `rejectAllPending()` on close/disconnect; `waitForResponse()` is gone. |
+> | LSP-04 | Fixed (by design change) | The frontend sends bare JSON; the Rust bridge owns Content-Length framing (`lsp.ts` header comment, test "sends bare JSON, never Content-Length framing" in `lsp.test.ts`). |
+> | LSP misc. | Fixed | Document versions are per-URI integer counters (`docVersions` in `lsp.ts`); completion fallback range uses `model.getWordUntilPosition` (`lsp.ts` ~line 660). |
+> | HINT-01 | Fixed | `ai_inline_completion_cancel` + per-request cancel flags in `state.completion_cancel` (`src-tauri/src/commands/edit.rs`); frontend `cancelAiInlineCompletion` in `src/services/tauri/edit.ts`. |
+> | EDIT-01 | Fixed | Reject applies a scoped inverse edit (`rejectInline` in `CodeEditor.tsx`) and refuses if the document changed after the preview; no global undo. |
+> | GIT-01 | Fixed | `run_git_cmd_bytes(&repo, &["status", "--porcelain=v1", "-z", "-uall"])` in `src-tauri/src/commands/ide.rs`; NUL/rename parsing in `git_workspace.rs`. |
+> | GIT-02 / GIT-03 | Fixed | Git commands call `git_workspace::resolve_git_context_for_root(..., git_root)` / `resolve_git_dir(..., git_root, ...)`; no more `let _ = git_root;`. |
+> | AGENT-01 | Fixed | All `ToolContext`s now use `bypass_permissions: false` (`commands/chat_turn/mod.rs`, `chat_turn/tool_approval.rs`, `runtime/approval.rs`, `browser/mod.rs`, `tools/devenv.rs`, `tools/durable_plan_todo.rs`). |
+> | 7.2 capability metadata | Partially | Kernel `Tool` trait exposes `is_read_only()` (`piscis-kernel/src/agent/tool.rs`); the full structured `ToolCapabilities` metadata proposed here does not exist. |
+> | SEC-01 | Fixed | Mermaid runs with `securityLevel: "strict"` and SVG is sanitized via `src/workspaces/codez/mermaidSafe.ts` (`loadMermaid`, `sanitizeMermaidSvg`); `src-tauri/tauri.conf.json` now defines an explicit CSP. |
+> | 9.3 Mermaid chunking | Fixed | Both `Markdown.tsx` and `MarkdownPreview.tsx` load Mermaid via `loadMermaid()`. |
+> | CSS-01 | Fixed | `src/extensions/ui/extensions.css` comment rewritten without `*/`. |
+> | TEST-01 | Partially | Frontend now has 69 test files (LSP, LSP session, Git panel, editor recovery/conflict, permission card, etc.); full Agent policy matrix and Extension Host contract suite remain open. |
+> | MAINT-01 | Partially | `chat_turn.rs` split into `commands/chat_turn/{mod,prompt_assembly,tool_approval,post_turn}.rs`; `workz/index.tsx` (~300 lines), `AssistantPanel.tsx` (~320) and `codez/index.tsx` (~560) shrank. `commands/ide.rs` grew to ~2,900 lines, `CodeEditor.tsx` ~900, `lsp.ts` ~880, `gateway/wechat.rs` ~2,050 — still open. |
+> | PERF-01 / 9.4 | Not re-measured | Bundle sizes were not re-measured for this update. |
 
-从长期维护和面向真实用户交付的标准看，当前更接近功能覆盖较广的 Beta：
+## 1. Executive Summary
 
-- Rust 基础模块、工作流、索引和 gateway 测试质量较好。
-- 编辑器、LSP 和 Git 的核心路径存在会直接影响功能正确性的缺陷。
-- Agent Harness 已有 PolicyGate 和能力分层，但实际执行上下文默认绕过权限确认，安全模型存在断层。
-- 前端测试、LSP 集成测试和 Extension Host 契约测试明显落后于功能增长。
-- Monaco、Mermaid 和主应用的加载成本偏高，冷启动和首个编辑器可用时间有较大优化空间。
-- 多个核心文件已超过 1,000 行，功能继续增长时回归风险会快速上升。
+AgentZ has built a fairly complete desktop AI IDE stack: a Tauri/Rust backend, a React/Monaco editor, a standalone Extension Host, LSP, Git, multi-agent, workflows, context compaction, a file journal, a code index and a knowledge graph are all in place.
 
-综合评价：
+Measured against long-term maintenance and shipping to real users, the project is currently closer to a broad-coverage Beta:
 
-| 维度 | 当前评价 | 说明 |
+- Rust foundation modules, workflows, indexing and the gateway have good test quality.
+- The core paths of the editor, LSP and Git contain defects that directly affect functional correctness.
+- The Agent Harness already has a PolicyGate and capability tiers, but the actual execution context bypasses permission confirmation by default, leaving a gap in the security model.
+- Frontend tests, LSP integration tests and Extension Host contract tests lag well behind feature growth.
+- Monaco, Mermaid and the main app carry a high load cost; cold start and time-to-first-usable-editor have substantial room for improvement.
+- Several core files exceed 1,000 lines; regression risk will rise quickly as features keep growing.
+
+Overall assessment:
+
+| Dimension | Rating | Notes |
 | --- | ---: | --- |
-| 架构潜力 | 8/10 | 分层方向合理，Rust kernel、Tauri host、React UI、Extension Host 边界基本明确 |
-| 正确性/可靠性 | 6/10 | LSP 生命周期、模型 URI、协议竞态和 Git 路径解析存在关键缺陷 |
-| 安全边界 | 5/10 | ToolContext 绕过权限、Mermaid loose mode、CSP 关闭构成组合风险 |
-| 性能 | 5/10 | Monaco、TS worker、主包和 Mermaid 图形依赖体积较大 |
-| 测试成熟度 | 6/10 | Rust 单测较好，但 IDE 主路径和端到端测试不足 |
+| Architectural potential | 8/10 | Layering is sound; boundaries between Rust kernel, Tauri host, React UI and Extension Host are mostly clear |
+| Correctness/reliability | 6/10 | Critical defects in LSP lifecycle, model URIs, protocol races and Git path parsing |
+| Security boundaries | 5/10 | ToolContext permission bypass, Mermaid loose mode and disabled CSP form a combined risk |
+| Performance | 5/10 | Monaco, the TS worker, the main bundle and Mermaid graph dependencies are large |
+| Test maturity | 6/10 | Rust unit tests are good, but IDE main paths and end-to-end tests are insufficient |
 
-建议先处理本文 P0/P1 问题，再继续扩展新功能。
+Recommendation: address the P0/P1 issues in this document before expanding with new features.
 
-## 2. 审计方法与验证结果
+## 2. Audit Method and Verification Results
 
-### 2.1 已执行的验证
+### 2.1 Verification performed
 
 ```bash
 npm run typecheck
@@ -44,62 +68,62 @@ npm --prefix extension-host run build
 npm run build
 ```
 
-结果：
+Results:
 
-- TypeScript typecheck：通过。
-- ESLint：0 errors，61 warnings，其中包含多个 React Hook 依赖问题。
-- Vitest：5 个测试文件、21 个测试全部通过。
-- Cargo check：通过。
-- Rust tests：87 通过、1 个需要本地 Chromium 的测试被忽略。
-- Extension Host：构建通过，`dist/host.js` 约 80 KB。
-- Vite production build：通过，但存在 CSS 语法警告、无效动态拆包警告和多个大 chunk 警告。
-- 审计开始和结束时未对现有业务文件进行修改；本文档是唯一新增文件。
+- TypeScript typecheck: passed.
+- ESLint: 0 errors, 61 warnings, including several React Hook dependency issues.
+- Vitest: 5 test files, all 21 tests passed.
+- Cargo check: passed.
+- Rust tests: 87 passed, 1 test requiring local Chromium ignored.
+- Extension Host: build passed, `dist/host.js` about 80 KB.
+- Vite production build: passed, but with a CSS syntax warning, an ineffective dynamic-split warning and several large-chunk warnings.
+- No existing business files were modified between the start and end of the audit; this document was the only new file.
 
-### 2.2 关键源码规模
+### 2.2 Size of key source files
 
-下列文件已经成为维护热点：
+The following files have become maintenance hotspots:
 
-| 文件 | 约 LOC | 风险 |
+| File | ~LOC | Risk |
 | --- | ---: | --- |
-| `src-tauri/src/commands/chat_turn.rs` | 2,288 | Agent turn 组装、工具注册、上下文、执行和持久化混合 |
-| `src-tauri/src/gateway/wechat.rs` | 2,064 | 协议、网络、状态和解析职责集中 |
-| `src-tauri/src/commands/ide.rs` | 1,560 | 文件、Git、终端、watcher、LSP command 聚合 |
-| `src/workspaces/workz/index.tsx` | 1,521 | 工作区 UI 和大量状态集中 |
-| `src/workspaces/codez/AssistantPanel.tsx` | 1,368 | 会话、事件、输入、计划、工具状态混合 |
-| `src/workspaces/codez/index.tsx` | 1,323 | 文件树、标签页、watcher、Git 刷新和布局集中 |
-| `src/workspaces/codez/CodeEditor.tsx` | 690 | Monaco、LSP、AI completion、inline edit、DAP 混合 |
-| `src/services/tauri/lsp.ts` | 737 | 协议、client、转换、Monaco provider 混合 |
+| `src-tauri/src/commands/chat_turn.rs` | 2,288 | Agent turn assembly, tool registration, context, execution and persistence mixed together |
+| `src-tauri/src/gateway/wechat.rs` | 2,064 | Protocol, networking, state and parsing concentrated in one place |
+| `src-tauri/src/commands/ide.rs` | 1,560 | Aggregates file, Git, terminal, watcher and LSP commands |
+| `src/workspaces/workz/index.tsx` | 1,521 | Workspace UI with a lot of concentrated state |
+| `src/workspaces/codez/AssistantPanel.tsx` | 1,368 | Session, events, input, plan and tool state mixed |
+| `src/workspaces/codez/index.tsx` | 1,323 | File tree, tabs, watcher, Git refresh and layout concentrated |
+| `src/workspaces/codez/CodeEditor.tsx` | 690 | Monaco, LSP, AI completion, inline edit and DAP mixed |
+| `src/services/tauri/lsp.ts` | 737 | Protocol, client, conversion and Monaco providers mixed |
 
-## 3. 缺陷优先级总览
+## 3. Defect Priority Overview
 
-| ID | 优先级 | 模块 | 问题 | 主要影响 |
+| ID | Priority | Module | Issue | Main impact |
 | --- | --- | --- | --- | --- |
-| LSP-01 | P0 | 编辑器/LSP | Monaco model URI 与 provider 目标 URI 不一致 | Hover、补全、跳转、引用可能全部失效，marker 可能落到错误文件 |
-| LSP-02 | P0 | 编辑器/LSP | 切换标签后断开 LSP，但未可靠重连 | 首个文件外的标签页失去 LSP |
-| LSP-03 | P0 | LSP 协议 | initialize 响应存在丢失竞态 | 偶发连接等待 10 秒后失败 |
-| LSP-04 | P0 | LSP 协议 | Content-Length 使用 UTF-16 字符长度 | 含中文/emoji 的消息长度不正确 |
-| AGENT-01 | P0/P1 | Agent Harness | ToolContext 默认 `bypass_permissions: true` | 权限模型难以保证，写文件/执行命令等工具可能绕过确认 |
-| SEC-01 | P1 | Markdown/Tauri | Mermaid `securityLevel: loose` 且 CSP 关闭 | 不可信内容渲染攻击面扩大 |
-| GIT-01 | P1 | Git | porcelain v1 按行/字符串切片解析 | 空格、引号、中文、换行、rename 路径错误 |
-| GIT-02 | P1 | Git | nested repo diff 混用 workspace path 与 repo-relative path | diff 为空或找不到文件 |
-| GIT-03 | P1 | Git API | 多个 API 接收 `git_root` 后忽略 | UI 选择的 repo 与实际操作可能不一致 |
-| EDIT-01 | P1 | Inline Edit | Reject 依赖全局 undo 栈 | 并发编辑后可能撤销用户修改 |
-| HINT-01 | P1/P2 | AI Completion | 只有前端逻辑取消，没有后端请求取消 | 无效推理、成本增加、资源占用 |
-| PERF-01 | P1/P2 | Build/启动 | Monaco、主包和 TS worker 体积过大 | 冷启动、编辑器 ready 时间和内存占用偏高 |
-| CSS-01 | P1 | CSS | 注释内包含 `*/` 导致语法警告 | 后续 CSS 可能被错误解析 |
-| TEST-01 | P1/P2 | 测试 | 编辑器/Git/LSP/Agent 权限缺少回归测试 | 核心缺陷难以及时发现 |
-| MAINT-01 | P2 | 架构 | 核心模块职责和文件规模过大 | 修改成本和回归风险持续上升 |
+| LSP-01 | P0 | Editor/LSP | Monaco model URI does not match provider target URI | Hover, completion, go-to-definition and references may all fail; markers may land on the wrong file |
+| LSP-02 | P0 | Editor/LSP | LSP disconnects on tab switch but is not reliably reconnected | Tabs other than the first file lose LSP |
+| LSP-03 | P0 | LSP protocol | Race that can lose the initialize response | Connection occasionally waits 10 seconds and fails |
+| LSP-04 | P0 | LSP protocol | Content-Length uses UTF-16 character length | Wrong length for messages containing CJK/emoji |
+| AGENT-01 | P0/P1 | Agent Harness | ToolContext defaults to `bypass_permissions: true` | Permission model cannot be guaranteed; file write / command execution tools may bypass confirmation |
+| SEC-01 | P1 | Markdown/Tauri | Mermaid `securityLevel: loose` with CSP disabled | Larger attack surface when rendering untrusted content |
+| GIT-01 | P1 | Git | porcelain v1 parsed by line/string slicing | Wrong paths for spaces, quotes, CJK, newlines, renames |
+| GIT-02 | P1 | Git | Nested-repo diff mixes workspace path and repo-relative path | Empty diff or file not found |
+| GIT-03 | P1 | Git API | Several APIs accept `git_root` and then ignore it | Repo chosen in the UI may differ from the one actually operated on |
+| EDIT-01 | P1 | Inline Edit | Reject relies on the global undo stack | May undo user edits after concurrent edits |
+| HINT-01 | P1/P2 | AI Completion | Only frontend logical cancellation, no backend request cancellation | Wasted inference, higher cost, resource usage |
+| PERF-01 | P1/P2 | Build/startup | Monaco, main bundle and TS worker too large | High cold start, editor-ready time and memory usage |
+| CSS-01 | P1 | CSS | Comment contains `*/`, causing a syntax warning | Following CSS may be mis-parsed |
+| TEST-01 | P1/P2 | Testing | No regression tests for editor/Git/LSP/Agent permissions | Core defects are hard to catch in time |
+| MAINT-01 | P2 | Architecture | Core module responsibilities and file sizes too large | Rising change cost and regression risk |
 
-## 4. 编辑器与 LSP
+## 4. Editor and LSP
 
-### 4.1 LSP-01：Monaco model URI 与 provider URI 不一致
+### 4.1 LSP-01: Monaco model URI does not match provider URI
 
-#### 定位
+#### Location
 
 - `src/workspaces/codez/CodeEditor.tsx:593-640`
 - `src/services/tauri/lsp.ts:626-660`
 
-`CodeEditor` 创建 Monaco `<Editor>` 时未传入 `path`：
+`CodeEditor` creates the Monaco `<Editor>` without passing `path`:
 
 ```tsx
 <Editor
@@ -111,23 +135,23 @@ npm run build
 />
 ```
 
-`@monaco-editor/react` 在没有 `path` 时通常使用 `inmemory://model/...` URI。但 LSP provider 使用文件 URI：
+Without `path`, `@monaco-editor/react` usually uses an `inmemory://model/...` URI. The LSP provider, however, uses a file URI:
 
 ```ts
 const modelUri = monaco.Uri.parse(`file://${filePath}`);
 const matchesFile = (model) => model.uri.toString() === modelUri.toString();
 ```
 
-#### 影响
+#### Impact
 
-- Completion provider 因 `matchesFile` 为 false 返回 `null`。
-- Hover、Definition、References 同样失效。
-- Diagnostics 找不到目标模型时使用 `monaco.editor.getModels()[0]`，可能把 marker 写到错误标签页。
-- 多标签页打开顺序不同会使问题呈现随机性。
+- The completion provider returns `null` because `matchesFile` is false.
+- Hover, Definition and References fail the same way.
+- When diagnostics cannot find the target model they fall back to `monaco.editor.getModels()[0]`, which can write markers to the wrong tab.
+- Different tab open orders make the problem appear random.
 
-#### 修复方案
+#### Fix
 
-1. 建立唯一的 URI 工具函数：
+1. Create a single URI helper:
 
 ```ts
 export function editorUri(monaco: typeof Monaco, fullPath: string) {
@@ -135,7 +159,7 @@ export function editorUri(monaco: typeof Monaco, fullPath: string) {
 }
 ```
 
-2. 给 Editor 传入稳定 path：
+2. Pass a stable path to Editor:
 
 ```tsx
 <Editor
@@ -145,52 +169,52 @@ export function editorUri(monaco: typeof Monaco, fullPath: string) {
 />
 ```
 
-3. `registerLspProviders`、markers、didOpen/didChange/didClose、definition/reference location 全部使用同一 URI 生成逻辑。
-4. 删除以下 fallback：
+3. `registerLspProviders`, markers, didOpen/didChange/didClose and definition/reference locations must all use the same URI logic.
+4. Remove this fallback:
 
 ```ts
 monaco.editor.getModel(modelUri) ?? monaco.editor.getModels()[0]
 ```
 
-目标 model 不存在时应跳过 marker，并记录可观测日志。
+If the target model does not exist, skip the marker update and emit an observable log.
 
-#### 验收测试
+#### Acceptance tests
 
-- 打开 TS、Rust、Python 文件后，model URI 必须为对应文件 URI。
-- 同时打开两个同语言文件，诊断只出现在对应文件。
-- Hover、Completion、Definition 和 References 的 provider 能匹配当前 model。
-- 关闭文件后不会给已销毁 model 更新 marker。
+- After opening TS, Rust and Python files, each model URI must be the corresponding file URI.
+- With two same-language files open, diagnostics appear only on the corresponding file.
+- Hover, Completion, Definition and References providers match the current model.
+- Closing a file does not update markers on the disposed model.
 
-### 4.2 LSP-02：标签切换后 LSP 生命周期断裂
+### 4.2 LSP-02: LSP lifecycle breaks after tab switch
 
-#### 定位
+#### Location
 
-- 初始化：`src/workspaces/codez/CodeEditor.tsx:483-535`
-- cleanup：`src/workspaces/codez/CodeEditor.tsx:554-566`
-- Editor mount：`src/workspaces/codez/CodeEditor.tsx:595-624`
+- Initialization: `src/workspaces/codez/CodeEditor.tsx:483-535`
+- Cleanup: `src/workspaces/codez/CodeEditor.tsx:554-566`
+- Editor mount: `src/workspaces/codez/CodeEditor.tsx:595-624`
 
-LSP 初始化完全位于 `onMount` callback 中。标签切换时 React 可能复用同一个 Editor 组件，因此 `onMount` 不会再次执行。与此同时，以 `tab.path` 为依赖的 effect cleanup 会断开当前 client。
+LSP initialization lives entirely inside the `onMount` callback. On tab switch React may reuse the same Editor component, so `onMount` does not run again. Meanwhile the cleanup of the effect keyed on `tab.path` disconnects the current client.
 
-#### 可复现路径
+#### Reproduction
 
-1. 打开第一个支持 LSP 的文件。
-2. 等待 LSP 连接。
-3. 打开并切换至第二个文件。
-4. 第一个 path 的 effect cleanup 调用 `disconnect()`。
-5. Monaco 没有重新 mount，新文件没有执行 LSP start/connect/provider registration。
+1. Open the first LSP-capable file.
+2. Wait for the LSP to connect.
+3. Open and switch to a second file.
+4. The effect cleanup for the first path calls `disconnect()`.
+5. Monaco does not remount; the new file never runs LSP start/connect/provider registration.
 
-#### 修复方案
+#### Fix
 
-将职责拆开：
+Separate responsibilities:
 
-- `onMount`：只保存 `editor` 和 `monaco` 实例、注册全局命令。
-- `useEffect([projectDir, language])`：获取或复用 project/language 级 LSP client。
-- `useEffect([client, tab.path])`：执行 didOpen/didClose、注册文件级 provider/marker binding。
-- project + language 对应一个长期存活的 LSP server/session，不应每次切换文件就停止 server。
-- 每个 document 单独维护递增版本号。
-- project 关闭或最后一个对应语言文档关闭时，再按策略回收 server。
+- `onMount`: only store the `editor` and `monaco` instances and register global commands.
+- `useEffect([projectDir, language])`: obtain or reuse a project/language-level LSP client.
+- `useEffect([client, tab.path])`: perform didOpen/didClose and register file-level provider/marker bindings.
+- One long-lived LSP server/session per project + language; do not stop the server on every file switch.
+- Maintain a per-document incrementing version number.
+- Reclaim servers according to policy when the project closes or the last document of that language closes.
 
-建议的数据结构：
+Suggested data structures:
 
 ```ts
 type DocumentState = {
@@ -208,40 +232,40 @@ type LanguageSession = {
 };
 ```
 
-#### 验收测试
+#### Acceptance tests
 
-- A.ts → B.ts → A.ts 切换后两者 LSP 均可用。
-- TS → Rust → TS 切换不会错误复用不同 language server。
-- 快速连续切换 10 次不会留下 orphan WebSocket/provider。
-- 关闭一个标签不会断开其他同语言标签使用的 server。
+- After switching A.ts → B.ts → A.ts, LSP works in both.
+- Switching TS → Rust → TS does not wrongly reuse a different language server.
+- Ten rapid switches leave no orphan WebSocket/provider.
+- Closing one tab does not disconnect the server used by other tabs of the same language.
 
-### 4.3 LSP-03：initialize 响应竞态
+### 4.3 LSP-03: initialize response race
 
-#### 定位
+#### Location
 
 - `src/services/tauri/lsp.ts:155-245`
 - `src/services/tauri/lsp.ts:435-462`
 
-当前流程：
+Current flow:
 
 ```ts
 ws.send(initReq);
 const initResp = await this.waitForResponse();
 ```
 
-`waitForResponse()` 会临时替换 `ws.onmessage`。如果 initialize response 在替换 handler 前到达，原始 `handleMessage()` 会收到该响应；因为 initialize ID 没有加入 `pending`，响应被丢弃，最终等待 10 秒超时。
+`waitForResponse()` temporarily replaces `ws.onmessage`. If the initialize response arrives before the handler is replaced, the original `handleMessage()` receives it; because the initialize ID was never added to `pending`, the response is dropped and the wait eventually times out after 10 seconds.
 
-#### 修复方案
+#### Fix
 
-- WebSocket 生命周期内只允许一个 `onmessage` dispatcher。
-- initialize 必须走统一的 `sendRequest("initialize", params)`。
-- `sendRequest` 必须先注册 pending，再发送消息。
-- pending 应包含 `resolve`、`reject` 和 timeout handle。
-- server 返回 JSON-RPC error 时 reject，而不是将 `null` 当正常结果。
-- disconnect/close/error 时 reject 全部 pending 请求。
-- 删除 `waitForResponse()` 临时替换 handler 的实现。
+- Allow only one `onmessage` dispatcher for the WebSocket's lifetime.
+- initialize must go through the common `sendRequest("initialize", params)`.
+- `sendRequest` must register the pending entry before sending.
+- A pending entry holds `resolve`, `reject` and a timeout handle.
+- Reject when the server returns a JSON-RPC error instead of treating `null` as a normal result.
+- Reject all pending requests on disconnect/close/error.
+- Remove the `waitForResponse()` handler-swapping implementation.
 
-参考结构：
+Reference structure:
 
 ```ts
 type PendingRequest = {
@@ -251,159 +275,159 @@ type PendingRequest = {
 };
 ```
 
-#### 验收测试
+#### Acceptance tests
 
-- fake LSP server 同步/立即回复 initialize 时连接稳定成功。
-- initialize 返回 error 时立即失败，不等待超时。
-- WebSocket close 时所有 pending promise 被 reject。
-- notification 和 response 交错到达时不会丢消息。
+- Connection reliably succeeds when a fake LSP server replies to initialize synchronously/immediately.
+- When initialize returns an error, fail immediately without waiting for the timeout.
+- All pending promises are rejected on WebSocket close.
+- No messages are lost when notifications and responses interleave.
 
-### 4.4 LSP-04：Content-Length 计算错误
+### 4.4 LSP-04: wrong Content-Length calculation
 
-#### 定位
+#### Location
 
 - `src/services/tauri/lsp.ts:401-404`
 
-当前使用：
+Current code:
 
 ```ts
 return `Content-Length: ${body.length}\r\n\r\n${body}`;
 ```
 
-JavaScript `string.length` 是 UTF-16 code unit 数，不是 LSP Content-Length 要求的 UTF-8 byte length。中文、emoji、部分组合字符都会产生错误长度。
+JavaScript `string.length` counts UTF-16 code units, not the UTF-8 byte length that LSP Content-Length requires. CJK, emoji and some combining characters all produce a wrong length.
 
-#### 修复方案
+#### Fix
 
 ```ts
 const byteLength = new TextEncoder().encode(body).byteLength;
 return `Content-Length: ${byteLength}\r\n\r\n${body}`;
 ```
 
-同时确认 WebSocket bridge 是否真的需要 LSP stdio framing。如果 bridge 的 WebSocket 每个 frame 已经是一条 JSON-RPC 消息，优先直接发送 JSON，避免重复 framing。
+Also confirm whether the WebSocket bridge really needs LSP stdio framing. If each WebSocket frame on the bridge is already one JSON-RPC message, prefer sending plain JSON to avoid double framing.
 
-#### 测试
+#### Tests
 
-- body 含中文、emoji、CRLF、代理对。
-- 一个 WebSocket frame 内包含一个或多个 LSP frame。
-- 分片 frame 能够被 bridge 正确重组；如果协议不支持分片，应在双方明确约束。
+- Body containing CJK, emoji, CRLF and surrogate pairs.
+- One WebSocket frame containing one or more LSP frames.
+- Fragmented frames are reassembled correctly by the bridge; if the protocol does not support fragmentation, state the constraint on both sides.
 
-### 4.5 LSP 其余正确性问题
+### 4.5 Other LSP correctness issues
 
-#### Diagnostics 没有按 URI 隔离
+#### Diagnostics are not isolated per URI
 
-`LspClient` 只有一个 `diagnostics: LspDiagnostic[]` 和一个 callback。多文档共享 client 后必须改为：
+`LspClient` has only one `diagnostics: LspDiagnostic[]` and one callback. Once multiple documents share a client, it must become:
 
 ```ts
 Map<DocumentUri, LspDiagnostic[]>
 Map<DocumentUri, Set<DiagnosticsListener>>
 ```
 
-`publishDiagnostics.params.uri` 必须参与路由。
+`publishDiagnostics.params.uri` must take part in routing.
 
-#### 文档版本使用 `Date.now()`
+#### Document version uses `Date.now()`
 
-`src/services/tauri/lsp.ts:248-264` 使用时间戳作为 version。虽然通常递增，但语义上应为文档级整数计数器。快速调用、系统时间调整或恢复快照都可能破坏顺序假设。
+`src/services/tauri/lsp.ts:248-264` uses a timestamp as the version. Although usually increasing, semantically it should be a per-document integer counter. Rapid calls, system clock adjustments or snapshot restores can all break the ordering assumption.
 
-#### Completion fallback range 错误
+#### Wrong completion fallback range
 
-`src/services/tauri/lsp.ts:543-550` 在 LSP item 没有 `textEdit` 时给出固定的 `(1,1)-(1,1)` range。这会让补全文本插入文件首部，或被 Monaco 判定为无效。
+`src/services/tauri/lsp.ts:543-550` gives a fixed `(1,1)-(1,1)` range when an LSP item has no `textEdit`. This makes completion text insert at the top of the file, or Monaco may reject it as invalid.
 
-正确做法：
+Correct approach:
 
-- provider 层使用当前 `position` 和当前 word range 补齐 range；或
-- converter 接收 `model`、`position`，通过 `model.getWordUntilPosition(position)` 计算替换范围。
+- fill in the range at the provider layer from the current `position` and current word range; or
+- have the converter accept `model` and `position` and compute the replacement range via `model.getWordUntilPosition(position)`.
 
-#### Location URI 手工伪造
+#### Hand-forged Location URI
 
-`src/services/tauri/lsp.ts:556-575` 手工构造一个假 `Monaco.Uri` 对象。应在 provider 具备 Monaco namespace 的位置使用 `monaco.Uri.parse(loc.uri)`，并正确处理 percent encoding、Windows drive 和 UNC path。
+`src/services/tauri/lsp.ts:556-575` hand-constructs a fake `Monaco.Uri` object. Use `monaco.Uri.parse(loc.uri)` where the provider has the Monaco namespace, and handle percent-encoding, Windows drives and UNC paths correctly.
 
-## 5. Hint、AI Completion 与 Inline Edit
+## 5. Hint, AI Completion and Inline Edit
 
-### 5.1 HINT-01：AI completion 不能真正取消后端请求
+### 5.1 HINT-01: AI completion cannot actually cancel backend requests
 
-#### 定位
+#### Location
 
-- 前端 provider：`src/workspaces/codez/CodeEditor.tsx:432-480`
-- 后端请求：`src-tauri/src/commands/edit.rs:117-206`
+- Frontend provider: `src/workspaces/codez/CodeEditor.tsx:432-480`
+- Backend request: `src-tauri/src/commands/edit.rs:117-206`
 
-前端先等待 350ms，并检查 Monaco token；但 `aiInlineCompletion()` 一旦通过 Tauri invoke 发出，token 无法取消 Rust 内部的 LLM HTTP 请求。连续输入会产生已过时但仍在执行的请求。
+The frontend waits 350 ms and checks the Monaco token, but once `aiInlineCompletion()` is sent via Tauri invoke, the token cannot cancel the LLM HTTP request inside Rust. Continuous typing produces stale requests that keep running.
 
-#### 影响
+#### Impact
 
-- 模型调用成本和网络请求增加。
-- 旧请求占用连接、内存和 provider rate limit。
-- 关闭标签或切换项目后请求仍可能继续。
-- 高延迟模型会导致 completion queue 堵塞。
+- More model-call cost and network requests.
+- Stale requests occupy connections, memory and provider rate limits.
+- Requests may continue after closing a tab or switching projects.
+- High-latency models clog the completion queue.
 
-#### 修复方案
+#### Fix
 
-- 前端为每个 editor/model 维护 request generation。
-- 新请求发起时显式取消上一个 request ID。
-- Rust 维护 `request_id -> CancellationToken`。
-- LLM client 接受 cancel future/AbortHandle。
-- 全局或 project 级最多允许 1 个 completion in-flight；最新请求优先。
-- 对短时间重复上下文增加小型 LRU cache。
-- 记录 requested、displayed、accepted、cancelled、latency、tokens 指标。
+- The frontend keeps a request generation per editor/model.
+- When a new request starts, explicitly cancel the previous request ID.
+- Rust keeps `request_id -> CancellationToken`.
+- The LLM client accepts a cancel future/AbortHandle.
+- Allow at most one in-flight completion globally or per project; newest request wins.
+- Add a small LRU cache for repeated context within a short window.
+- Record requested, displayed, accepted, cancelled, latency and tokens metrics.
 
-#### 验收测试
+#### Acceptance tests
 
-- 连续输入 20 个字符，后端最多保留一个有效请求。
-- 关闭标签后请求取消。
-- 旧请求晚于新请求返回时，旧结果不会显示。
-- provider 超时、取消和 API error 不污染 UI。
+- After typing 20 characters in a row, the backend keeps at most one live request.
+- Closing a tab cancels the request.
+- If an old request returns after a newer one, the old result is not shown.
+- Provider timeouts, cancellations and API errors do not pollute the UI.
 
-### 5.2 Completion 上下文过于机械
+### 5.2 Completion context is too mechanical
 
-#### 定位
+#### Location
 
 - `src-tauri/src/commands/edit.rs:180-187`
 
-当前仅截取 prefix 最后 2,000 字符和 suffix 前 600 字符。建议逐步升级：
+Currently it only takes the last 2,000 characters of the prefix and the first 600 characters of the suffix. Suggested incremental upgrades:
 
-1. 当前函数/类 AST 范围。
-2. 文件 imports 和导出 symbol。
-3. LSP expected type/signature。
-4. 最近编辑区域和光标邻近上下文。
-5. 相关文件的轻量符号摘要，而不是整文件拼接。
-6. 按 token 预算截取，而不是按 Unicode 字符数截取。
+1. AST range of the current function/class.
+2. File imports and exported symbols.
+3. LSP expected type/signature.
+4. Recently edited regions and context near the cursor.
+5. Lightweight symbol summaries of related files instead of concatenating whole files.
+6. Truncate by token budget rather than Unicode character count.
 
-必须在设置或首次启用时明确提示：代码上下文可能被发送至用户配置的远程模型/provider。
+The settings or first-enable flow must clearly state that code context may be sent to the remote model/provider configured by the user.
 
-### 5.3 EDIT-01：Inline edit reject 依赖全局 undo
+### 5.3 EDIT-01: Inline edit reject relies on global undo
 
-#### 定位
+#### Location
 
 - `src/workspaces/codez/CodeEditor.tsx:169-220`
 - `src/workspaces/codez/CodeEditor.tsx:284-299`
 
-AI proposal 通过 `executeEdits()` 直接写入 model；Reject 通过：
+The AI proposal is written directly into the model via `executeEdits()`; Reject uses:
 
 ```ts
 editor.trigger("agentz-inline-edit", "undo", null);
 ```
 
-如果 preview 后发生其他编辑、扩展 format、LSP code action 或外部同步，undo 栈顶部不一定仍是 AI edit。
+If other edits, extension formatting, LSP code actions or external syncs happen after the preview, the top of the undo stack is not necessarily the AI edit anymore.
 
-#### 修复方案
+#### Fix
 
-proposal state 应保存：
+Proposal state should store:
 
-- model URI；
-- apply 前的 `alternativeVersionId`；
-- 原始 range；
-- inverse edit；
-- proposal generation ID；
-- apply 后的 version。
+- model URI;
+- `alternativeVersionId` before apply;
+- original range;
+- inverse edit;
+- proposal generation ID;
+- version after apply.
 
-Reject 时：
+On Reject:
 
-- 如果 model/version 仍匹配，则应用 inverse edit；
-- 如果已经发生并发变化，则显示冲突 diff，让用户选择保留/恢复；
-- 不使用全局 undo 作为业务回滚机制。
+- if model/version still match, apply the inverse edit;
+- if a concurrent change has happened, show a conflict diff and let the user choose keep/restore;
+- never use global undo as a business rollback mechanism.
 
-### 5.4 Inline edit 的异步一致性
+### 5.4 Async consistency of inline edit
 
-生成过程中切换 tab 时，目前只检查 `inlineStateRef.current` 是否存在，没有验证 proposal 是否仍属于原始 model/path。建议响应返回时验证：
+When switching tabs during generation, the code only checks whether `inlineStateRef.current` exists and does not verify the proposal still belongs to the original model/path. On response, verify:
 
 ```ts
 request.path === activePath
@@ -411,70 +435,70 @@ request.modelUri === editor.getModel()?.uri.toString()
 request.generation === currentGeneration
 ```
 
-不匹配时直接丢弃响应。
+Discard the response on mismatch.
 
-## 6. Git 版本控制
+## 6. Git Version Control
 
-### 6.1 GIT-01：porcelain 输出解析不安全
+### 6.1 GIT-01: unsafe porcelain output parsing
 
-#### 定位
+#### Location
 
-- 命令：`src-tauri/src/commands/ide.rs:739-745`
-- 解析：`src-tauri/src/commands/git_workspace.rs:173-208`
+- Command: `src-tauri/src/commands/ide.rs:739-745`
+- Parsing: `src-tauri/src/commands/git_workspace.rs:173-208`
 
-当前执行：
+Current command:
 
 ```bash
 git status --porcelain=v1 -uall
 ```
 
-并将 `line[3..]` 当作路径。这无法正确处理：
+and `line[3..]` is treated as the path. This cannot correctly handle:
 
-- 空格、引号、反斜杠及 Git quotePath 转义；
-- 中文/非 ASCII 文件名；
-- rename/copy 的 `old -> new`；
-- 文件名中的换行符；
-- 非 UTF-8 路径；
-- Rust 字符边界与字节切片差异。
+- spaces, quotes, backslashes and Git quotePath escaping;
+- CJK/non-ASCII file names;
+- rename/copy `old -> new`;
+- newlines in file names;
+- non-UTF-8 paths;
+- the difference between Rust char boundaries and byte slicing.
 
-#### 修复方案
+#### Fix
 
-使用 NUL 输出并按 bytes 解析：
+Use NUL-separated output and parse as bytes:
 
 ```bash
 git -c core.quotepath=false status --porcelain=v1 -z -uall
 ```
 
-建议让 `run_git_cmd` 为 Git status 提供 byte-oriented 版本：
+Give `run_git_cmd` a byte-oriented variant for Git status:
 
 ```rust
 async fn run_git_cmd_bytes(...) -> Result<Vec<u8>, String>
 ```
 
-rename/copy 状态在 `-z` 模式下需要读取额外 path 字段。内部路径尽量使用 `OsString`/`PathBuf`，只在 UI 序列化边界进行可损转换并标注风险。
+In `-z` mode rename/copy entries need an extra path field to be read. Use `OsString`/`PathBuf` internally where possible and only do lossy conversion at the UI serialization boundary, flagged as such.
 
-#### 必须增加的 fixture
+#### Required fixtures
 
 - `normal.ts`
 - `a b.ts`
 - `中文.ts`
 - `quote"name.ts`
 - rename old → new
-- copied 文件
-- staged + worktree 同时修改
+- copied file
+- staged + worktree modified at the same time
 - untracked directory
 - nested repository
 
-### 6.2 GIT-02：nested repo diff 路径混用
+### 6.2 GIT-02: mixed paths in nested-repo diff
 
-#### 定位
+#### Location
 
 - `src-tauri/src/commands/ide.rs:796-835`
 - `src-tauri/src/commands/git_workspace.rs:102-147`
 
-`resolve_git_context()` 已经返回 `root` 和 `path_in_repo`，但 diff 命令部分仍使用 workspace-relative `path`。当当前目录已经是嵌套 repo root 时，再传带 repo 前缀的 workspace path 会导致路径重复。
+`resolve_git_context()` already returns `root` and `path_in_repo`, but parts of the diff command still use the workspace-relative `path`. When the current directory is already the nested repo root, passing a workspace path with the repo prefix duplicates the path.
 
-示例：
+Example:
 
 ```text
 workspace: /repo
@@ -483,11 +507,11 @@ workspace path: packages/app/src/main.ts
 repo-relative path: src/main.ts
 ```
 
-在 `/repo/packages/app` 执行 Git 命令时只能使用 `src/main.ts`。
+Git commands run in `/repo/packages/app` must use `src/main.ts`.
 
-#### 修复方案
+#### Fix
 
-统一定义：
+Define once:
 
 ```rust
 struct GitContext {
@@ -498,98 +522,98 @@ struct GitContext {
 }
 ```
 
-所有 Git 子命令只能接收 `GitContext`，禁止单独传递含义不明确的 `path: String`。
+All Git subcommands accept only a `GitContext`; passing an ambiguous `path: String` on its own is forbidden.
 
-### 6.3 GIT-03：`git_root` 参数被忽略
+### 6.3 GIT-03: `git_root` parameter ignored
 
-#### 定位
+#### Location
 
-典型位置：
+Typical locations:
 
 - `src-tauri/src/commands/ide.rs:906-917`
 - `src-tauri/src/commands/ide.rs:935-945`
 - `src-tauri/src/commands/ide.rs:953-980`
 - `src-tauri/src/commands/ide.rs:986-996`
 
-多个 API 接收 `git_root` 后执行：
+Several APIs accept `git_root` and then do:
 
 ```rust
 let _ = git_root;
 ```
 
-这会使 UI 显式选择的仓库与后端实际解析不一致，也让 API 契约具有误导性。
+This makes the repo explicitly selected in the UI inconsistent with what the backend actually resolves, and makes the API contract misleading.
 
-#### 修复方案
+#### Fix
 
-- 若提供 `git_root`，先通过 `resolve_git_dir()` 验证其位于 workspace 内且为已发现 repo。
-- 再验证 path 确实属于该 repo。
-- 未提供时才根据 path 自动推断。
-- 如果 path 与 git_root 冲突，返回明确错误，不要静默选择另一个 repo。
+- If `git_root` is provided, first validate via `resolve_git_dir()` that it is inside the workspace and is a discovered repo.
+- Then verify that path actually belongs to that repo.
+- Infer from path only when it is not provided.
+- If path conflicts with git_root, return an explicit error; do not silently choose another repo.
 
-### 6.4 Git discard 和文件系统安全
+### 6.4 Git discard and filesystem safety
 
-`GitPanel` 已在 `src/workspaces/codez/GitPanel.tsx:79-109` 对 discard 提示确认，这是正确方向。但仍建议：
+`GitPanel` already prompts for confirmation on discard at `src/workspaces/codez/GitPanel.tsx:79-109`, which is the right direction. Still recommended:
 
-- 使用现有 `confirmDialog()` 原生 Tauri dialog，避免 WebView `window.confirm` 不可靠问题。
-- untracked 文件删除优先进入系统回收站或项目 recovery area。
-- discard 前创建可恢复 journal/checkpoint。
-- discard all 不要吞掉每个文件的错误；应汇总成功、失败和未处理路径。
-- 所有 destructive operation 返回结构化结果，不返回拼接字符串。
+- use the existing native Tauri `confirmDialog()` to avoid unreliable WebView `window.confirm`;
+- send deleted untracked files to the system recycle bin or a project recovery area first;
+- create a recoverable journal/checkpoint before discard;
+- discard all must not swallow per-file errors; aggregate succeeded, failed and unprocessed paths;
+- all destructive operations return structured results, not concatenated strings.
 
-### 6.5 Git 产品能力缺口
+### 6.5 Git product capability gaps
 
-为达到成熟 IDE 体验，后续建议补充：
+To reach a mature IDE experience, consider adding:
 
-- staged diff 与 worktree diff 明确分离；
-- hunk/line stage 和 unstage；
-- merge conflict 三方视图；
-- detached HEAD、remote branch、ahead/behind；
-- fetch/pull/push；
-- stash；
-- amend、sign-off、签名；
-- askpass/credential helper 集成；
-- Git operation queue，避免并发修改 index；
-- operation progress、cancel 和审计日志。
+- clear separation of staged diff and worktree diff;
+- hunk/line stage and unstage;
+- three-way merge conflict view;
+- detached HEAD, remote branches, ahead/behind;
+- fetch/pull/push;
+- stash;
+- amend, sign-off, signing;
+- askpass/credential helper integration;
+- a Git operation queue to avoid concurrent index modification;
+- operation progress, cancel and audit log.
 
 ## 7. Agent Harness
 
-### 7.1 AGENT-01：执行上下文绕过权限
+### 7.1 AGENT-01: execution context bypasses permissions
 
-#### 定位
+#### Location
 
-- delegated/辅助路径：`src-tauri/src/commands/chat_turn.rs:1243`
-- 主 Agent turn：`src-tauri/src/commands/chat_turn.rs:2084`
+- Delegated/auxiliary path: `src-tauri/src/commands/chat_turn.rs:1243`
+- Main Agent turn: `src-tauri/src/commands/chat_turn.rs:2084`
 
-两处均设置：
+Both set:
 
 ```rust
 bypass_permissions: true
 ```
 
-外层虽然创建了 `PolicyGate`，但 ToolContext 又显式绕过权限，使最终权限语义不透明。主 registry 包含文件写入、shell、process、浏览器、MCP、App self-management、用户自定义 executable tools 等能力，不能只依赖 system prompt 中“先确认”的软约束。
+Although the outer layer creates a `PolicyGate`, the ToolContext then explicitly bypasses permissions, making the final permission semantics opaque. The main registry includes file writes, shell, process, browser, MCP, App self-management, user-defined executable tools and more; it cannot rely solely on the soft "confirm first" constraint in the system prompt.
 
-#### 修复方案
+#### Fix
 
-1. 主 Agent 默认设为 `false`。
-2. 仅允许内部、只读、已证明安全的任务使用 bypass。
-3. 权限判断必须由 harness 强制执行，不依赖模型自觉。
-4. 对以下能力分别建策略：
-   - workspace read；
-   - workspace write；
-   - outside-workspace read/write；
-   - process execution；
-   - network；
-   - credentials/secrets；
-   - destructive operation；
-   - external side effect，例如发送消息、提交表单。
-5. 每次策略判定记录：tool、参数摘要、能力、匹配规则、decision、用户确认结果。
-6. 子 Agent 只读 registry 是正确方向，但应再加 capability token，形成双重约束。
+1. Default to `false` for the main Agent.
+2. Allow bypass only for internal, read-only tasks proven safe.
+3. Permission decisions must be enforced by the harness, not left to the model.
+4. Build separate policies for:
+   - workspace read;
+   - workspace write;
+   - outside-workspace read/write;
+   - process execution;
+   - network;
+   - credentials/secrets;
+   - destructive operations;
+   - external side effects, e.g. sending messages, submitting forms.
+5. Log every policy decision: tool, argument summary, capability, matched rule, decision, user confirmation result.
+6. The read-only registry for sub-agents is the right direction, but add a capability token on top for a double constraint.
 
-### 7.2 Tool allowlist 依赖字符串，容易漂移
+### 7.2 Tool allowlist relies on strings and drifts easily
 
-`chat_turn.rs:930-944` 和 tool registry 通过工具名字符串启用/禁用能力。新工具添加、重命名或 alias 时可能漏进安全分类。
+`chat_turn.rs:930-944` and the tool registry enable/disable capabilities by tool-name strings. Newly added, renamed or aliased tools can slip past the security classification.
 
-建议每个工具暴露结构化 metadata：
+Each tool should expose structured metadata:
 
 ```rust
 struct ToolCapabilities {
@@ -605,37 +629,37 @@ struct ToolCapabilities {
 }
 ```
 
-PolicyGate 基于 metadata 和参数进行判定。CI 增加测试：任何注册工具如果没有 capability metadata，则构建失败。
+PolicyGate decides based on metadata and arguments. Add a CI test: the build fails if any registered tool lacks capability metadata.
 
-### 7.3 Tool transaction 和恢复能力不足
+### 7.3 Insufficient tool transactions and recovery
 
-当前有 FileJournal，这是很好的基础。但一个 Agent turn 中多个修改并不天然构成事务：第三个文件写失败时，前两个可能已经落盘。
+FileJournal already exists and is a good foundation. But multiple modifications within one Agent turn do not naturally form a transaction: when the third file write fails, the first two may already be on disk.
 
-建议：
+Recommendations:
 
-- turn 开始创建 journal transaction ID；
-- file tool 记录 before image、after image 和 hash；
-- turn 失败时 UI 提供“一键回滚本轮”；
-- 自动回滚只能在文件未被外部再次修改时执行；
-- 使用 content hash 检测冲突；
-- process/network side effect 标记为不可逆，不能伪装成可回滚。
+- create a journal transaction ID at turn start;
+- file tools record before image, after image and hash;
+- on turn failure, the UI offers "roll back this turn";
+- automatic rollback only when the files have not been modified externally since;
+- detect conflicts with content hashes;
+- mark process/network side effects as irreversible; do not pretend they can be rolled back.
 
-### 7.4 Cancellation 和 timeout
+### 7.4 Cancellation and timeout
 
-`chat_turn.rs:2171-2191` 在 timeout 后设置 cancel flag，再等待 collector。需要验证每个工具和 LLM client 都会及时观察 cancel；否则 UI 可能显示超时但后台任务仍占用资源。
+`chat_turn.rs:2171-2191` sets a cancel flag after timeout and then waits for the collector. Verify that every tool and the LLM client observe cancellation promptly; otherwise the UI may show a timeout while the background task keeps consuming resources.
 
-建议：
+Recommendations:
 
-- 所有 Tool trait 实现接受统一 `CancellationToken`；
-- 外部进程进入独立 process group，取消时终止整个 group；
-- HTTP 请求绑定 cancellation；
-- collector 在 producer 异常退出时有独立 deadline；
-- timeout 后区分 `cancel_requested`、`cancelled`、`force_terminated`；
-- 增加故意不响应 cancel 的 fake tool 测试。
+- all Tool trait implementations accept a common `CancellationToken`;
+- external processes run in their own process group, and the whole group is terminated on cancel;
+- HTTP requests are bound to cancellation;
+- the collector has its own deadline if the producer exits abnormally;
+- after timeout, distinguish `cancel_requested`, `cancelled` and `force_terminated`;
+- add a fake tool test that deliberately ignores cancellation.
 
-### 7.5 Agent Harness 推荐拆分
+### 7.5 Recommended Agent Harness split
 
-`chat_turn.rs` 同时负责请求规范化、附件、slash command、skills、MCP、工具注册、上下文、模型配置、运行、事件收集和持久化。建议拆为：
+`chat_turn.rs` handles request normalization, attachments, slash commands, skills, MCP, tool registration, context, model config, execution, event collection and persistence all at once. Suggested split:
 
 ```text
 TurnRequestNormalizer
@@ -650,25 +674,25 @@ TurnPersistence
 TurnRecovery
 ```
 
-拆分原则：
+Principles:
 
-- Tool registry 构建不依赖 UI 事件细节。
-- Context assembly 是纯函数，可 fixture 测试。
-- Persistence 与 streaming collector 分离。
-- Policy decision 可独立单测。
-- 主 Agent、delegate、Fish、Koi 使用相同 capability 模型，仅配置不同。
+- Tool registry construction does not depend on UI event details.
+- Context assembly is a pure function testable with fixtures.
+- Persistence is separate from the streaming collector.
+- Policy decisions can be unit-tested independently.
+- Main Agent, delegate, Fish and Koi use the same capability model with different configuration.
 
-## 8. 安全
+## 8. Security
 
-### 8.1 SEC-01：Mermaid loose mode 与 CSP 关闭
+### 8.1 SEC-01: Mermaid loose mode and disabled CSP
 
-#### 定位
+#### Location
 
 - `src/workspaces/codez/Markdown.tsx:49-60`
 - `src/workspaces/codez/Markdown.tsx:92-124`
 - `src-tauri/tauri.conf.json:25-27`
 
-当前 Mermaid：
+Current Mermaid setup:
 
 ```ts
 mermaid.initialize({
@@ -678,294 +702,294 @@ mermaid.initialize({
 });
 ```
 
-生成 SVG 通过 `innerHTML` 插入 DOM；Tauri CSP 同时为 `null`。Markdown 普通 HTML 路径已经使用 rehype-sanitize，这是优点，但 Mermaid 生成 SVG 走独立路径。
+The generated SVG is inserted into the DOM via `innerHTML`, and the Tauri CSP is `null`. The normal Markdown HTML path already uses rehype-sanitize, which is good, but Mermaid-generated SVG goes through a separate path.
 
-内容来源包括模型输出、工具结果、仓库文档或扩展，不能全部视为可信。
+Content sources include model output, tool results, repository docs and extensions; not all can be treated as trusted.
 
-#### 修复方案
+#### Fix
 
-- Mermaid 改为 `securityLevel: "strict"`。
-- SVG 插入 DOM 前使用 SVG-aware sanitizer。
-- 禁止 event handler attribute、`javascript:`、`foreignObject`、外部 resource 和不必要的 style/url。
-- 为 Tauri 配置明确 CSP，至少限制 script、connect、img、style 和 frame source。
-- 逐项列出 LSP WebSocket、模型 API、自带资源需要的 connect-src，不使用全开放。
-- Tauri commands 仍必须验证路径和权限，不能将 WebView 当成可信边界。
+- Switch Mermaid to `securityLevel: "strict"`.
+- Use an SVG-aware sanitizer before inserting SVG into the DOM.
+- Forbid event handler attributes, `javascript:`, `foreignObject`, external resources and unnecessary style/url.
+- Configure an explicit CSP for Tauri, restricting at least script, connect, img, style and frame sources.
+- Enumerate the connect-src entries needed for the LSP WebSocket, model APIs and bundled resources; do not open everything.
+- Tauri commands must still validate paths and permissions; do not treat the WebView as a trusted boundary.
 
-#### 测试
+#### Tests
 
-- 恶意 Mermaid label/link。
-- SVG event attributes。
-- `javascript:`/data URL。
-- raw HTML、iframe、foreignObject。
-- 模型输出恶意 Markdown 链接。
+- Malicious Mermaid labels/links.
+- SVG event attributes.
+- `javascript:`/data URLs.
+- Raw HTML, iframe, foreignObject.
+- Malicious Markdown links in model output.
 
-### 8.2 Markdown sanitizer 注意事项
+### 8.2 Markdown sanitizer caveats
 
-`sanitizeSchema` 允许 span style 和全局 className/id。应确认：
+`sanitizeSchema` allows span style and global className/id. Confirm that:
 
-- style 仅用于 KaTeX 的必要属性；
-- 不允许 `url()`、position overlay 等可疑 CSS；
-- id 不会与应用 DOM 产生 clobbering；
-- link click 经过协议 allowlist，并统一加 `rel="noopener noreferrer"`；
-- 本地绝对路径链接需要经过 workspace scope 检查。
+- style is only used for attributes KaTeX needs;
+- `url()`, position overlays and other suspicious CSS are disallowed;
+- ids cannot clobber application DOM;
+- link clicks go through a protocol allowlist and uniformly get `rel="noopener noreferrer"`;
+- local absolute-path links are checked against workspace scope.
 
-## 9. 性能与资源管理
+## 9. Performance and Resource Management
 
-### 9.1 PERF-01：构建产物体积
+### 9.1 PERF-01: build output size
 
-本次 production build 关键结果：
+Key results of this production build:
 
-| 产物 | 大小 | gzip |
+| Artifact | Size | gzip |
 | --- | ---: | ---: |
-| 主应用 `index-*.js` | 约 2,011.65 KB | 约 561.29 KB |
-| Monaco `monaco-*.js` | 约 3,830.98 KB | 约 992.59 KB |
-| TypeScript worker | 约 7,020.26 KB | worker 未显示 gzip |
-| CSS worker | 约 1,031.26 KB | worker 未显示 gzip |
-| HTML worker | 约 690.01 KB | worker 未显示 gzip |
-| Markdown chunk | 约 335.50 KB | 约 101.86 KB |
-| Cytoscape | 约 442.57 KB | 约 141.98 KB |
-| Wardley | 约 615.35 KB | 约 148.57 KB |
+| Main app `index-*.js` | ~2,011.65 KB | ~561.29 KB |
+| Monaco `monaco-*.js` | ~3,830.98 KB | ~992.59 KB |
+| TypeScript worker | ~7,020.26 KB | gzip not shown for workers |
+| CSS worker | ~1,031.26 KB | gzip not shown for workers |
+| HTML worker | ~690.01 KB | gzip not shown for workers |
+| Markdown chunk | ~335.50 KB | ~101.86 KB |
+| Cytoscape | ~442.57 KB | ~141.98 KB |
+| Wardley | ~615.35 KB | ~148.57 KB |
 
-构建转换 4,106 个模块，本机耗时约 2 分 29 秒。
+The build transformed 4,106 modules and took about 2 min 29 s on the local machine.
 
-### 9.2 Monaco 加载策略
+### 9.2 Monaco loading strategy
 
-#### 定位
+#### Location
 
 - `src/monaco-setup.ts:5-46`
 - `vite.config.ts:20-29`
 
-`monaco-setup.ts` 顶层导入完整 Monaco 和 JSON/CSS/HTML/TS workers。建议：
+`monaco-setup.ts` imports full Monaco and the JSON/CSS/HTML/TS workers at top level. Recommendations:
 
-- IDE workspace 首次打开前不加载 Monaco。
-- 按语言动态加载 contribution 和 worker。
-- 未打开 JS/TS 文件时不启动 TS worker。
-- 只读 diff/preview 场景评估是否需要完整 language service。
-- Extension UI、WorkZ、设置页不应因为共享入口而加载 Monaco。
-- 使用 route/workspace-level lazy boundary。
+- do not load Monaco before the IDE workspace is first opened;
+- load contributions and workers per language on demand;
+- do not start the TS worker until a JS/TS file is opened;
+- evaluate whether read-only diff/preview needs the full language service;
+- Extension UI, WorkZ and Settings should not load Monaco because of a shared entry;
+- use route/workspace-level lazy boundaries.
 
-### 9.3 Mermaid 动态拆包失效
+### 9.3 Mermaid dynamic splitting ineffective
 
-Vite 报告：Mermaid 在 `Markdown.tsx` 动态导入，但在 `MarkdownPreview.tsx` 静态导入，因此不会真正进入独立动态 chunk。
+Vite reports that Mermaid is dynamically imported in `Markdown.tsx` but statically imported in `MarkdownPreview.tsx`, so it never actually becomes a separate dynamic chunk.
 
-修复：两个入口都通过同一个 `loadMermaid()` 模块动态加载，删除任何顶层 Mermaid import。
+Fix: load it dynamically through the same `loadMermaid()` module from both entries and remove all top-level Mermaid imports.
 
-### 9.4 主包拆分
+### 9.4 Main bundle splitting
 
-当前 `vite.config.ts` 只有 app-vendor、monaco、markdown 三个粗粒度 manual chunks。建议 lazy boundary：
+`vite.config.ts` currently has only three coarse manual chunks: app-vendor, monaco and markdown. Suggested lazy boundaries:
 
-- CodeZ workspace；
-- WorkZ workspace；
-- Settings；
-- Extension Manager；
-- Browser Panel；
-- Workflow Designer；
-- Graph/Cytoscape；
-- Markdown/Mermaid/KaTeX；
-- Image Preview；
-- Git panel 高级功能。
+- CodeZ workspace;
+- WorkZ workspace;
+- Settings;
+- Extension Manager;
+- Browser Panel;
+- Workflow Designer;
+- Graph/Cytoscape;
+- Markdown/Mermaid/KaTeX;
+- Image Preview;
+- advanced Git panel features.
 
-不要仅靠 manualChunks 强拆第三方包，应优先从 React 页面/功能入口动态 import，确保未访问功能不下载、不解析、不执行。
+Do not rely only on manualChunks to force-split third-party packages; prefer dynamic imports from React page/feature entries so unvisited features are not downloaded, parsed or executed.
 
-### 9.5 文件 watcher 与索引
+### 9.5 File watcher and indexing
 
-现有优点：
+Existing strengths:
 
-- watcher 对 ignored path 做过滤；
-- index worker 有事件合并和有界队列测试；
-- agent busy 时减少 UI refresh；
-- graph rebuild/patch 有异步调度。
+- the watcher filters ignored paths;
+- the index worker has event coalescing and bounded-queue tests;
+- UI refresh is reduced while the agent is busy;
+- graph rebuild/patch is scheduled asynchronously.
 
-建议补充指标：
+Suggested additional metrics:
 
-- watcher raw events、ignored、coalesced；
-- 单批次 path 数和 rebuild 次数；
-- index latency 和失败率；
-- Git refresh 次数与耗时；
-- 大仓库打开时初次扫描耗时；
-- watcher overflow 和 fallback rebuild。
+- watcher raw events, ignored, coalesced;
+- paths per batch and number of rebuilds;
+- index latency and failure rate;
+- Git refresh count and duration;
+- initial scan time when opening a large repo;
+- watcher overflow and fallback rebuilds.
 
-### 9.6 性能预算
+### 9.6 Performance budgets
 
-CI 建议加入：
+Suggested CI additions:
 
-- 首屏主包 gzip budget；
-- CodeZ 首次加载资源 budget；
-- Monaco ready 时间；
-- LSP ready 时间；
-- 首次按键响应；
-- AI completion TTFT/P95；
-- 大文件打开和编辑延迟；
-- 10k/100k 文件 workspace watcher/index benchmark；
-- 稳态内存和标签切换后的泄漏检查。
+- first-screen main bundle gzip budget;
+- CodeZ first-load resource budget;
+- Monaco ready time;
+- LSP ready time;
+- first keystroke response;
+- AI completion TTFT/P95;
+- large-file open and edit latency;
+- 10k/100k-file workspace watcher/index benchmark;
+- steady-state memory and leak checks after tab switching.
 
 ## 10. Extension Host
 
-现状优点：
+Current strengths:
 
-- Extension Host 独立构建，避免扩展直接混入 React UI 主线程。
-- 有 RPC、workspace、SCM、language features、tasks、testing、debug、tree view、webview 等抽象。
-- 输出 retention 已有边界测试。
+- The Extension Host is built separately, so extensions are not mixed into the React UI main thread.
+- Abstractions exist for RPC, workspace, SCM, language features, tasks, testing, debug, tree view, webview and more.
+- Output retention already has boundary tests.
 
-风险和建议：
+Risks and recommendations:
 
-- 当前主要验证是 build/smoke，缺少 VS Code API compatibility contract tests。
-- 为每个已实现 API 建 capability/compatibility matrix。
-- 扩展崩溃、无限输出、死循环、超时 RPC、重复 activate/deactivate 需要隔离测试。
-- Extension Host 应有内存/CPU/消息大小/调用频率限制。
-- Webview、shell、filesystem、network 权限应按扩展声明授予。
-- RPC request 必须支持 timeout、cancel、structured error 和 host restart。
-- Extension Host 重启后要恢复已安装扩展状态，但不能重复注册 command/provider。
-- 快速切换 workspace 时验证旧 host 不再操作新 workspace。
+- Verification is mainly build/smoke; there are no VS Code API compatibility contract tests.
+- Build a capability/compatibility matrix for every implemented API.
+- Extension crashes, unbounded output, infinite loops, timed-out RPCs and repeated activate/deactivate need isolation tests.
+- The Extension Host should have memory/CPU/message-size/call-rate limits.
+- Webview, shell, filesystem and network permissions should be granted per extension declaration.
+- RPC requests must support timeout, cancel, structured errors and host restart.
+- After an Extension Host restart, restore installed extension state without re-registering commands/providers.
+- When switching workspaces quickly, verify the old host no longer operates on the new workspace.
 
-## 11. React 和 UI 状态问题
+## 11. React and UI State Issues
 
-ESLint 报告 61 个 warnings，其中以下 Hook warning 具有行为风险，不应仅当作格式问题：
+ESLint reports 61 warnings; the following Hook warnings carry behavioral risk and should not be treated as mere formatting:
 
-- `src/extensions/ui/QuickInput.tsx:17-20`：effect 缺少 `inputBox?.value`，同一 input ID 更新默认值时 UI 不同步。
-- `src/workspaces/codez/AssistantPanel.tsx:530`：callback 缺少 `flushStreamDelta`，可能捕获过期流式刷新逻辑。
-- `src/workspaces/codez/AssistantPanel.tsx:784-802`：callbacks 缺少 `onModeChange`，可能使用过期翻译/状态。
-- `src/workspaces/codez/CodeEditor.tsx:538`：handleMount 缺少 `tab.content`、`tab.isReadOnly`，进一步放大 LSP 和 breakpoint 旧闭包问题。
-- `src/workspaces/codez/FileTree.tsx:255`：缺少 `node.is_dir`。
-- `src/workspaces/codez/Terminal.tsx:159`：effect 缺少 `active`。
-- `src/workspaces/codez/index.tsx:595`：cleanup 直接读取可能已变化的 ref；应在 effect 内捕获对应集合/状态。
-- `src/workspaces/codez/settings/WfBranchExprPaths.tsx:29`：memo 缺少 `nodeLabel`。
-- `src/workspaces/workz/index.tsx:355,821`：缺少 `setPreviewPath`。
+- `src/extensions/ui/QuickInput.tsx:17-20`: effect missing `inputBox?.value`; UI does not sync when the default value updates for the same input ID.
+- `src/workspaces/codez/AssistantPanel.tsx:530`: callback missing `flushStreamDelta`; may capture stale stream-flush logic.
+- `src/workspaces/codez/AssistantPanel.tsx:784-802`: callbacks missing `onModeChange`; may use stale translations/state.
+- `src/workspaces/codez/CodeEditor.tsx:538`: handleMount missing `tab.content`, `tab.isReadOnly`, amplifying the stale-closure problems for LSP and breakpoints.
+- `src/workspaces/codez/FileTree.tsx:255`: missing `node.is_dir`.
+- `src/workspaces/codez/Terminal.tsx:159`: effect missing `active`.
+- `src/workspaces/codez/index.tsx:595`: cleanup reads a ref that may have changed; capture the relevant collection/state inside the effect.
+- `src/workspaces/codez/settings/WfBranchExprPaths.tsx:29`: memo missing `nodeLabel`.
+- `src/workspaces/workz/index.tsx:355,821`: missing `setPreviewPath`.
 
-处理方式：
+How to handle:
 
-- 不建议批量 `eslint --fix` 后结束。
-- 对每个 warning 判断 callback 是否需要 ref、useEvent 风格封装或真实依赖。
-- 对涉及订阅/异步请求的 effect 增加 race/cancellation 测试。
-- CI 可逐步设置 warning budget，最终将 `react-hooks/exhaustive-deps` 提升为 error。
+- Do not just run a bulk `eslint --fix` and stop.
+- For each warning decide whether the callback needs a ref, a useEvent-style wrapper or a real dependency.
+- Add race/cancellation tests for effects involving subscriptions/async requests.
+- CI can introduce a warning budget gradually and eventually promote `react-hooks/exhaustive-deps` to an error.
 
-## 12. CSS-01：生产构建 CSS 语法警告
+## 12. CSS-01: CSS syntax warning in production build
 
-#### 定位
+#### Location
 
 - `src/extensions/ui/extensions.css:1-2`
 
-注释文本中包含：
+The comment text contains:
 
 ```css
 (--bg-*/--text-*/--border/--accent)
 ```
 
-其中 `*/` 会提前关闭 CSS 注释，Vite/esbuild 报：
+The `*/` closes the CSS comment early, and Vite/esbuild reports:
 
 ```text
 Unexpected "*" [css-syntax-error]
 ```
 
-#### 修复
+#### Fix
 
-改写为不包含注释终止符的文字，例如：
+Rewrite the text without a comment terminator, for example:
 
 ```css
 /* Uses the --bg-, --text-, --border-, and --accent token families. */
 ```
 
-将 production build warning 设为 CI failure，避免真正的语法错误长期被忽略。
+Make production build warnings a CI failure so real syntax errors are not ignored long-term.
 
-## 13. 测试策略
+## 13. Testing Strategy
 
-### 13.1 当前覆盖优势
+### 13.1 Current coverage strengths
 
-Rust 已覆盖：
+Rust already covers:
 
-- workflow validation/runtime；
-- gateway 消息解析；
-- graph/index；
-- path filtering；
-- codebase index worker；
-- terminal log bounds；
-- skills provenance；
-- 部分 interactive UI schema；
-- nested repo discovery 的基础情况。
+- workflow validation/runtime;
+- gateway message parsing;
+- graph/index;
+- path filtering;
+- codebase index worker;
+- terminal log bounds;
+- skills provenance;
+- part of the interactive UI schema;
+- basic nested repo discovery.
 
-### 13.2 当前关键缺口
+### 13.2 Current key gaps
 
-前端仅 5 个测试文件、21 个测试，未充分覆盖：
+The frontend has only 5 test files and 21 tests, without adequate coverage of:
 
-- Monaco 多标签页生命周期；
-- LSP client 和 WebSocket framing；
-- provider URI 匹配；
-- diagnostics 路由；
-- Git porcelain 特殊路径；
-- nested repo Git 操作；
-- GitPanel destructive flows；
-- AI completion cancellation；
-- inline edit 冲突和回滚；
-- AssistantPanel streaming event ordering；
-- Agent permission matrix；
-- prompt injection；
-- Markdown/Mermaid hostile input；
-- Extension Host API contracts。
+- Monaco multi-tab lifecycle;
+- LSP client and WebSocket framing;
+- provider URI matching;
+- diagnostics routing;
+- Git porcelain special paths;
+- nested repo Git operations;
+- GitPanel destructive flows;
+- AI completion cancellation;
+- inline edit conflicts and rollback;
+- AssistantPanel streaming event ordering;
+- Agent permission matrix;
+- prompt injection;
+- Markdown/Mermaid hostile input;
+- Extension Host API contracts.
 
-### 13.3 必须新增的测试套件
+### 13.3 Test suites to add
 
 #### LSP fake server integration tests
 
-- initialize 立即响应；
-- delayed response；
-- response/error/notification 交错；
-- non-ASCII payload；
-- socket close；
-- multiple documents；
-- diagnostics per URI；
-- reconnect 和 server crash。
+- immediate initialize response;
+- delayed response;
+- interleaved response/error/notification;
+- non-ASCII payload;
+- socket close;
+- multiple documents;
+- diagnostics per URI;
+- reconnect and server crash.
 
 #### Monaco integration tests
 
-- 两个标签 URI 唯一；
-- A → B → A provider 仍有效；
-- marker 不串文件；
-- close/reopen 不泄漏 provider；
-- external disk update 与 dirty buffer 冲突。
+- unique URIs for two tabs;
+- providers still valid after A → B → A;
+- markers do not leak across files;
+- close/reopen does not leak providers;
+- external disk update conflicting with a dirty buffer.
 
 #### Git fixture tests
 
-- 空格、中文、引号、rename、copy、删除、untracked；
-- staged + unstaged 双状态；
-- nested repo status/diff/add/reset/discard；
-- 显式 git_root 和 path 冲突；
-- discard failure 汇总；
-- unborn branch/首次 commit；
-- detached HEAD。
+- spaces, CJK, quotes, rename, copy, delete, untracked;
+- staged + unstaged dual state;
+- nested repo status/diff/add/reset/discard;
+- explicit git_root conflicting with path;
+- discard failure aggregation;
+- unborn branch/first commit;
+- detached HEAD.
 
 #### Agent policy tests
 
-- 每个注册 tool 必须有 capability metadata；
-- balanced/strict/auto 等 profile 的 decision matrix；
-- outside-workspace；
-- shell/network/credentials/destructive；
-- 用户拒绝确认；
-- sub-agent 无法取得 write/exec capability；
-- MCP tool capability 映射缺失时默认 deny。
+- every registered tool must have capability metadata;
+- decision matrix for profiles such as balanced/strict/auto;
+- outside-workspace;
+- shell/network/credentials/destructive;
+- user declines confirmation;
+- sub-agents cannot obtain write/exec capability;
+- default deny when an MCP tool's capability mapping is missing.
 
 #### Cancellation tests
 
-- LLM request cancel；
-- shell process tree cancel；
-- hung tool timeout；
-- collector close；
-- UI cancel 后无后续 token/tool event；
-- timeout 后 session 状态正确恢复。
+- LLM request cancel;
+- shell process tree cancel;
+- hung tool timeout;
+- collector close;
+- no further token/tool events after UI cancel;
+- session state recovers correctly after timeout.
 
 #### Security tests
 
-- 恶意 Markdown/HTML/SVG/Mermaid；
-- link protocol；
-- WebView → Tauri invoke scope；
-- extension webview 消息；
-- user tool manifest path traversal；
-- prompt injection 试图启用禁用工具。
+- malicious Markdown/HTML/SVG/Mermaid;
+- link protocols;
+- WebView → Tauri invoke scope;
+- extension webview messages;
+- user tool manifest path traversal;
+- prompt injection attempting to enable disabled tools.
 
-## 14. 推荐重构边界
+## 14. Recommended Refactoring Boundaries
 
 ### 14.1 `CodeEditor.tsx`
 
-拆分为：
+Split into:
 
 ```text
 CodeEditorView
@@ -979,20 +1003,20 @@ useEditorCommands
 
 ### 14.2 `src/services/tauri/lsp.ts`
 
-拆分为：
+Split into:
 
 ```text
-lsp/protocol.ts       JSON-RPC 类型与 framing
-lsp/client.ts         WebSocket、pending、cancel、reconnect
+lsp/protocol.ts       JSON-RPC types and framing
+lsp/client.ts         WebSocket, pending, cancel, reconnect
 lsp/documents.ts      document lifecycle/version
-lsp/converters.ts     LSP ↔ Monaco 转换
+lsp/converters.ts     LSP ↔ Monaco conversion
 lsp/providers.ts      Monaco provider registration
-lsp/sessionPool.ts    project/language 复用
+lsp/sessionPool.ts    project/language reuse
 ```
 
 ### 14.3 `src-tauri/src/commands/ide.rs`
 
-拆分为：
+Split into:
 
 ```text
 commands/ide/files.rs
@@ -1002,65 +1026,65 @@ commands/ide/watcher.rs
 commands/ide/lsp.rs
 ```
 
-### 14.4 前端 workspace
+### 14.4 Frontend workspaces
 
-`codez/index.tsx` 和 `AssistantPanel.tsx` 建议将 watcher、tab model、session stream、Git refresh scheduler 分离为独立 store/hook，避免一个组件同时承担持久化、订阅、调度和渲染。
+For `codez/index.tsx` and `AssistantPanel.tsx`, separate the watcher, tab model, session stream and Git refresh scheduler into dedicated stores/hooks, so one component does not handle persistence, subscriptions, scheduling and rendering at once.
 
-## 15. 分阶段实施计划
+## 15. Phased Implementation Plan
 
-### 阶段一：正确性与安全，建议立即处理
+### Phase 1: correctness and security, address immediately
 
-1. 修复 Monaco model URI，删除 diagnostics 的首 model fallback。
-2. 将 LSP 生命周期从 onMount 中拆出并支持多文档。
-3. 修复 initialize race、UTF-8 Content-Length、pending rejection。
-4. 主 Agent 关闭 `bypass_permissions`，建立最小权限回归测试。
-5. Mermaid 使用 strict mode，启用 CSP，并 sanitize SVG。
-6. Git status 改用 `-z` 字节解析。
-7. 修复 nested repo diff/path 和被忽略的 git_root。
-8. 修复 `extensions.css` 注释语法。
+1. Fix the Monaco model URI and remove the first-model fallback for diagnostics.
+2. Move the LSP lifecycle out of onMount and support multiple documents.
+3. Fix the initialize race, UTF-8 Content-Length and pending rejection.
+4. Disable `bypass_permissions` for the main Agent and add minimal permission regression tests.
+5. Use Mermaid strict mode, enable CSP and sanitize SVG.
+6. Switch Git status to `-z` byte parsing.
+7. Fix nested repo diff/path and the ignored git_root.
+8. Fix the comment syntax in `extensions.css`.
 
-阶段一验收门槛：
+Phase 1 acceptance gates:
 
-- 所有新增回归测试通过；
-- production build 无 warning；
-- 两文件、多语言、多 repo 手工 smoke 通过；
-- Agent 写文件/执行命令按策略触发确认或拒绝；
-- 恶意 Mermaid/Markdown 测试无法执行脚本或越权 invoke。
+- all new regression tests pass;
+- production build has no warnings;
+- manual smoke tests with two files, multiple languages and multiple repos pass;
+- Agent file writes / command execution trigger confirmation or denial according to policy;
+- malicious Mermaid/Markdown tests cannot execute scripts or invoke beyond scope.
 
-### 阶段二：核心体验稳定化
+### Phase 2: core experience stabilization
 
-1. project/language LSP session pool。
-2. AI completion 真取消、并发限制、generation guard。
-3. Inline edit inverse-edit 回滚与冲突处理。
-4. Git operation queue、staged/worktree diff、结构化错误。
-5. 拆分 `chat_turn.rs`、`CodeEditor.tsx`、CodeZ workspace。
-6. 核心集成测试加入 CI。
-7. React Hook warnings 清零。
+1. Project/language LSP session pool.
+2. Real AI completion cancellation, concurrency limit, generation guard.
+3. Inline edit inverse-edit rollback and conflict handling.
+4. Git operation queue, staged/worktree diff, structured errors.
+5. Split `chat_turn.rs`, `CodeEditor.tsx` and the CodeZ workspace.
+6. Add core integration tests to CI.
+7. Clear all React Hook warnings.
 
-### 阶段三：性能和产品化
+### Phase 3: performance and productization
 
-1. WorkZ/CodeZ/Settings/Extensions/Graph/Browser 路由级 lazy loading。
-2. Monaco contribution 和 worker 按语言加载。
-3. Mermaid 单一路径动态加载。
-4. Bundle、启动、LSP、completion 性能预算进入 CI。
-5. Extension Host compatibility suite 和资源限制。
-6. Tool capability metadata、事务回滚和完整审计日志。
+1. Route-level lazy loading for WorkZ/CodeZ/Settings/Extensions/Graph/Browser.
+2. Per-language loading of Monaco contributions and workers.
+3. Single-path dynamic loading of Mermaid.
+4. Bundle, startup, LSP and completion performance budgets in CI.
+5. Extension Host compatibility suite and resource limits.
+6. Tool capability metadata, transactional rollback and full audit logging.
 
-## 16. 建议的完成定义（Definition of Done）
+## 16. Suggested Definition of Done
 
-每个核心修复 PR 至少满足：
+Every core fix PR should at least:
 
-- 提供对应自动化回归测试，不只手工验证。
-- 描述对 Windows、macOS、Linux 路径和进程行为的影响。
-- 不引入新的 lint/type/build warning。
-- destructive 或 external-side-effect 行为具有明确权限决策。
-- 异步逻辑包含 cancellation、timeout 和 stale response 处理。
-- 对性能敏感的改动提供前后指标。
-- 更新相关架构文档或代码注释。
-- 验证多标签、多 repo、大文件和项目切换场景。
+- include matching automated regression tests, not only manual verification;
+- describe the impact on Windows, macOS and Linux path and process behavior;
+- introduce no new lint/type/build warnings;
+- have explicit permission decisions for destructive or external-side-effect behavior;
+- include cancellation, timeout and stale-response handling for async logic;
+- provide before/after metrics for performance-sensitive changes;
+- update related architecture docs or code comments;
+- verify multi-tab, multi-repo, large-file and project-switch scenarios.
 
-## 17. 最终结论
+## 17. Final Conclusion
 
-AgentZ 的核心优势是已经具备真正 AI IDE 所需的大部分基础构件，而不是单纯在编辑器旁添加聊天框。当前最主要的问题不是功能缺失，而是部分关键链路的生命周期、协议正确性和权限模型尚未完全闭合。
+AgentZ's core strength is that it already has most of the building blocks a real AI IDE needs, rather than simply adding a chat box next to an editor. The main problem right now is not missing features but that the lifecycle, protocol correctness and permission model of some critical paths are not yet fully closed.
 
-最高收益的工作顺序是：先修 LSP URI/生命周期/协议，再修 Agent 权限和 Git 路径解析，同时收紧 Mermaid/CSP；随后补齐集成测试和 cancellation；最后进行模块拆分和加载性能优化。完成阶段一后，编辑器智能能力、Git 多仓库可靠性和 Agent 安全性都会获得显著提升，也能为后续功能扩展建立稳定基线。
+The highest-return order of work: first fix LSP URI/lifecycle/protocol, then Agent permissions and Git path parsing while tightening Mermaid/CSP; then fill in integration tests and cancellation; finally do module splitting and load-performance optimization. Once Phase 1 is done, editor intelligence, multi-repo Git reliability and Agent safety will all improve significantly, establishing a stable baseline for further feature work.

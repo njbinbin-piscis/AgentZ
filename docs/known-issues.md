@@ -1,28 +1,37 @@
 # Known Issues — Agent Loop Robustness & Tooling
 
+**English** | [简体中文](known-issues.zh-CN.md)
+
 Status: **1.0.0 Engineering Baseline Closed (2026-10-19)** — All host-side engineering, WorkZ ↔ CodeZ handoff, dirty buffer conflict protection, per-turn undo, side-channel token accounting, secret scrubbing, and bundle/E2E gates are resolved and verified in `1.0.0` (see `docs/upgrade/release-decision-1.0.0.md` and `docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md`). External hardware/certificate items are tracked under `ADR-006`. Historical notes below are retained for engineering provenance.
 
-Owner: Piscis. Created: 2026-09-29. Updated: 2026-10-19.
+Owner: Piscis. Created: 2026-09-29. Updated: 2026-11-02.
 
-## Status index (2026-10-13)
+## Status index (re-verified 2026-11-02 against 1.0.40)
 
 Line numbers in the sections below are from the 2026-09-29 snapshot and have
-drifted. Find the code by symbol with `rg` instead of by line. Support scope
-(what is verified per platform) is tracked in
-[AZ-005 支持矩阵](upgrade/evidence/AZ-005-support-matrix.md); a known issue
-here does not change that matrix.
+drifted. Find the code by symbol with `rg` instead of by line. Since then,
+`src-tauri/src/commands/chat_turn.rs` has been split into the
+`src-tauri/src/commands/chat_turn/` module (`mod.rs`, `post_turn.rs`,
+`tool_approval.rs`, `prompt_assembly.rs`, ...), and the kernel is no longer an
+opaque git dependency: the root `Cargo.toml` pins `piscis-engine` `v0.8.71` and
+a `[patch]` block builds it from `vendor/piscis-engine/`, so "kernel-side"
+items can now be checked and fixed in this repository. Support scope (what is
+verified per platform) is tracked in the
+[AZ-005 support matrix](upgrade/evidence/AZ-005-support-matrix.md); a known
+issue here does not change that matrix.
 
-| # | Item | Status on 2026-10-13 | Stale reference / how to verify |
+| # | Item | Status on 2026-11-02 | Where to verify |
 | --- | --- | --- | --- |
-| 1 | Whole-turn 600s timeout | Host part fixed (Fix batch 1); per-step recovery still kernel-side | `default_timeout` no longer exists. Current turn timeout: `rg -n "turn_timeout_secs" src-tauri/src/commands/chat_turn.rs` |
-| 2 | LLM request retry | Open, kernel-side (`piscis-kernel`) | Its "pinned v0.8.62" is stale: root `Cargo.toml` pins `v0.8.68`. `clawhub_get_with_retry` is unrelated to the agent LLM path |
-| 3 | Tool timeout returned to agent | Open, kernel-side | Not re-verified in this pass |
-| 4 | UAC prompt must not hard-fail | Open, partly host-side | Not re-verified in this pass |
-| 5 | CRLF multi-line `file_edit` | Resolved in Fix batch 5 ("fixed upstream"). The "Open" status in its own section is superseded | Resolved; kept for history |
-| 6 | Verification gap in this environment | Not re-verified in this pass | See section 6 |
-| 7 | Aborted turn drops plan continuity | Host part fixed; store still in-memory, no cross-restart durability | Not re-verified in this pass |
-| 8 | `plan_todo` stuck `in_progress` | Open; Fix batch 1 only surfaces the count | Not re-verified in this pass |
-| 21 / 22 | DeepSeek tool-call pairing and "think" compatibility | Status as recorded in their sections (Fix batch 7 landed an engine commit) | Not re-verified in this pass |
+| 1 | Whole-turn 600s timeout | **Resolved.** There is no default whole-turn cap any more: the turn is only bounded when the request sets `task_timeout_secs` (otherwise one year). A timeout returns partial output and the `timed_out` state | `src-tauri/src/commands/chat_turn/mod.rs` (`task_timeout_secs`, `turn_timeout_secs`), `post_turn.rs` |
+| 2 | LLM request retry | **Resolved (kernel).** The agent loop retries transient LLM failures with bounded exponential backoff and an interruptible sleep; permanent errors (auth, 4xx, balance) fail fast via `error_class::is_retryable` | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs` (`retry_backoff`), `src/llm/error_class.rs` |
+| 3 | Tool timeout returned to agent | **Resolved (kernel).** A per-tool timeout becomes a `ToolResult::err` fed back to the model; the turn continues | `loop_.rs` (`Tool '{}' timed out after {}s`) |
+| 4 | UAC prompt must not hard-fail | **Resolved (kernel).** The permission wait is bounded to 60 s and resolves as "denied"; an unanswered elevation dialog ends in a tool error (`Elevated command timed out ...`), not a turn failure | `loop_.rs` (permission `tokio::time::timeout(60s)`), `piscis-kernel/src/tools/elevate.rs` |
+| 5 | CRLF multi-line `file_edit` | **Resolved** (Fix batch 5; now in the vendored kernel) | `piscis-kernel/src/tools/file_write.rs` (`adapt_eol`, `eol_tests`) |
+| 6 | Verification gap in this environment | **Resolved** for the build machine: the 2026-09-30 audit built and ran the app with node/cargo/MSVC | See *Tool verification audit* |
+| 7 | Aborted turn drops plan continuity | **Partly open.** Host part fixed; the plan store (`new_plan_store()` in `state.rs`) is still in-memory, so open todos do not survive a restart | `src-tauri/src/state.rs` |
+| 8 | `plan_todo` stuck `in_progress` | **Open.** Open todos are counted (`open_todos`) and auto-continued, but never auto-marked `cancelled`/`pending` | `chat_turn/post_turn.rs` |
+| 21 | DeepSeek tool-call pairing | **Resolved (kernel).** `convert_messages` tracks `pending_tool_ids` | `piscis-kernel/src/llm/openai.rs` |
+| 22 | DeepSeek / "think" compatibility | **Partly resolved.** `is_deepseek_thinking_model` is case-insensitive and matches gateway-prefixed, `think` and `-r1` names; reasoning is still not shown in the UI | `piscis-kernel/src/llm/openai.rs` |
 
 Windows packaging target: see the README. Verified outputs are the NSIS `.exe`
 files uploaded by `.github/workflows/release.yml`.
@@ -30,6 +39,8 @@ files uploaded by `.github/workflows/release.yml`.
 ---
 
 ## 1. `agent turn failed: timed out after 600s` kills the whole turn
+
+**Status (2026-11-02).** **Resolved.** No default whole-turn cap remains (`chat_turn/mod.rs`: the cap applies only when `task_timeout_secs` is set), LLM retries and tool timeouts are handled per step in the kernel (#2, #3).
 
 **Status (2026-09-29).** Host-side portion **fixed** — see *Fix batch 1* at the end. Per-step recovery inside the agent loop (return the timeout to the model) is still kernel-side.
 
@@ -71,6 +82,8 @@ Only (3) should ever surface as a turn-level failure, and only after retries.
 
 ## 2. LLM request timeout should retry 3× before failing
 
+**Status (2026-11-02).** **Resolved in the vendored kernel.** `piscis-kernel/src/agent/loop_.rs` retries transient LLM errors with `retry_backoff` (1 s, 2 s, ...) and an interruptible sleep; `llm/error_class.rs` keeps auth/4xx/balance errors non-retryable.
+
 **Status (2026-09-29).** **Not fixable in this repo** — the LLM call lives in the external `piscis-kernel` crate. Requires an upstream `piscis-engine` change (retry wrapper); the host can only supply config.
 
 **Symptom.** An LLM HTTP read timeout bubbles straight up as a turn failure
@@ -100,9 +113,11 @@ fail fast (`AssistantPanel.tsx` already special-cases 402).
 
 ## 3. Tool call timeouts must be returned to the agent, not raised
 
+**Status (2026-11-02).** **Resolved in the vendored kernel.** On a per-tool timeout `loop_.rs` logs `Tool '<name>' timed out after <N>s` and returns a `ToolResult::err` (a Chinese-language message naming the tool and the timeout, with a hint to simplify or split the command) to the model instead of ending the turn. The body is a human-readable message, not the machine-readable JSON proposed below.
+
 **Status (2026-09-29).** **Kernel-side, still open.** Tool execution + the loop that feeds results back live in `piscis-kernel`; the host cannot intercept a tool timeout.
 
-**Symptom.** "有时是工具调用超时" — a tool call times out and the turn ends in
+**Symptom.** "Sometimes a tool call times out" — a tool call times out and the turn ends in
 error instead of the agent being told the tool timed out.
 
 **Expected behavior.** A tool timeout is a normal `tool_result` with
@@ -120,9 +135,11 @@ converting it into a turn failure.
 
 ## 4. Tool call that triggers a UAC prompt (no user response) must not hard-fail
 
+**Status (2026-11-02).** **Resolved in the vendored kernel.** The permission wait in `loop_.rs` is a `tokio::select!` over user cancel and a 60 s `tokio::time::timeout`; no answer resolves as "User denied this operation". The elevation tool (`tools/elevate.rs`) bounds the UAC wait by its `timeout_secs` and returns an error ("The user may have cancelled the UAC dialog ...") that becomes a tool error, not a turn failure.
+
 **Status (2026-09-29).** **Partly host-side, still open.** The host owns the `permission_responses` map (`interactive.rs`) and could add a bounded wait, but the actual elevation wait happens in the kernel/tool. Needs a kernel change plus a host-side timeout policy.
 
-**Symptom.** "甚至有时是工具调用触发UAC而用户没有响应" — a shell/tool call requests
+**Symptom.** "Sometimes a tool call even triggers UAC and the user does not respond" — a shell/tool call requests
 elevation, the Windows UAC dialog appears, the user does not answer it, and the
 turn errors out.
 
@@ -154,6 +171,8 @@ turn errors out.
 
 ## 5. Tooling: `file_edit` multi-line replacement fails on CRLF files
 
+**Status (2026-11-02).** **Resolved** — see Fix batch 5; the fix ships in the vendored kernel (`piscis-kernel/src/tools/file_write.rs`, `adapt_eol`).
+
 **Status (2026-09-29).** **Open** (tooling). Worked around again this session via a throwaway Python exact-once replacement script.
 
 **Symptom (observed while editing this repo).** `file_edit` with a multi-line
@@ -178,6 +197,8 @@ file's on-disk line ending. Until then, prefer single-line anchors or
 
 ## 6. Verification gap in this environment
 
+**Status (2026-09-30).** **Resolved** for the build machine — the *Tool verification audit* below ran a full `tauri dev` build with node, cargo and MSVC installed.
+
 **Probed (2026-09-29).** `node`, `npm`, `npx`, `cargo`, `rustc`, `rustup`,
 `cl`, `link`, `msbuild`, `winget`, `choco`, `scoop` are **all missing**. Present:
 `git` (`C:\Program Files\Git\cmd\git.exe`) and `python` (3.12). There is no
@@ -196,11 +217,13 @@ by real output.
 
 ## 7. Aborted turn (600s) drops plan/todo continuity for the next turn
 
+**Status (2026-11-02).** **Still partly open.** The plan store is still created by `new_plan_store()` in `src-tauri/src/state.rs` and held in memory; open todos are lost on restart.
+
 **Status (2026-09-29).** Host-side portion **fixed** — see *Fix batch 1*. The store is still in-memory; cross-restart durability is not addressed.
 
 **Symptom.** A turn dies from the 600s timeout while `plan_todo` items are still
 `pending` / `in_progress`. The UI shows the `plan_todo` tool note
-(*"请继续执行或将其标记为 cancelled … 只更新计划板，本身不算实际进展"*), but the next
+(*"Continue executing or mark them cancelled … updating the plan board alone does not count as real progress"*), but the next
 user message is handled as if that note were never delivered — the agent starts
 the new request and leaves the old todos dangling instead of deciding
 (continue / cancel / clarify).
@@ -248,6 +271,8 @@ shows it did not take effect after an abnormal termination.
 ---
 
 ## 8. Turn aborted mid-plan leaves `plan_todo` items `in_progress` forever
+
+**Status (2026-11-02).** **Still open.** `chat_turn/post_turn.rs` counts `pending`/`in_progress` items as `open_todos` and the CodeZ panel auto-continues, but no code flips them to `cancelled`/`pending` on abnormal turn end.
 
 **Status (2026-09-29).** **Open.** *Fix batch 1* surfaces the open-todo count but deliberately keeps the items open so the next-turn reconciliation can fire; auto-marking is not yet implemented.
 
@@ -363,10 +388,12 @@ because nothing here can be compiled), and reuses the existing queue/drain path.
 
 **Frontend** (`src/workspaces/codez/AssistantPanel.tsx`)
 - `agent_final` with `timed_out && open_todos > 0` enqueues a continuation turn
-  (bounded by `MAX_AUTO_RESUMES = 2`). Because the event can land before
+  (bounded by `MAX_AUTO_RESUMES = 2`; as of 1.0.40 the logic lives in
+  `src/workspaces/codez/useAssistantSession.ts`, `MAX_AUTO_RESUMES = 6`, and
+  resumes on any `timed_out` final event). Because the event can land before
   `busy=false` commits, it is pushed onto the existing `queueRef` and drained by
   the `finally` block — no new scheduling path.
-- `QueuedTurn.displayText` lets the bubble read *"（自动继续：上一轮超时）"* while the
+- `QueuedTurn.displayText` lets the bubble read *"(Auto-continue: previous turn timed out)"* while the
   model still receives the full directive (`chat.autoContinuePrompt`). All
   `setQueuedView` call sites now use the `queuedLabels()` helper.
 - The counter resets on every user-initiated submit, so the budget is per user
@@ -447,7 +474,7 @@ all live in the external `piscis-kernel` crate (`Cargo.toml:23-25`, pinned
 ## Fix batch 4 (2026-09-30) — pending `chat_ui` card leaked into a new session
 
 **Symptom.** A `chat_ui` form (e.g. the wizard from `plan_mode_ui` / any
-interactive tool) is on screen; clicking **＋** (CodeZ *New chat*) or **＋ 新建**
+interactive tool) is on screen; clicking **＋** (CodeZ *New chat*) or **＋ New**
 (WorkZ *New task*) shows the same form again in the brand-new, otherwise-empty
 session.
 
@@ -627,7 +654,7 @@ tools (below) is what makes an agent actually use them.
 ### 18. Every streamed token is rendered twice (fixed)
 
 **Symptom.** While a reply streams, each token appears twice
-(`消息消息输出输出时时…`). After the turn ends and the session is reloaded from the
+(`messagemessage outputoutput whenwhen…`, i.e. every token doubled). After the turn ends and the session is reloaded from the
 DB the text is correct.
 
 **Root cause.** The DB copy is right, so the backend emits each `text_delta`
@@ -677,7 +704,9 @@ when collapsed; click to expand full input/output. Applied to CodeZ
 reload from the DB the history shows text only (same as before). Persisting
 per-message tool trace is a follow-up.
 
-### 21. DeepSeek: `tool_call_ids did not have response messages` (open — kernel)
+### 21. DeepSeek: `tool_call_ids did not have response messages` (resolved — kernel)
+
+**Status (2026-11-02).** **Resolved.** The Fix batch 7 change is in the vendored kernel: `convert_messages` in `piscis-kernel/src/llm/openai.rs` uses a `pending_tool_ids` set.
 
 **Error.** `An assistant message with 'tool_calls' must be followed by tool
 messages responding to each 'tool_call_id'. The following tool_call_ids did not
@@ -712,7 +741,9 @@ DeepSeek uses the OpenAI-compatible client of `piscis-kernel`
 4. Synthesize the missing replies on turn cancel/timeout too (this repo's new
    `timed_out` path leaves half-finished calls in history).
 
-### 22. DeepSeek / "think" compatibility audit (open — kernel)
+### 22. DeepSeek / "think" compatibility audit (partly resolved — kernel)
+
+**Status (2026-11-02).** Model matching is fixed in the vendored kernel (`is_deepseek_thinking_model` lowercases and matches `deepseek` + `v4` / `reasoner` / `think` / `-r1` / `deepseek-flash`; a provider that demands `reasoning_content` replay disables thinking and retries once). Showing reasoning in the UI was not re-verified.
 
 - `is_deepseek_thinking_model()` matches only `deepseek-v4*` and
   `deepseek-reasoner`. Thinking-capable DeepSeek models reached through other

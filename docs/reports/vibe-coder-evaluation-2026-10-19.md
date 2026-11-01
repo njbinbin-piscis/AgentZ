@@ -1,163 +1,169 @@
-# AgentZ 0.9.19 评估报告：Vibe Coding 程序员视角
+# AgentZ 0.9.19 Evaluation: A Vibe-Coding Programmer's Perspective
 
-日期：2026-10-19。评估对象：`main` 分支 0.9.19（提交 `1b17637`）。
+**English** | [简体中文](vibe-coder-evaluation-2026-10-19.zh-CN.md)
 
-## 0. 评估方式与边界
+Date: 2026-10-19. Subject: `main` branch 0.9.19 (commit `1b17637`).
 
-- 视角：一名以"用自然语言驱动 AI 写代码"为主要工作方式的程序员。日常对比对象是 Cursor、Claude Code、Codex、Windsurf。关心的是：多快能跑起第一个任务、AI 改代码是否可控、出错时能不能快速回滚、界面是否让人专注于"说需求—看 diff—接受"这个循环。
-- 依据：README、CHANGELOG、`docs/upgrade/acceptance-0.9.12.md` 验收清单、`src/` 前端源码与 `src-tauri/src/commands/` 后端命令清单的静态阅读。
-- 未做：没有在安装包上实际运行和截图。界面结论来自代码结构和发布记录，凡涉及"手感"的判断都应在真机走查后修正。
+> **Status (2026-11-02, AgentZ 1.0.40):** This is a dated evaluation; its conclusions are kept. Since then: a user-facing command palette / quick open now exists (`src/workspaces/codez/CommandPalette.tsx`, bound in `useCodezShortcuts.ts` to Ctrl/Cmd+P for files and Ctrl/Cmd+Shift+P for commands); hard-coded Chinese literals in `.tsx` files are gone (0 found outside tests); the giant `codez/index.tsx`, `workz/index.tsx` and `AssistantPanel.tsx` components have been split (`App.tsx` has grown instead); and the ledger (`docs/upgrade/plan.json`) marks the dirty-buffer conflict (AZ-041), human-edit feedback (AZ-037) and the E2E gate (AZ-056) as `done`. Still open: code signing (AZ-064), multi-agent team isolation/budget/benefit evidence (AZ-070/071/075), and real remote reconnect (AZ-045) — all `deferred`. Ledger `done` items were not natively re-verified for this note.
 
-## 1. 一句话结论
+## 0. Method and scope
 
-AgentZ 的**功能野心和底层能力已经达到第一梯队 AI IDE 的广度**，在"任务隔离（worktree）+ 多 Agent 团队 + 代码图谱/仓库记忆"这条线上甚至比主流产品更激进；但**对 vibe coder 最关键的"开箱即用、快速可信的单人改码循环"还没打磨到位**：没有通过验收门禁、安装包未签名、缺少 Ctrl+P / 命令面板这类肌肉记忆入口、首用引导没有经过真实用户走查。现阶段适合愿意折腾的早期用户，不适合作为主力 IDE 直接替换 Cursor。
+- Perspective: a programmer whose main way of working is "driving AI to write code in natural language". Day-to-day comparisons are Cursor, Claude Code, Codex and Windsurf. What matters: how fast you can run your first task, whether AI code changes are controllable, whether you can roll back quickly when things go wrong, and whether the UI keeps you focused on the "state the requirement → look at the diff → accept" loop.
+- Basis: static reading of README, CHANGELOG, the `docs/upgrade/acceptance-0.9.12.md` acceptance checklist, frontend source in `src/`, and the backend command list in `src-tauri/src/commands/`.
+- Not done: no actual run or screenshots on an installer. UI conclusions come from code structure and release records; any judgement about "feel" should be revised after a hands-on walkthrough.
 
-综合打分（10 分制，越高越好）：
+## 1. One-line conclusion
 
-| 维度 | 分数 |
+AgentZ's **feature ambition and underlying capabilities already match the breadth of first-tier AI IDEs**, and on the "task isolation (worktree) + multi-agent teams + code graph/repo memory" line it is even more aggressive than mainstream products; but **what matters most to a vibe coder — an "out-of-the-box, quickly trustworthy single-person code-change loop" — is not polished yet**: it has not passed the acceptance gate, the installer is unsigned, muscle-memory entry points like Ctrl+P / a command palette are missing, and first-run onboarding has not been walked through by real users. For now it suits early adopters who like to tinker, not replacing Cursor as a main IDE.
+
+> *Status (2026-11-02):* Ctrl+P / command palette — fixed (see above). Acceptance gate — AZ-056 `done` in the ledger. Unsigned installer — still open (AZ-064 `deferred`). First-run walkthrough with real users — not verified.
+
+Overall scores (out of 10, higher is better):
+
+| Dimension | Score |
 |---|---|
-| 功能广度 | 9 |
-| AI 改码循环（提需求 → diff → 接受/回滚） | 7 |
-| 任务隔离与并行 | 8.5 |
-| 上下文与代码理解 | 8 |
-| 界面一致性与美观 | 6 |
-| 首用体验 | 5 |
-| 稳定性与可信度 | 4.5 |
-| 可扩展性 | 7.5 |
+| Feature breadth | 9 |
+| AI code-change loop (request → diff → accept/roll back) | 7 |
+| Task isolation and parallelism | 8.5 |
+| Context and code understanding | 8 |
+| UI consistency and look | 6 |
+| First-run experience | 5 |
+| Stability and trustworthiness | 4.5 |
+| Extensibility | 7.5 |
 
-## 2. 产品形态：CodeZ + WorkZ 双模式
+## 2. Product shape: CodeZ + WorkZ dual mode
 
-AgentZ 把一个桌面应用拆成两种工作方式：
+AgentZ splits one desktop app into two ways of working:
 
-- **CodeZ**：以编辑器为中心，对标 Cursor。Monaco 编辑器、文件树、Git、终端、内置浏览器、LSP/DAP，右侧是 AI 对话，支持 `@文件`、`@codebase`、`@graph`，Ctrl/⌘+K 行内编辑，Tab ghost text 补全。
-- **WorkZ**：以任务为中心，对标 Codex。每个任务一个 git worktree 和分支，可以并行跑多个 Agent，结束后评审 diff、合并或开 PR。
+- **CodeZ**: editor-centred, comparable to Cursor. Monaco editor, file tree, Git, terminal, built-in browser, LSP/DAP, AI chat on the right, supporting `@file`, `@codebase`, `@graph`, Ctrl/⌘+K inline edit, Tab ghost-text completion.
+- **WorkZ**: task-centred, comparable to Codex. Each task gets a git worktree and branch, multiple agents can run in parallel, and afterwards you review the diff, merge, or open a PR.
 
-**vibe coder 的感受：**
+**How it feels to a vibe coder:**
 
-- 优点：这个划分正好对应 vibe coding 的两种状态——"我盯着改"和"我丢给 AI 跑，回头验收"。0.9.15 起两种模式共享同一个项目和会话数据库，在 WorkZ 点 CodeZ 发起的会话可以直接续聊，这一点做得对，避免了"两个产品拼在一起"的割裂感。
-- 风险：新用户第一次打开时需要先理解"我该进哪个模式"。目前没有看到明确的模式选择引导，容易两边都点一下然后迷路。
+- Pro: the split maps exactly onto the two states of vibe coding — "I'm watching it change things" and "I hand it to the AI and check back later". Since 0.9.15 both modes share the same project and session database, so a session started in CodeZ can be continued directly from WorkZ. This is the right call and avoids the "two products glued together" feeling.
+- Risk: a new user opening it for the first time has to figure out "which mode should I go into". No explicit mode-selection guidance was found, so it's easy to click into both and get lost.
 
-## 3. 功能评估
+## 3. Feature evaluation
 
-### 3.1 AI 改码循环（最核心）
+### 3.1 AI code-change loop (the core)
 
-| 能力 | 现状 | 评价 |
+| Capability | Current state | Assessment |
 |---|---|---|
-| 对话改码 | 有，多模型（Anthropic、OpenAI、DeepSeek、通义、MiniMax、智谱、Kimi 及任意 OpenAI 兼容端点） | 国产模型覆盖是相对 Cursor 的明显优势，对国内开发者友好 |
-| 行内编辑 Ctrl+K | 有，inline diff，Enter 接受、Esc 撤销 | 交互与 Cursor 对齐，迁移成本低 |
-| Tab 补全 | 有 ghost text | 补全质量和延迟需真机实测，这是 vibe coder 最敏感的指标 |
-| 会话分叉 / 检查点 | 有，0.9.16 修了分叉命名 | 很有价值，"这条路走歪了，回到检查点换个说法"正是 vibe coding 的日常 |
-| 计划模式 | 有 `chat_plan`、`DurablePlanActions` | 适合大改动先对齐思路 |
-| 脏缓冲与外部改动冲突 | 验收项 UT-012 未验证 | **高风险**：如果 Agent 改文件时覆盖了我没保存的编辑，信任会立刻崩塌 |
-| 暂停任务后人工编辑反馈给 Agent | UT-008 未实现 | 对"AI 写一半我手动修一下再让它继续"这个高频场景是缺口 |
+| Chat-driven code changes | Yes, multi-model (Anthropic, OpenAI, DeepSeek, Qwen (Tongyi), MiniMax, Zhipu, Kimi and any OpenAI-compatible endpoint) | Coverage of Chinese models is a clear advantage over Cursor and friendly to developers in China |
+| Inline edit Ctrl+K | Yes, inline diff, Enter to accept, Esc to undo | Interaction matches Cursor, low migration cost |
+| Tab completion | Ghost text | Completion quality and latency need hands-on testing; this is the metric vibe coders are most sensitive to |
+| Session fork / checkpoints | Yes; 0.9.16 fixed fork naming | Very valuable — "this path went wrong, go back to a checkpoint and rephrase" is daily vibe coding |
+| Plan mode | Yes: `chat_plan`, `DurablePlanActions` | Good for aligning on approach before big changes. *(2026-11-02: plan mode exists — `src/services/tauri/chatPlan.ts`, `src-tauri/src/runtime/durable_plan.rs` — but no `DurablePlanActions` symbol was found in current code.)* |
+| Dirty buffer vs. external change conflict | Acceptance item UT-012 unverified | **High risk**: if the agent overwrites my unsaved edits when changing a file, trust collapses immediately. *(2026-11-02: ledger AZ-041 `done`; `editorConflict.ts` + tests exist; not re-verified natively.)* |
+| Human edits after pausing a task fed back to the agent | UT-008 not implemented | A gap for the frequent "AI writes half, I fix it by hand, then let it continue" scenario. *(2026-11-02: ledger AZ-037 `done`.)* |
 
-### 3.2 任务隔离与并行（WorkZ）
+### 3.2 Task isolation and parallelism (WorkZ)
 
-- 每任务独立 worktree（`../.agentz-worktrees/task-<id>`）+ 分支 `workz/task-<id>`，结束后 `base...branch` diff、no-ff 合并或 `gh` 开 PR。这是目前让 AI "放手去改"最安全的方式，**是 AgentZ 最值得宣传的卖点**。
-- 团队模板（`fullstack-squad`、`research-duo`）和内置角色（Architect、Coder、Reviewer 等）概念很好，但验收清单里 UT-040/041/045（成员环境隔离、团队预算、多 Agent 相对收益）都是"未开始/无数据"。也就是说：**多 Agent 目前更像演示能力，还不能证明比单 Agent 更快更省钱**。建议默认关闭团队模式，直到有对照数据。
-- 交付评审（`DeliveryReviewPanel`、`AgentTaskReview`）有组件和测试，0.9.19 还能按"被引用次数"排序改动文件，评审大 diff 时有用。
+- Each task has its own worktree (`../.agentz-worktrees/task-<id>`) + branch `workz/task-<id>`; afterwards a `base...branch` diff, a no-ff merge, or a PR via `gh`. This is currently the safest way to let AI "go ahead and change things", and **is AgentZ's most marketable selling point**. *(Paths confirmed in `crates/agentz-task-state/src/cleanup.rs`.)*
+- Team templates (`fullstack-squad`, `research-duo`) and built-in roles (Architect, Coder, Reviewer, etc.) are good concepts, but UT-040/041/045 in the acceptance checklist (member environment isolation, team budget, relative multi-agent benefit) are all "not started / no data". In other words: **multi-agent is currently more of a demo capability and cannot yet show it is faster or cheaper than a single agent**. Recommend team mode be off by default until there is comparison data. *(2026-11-02: still open — AZ-070/071/075 `deferred`.)*
+- Delivery review (`DeliveryReviewPanel`, `AgentTaskReview`) has components and tests, and 0.9.19 can also sort changed files by "reference count", which helps when reviewing big diffs. *(2026-11-02: `src/workspaces/workz/AgentTaskReview.tsx` + test exist; no `DeliveryReviewPanel` component was found in current code.)*
 
-### 3.3 上下文与代码理解
+### 3.3 Context and code understanding
 
-- 代码图谱：Tree-sitter 符号、调用边、PageRank 排枢纽文件，还能把前端 `invoke` 连到 Rust `#[tauri::command]`。对 Tauri 项目非常对口。
-- 仓库记忆 `.agentz/REPO_MEMORY.md`：记录不变量和坑，引用行被修改后自动标为过期。这个设计比单纯的 rules 文件聪明，解决了"规则写了但代码早变了"的问题。
-- 双轨 Wiki（快速架构 Wiki + 增量 DeepWiki）、本地向量 + 关键词混合记忆。
-- 兼容 `.cursor/rules/`，从 Cursor 迁过来的规则能直接用，迁移友好。
+- Code graph: Tree-sitter symbols, call edges, PageRank to rank hub files, and it can even link frontend `invoke` calls to Rust `#[tauri::command]`. Very well suited to Tauri projects.
+- Repository memory `.agentz/REPO_MEMORY.md`: records invariants and pitfalls, and lines it cites are automatically marked stale when modified. This design is smarter than a plain rules file and solves "the rule was written but the code has long since changed". *(Tool at `src-tauri/src/tools/repo_memory.rs`; the exact file name was not confirmed in Rust code.)*
+- Dual-track wiki (fast architecture wiki + incremental DeepWiki), local vector + keyword hybrid memory.
+- Compatible with `.cursor/rules/`, so rules migrated from Cursor work as-is — migration-friendly.
 
-**评价**：这一块的设计水平高于平均。但功能越多，Agent 每轮塞进上下文的东西越多，需要关注 token 消耗和首字延迟。界面上应该能看到"这轮用了哪些上下文、花了多少"——`BudgetObservation` 组件已经存在，方向正确。
+**Assessment**: the design level here is above average. But the more features there are, the more each agent turn stuffs into context, so token consumption and time-to-first-token deserve attention. The UI should show "which context this turn used and what it cost" — the `BudgetObservation` component already exists, which is the right direction. *(2026-11-02: no `BudgetObservation` symbol found in current code; `src/components/ContextUsageRing.tsx` shows total context usage.)*
 
-### 3.4 工程环境
+### 3.4 Engineering environment
 
-- 内置终端（xterm + PTY）、Git 面板、LSP、DAP 调试、内置浏览器（RobotZ）、自动检测 Rust/Node/Python/Go/Java/.NET/C++ 等工具链（`devenv`）。
-- 远程开发：SSH / Dev Container / Docker / WSL，自动部署 agentz-server，自动端口转发。主机密钥变更会拒绝连接，安全默认值合理。但真实远程断连恢复（UT-015）没验证过。
-- 扩展：自研的 VS Code 兼容扩展宿主，从 Open VSX 或 `.vsix` 安装。接通面很广（命令、补全、诊断、树视图、Webview、调试、测试……），但**还没有一份真实扩展兼容档案**（UT-016）。vibe coder 装上常用的 ESLint、Prettier、Tailwind IntelliSense 能不能用，是决定能否当主力 IDE 的关键。
+- Built-in terminal (xterm + PTY), Git panel, LSP, DAP debugging, built-in browser (RobotZ), automatic detection of Rust/Node/Python/Go/Java/.NET/C++ and other toolchains (`devenv`).
+- Remote development: SSH / Dev Container / Docker / WSL, auto-deploys agentz-server, automatic port forwarding. A host key change rejects the connection — a sensible secure default. But real remote disconnect recovery (UT-015) has not been verified. *(2026-11-02: still open — AZ-045 `deferred`.)*
+- Extensions: a home-grown VS Code-compatible extension host, installing from Open VSX or `.vsix`. The wired surface is broad (commands, completion, diagnostics, tree views, Webview, debugging, testing…), but **there is no compatibility profile for real extensions yet** (UT-016). Whether a vibe coder's everyday ESLint, Prettier and Tailwind IntelliSense work is key to whether it can be a main IDE. *(2026-11-02: ledger AZ-046 `done`.)*
 
-### 3.5 外围能力
+### 3.5 Peripheral capabilities
 
-技能市场（ClawHub）、Hooks、MCP（stdio/SSE）、工作流设计器、定时自动化、飞书/微信/钉钉网关、连接器 OAuth、桌面控制 `app_control`。
+Skill marketplace (ClawHub), Hooks, MCP (stdio/SSE), workflow designer, scheduled automation, Feishu/WeChat/DingTalk gateways, connector OAuth, desktop control `app_control`.
 
-**评价**：广度惊人，但对 vibe coder 来说大部分是"知道有，暂时不用"。问题在于这些入口都堆在设置里，会稀释核心体验（见 4.3）。验收清单里这一组大量处于 deferred / pending。
+**Assessment**: astonishing breadth, but for a vibe coder most of it is "good to know, not using it yet". The problem is that these entry points are all piled into Settings, diluting the core experience (see 4.3). Many items in this group in the acceptance checklist are deferred / pending.
 
-## 4. 界面评估
+## 4. UI evaluation
 
-> 以下来自源码结构阅读，未经真机截图核对。
+> The following comes from reading the source structure and was not checked against real screenshots.
 
-### 4.1 布局与信息架构
+### 4.1 Layout and information architecture
 
-- CodeZ 是标准的"活动栏 + 侧栏 + 编辑区 + 底部面板 + 右侧 AI 面板 + 状态栏"，对 VS Code / Cursor 用户零学习成本。
-- WorkZ 是"会话侧栏 + 对话流 + 产物抽屉 + 协作板"。0.9.18 把对话气泡改成按栏宽比例（Agent 回复占 80%），大屏下阅读体验更好；Mermaid 随气泡缩放。
-- 0.9.13 移除了重复聊天面板、0.9.12 移除了对话里的"工作目录/配置详情/开始第一个任务"说明面板——方向正确：**vibe coder 要的是干净的对话区，不是教程卡片**。
+- CodeZ is the standard "activity bar + sidebar + editor area + bottom panel + right-side AI panel + status bar" — zero learning cost for VS Code / Cursor users.
+- WorkZ is "session sidebar + conversation stream + artifact drawer + collaboration board". 0.9.18 made chat bubbles proportional to column width (agent replies take 80%), improving reading on large screens; Mermaid scales with the bubble.
+- 0.9.13 removed the duplicate chat panel, and 0.9.12 removed the "working directory / configuration details / start your first task" explainer panels from the conversation — the right direction: **a vibe coder wants a clean conversation area, not tutorial cards**.
 
-### 4.2 一致性与主题
+### 4.2 Consistency and theming
 
-- 0.9.16 才修掉一批面板在浅色主题下仍是硬编码深色背景的问题（远程连接、项目模板、任务评审、技能修订面板）。
-- 静态统计：`src/` CSS 中有约 750 处十六进制颜色字面量，只有约 150 处使用 `var(--…)` 主题变量；组件里还有若干内联 `style={{…}}`。这意味着主题问题大概率还会继续冒出来。建议把颜色全部收敛到设计 token。
-- 前端 `.tsx` 中约有 185 行直接包含中文字面量，绕过了 i18n。切到英文界面时可能出现中英混杂（UT-017 也提到了中英语义一致性未走查）。
+- Only in 0.9.16 was a batch of panels fixed that still had hard-coded dark backgrounds in the light theme (remote connection, project templates, task review, skill revision panels).
+- Static count: CSS under `src/` had about 750 hex colour literals and only about 150 uses of `var(--…)` theme variables; components also had several inline `style={{…}}`. This means theming issues are likely to keep popping up. Recommend converging all colours onto design tokens. *(2026-11-02, partially fixed: a line-count recount finds ~1,150 lines with hex literals vs ~1,500 lines using `var(--` in `src/**/*.css`; counting method differs from the original, but variables now outnumber literals.)*
+- About 185 lines in frontend `.tsx` files contained Chinese literals directly, bypassing i18n. Switching to the English UI may show mixed Chinese/English (UT-017 also notes Chinese/English semantic consistency has not been walked through). *(2026-11-02: fixed — no Han-character literals found in non-test `.tsx` files.)*
 
-### 4.3 效率入口（vibe coder 最在意）
+### 4.3 Efficiency entry points (what vibe coders care about most)
 
-- **没找到面向用户的命令面板（Ctrl+Shift+P）和快速打开文件（Ctrl+P）**。代码里只有供扩展调用的 `QuickPick`。对习惯键盘流的程序员这是最明显的缺口，优先级应高于大部分外围功能。
-- 设置面板 `SettingsPanel.tsx` 约 43KB，下挂助手、规则、Hooks、工作流设计器、远程、诊断、应用变更等十几个分区。功能都在，但"我只想换个模型"要穿过很多东西。建议把"模型与密钥"做成顶层快捷入口，比如状态栏点击切换模型。
-- 键盘可达性：已有 BottomPanel 键盘测试，但整体键盘走查（UT-017）未做；前端 `aria-` 属性约 66 处，无障碍属于起步阶段。
+- **No user-facing command palette (Ctrl+Shift+P) or quick file open (Ctrl+P) was found.** The code only had a `QuickPick` for extensions. For keyboard-driven programmers this is the most obvious gap, and it should be prioritised above most peripheral features. *(2026-11-02: fixed — `src/workspaces/codez/CommandPalette.tsx` (files mode and `>` commands mode, with tests), bound in `src/workspaces/codez/useCodezShortcuts.ts`.)*
+- The settings panel `SettingsPanel.tsx` is about 43KB and hosts a dozen-plus sections: assistant, rules, Hooks, workflow designer, remote, diagnostics, app changes, etc. Everything is there, but "I just want to switch model" means wading through a lot. Recommend making "models and keys" a top-level shortcut, e.g. click the status bar to switch model. *(2026-11-02: `src/workspaces/codez/SettingsPanel.tsx` is now ~55KB — still open.)*
+- Keyboard accessibility: there are BottomPanel keyboard tests, but the overall keyboard walkthrough (UT-017) has not been done; the frontend has about 66 `aria-` attributes, so accessibility is at an early stage.
 
-### 4.4 状态反馈
+### 4.4 Status feedback
 
-- 0.9.16、0.9.17 修了停止按钮转圈、会话 LED 不停闪烁这类问题，说明团队在意"运行中/已停止"状态的准确性，这一点很重要。
-- 运行中的"阻塞原因、最近动作、预算"三项信息（UT-011）有候选实现，未经用户走查。
+- 0.9.16 and 0.9.17 fixed issues like the stop button spinning forever and the session LED blinking constantly, showing the team cares about the accuracy of "running / stopped" state — which matters a lot.
+- The three pieces of in-run information — "blocking reason, latest action, budget" (UT-011) — have a candidate implementation not yet walked through with users.
 
-## 5. 稳定性与可信度
+## 5. Stability and trustworthiness
 
-这是目前最大的短板，也是 vibe coder 是否敢把真项目交给它的决定因素：
+This is currently the biggest weakness, and the deciding factor in whether a vibe coder dares to hand it a real project:
 
-1. **0.9.12 到 0.9.19 连续 8 个版本均注明"未通过上线验收门禁"**，46 个验收项未完成，端到端门禁（UT-026）没有执行。
-2. **安装包未签名**，Windows SmartScreen 会拦截；macOS/Linux 没在真机上跑过。
-3. 两天内发了 7 个版本（10-18 到 10-19），迭代速度快，但单版本改动量小、修的多是 UI 回归，说明缺少自动化 UI 回归保护。
-4. 长任务内存增长（UT-030）、资源残留（UT-027）、数据迁移与备份恢复（UT-033）都没验证。对需要连续跑几小时 Agent 的 vibe coder，这些都是实际风险。
-5. 前端几个核心文件偏大：`workz/index.tsx` 约 77KB（46 个 `useState`）、`codez/index.tsx` 约 66KB、`AssistantPanel.tsx` 约 59KB、`App.tsx` 约 46KB。状态集中在巨型组件里，正是"修 A 坏 B"类 UI 回归的温床。
+1. **Eight consecutive versions from 0.9.12 to 0.9.19 state "did not pass the release acceptance gate"**, 46 acceptance items are unfinished, and the end-to-end gate (UT-026) has not been run. *(2026-11-02: ledger AZ-056 `done`; 65 of 83 ledger items `done`, 18 `deferred`.)*
+2. **The installer is unsigned**, so Windows SmartScreen blocks it; macOS/Linux have not been run on real machines. *(2026-11-02: still open — AZ-064 `deferred`; AZ-058 status not checked.)*
+3. Seven versions shipped in two days (10-18 to 10-19). Iteration is fast, but each version changes little and mostly fixes UI regressions, indicating a lack of automated UI regression protection.
+4. Long-task memory growth (UT-030), leftover resources (UT-027), and data migration and backup/restore (UT-033) are all unverified. For vibe coders who run agents for hours at a time, these are real risks. *(2026-11-02: ledger AZ-060 and AZ-063 `done`.)*
+5. Several core frontend files are large: `workz/index.tsx` about 77KB (46 `useState`), `codez/index.tsx` about 66KB, `AssistantPanel.tsx` about 59KB, `App.tsx` about 46KB. State concentrated in giant components is the breeding ground for "fix A, break B" UI regressions. *(2026-11-02, partially fixed: `workz/index.tsx` ~11KB, `codez/index.tsx` ~24KB, `AssistantPanel.tsx` ~12KB; but `App.tsx` grew to ~58KB.)*
 
-正面因素：前端已有 51 个测试文件，安全默认值（主机密钥、令牌加密、诊断脱敏）设计认真，CHANGELOG 对"已知限制"的披露很诚实。
+Positives: the frontend already has 51 test files, secure defaults (host keys, token encryption, diagnostic redaction) are carefully designed, and the CHANGELOG is honest in disclosing "known limitations". *(2026-11-02: 69 test files under `src/`.)*
 
-## 6. 与主流产品的对比
+## 6. Comparison with mainstream products
 
-| 维度 | AgentZ | Cursor | Claude Code / Codex |
+| Dimension | AgentZ | Cursor | Claude Code / Codex |
 |---|---|---|---|
-| 编辑器体验 | Monaco，接近 VS Code | VS Code 分支，成熟 | 无，终端或网页 |
-| 行内编辑 / Tab | 有，需实测 | 业界标杆 | 无 |
-| 并行任务隔离 | worktree，原生支持 | 后台 Agent | Codex 云端沙箱 |
-| 多 Agent 团队 | 有，未证明收益 | 弱 | 子 Agent |
-| 国产模型 | 原生覆盖 | 有限 | 无 |
-| 代码图谱 / 仓库记忆 | 强 | 索引 + rules | CLAUDE.md |
-| 扩展生态 | 自研兼容层，未建档 | 完整 VS Code 生态 | MCP |
-| 稳定性 | 未过门禁 | 成熟 | 成熟 |
-| 本地 / 开源 | Apache-2.0，本地 | 闭源 | 闭源 |
+| Editor experience | Monaco, close to VS Code | VS Code fork, mature | None; terminal or web |
+| Inline edit / Tab | Yes, needs hands-on testing | Industry benchmark | None |
+| Parallel task isolation | worktree, native support | Background agents | Codex cloud sandbox |
+| Multi-agent teams | Yes, benefit unproven | Weak | Sub-agents |
+| Chinese models | Native coverage | Limited | None |
+| Code graph / repo memory | Strong | Index + rules | CLAUDE.md |
+| Extension ecosystem | Home-grown compat layer, no profiles | Full VS Code ecosystem | MCP |
+| Stability | Has not passed the gate | Mature | Mature |
+| Local / open source | Apache-2.0, local | Closed source | Closed source |
 
-**差异化定位**：开源、本地、国产模型友好、worktree 并行、仓库记忆。这几点组合起来，在市场上是有独特位置的。
+**Differentiated positioning**: open source, local, friendly to Chinese models, worktree parallelism, repository memory. Combined, these give it a unique place in the market.
 
-## 7. 改进建议（按 vibe coder 收益排序）
+## 7. Recommendations (ordered by benefit to vibe coders)
 
-**P0：先让单人改码循环可信**
+**P0: make the single-person code-change loop trustworthy first**
 
-1. 补齐 Ctrl+P 快速打开和 Ctrl+Shift+P 命令面板。
-2. 验证并修好脏缓冲冲突（UT-012）：Agent 绝不能覆盖未保存的编辑。
-3. 每个 Agent 回合一键整体回滚（不只是会话检查点，还要回滚文件）。
-4. 跑通端到端门禁（UT-026），至少覆盖"打开项目 → 对话改码 → 接受 diff → 提交"这条主路径，阻止 UI 回归继续逐版本出现。
-5. 代码签名，消除首次安装的系统拦截。
+1. Add Ctrl+P quick open and a Ctrl+Shift+P command palette. *(2026-11-02: done.)*
+2. Verify and fix the dirty-buffer conflict (UT-012): the agent must never overwrite unsaved edits. *(2026-11-02: ledger AZ-041 `done`.)*
+3. One-click rollback of an entire agent turn (not just session checkpoints, but also file rollback).
+4. Get the end-to-end gate (UT-026) running, covering at least the main path "open project → chat-driven change → accept diff → commit", to stop UI regressions recurring release after release. *(2026-11-02: ledger AZ-056 `done`.)*
+5. Code signing, to eliminate system blocking on first install. *(2026-11-02: open — AZ-064 `deferred`.)*
 
-**P1：降低首用门槛**
+**P1: lower the first-run barrier**
 
-6. 首次启动三步引导：选模型并填密钥 → 打开项目 → 跑一个示例任务（UT-036），并做 5 人走查。
-7. 状态栏直接切换模型并显示本轮 token 和费用。
-8. 用一句话和示意图说明 CodeZ 与 WorkZ 的区别，首次进入时让用户选。
+6. A three-step first-launch guide: choose a model and enter a key → open a project → run a sample task (UT-036), plus a 5-person walkthrough.
+7. Switch models directly from the status bar and show this turn's tokens and cost.
+8. Explain the difference between CodeZ and WorkZ in one sentence and a diagram, and let users choose on first entry.
 
-**P2：收敛与打磨**
+**P2: converge and polish**
 
-9. 颜色全部收敛到主题 token；清理 `.tsx` 里的中文字面量，交给 i18n。
-10. 拆分四个巨型组件，把状态下沉到 store。
-11. 建立前 10 个常用扩展的兼容档案（ESLint、Prettier、GitLens、Tailwind、Python、rust-analyzer 等）。
-12. 多 Agent 团队、网关、桌面控制等未验证能力在界面上标注 Beta，默认折叠，避免稀释核心体验。
+9. Converge all colours onto theme tokens; clean Chinese literals out of `.tsx` and hand them to i18n. *(2026-11-02: Chinese literals done; colour tokens partially.)*
+10. Split the four giant components and push state down into stores. *(2026-11-02: three of four split; `App.tsx` still large.)*
+11. Build compatibility profiles for the top 10 common extensions (ESLint, Prettier, GitLens, Tailwind, Python, rust-analyzer, etc.).
+12. Label unverified capabilities such as multi-agent teams, gateways and desktop control as Beta in the UI and collapse them by default, to avoid diluting the core experience.
 
-## 8. 给潜在用户的建议
+## 8. Advice for prospective users
 
-- **适合**：想要开源本地 AI IDE、主要用国产模型、喜欢用 worktree 让 AI 并行试几种方案、愿意反馈 bug 的早期用户。
-- **暂不适合**：需要稳定主力 IDE、依赖大量 VS Code 扩展、在 macOS/Linux 上工作、或在公司受管设备上无法安装未签名软件的开发者。
-- **推荐用法**：先把 WorkZ 当作"安全沙箱里的 AI 外包"，在独立 worktree 里让它做功能或重构，自己在评审面板验收后再合并；日常手写代码暂时继续用熟悉的编辑器。
+- **Good fit**: early adopters who want an open-source local AI IDE, mainly use Chinese models, like using worktrees to let AI try several approaches in parallel, and are willing to report bugs.
+- **Not yet a fit**: developers who need a stable main IDE, depend on many VS Code extensions, work on macOS/Linux, or cannot install unsigned software on company-managed devices.
+- **Recommended usage**: treat WorkZ as "AI outsourcing in a safe sandbox" first — let it build features or refactor in an isolated worktree, accept the result in the review panel yourself, then merge; for day-to-day hand-written code, keep using your familiar editor for now.

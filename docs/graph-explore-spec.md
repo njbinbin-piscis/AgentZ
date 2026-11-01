@@ -1,14 +1,16 @@
-# graph_explore — 自研规格（参照 CodeGraph）
+# graph_explore — In-house Specification (modelled on CodeGraph)
 
-> 参照项目：[colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) v1.1.1  
-> 对照样本：AgentZ 仓库 `codegraph init` 索引（464 文件 · 7691 符号）  
-> 状态：**Phase 0 实现中**（file 级 + 源码片段 + blast radius）；Phase 1 起 tree-sitter 符号
+**English** | [简体中文](graph-explore-spec.zh-CN.md)
+
+> Reference project: [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) v1.1.1  
+> Comparison sample: `codegraph init` index of the AgentZ repository (464 files · 7691 symbols)  
+> Status (verified against the code 2026-11-02, AgentZ 1.0.40): **Phase 0 shipped and most of Phase 1 shipped** — file-level index + source snippets + blast radius, plus tree-sitter AST symbols, `calls` / `ipc_calls` edges, per-file incremental sync and a staleness banner. Connect-time reconciliation, framework route edges beyond Tauri IPC, and the Dashboard reading `graph.db` (Phases 2–3) are not implemented.
 
 ---
 
-## 1. 为什么要做
+## 1. Why
 
-CodeGraph 在 AgentZ 上的实测（2026-06）：
+CodeGraph measured on AgentZ (2026-06):
 
 ```bash
 codegraph explore "search_graph graph_agent AGENT_CODING_BRIEF"
@@ -16,24 +18,24 @@ codegraph node graph_context_block
 codegraph callers search_graph
 ```
 
-| 能力 | CodeGraph | AgentZ `graph_search`（旧） |
-|------|-----------|---------------------------|
-| 返回带行号源码 | 是（verbatim，等同 Read） | 否 |
-| 符号粒度 | function / method / import … | file / module |
-| Blast radius | 谁依赖、改前注意 | 仅 importers 列表 |
-| Call path | call 边 + 动态 dispatch 提示 | import 边 id 列表 |
-| 存储 | `.codegraph/graph.db` SQLite FTS | `.agentz/graph.json` 全量 JSON |
-| 增量 | per-file upsert + staleness 标记 | 全量 rebuild |
+| Capability | CodeGraph | AgentZ `graph_search` (legacy) |
+|------------|-----------|--------------------------------|
+| Returns source with line numbers | Yes (verbatim, equivalent to Read) | No |
+| Symbol granularity | function / method / import … | file / module |
+| Blast radius | Who depends on it, what to check before changing | importers list only |
+| Call path | call edges + dynamic dispatch hints | list of import edge ids |
+| Storage | `.codegraph/graph.db` SQLite FTS | `.agentz/graph.json` full JSON |
+| Incremental | per-file upsert + staleness marking | full rebuild |
 
-**自研目标**：在 `.agentz/` 内提供同等 **Agent 体验**（`graph_explore` 一次调用），不依赖外部 CodeGraph；Dashboard 继续读同一索引。
+**Goal**: provide the same **agent experience** inside `.agentz/` (a single `graph_explore` call) without depending on external CodeGraph; the Dashboard keeps reading the same index.
 
 ---
 
-## 2. Agent 入口
+## 2. Agent entry points
 
-### 2.1 工具：`graph_explore`（主）
+### 2.1 Tool: `graph_explore` (primary)
 
-替代/并列 `graph_search`，描述中明确优先级：
+Sits alongside / replaces `graph_search`; its description states the priority explicitly:
 
 ```
 Structural questions → graph_explore FIRST
@@ -41,58 +43,78 @@ Implementation snippets → codebase_search
 Legacy file/module ids → graph_search (deprecated)
 ```
 
-**输入**
+**Input**
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `query` | string | 自然语言或 symbol/path 片段 |
-| `limit` | int | 种子符号数，默认 12，最大 25 |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `query` | string | Natural language or a symbol/path fragment (required) |
+| `limit` | int | Number of seed nodes, default 12, max 25 (clamped to 1–25 in `explore_graph`) |
 
-**输出结构**（对齐 CodeGraph `codegraph_explore` Markdown）
+If the graph index is not ready yet, the tool returns the `graph_index::not_ready_message` notice instead of exploring. On first use, `graph.db` is populated automatically from `graph.json` (`ensure_synced`).
+
+**Output structure** (aligned with CodeGraph's `codegraph_explore` Markdown; this is the shape `explore_graph` emits today)
 
 ```markdown
+⚠️ **Pending re-index:** {count} file(s) changed recently — Read edited files directly for live content.
+
 **Exploration: {query}**
 
-Found {n} symbol(s) across {m} file(s).
+Found {n} node(s) across {m} file(s).
+
+**Repository Memory Notes (Source-Anchored)**
+
+- {✓ [ACTIVE] | ⚠️ [STALE]} **[{kind}] {title}** (`{scope_target}`): {body} — refs: {citations}
 
 **Blast radius — what depends on these (update/verify before editing)**
 
-- `{name}` ({path}:{line}) — {in_count} importer(s) in `{paths...}`; {test_hint}
+- {one line per importer / caller in 1 hop}
 
-**Call / import flow (1-hop)**
+**Call / IPC reference sites**
+
+- {call sites or frontend invoke("…") sites for the queried symbol}
+
+**Import / call / IPC flow (1-hop)**
 
 - `{from}` --[{kind}]--> `{to}`
 
 **Source Code**
 
-> Verbatim on-disk source with line numbers. Treat as already Read.
+> Verbatim on-disk source with line numbers — treat as already Read.
 
-**`{path}`** — {symbol_summary}
+**`{path}:{start}-{end}`** — `{signature or name}` ({kind})
 
-```{lang}
+```
 1  ...
 ```
 
-**Staleness**（Phase 1+）
+**`{path}`** — {name} ({kind}, {layer})
 
-> ⚠️ Pending re-index: `src/foo.rs` (edited 1.2s ago). Read file directly for live content.
 ```
+1  ...
+```
+```
+
+Notes on the current output:
+
+- The staleness banner is printed **first**, only when `pending_sync` has rows, and reports a file **count** rather than per-file paths and edit times.
+- The Repository Memory, Call / IPC reference sites and flow sections are omitted when empty; when blast radius is empty it prints `_No indexed importers or callers in 1-hop._`.
+- Up to 6 matched AST symbols are rendered as focused line ranges, then up to 8 whole files; code fences carry no language tag.
 
 ### 2.2 `@graph` mention
 
-[`graph_context_block`](../src-tauri/src/commands/chat_turn.rs) 在 Phase 2 改为调用 `explore_graph` 而非 `search_graph`（Phase 0 仍用旧路径，避免行为突变）。
+[`graph_context_block`](../src-tauri/src/commands/chat_turn/prompt_assembly.rs) already calls `graph_db::explore_graph(root, query, 12)` (the original plan deferred this switch from `search_graph` to Phase 2). It drops `@`-prefixed words from the query and omits the block when there are no matches.
 
-### 2.3 系统简报
+### 2.3 System brief
 
-[`coding_brief_excerpt`](../src-tauri/src/commands/graph_agent.rs) 保持不变；Deep wiki / domain 叠加不变。
+[`coding_brief_excerpt`](../src-tauri/src/commands/graph_agent.rs) is unchanged; the Deep wiki / domain overlays are unchanged.
 
 ---
 
-## 3. 存储：`.agentz/graph.db`
+## 3. Storage: `.agentz/graph.db`
 
-与 [`index.db`](./agentz-artifacts.md) 并列，**专用于结构图**。
+Lives alongside [`index.db`](./agentz-artifacts.md) and is **dedicated to the structure graph** (it also holds Repository Memory notes and the module wiki cache).
 
-### 3.1 表结构（v1）
+### 3.1 Schema (as created by `open_graph_db` in `graph_db.rs`)
 
 ```sql
 -- meta: version, generated_at, graph_json_hash
@@ -104,18 +126,22 @@ CREATE TABLE nodes (
   path TEXT,                    -- repo-relative
   name TEXT NOT NULL,
   layer TEXT,
-  summary TEXT DEFAULT '',
+  summary TEXT NOT NULL DEFAULT '',
   start_line INTEGER,
-  end_line INTEGER
+  end_line INTEGER,
+  signature TEXT NOT NULL DEFAULT '',
+  content_hash TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE edges (
   from_id TEXT NOT NULL,
   to_id TEXT NOT NULL,
-  kind TEXT NOT NULL,           -- imports | calls | contains | depends
-  weight INTEGER DEFAULT 1,
+  kind TEXT NOT NULL,           -- imports | calls | ipc_calls | contains | depends
+  weight INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY (from_id, to_id, kind)
 );
+CREATE INDEX idx_edges_from ON edges(from_id);
+CREATE INDEX idx_edges_to ON edges(to_id);
 
 CREATE VIRTUAL TABLE nodes_fts USING fts5(
   name, path, summary, kind,
@@ -126,55 +152,59 @@ CREATE TABLE pending_sync (
   path TEXT PRIMARY KEY,
   updated_at INTEGER NOT NULL   -- unix ms
 );
+
+-- Repository Memory (source-anchored notes) and module wiki cache
+CREATE TABLE repo_notes (...);
+CREATE TABLE module_wiki_cache (...);
 ```
 
-PRAGMA：`journal_mode=WAL`（与 CodeGraph 一致，支持并发读）。
+PRAGMA: `journal_mode=WAL` (same as CodeGraph, supports concurrent reads); connections also set a 10 s `busy_timeout`.
 
-### 3.2 与 `graph.json` 关系
+### 3.2 Relationship with `graph.json`
 
-| 阶段 | graph.json | graph.db |
-|------|------------|----------|
-| Phase 0 | 仍生成（Dashboard + 兼容） | 从 GraphDoc **导入** file/import 边 |
-| Phase 1 | 可选导出快照 | **主存储** + 符号 upsert |
-| Phase 2 | 只读导出 / 废弃 | 唯一真相源 |
-
----
-
-## 4. 索引管线
-
-### Phase 0（当前）
-
-1. `graph::generate` → `graph.json`（现有 regex import）
-2. `graph_db::sync_from_graph_doc` → 写入 `graph.db`
-3. `explore_graph`：FTS 匹配 file 节点 → 读盘带行号源码 → import 边 blast radius
-
-### Phase 1 — tree-sitter 符号
-
-- 语言优先：**Rust、TypeScript/TSX**（AgentZ 主栈）
-- 节点：function、method、struct、impl、interface
-- 边：`calls`（同文件确定 + 跨文件 resolve）、保留 `imports`
-- 增量：`sync_file(path)` 删除该文件相关行再插入（**禁止**全量 rebuild）
-
-### Phase 2 — explore 质量
-
-- Connect-time `(size, mtime, hash)` 对账（会话开始）
-- `pending_sync` + 工具输出 staleness banner
-- 框架 route 边（Express / Axum / Tauri command 等，按优先级）
-
-### Phase 3 — Dashboard 统一
-
-- GraphDashboard 读 `graph.db`（cluster 聚合可在 SQL 或 TS 层）
-- diff overlay 映射 symbol/file
+| Phase | graph.json | graph.db |
+|-------|------------|----------|
+| Phase 0 | Still generated (Dashboard + compatibility) | **Imported** from GraphDoc (`sync_from_graph_doc`): file nodes, import edges, plus AST symbols and `calls` edges |
+| Phase 1 | Optional snapshot export | **Primary store** + symbol upsert (per-file upsert implemented; `graph.json` is still generated) |
+| Phase 2 | Read-only export / deprecated | Single source of truth (not implemented) |
 
 ---
 
-## 5. CodeGraph 实测 → AgentZ 应对
+## 4. Indexing pipeline
 
-### 5.1 Wiki / graph 注入链（应对 explore 问题）
+### Phase 0 (implemented)
 
-**问题**：`how does chat_turn inject wiki or graph context`
+1. `graph::generate` → `graph.json` (regex imports, plus cross-language Tauri IPC `ipc_calls` edges from frontend `invoke("cmd")` to `#[tauri::command] fn cmd`)
+2. `graph_db::sync_from_graph_doc` → writes `graph.db`
+3. `explore_graph`: FTS match on nodes (exact-name first, then bm25, LIKE fallback) → read numbered source from disk → blast radius from import / call edges
 
-CodeGraph 精准命中：
+### Phase 1 — tree-sitter symbols (largely implemented)
+
+- Languages: **Rust, TypeScript/TSX** as planned, plus JavaScript, Python and Go (`symbols.rs` `extract_file_skeleton`)
+- Nodes: function, method, struct, impl, interface (whatever kinds the skeleton extractor reports)
+- Edges: `calls` (callee resolved by symbol name, up to 6 matches), `contains` (file → symbol); `imports` kept
+- Incremental: `sync_file_in_graph_db(path)` deletes the file's symbol rows and edges and re-inserts them (**no** full rebuild); triggered from file-change handling in `graph_index.rs` via `mark_pending_sync`
+
+### Phase 2 — explore quality
+
+- Connect-time `(size, mtime, hash)` reconciliation (session start) — not implemented
+- `pending_sync` + staleness banner in tool output — implemented (count-based banner; `clear_pending_sync` after a full sync)
+- Framework route edges (Express / Axum / Tauri command etc., by priority) — only Tauri IPC (`ipc_calls`) implemented
+
+### Phase 3 — Dashboard unification (not implemented)
+
+- GraphDashboard reads `graph.db` (cluster aggregation in SQL or the TS layer)
+- diff overlay maps symbol/file
+
+---
+
+## 5. CodeGraph findings → AgentZ response
+
+### 5.1 Wiki / graph injection chain (the explore problem)
+
+**Question**: `how does chat_turn inject wiki or graph context`
+
+CodeGraph hit it precisely (2026-06 measurement; `chat_turn.rs` has since been split into the `src-tauri/src/commands/chat_turn/` module, and `graph_context_block` now lives in `chat_turn/prompt_assembly.rs`):
 
 ```
 graph_context_block (chat_turn.rs:662)
@@ -186,65 +216,68 @@ repo_wiki_context (chat_turn.rs:~1458)
   → coding_brief_excerpt + deep_wiki_excerpt + domain_context_excerpt
 ```
 
-**自研 explore 应一次返回上述 3 个函数源码 + 调用链**，而不是 200 个无关 `search` 符号。
+**The in-house explore should return the source of these 3 functions + the call chain in one go**, not 200 unrelated `search` symbols.
 
-**检索策略（Phase 0 改进）**：
+**Retrieval strategy (Phase 0 improvements)**:
 
-1. FTS 短语 + path 加权（`chat_turn`, `graph_agent`, `graph_context`）
-2. 排除 `bundled/preinstall/**`（CodeGraph 噪声来源）
-3. Rust 路径优先于 TS 当 query 含 `chat_turn` / `graph_agent`
+1. FTS phrase + path weighting (`chat_turn`, `graph_agent`, `graph_context`) — implemented as quoted-term FTS with exact-name-first ordering and bm25
+2. Exclude `bundled/preinstall/**` (the CodeGraph noise source) — implemented
+3. Prefer Rust paths over TS when the query contains `chat_turn` / `graph_agent` — not verified in code
 
 ### 5.2 `search_graph` blast radius
 
-CodeGraph callers：
+CodeGraph callers (2026-06):
 
 | Caller | Location |
 |--------|----------|
-| `graph_context_block` | chat_turn.rs:662 |
-| `GraphSearchTool::call` | tools/graph_search.rs:51 |
-| test | graph_agent.rs:707 |
+| `graph_context_block` | chat_turn.rs:662 (now no longer a caller; it calls `explore_graph`) |
+| `GraphSearchTool::call` | tools/graph_search.rs:51 (now L71) |
+| test | graph_agent.rs:707 (now L738) |
 
-explore 输出必须包含此表，而非仅 import importers。
+explore output must include this table rather than just import importers. *Current code: `explore_graph` adds a "Call / IPC reference sites" section (AST `calls`/`ipc_calls` edges plus a text scan for call and `invoke` sites).*
 
 ---
 
-## 6. 验收标准
+## 6. Acceptance criteria
 
-### 自动化
+### Automated
 
 ```bash
 cd AgentZ/src-tauri && cargo test graph_db -- --nocapture
 ./scripts/verify-wiki-graph.sh
 ```
 
-### 手动（AgentZ 自举）
+### Manual (AgentZ self-hosting)
 
-| 查询 | 预期 |
-|------|------|
-| `graph_explore("graph_context_block wiki inject")` | 含 `chat_turn.rs` 源码 + `search_graph` 调用 |
-| `graph_explore("GraphSearchTool")` | 含 `graph_search.rs` 全文 + callers 摘要 |
-| 改 `graph_agent.rs` 后 2s 内 | staleness banner（Phase 1） |
+| Query | Expected |
+|-------|----------|
+| `graph_explore("graph_context_block wiki inject")` | Contains `chat_turn/prompt_assembly.rs` source + the `explore_graph` call |
+| `graph_explore("GraphSearchTool")` | Contains the full `graph_search.rs` + callers summary |
+| Within 2 s of editing `graph_agent.rs` | staleness banner (Phase 1) |
 
-### 对标 CodeGraph（Dogfood）
+### Against CodeGraph (dogfood)
 
-同一问题 CodeGraph / AgentZ 输出 **文件重叠率 ≥ 60%**（Phase 1 起测量）。
-
----
-
-## 7. 文件清单
-
-| 文件 | 职责 |
-|------|------|
-| [`graph_db.rs`](../src-tauri/src/commands/graph_db.rs) | SQLite schema、sync、explore |
-| [`graph_explore.rs`](../src-tauri/src/tools/graph_explore.rs) | Agent 工具 |
-| [`graph_agent.rs`](../src-tauri/src/commands/graph_agent.rs) | `explore_graph()` 门面 |
-| [`graph.rs`](../src-tauri/src/commands/graph.rs) | generate 后 sync db |
-| 本文档 | 规格与 Phase 划分 |
+For the same question, CodeGraph / AgentZ output **file overlap ≥ 60%** (measured from Phase 1).
 
 ---
 
-## 8. 参考
+## 7. File list
 
-- CodeGraph README — explore 输出格式、auto-sync 三层机制
-- AgentZ [`graph-schema.md`](./graph-schema.md) — 现有 JSON schema
-- AgentZ [`wiki-graph-verification.md`](./wiki-graph-verification.md) — 验收清单
+| File | Responsibility |
+|------|----------------|
+| [`graph_db.rs`](../src-tauri/src/commands/graph_db.rs) | SQLite schema, sync, incremental per-file sync, `explore_graph()` |
+| [`graph_explore.rs`](../src-tauri/src/tools/graph_explore.rs) | Agent tool |
+| [`graph_agent.rs`](../src-tauri/src/commands/graph_agent.rs) | Legacy `search_graph()` and `coding_brief_excerpt()` (no longer the `explore_graph()` facade) |
+| [`graph.rs`](../src-tauri/src/commands/graph.rs) | generate, then sync db; Tauri IPC edges |
+| [`symbols.rs`](../src-tauri/src/commands/symbols.rs) | tree-sitter symbol / call extraction (`extract_file_skeleton`) |
+| [`graph_index.rs`](../src-tauri/src/commands/graph_index.rs) | Index worker, readiness notice, `mark_pending_sync` on file changes |
+| [`prompt_assembly.rs`](../src-tauri/src/commands/chat_turn/prompt_assembly.rs) | `@graph` mention (`graph_context_block`) |
+| This document | Spec and phase plan |
+
+---
+
+## 8. References
+
+- CodeGraph README — explore output format, three-layer auto-sync mechanism
+- AgentZ [`graph-schema.md`](./graph-schema.md) — existing JSON schema
+- AgentZ [`wiki-graph-verification.md`](./wiki-graph-verification.md) — acceptance checklist
