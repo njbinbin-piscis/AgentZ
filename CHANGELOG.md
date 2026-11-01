@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.39] - 2026-11-01
+
+### Fixed
+
+- **`file_search` treated a file path as an empty search.** `path` must be a directory. Passing a file now returns `Path is not a directory` instead of `No matches` or `No files found`. The tool description says to pass the parent directory and set `include` to the file name, or use `file_read`.
+
 ## [1.0.38] - 2026-11-01
 
 ### Fixed
