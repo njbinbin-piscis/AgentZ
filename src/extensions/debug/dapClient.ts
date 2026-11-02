@@ -18,6 +18,13 @@ export interface DapMessage {
 
 type EventHandler = (event: string, body: unknown) => void;
 type LogHandler = (line: string) => void;
+/** Answers a request the adapter sends to us (e.g. `startDebugging`). */
+type RequestHandler = (command: string, args: unknown) => Promise<unknown> | unknown;
+interface StartStatus {
+  running: boolean;
+  session_id: string;
+  port?: number | null;
+}
 
 /**
  * Remote sessions: the adapter sees plain POSIX paths while the IDE uses
@@ -59,6 +66,11 @@ export class DapClient {
   private readonly connectTimeoutMs: number;
   private eventHandler: EventHandler | undefined;
   private logHandler: LogHandler | undefined;
+  private requestHandler: RequestHandler | undefined;
+  /** Loopback port of a TCP adapter; extra connections to it are child targets. */
+  private port: number | null = null;
+  /** Session id of the connection that started the adapter (child connections only). */
+  private rootId: string | null = null;
   /** `agentz-remote://<authority>` when the adapter runs on a remote. */
   private remotePrefix: string | null = null;
 
@@ -95,7 +107,25 @@ export class DapClient {
     finally { if (timer !== undefined) clearTimeout(timer); }
   }
 
-  async connect(command: string, args: string[], cwd?: string, remoteDir?: string): Promise<void> {
+  async connect(command: string, args: string[], cwd?: string, remoteDir?: string, tcp?: boolean): Promise<void> {
+    await this.open(remoteDir, () =>
+      invoke<StartStatus>("dap_start", { sessionId: this.sessionId, command, args, cwd, remoteDir: remoteDir ?? null, tcp: tcp ?? null }),
+    );
+  }
+
+  /** Opens another connection to the same TCP adapter (js-debug runs one session per debug target). */
+  async openChild(): Promise<DapClient> {
+    if (this.state !== "running" || this.port === null) throw new Error("This debug adapter does not accept extra connections");
+    const root = this.rootId ?? this.sessionId;
+    const port = this.port;
+    const child = new DapClient();
+    child.rootId = root;
+    child.port = port;
+    await child.open(undefined, () => invoke<StartStatus>("dap_tcp_child", { parentSessionId: root, sessionId: child.sessionId, port }));
+    return child;
+  }
+
+  private async open(remoteDir: string | undefined, start: () => Promise<StartStatus>): Promise<void> {
     if (this.state !== "new") throw new Error("DAP client already used");
     this.state = "connecting";
     try {
@@ -112,9 +142,10 @@ export class DapClient {
       const m = /^agentz-remote:\/\/[^/]+/.exec(remoteDir);
       this.remotePrefix = m ? m[0] : null;
     }
-    const started = await this.connectPhase(invoke<{ running: boolean; session_id: string }>("dap_start", { sessionId: this.sessionId, command, args, cwd, remoteDir: remoteDir ?? null }), () => { void this.stopOwned(); });
+    const started = await this.connectPhase(start(), () => { void this.stopOwned(); });
     if (this.isTerminal()) throw new Error("DAP disposed during start");
     if (!started || started.running !== true || started.session_id !== this.sessionId) throw new Error("DAP start identity mismatch");
+    if (this.rootId === null) this.port = started.port ?? null;
     this.state = "running";
     } catch (error) { this.revoke("DAP connect failed"); await this.stopOwned(); throw error; }
   }
@@ -124,6 +155,32 @@ export class DapClient {
   }
   onLog(handler: LogHandler): void {
     this.logHandler = handler;
+  }
+  onRequest(handler: RequestHandler): void {
+    this.requestHandler = handler;
+  }
+
+  private async answer(msg: DapMessage): Promise<void> {
+    let success = true;
+    let body: unknown = {};
+    let message: string | undefined;
+    try {
+      if (!this.requestHandler) throw new Error("Unsupported request");
+      body = (await this.requestHandler(msg.command as string, msg.arguments)) ?? {};
+    } catch (error) {
+      success = false;
+      message = error instanceof Error ? error.message : String(error);
+    }
+    if (this.state !== "running") return;
+    const reply = JSON.stringify({
+      seq: this.seq++,
+      type: "response",
+      request_seq: msg.seq,
+      success,
+      command: msg.command,
+      ...(success ? { body } : { message }),
+    });
+    void invoke("dap_send", { sessionId: this.sessionId, message: reply }).catch(() => undefined);
   }
 
   private onMessage(raw: string): void {
@@ -147,6 +204,8 @@ export class DapClient {
       }
     } else if (msg.type === "event") {
       if (typeof msg.event === "string") this.eventHandler?.(msg.event, msg.body);
+    } else if (msg.type === "request" && typeof msg.command === "string") {
+      void this.answer(msg);
     }
   }
 

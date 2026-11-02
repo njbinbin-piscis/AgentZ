@@ -20,6 +20,8 @@ export interface DebugSnapshot {
   frames: StackFrame[];
   variables: Variable[];
   output: string[];
+  /** Increments on every stop so views can drop per-stop state (expanded vars, watches). */
+  stopSeq: number;
 }
 
 const EMPTY: DebugSnapshot = {
@@ -29,6 +31,7 @@ const EMPTY: DebugSnapshot = {
   frames: [],
   variables: [],
   output: [],
+  stopSeq: 0,
 };
 
 class DebugStore {
@@ -61,7 +64,7 @@ class DebugStore {
     this.commit(running ? { running, threadId: null, frames: [], variables: [] } : { running });
   }
   setStopped(threadId: number, frames: StackFrame[]): void {
-    this.commit({ running: false, threadId, frames, variables: [] });
+    this.commit({ running: false, threadId, frames, variables: [], stopSeq: this.state.stopSeq + 1 });
   }
   setVariables(variables: Variable[]): void {
     this.commit({ variables });

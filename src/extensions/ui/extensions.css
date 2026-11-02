@@ -171,3 +171,32 @@
 .agentz-debug-var-val { color: var(--text-secondary); }
 .agentz-debug-muted { opacity: 0.5; font-size: 12px; }
 .agentz-debug-frame-open { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; text-decoration: underline; cursor: pointer; }
+
+/* Paused line in the editor */
+.agentz-debug-line { background: rgba(255, 213, 0, 0.18); }
+
+/* Debug view: launch bar, variable tree, watch, console input */
+.agentz-debug-launch { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.agentz-debug-launch select {
+  background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border);
+  border-radius: 4px; height: 24px; font-size: 12px; max-width: 280px;
+}
+.agentz-debug-launch .agentz-debug-start {
+  width: auto; padding: 0 10px; background: var(--accent); color: #fff; font-size: 12px;
+  border: none; border-radius: 4px; height: 24px; cursor: pointer;
+}
+.agentz-debug-launch .agentz-debug-start:disabled { opacity: 0.4; cursor: default; }
+.agentz-debug-error { color: var(--error); font-size: 12px; padding: 2px 0; }
+.agentz-debug-node { font-size: 12px; }
+.agentz-debug-node-row { display: flex; gap: 6px; padding: 1px 0; align-items: baseline; }
+.agentz-debug-twisty {
+  background: none; border: 0; color: inherit; width: 14px; padding: 0; cursor: pointer; font-size: 10px;
+}
+.agentz-debug-twisty-spacer { display: inline-block; width: 14px; }
+.agentz-debug-node-children { margin-left: 14px; }
+.agentz-debug-var-val { word-break: break-all; }
+.agentz-debug-input {
+  width: 100%; box-sizing: border-box; background: var(--bg-tertiary); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font: inherit; font-size: 12px; margin: 4px 0;
+}
+.agentz-debug-watch-remove { background: none; border: 0; color: inherit; opacity: 0.5; cursor: pointer; }

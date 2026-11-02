@@ -4,6 +4,7 @@
 // `setBreakpoints` requests.
 
 import type * as monaco from "monaco-editor";
+import { debugStore } from "./debugStore";
 
 type Listener = () => void;
 
@@ -39,6 +40,45 @@ class BreakpointStore {
 
 export const breakpointStore = new BreakpointStore();
 
+/** Absolute path of the file most recently shown in an editor (for `${file}` in launch configs). */
+export const activeEditorFile: { path: string | null } = { path: null };
+
+function samePath(a: string, b: string): boolean {
+  const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "");
+  const x = norm(a);
+  const y = norm(b);
+  return /^[a-z]:\//i.test(x) ? x.toLowerCase() === y.toLowerCase() : x === y;
+}
+
+/** Highlights the line the debugger is paused on, when it is in `path`. */
+function attachDebugLine(
+  editor: monaco.editor.IStandaloneCodeEditor,
+  monacoNs: typeof monaco,
+  path: string,
+): () => void {
+  const collection = editor.createDecorationsCollection([]);
+  const render = () => {
+    const snap = debugStore.getSnapshot();
+    const top = snap.active && !snap.running ? snap.frames[0] : undefined;
+    if (top?.source && samePath(top.source, path)) {
+      collection.set([
+        {
+          range: new monacoNs.Range(top.line, 1, top.line, 1),
+          options: { isWholeLine: true, className: "agentz-debug-line" },
+        },
+      ]);
+    } else {
+      collection.clear();
+    }
+  };
+  const unsubscribe = debugStore.subscribe(render);
+  render();
+  return () => {
+    unsubscribe();
+    collection.clear();
+  };
+}
+
 /**
  * Attach breakpoint toggling + rendering to a Monaco editor for `path`.
  * Returns a disposer. Requires `glyphMargin: true` in editor options.
@@ -48,6 +88,8 @@ export function attachBreakpointGutter(
   monacoNs: typeof monaco,
   path: string,
 ): monaco.IDisposable {
+  activeEditorFile.path = path;
+  const disposeDebugLine = attachDebugLine(editor, monacoNs, path);
   const collection = editor.createDecorationsCollection([]);
 
   const render = () => {
@@ -77,6 +119,7 @@ export function attachBreakpointGutter(
     dispose: () => {
       mouseSub.dispose();
       storeSub();
+      disposeDebugLine();
       collection.clear();
     },
   };

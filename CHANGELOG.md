@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.48] - 2026-11-03
+
+### Added
+
+- **Debugging Python, Go and Node.js in CodeZ.** The debug panel now has a launch configuration picker and a start button. Configurations come from `.vscode/launch.json` (comments and trailing commas allowed) and from auto-detected templates: Flask, FastAPI, Django and the current file for Python; the main package, current file and package tests for Go; the package entry and current file for Node.js. Python uses the project virtualenv, Go uses Delve (`dlv`), and Node.js uses js-debug, downloaded once on first use.
+- **A fuller debug session.** Breakpoints added or removed while running take effect immediately, stopping opens the file and highlights the line, variables expand, watch expressions re-evaluate on every stop, and the debug console evaluates expressions in the paused frame.
+
+### Fixed
+
+- **Debug adapters that speak over TCP.** Delve and js-debug listen on a port instead of stdio. The debug channel now connects to such adapters and accepts the extra per-target connections js-debug opens, without weakening the existing session isolation.
+
 ## [1.0.47] - 2026-11-03
 
 ### Fixed

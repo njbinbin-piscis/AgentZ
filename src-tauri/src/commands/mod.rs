@@ -16,6 +16,7 @@ pub mod codebase;
 pub mod connectors;
 pub mod curator;
 pub mod dap;
+pub mod debug_adapters;
 pub mod data_scope;
 pub mod debug_scenarios;
 pub mod devenv;

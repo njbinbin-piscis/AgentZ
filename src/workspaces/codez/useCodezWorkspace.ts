@@ -1000,6 +1000,22 @@ export function useCodezWorkspace({
     [openFile],
   );
 
+  // Debugger: show the debug panel when a session starts, and jump to the
+  // paused line (opening the file) whenever execution stops.
+  useEffect(() => {
+    const onStarted = () => openBottomPanel("debug");
+    const onStopped = (e: Event) => {
+      const d = (e as CustomEvent<{ path: string; line: number } | undefined>).detail;
+      if (d?.path) void revealInFile(d.path, d.line, 1);
+    };
+    window.addEventListener("agentz-debug-started", onStarted);
+    window.addEventListener("agentz-debug-stopped", onStopped);
+    return () => {
+      window.removeEventListener("agentz-debug-started", onStarted);
+      window.removeEventListener("agentz-debug-stopped", onStopped);
+    };
+  }, [openBottomPanel, revealInFile]);
+
   // ─── Open diff for a file ────────────────────────────────────────
   const openDiff = useCallback(
     async (path: string) => {

@@ -4,7 +4,7 @@ const { output, points } = vi.hoisted(() => ({
   points: new Map<string, Set<number>>(),
 }));
 vi.mock("./dapClient", () => ({ DapClient: class {} }));
-vi.mock("./breakpoints", () => ({ breakpointStore: { all: () => points } }));
+vi.mock("./breakpoints", () => ({ breakpointStore: { all: () => points, subscribe: () => () => {} } }));
 vi.mock("../extensionUiStore", () => ({ extensionUiStore: { appendDebugOutput: output } }));
 vi.mock("../extensionService", () => ({ extensionService: { projectDir: "fallback" } }));
 import { DebugController, type DebugClient } from "./debugController";
@@ -21,7 +21,7 @@ function deferred<T>() {
 }
 class Client implements DebugClient {
   event: (event: string, body: unknown) => void = () => {};
-  connect = vi.fn(async (_command: string, _args: string[], _cwd?: string, _remote?: string) => {});
+  connect = vi.fn(async (_command: string, _args: string[], _cwd?: string, _remote?: string, _tcp?: boolean) => {});
   dispose = vi.fn(async () => {});
   handle: (command: string, args?: Record<string, unknown>) => unknown = (command) => {
     if (command === "initialize") return { supportsConfigurationDoneRequest: true };
@@ -289,4 +289,66 @@ it("a session started after a switch is tagged with the new project and survives
   await c.stopIfProjectChanged("/new");
   expect(c.isActive).toBe(true);
   expect(client.dispose).not.toHaveBeenCalled();
+});
+
+it("does not pass the adapter command to the debuggee launch request", async () => {
+  const client = new Client();
+  const c = controller([client]);
+  await c.start(config);
+  const launch = client.calls.find((call) => call.command === "launch");
+  expect(launch?.args).toMatchObject({ type: "custom", name: "Test" });
+  expect(launch?.args).not.toHaveProperty("__adapter");
+});
+
+it("evaluates in the top frame while paused and refuses while running", async () => {
+  const client = new Client();
+  const normal = client.handle;
+  client.handle = (command, args) =>
+    command === "evaluate" ? { result: `=${String(args?.expression)}`, variablesReference: 7 } : normal(command, args);
+  const c = controller([client]);
+  await c.start(config);
+  await expect(c.evaluate("x")).rejects.toThrow("Not paused");
+  client.event("stopped", { threadId: 1 });
+  await flush();
+  await expect(c.evaluate("x + 1", "repl")).resolves.toMatchObject({ result: "=x + 1", variablesReference: 7 });
+  expect(client.calls.find((call) => call.command === "evaluate")?.args).toMatchObject({ frameId: 1, context: "repl" });
+});
+
+it("opens a child connection when the adapter asks to start debugging and routes stops and steps to it", async () => {
+  const root = new Client();
+  const child = new Client();
+  let reverse: ((command: string, args: unknown) => unknown) | undefined;
+  (root as unknown as { onRequest: unknown }).onRequest = (h: (command: string, args: unknown) => unknown) => {
+    reverse = h;
+  };
+  (root as unknown as { openChild: unknown }).openChild = async () => child;
+  const normal = child.handle;
+  child.handle = (command, args) => {
+    if (command === "launch" || command === "attach") child.event("initialized", {});
+    return command === "launch" || command === "attach" ? {} : normal(command, args);
+  };
+  points.set("/project/a.js", new Set([2]));
+  const c = controller([root]);
+  await c.start({ ...config, __adapter: { command: "adapter", tcp: true } });
+  expect(root.connect.mock.calls[0][4]).toBe(true);
+  expect(reverse?.("startDebugging", { request: "launch", configuration: { type: "pwa-node", name: "t" } })).toEqual({});
+  await flush();
+  expect(child.calls.map((call) => call.command)).toEqual(
+    expect.arrayContaining(["initialize", "launch", "setBreakpoints", "configurationDone"]),
+  );
+  expect(child.calls.find((call) => call.command === "launch")?.args).toMatchObject({ type: "pwa-node" });
+  expect(() => reverse?.("runInTerminal", {})).toThrow("Unsupported");
+
+  child.event("stopped", { threadId: 5 });
+  await flush();
+  expect(debugStore.getSnapshot()).toMatchObject({ running: false, threadId: 5 });
+  await c.stepOver();
+  expect(child.calls.some((call) => call.command === "next")).toBe(true);
+  expect(root.calls.some((call) => call.command === "next")).toBe(false);
+
+  // A finished target retires its connection without ending the session.
+  child.event("terminated", {});
+  await flush();
+  expect(c.isActive).toBe(true);
+  expect(child.dispose).toHaveBeenCalled();
 });

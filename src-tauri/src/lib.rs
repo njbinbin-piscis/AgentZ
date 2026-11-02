@@ -315,6 +315,8 @@ pub fn run() {
             commands::dap::dap_start,
             commands::dap::dap_send,
             commands::dap::dap_stop,
+            commands::dap::dap_tcp_child,
+            commands::debug_adapters::debug_adapter_ensure,
             // chat session management
             commands::session::chat_list_sessions,
             commands::session::chat_get_messages,

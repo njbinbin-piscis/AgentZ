@@ -2,10 +2,18 @@
 use crate::state::AppState;
 use serde::Serialize;
 use serde_json::json;
-use std::{collections::HashSet, process::Stdio, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    process::Stdio,
+    sync::Arc,
+    time::Duration,
+};
 use tauri::{AppHandle, Emitter, State};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::process::{Child, ChildStdin};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::process::Child;
+#[cfg(test)]
+use tokio::process::ChildStdin;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 #[path = "dap_frame.rs"]
@@ -14,6 +22,10 @@ mod dap_frame;
 pub const DAP_EVENT: &str = "agentz:dap";
 const IO_TIMEOUT: Duration = Duration::from_secs(2);
 const SESSION_BUDGET: usize = 4096;
+/// Extra connections one TCP adapter may open (child debug targets).
+const MAX_CHILD_SESSIONS: usize = 32;
+const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
+type Writer = Box<dyn AsyncWrite + Send + Unpin>;
 fn validate_session_id(session_id: &str) -> Result<(), String> {
     let parsed = uuid::Uuid::parse_str(session_id).map_err(|_| "Invalid DAP session ID")?;
     if parsed.to_string() != session_id {
@@ -41,7 +53,10 @@ struct DapInner {
     generation: u64,
     session_id: Option<String>,
     child: Option<Child>,
-    stdin: Option<ChildStdin>,
+    stdin: Option<Writer>,
+    /// TCP adapters only: the loopback port, and the extra connections opened on it.
+    adapter_port: Option<u16>,
+    children: HashMap<String, Writer>,
 }
 #[derive(Clone, Debug)]
 struct Lease {
@@ -73,6 +88,8 @@ impl DapManager {
             .ok_or("DAP generation exhausted")?;
         inner.used_or_cancelled.insert(session_id.clone());
         inner.stdin = None;
+        inner.children.clear();
+        inner.adapter_port = None;
         let old = inner.child.take();
         inner.session_id = Some(session_id.clone());
         Ok((
@@ -100,6 +117,8 @@ impl DapManager {
         }
         inner.session_id = None;
         inner.stdin = None;
+        inner.children.clear();
+        inner.adapter_port = None;
         inner.child.take()
     }
     async fn spawn_owned(
@@ -131,8 +150,18 @@ impl DapManager {
         let stdout = child.stdout.take().ok_or("failed to take adapter stdout")?;
         let stderr = child.stderr.take();
         inner.child = Some(child);
-        inner.stdin = Some(stdin);
+        inner.stdin = Some(Box::new(stdin));
         Ok((stdout, stderr))
+    }
+    /// TCP adapters: frames are written to the socket instead of the child's stdin.
+    async fn set_writer(&self, lease: &Lease, writer: Writer, port: u16) -> Result<(), String> {
+        let mut inner = self.inner.lock().await;
+        if !lease.matches(&inner) {
+            return Err("DAP start was superseded or stopped".into());
+        }
+        inner.stdin = Some(writer);
+        inner.adapter_port = Some(port);
+        Ok(())
     }
     #[cfg(test)]
     async fn install(&self, lease: &Lease, child: Child, stdin: ChildStdin) -> Result<(), String> {
@@ -141,7 +170,7 @@ impl DapManager {
             return Err("DAP start was superseded or stopped".into());
         }
         inner.child = Some(child);
-        inner.stdin = Some(stdin);
+        inner.stdin = Some(Box::new(stdin));
         Ok(())
     }
 }
@@ -162,13 +191,152 @@ async fn emit_owned(app: &AppHandle, mgr: &DapManager, lease: &Lease, channel: &
         );
     }
 }
+async fn emit_child(
+    app: &AppHandle,
+    mgr: &DapManager,
+    lease: &Lease,
+    child_id: &str,
+    channel: &str,
+    data: String,
+    remove: bool,
+) {
+    let mut inner = mgr.inner.lock().await;
+    if !lease.matches(&inner) || !inner.children.contains_key(child_id) {
+        return;
+    }
+    if remove {
+        inner.children.remove(child_id);
+    }
+    let _ = app.emit(
+        DAP_EVENT,
+        json!({"session_id": child_id, "channel": channel, "data": data}),
+    );
+}
+async fn abandon(mgr: &DapManager, lease: &Lease) {
+    terminate(
+        mgr.take_owned(&lease.session_id, Some(lease.generation))
+            .await,
+    )
+    .await;
+}
 #[derive(Debug, Serialize)]
 pub struct DapStatus {
     pub running: bool,
     pub session_id: String,
+    /// Loopback port of a TCP adapter; extra connections (child targets) use it.
+    pub port: Option<u16>,
+}
+fn free_loopback_port() -> Result<u16, String> {
+    std::net::TcpListener::bind(("127.0.0.1", 0))
+        .and_then(|l| l.local_addr())
+        .map(|a| a.port())
+        .map_err(|e| format!("no free local port for the debug adapter: {e}"))
+}
+/// Waits for a freshly spawned TCP adapter to start listening.
+async fn connect_adapter(mgr: &DapManager, lease: &Lease, port: u16) -> Result<TcpStream, String> {
+    let deadline = tokio::time::Instant::now() + TCP_CONNECT_TIMEOUT;
+    loop {
+        {
+            let mut inner = mgr.inner.lock().await;
+            if !lease.matches(&inner) {
+                return Err("DAP start was superseded or stopped".into());
+            }
+            if let Some(child) = inner.child.as_mut() {
+                if let Ok(Some(status)) = child.try_wait() {
+                    return Err(format!(
+                        "debug adapter exited before accepting a connection ({status})"
+                    ));
+                }
+            }
+        }
+        match TcpStream::connect(("127.0.0.1", port)).await {
+            Ok(stream) => {
+                let _ = stream.set_nodelay(true);
+                return Ok(stream);
+            }
+            Err(error) => {
+                if tokio::time::Instant::now() >= deadline {
+                    return Err(format!(
+                        "could not connect to the debug adapter on port {port}: {error}"
+                    ));
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
+    }
+}
+/// Frames read from an adapter connection become `message` events. The main
+/// connection owns the session (its end terminates the adapter); child
+/// connections only retire themselves.
+fn spawn_reader<R>(app: AppHandle, mgr: Arc<DapManager>, lease: Lease, reader: R, child: Option<String>)
+where
+    R: AsyncRead + Unpin + Send + 'static,
+{
+    tokio::spawn(async move {
+        let mut reader = reader;
+        let mut parser = dap_frame::FrameParser::default();
+        let mut chunk = [0u8; 8192];
+        let reason = loop {
+            match reader.read(&mut chunk).await {
+                Ok(0) => {
+                    break parser
+                        .finish()
+                        .err()
+                        .unwrap_or_else(|| "adapter stdout closed".into())
+                }
+                Ok(n) => match parser.push(&chunk[..n]) {
+                    Ok(messages) => {
+                        for message in messages {
+                            match &child {
+                                Some(id) => {
+                                    emit_child(&app, &mgr, &lease, id, "message", message, false).await
+                                }
+                                None => emit_owned(&app, &mgr, &lease, "message", message).await,
+                            }
+                        }
+                    }
+                    Err(error) => break error,
+                },
+                Err(error) => break format!("DAP stdout read error: {error}"),
+            }
+        };
+        match child {
+            Some(id) => emit_child(&app, &mgr, &lease, &id, "exit", reason, true).await,
+            None => {
+                emit_owned(&app, &mgr, &lease, "exit", reason).await;
+                abandon(&mgr, &lease).await;
+            }
+        }
+    });
+}
+/// Adapter output that is not DAP traffic (stderr, or stdout of a TCP adapter).
+fn spawn_log_pump<R>(app: AppHandle, mgr: Arc<DapManager>, lease: Lease, reader: R)
+where
+    R: AsyncRead + Unpin + Send + 'static,
+{
+    tokio::spawn(async move {
+        let mut reader = reader;
+        let mut chunk = [0u8; 4096];
+        loop {
+            match reader.read(&mut chunk).await {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    emit_owned(
+                        &app,
+                        &mgr,
+                        &lease,
+                        "log",
+                        String::from_utf8_lossy(&chunk[..n]).to_string(),
+                    )
+                    .await
+                }
+            }
+        }
+    });
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn dap_start(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -177,10 +345,26 @@ pub async fn dap_start(
     args: Vec<String>,
     cwd: Option<String>,
     remote_dir: Option<String>,
+    tcp: Option<bool>,
 ) -> Result<DapStatus, String> {
     // Invalid remote input must never fall back to local process execution,
     // and must not revoke an existing owner before validation.
     let remote = validate_remote_dir(remote_dir.as_deref())?;
+    let tcp = tcp.unwrap_or(false);
+    if tcp && remote.is_some() {
+        return Err("debug adapters that use TCP are not supported on remote targets yet".into());
+    }
+    // `{port}` in the arguments is replaced by a free loopback port.
+    let (args, port) = if tcp {
+        let port = free_loopback_port()?;
+        let shown = port.to_string();
+        (
+            args.iter().map(|a| a.replace("{port}", &shown)).collect::<Vec<_>>(),
+            Some(port),
+        )
+    } else {
+        (args, None)
+    };
     let mgr = state.dap.clone();
     let (lease, old) = mgr.reserve(session_id).await?;
     terminate(old).await;
@@ -202,86 +386,98 @@ pub async fn dap_start(
     let cmd = match spawned {
         Ok(command) => command,
         Err(error) => {
-            terminate(
-                mgr.take_owned(&lease.session_id, Some(lease.generation))
-                    .await,
-            )
-            .await;
+            abandon(&mgr, &lease).await;
             return Err(error);
         }
     };
     let (stdout, stderr) = match mgr.spawn_owned(&lease, cmd).await {
         Ok(pipes) => pipes,
         Err(error) => {
-            terminate(
-                mgr.take_owned(&lease.session_id, Some(lease.generation))
-                    .await,
-            )
-            .await;
+            abandon(&mgr, &lease).await;
             return Err(error);
         }
     };
-    let app_out = app.clone();
-    let out_mgr = mgr.clone();
-    let out_lease = lease.clone();
-    tokio::spawn(async move {
-        let mut reader = stdout;
-        let mut parser = dap_frame::FrameParser::default();
-        let mut chunk = [0u8; 8192];
-        let reason = loop {
-            match reader.read(&mut chunk).await {
-                Ok(0) => {
-                    break parser
-                        .finish()
-                        .err()
-                        .unwrap_or_else(|| "adapter stdout closed".into())
-                }
-                Ok(n) => match parser.push(&chunk[..n]) {
-                    Ok(messages) => {
-                        for message in messages {
-                            emit_owned(&app_out, &out_mgr, &out_lease, "message", message).await;
-                        }
-                    }
-                    Err(error) => break error,
-                },
-                Err(error) => break format!("DAP stdout read error: {error}"),
+    let reader: Box<dyn AsyncRead + Send + Unpin> = if let Some(port) = port {
+        let stream = match connect_adapter(&mgr, &lease, port).await {
+            Ok(stream) => stream,
+            Err(error) => {
+                abandon(&mgr, &lease).await;
+                return Err(error);
             }
         };
-        emit_owned(&app_out, &out_mgr, &out_lease, "exit", reason).await;
-        terminate(
-            out_mgr
-                .take_owned(&out_lease.session_id, Some(out_lease.generation))
-                .await,
-        )
-        .await;
-    });
-    if let Some(mut stderr) = stderr {
-        let app_err = app.clone();
-        let err_mgr = mgr.clone();
-        let err_lease = lease.clone();
-        tokio::spawn(async move {
-            let mut chunk = [0u8; 4096];
-            loop {
-                match stderr.read(&mut chunk).await {
-                    Ok(0) | Err(_) => break,
-                    Ok(n) => {
-                        emit_owned(
-                            &app_err,
-                            &err_mgr,
-                            &err_lease,
-                            "log",
-                            String::from_utf8_lossy(&chunk[..n]).to_string(),
-                        )
-                        .await
-                    }
-                }
-            }
-        });
+        let (read_half, write_half) = stream.into_split();
+        if let Err(error) = mgr.set_writer(&lease, Box::new(write_half), port).await {
+            abandon(&mgr, &lease).await;
+            return Err(error);
+        }
+        // The adapter's own stdout is plain log output in this mode.
+        spawn_log_pump(app.clone(), mgr.clone(), lease.clone(), stdout);
+        Box::new(read_half)
+    } else {
+        Box::new(stdout)
+    };
+    spawn_reader(app.clone(), mgr.clone(), lease.clone(), reader, None);
+    if let Some(stderr) = stderr {
+        spawn_log_pump(app.clone(), mgr.clone(), lease.clone(), stderr);
     }
     info!("debug adapter started for session {}", lease.session_id);
     Ok(DapStatus {
         running: true,
         session_id: lease.session_id,
+        port,
+    })
+}
+
+/// Opens another connection to the running TCP adapter (js-debug starts one
+/// per debug target). It lives and dies with the parent session.
+#[tauri::command]
+pub async fn dap_tcp_child(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    parent_session_id: String,
+    session_id: String,
+    port: u16,
+) -> Result<DapStatus, String> {
+    validate_session_id(&parent_session_id)?;
+    validate_session_id(&session_id)?;
+    let mgr = state.dap.clone();
+    let lease = {
+        let inner = mgr.inner.lock().await;
+        if inner.session_id.as_deref() != Some(parent_session_id.as_str()) {
+            return Err("DAP session is not current".into());
+        }
+        if inner.adapter_port != Some(port) {
+            return Err("port does not belong to the debug adapter".into());
+        }
+        if inner.children.len() >= MAX_CHILD_SESSIONS {
+            return Err("too many debug target connections".into());
+        }
+        Lease {
+            generation: inner.generation,
+            session_id: parent_session_id,
+        }
+    };
+    let stream = tokio::time::timeout(TCP_CONNECT_TIMEOUT, TcpStream::connect(("127.0.0.1", port)))
+        .await
+        .map_err(|_| "debug adapter connection timed out".to_owned())?
+        .map_err(|e| format!("could not connect to the debug adapter: {e}"))?;
+    let _ = stream.set_nodelay(true);
+    let (read_half, write_half) = stream.into_split();
+    {
+        let mut inner = mgr.inner.lock().await;
+        if !lease.matches(&inner) {
+            return Err("DAP session ended while connecting".into());
+        }
+        if inner.children.contains_key(&session_id) {
+            return Err("DAP child session ID already in use".into());
+        }
+        inner.children.insert(session_id.clone(), Box::new(write_half));
+    }
+    spawn_reader(app, mgr, lease, read_half, Some(session_id.clone()));
+    Ok(DapStatus {
+        running: true,
+        session_id,
+        port: Some(port),
     })
 }
 
@@ -302,16 +498,24 @@ pub async fn dap_send(
         return Err("DAP message must be an object".into());
     }
     let mut inner = mgr.inner.lock().await;
-    if inner.session_id.as_deref() != Some(session_id.as_str()) {
+    let is_main = inner.session_id.as_deref() == Some(session_id.as_str());
+    if !is_main && !inner.children.contains_key(&session_id) {
         return Err("DAP session is not current".into());
     }
-    let stdin = inner.stdin.as_mut().ok_or("debug adapter is not running")?;
+    let writer: &mut Writer = if is_main {
+        inner.stdin.as_mut().ok_or("debug adapter is not running")?
+    } else {
+        inner
+            .children
+            .get_mut(&session_id)
+            .ok_or("debug adapter is not running")?
+    };
     let result = tokio::time::timeout(IO_TIMEOUT, async {
-        stdin
+        writer
             .write_all(format!("Content-Length: {}\r\n\r\n", message.len()).as_bytes())
             .await?;
-        stdin.write_all(message.as_bytes()).await?;
-        stdin.flush().await
+        writer.write_all(message.as_bytes()).await?;
+        writer.flush().await
     })
     .await;
     let error = match result {
@@ -324,8 +528,15 @@ pub async fn dap_send(
         DAP_EVENT,
         json!({ "session_id": session_id, "channel": "exit", "data": error }),
     );
+    if !is_main {
+        inner.children.remove(&session_id);
+        warn!("{}", error);
+        return Err(error);
+    }
     inner.session_id = None;
     inner.stdin = None;
+    inner.children.clear();
+    inner.adapter_port = None;
     let child = inner.child.take();
     drop(inner);
     terminate(child).await;
@@ -335,6 +546,10 @@ pub async fn dap_send(
 #[tauri::command]
 pub async fn dap_stop(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
     validate_session_id(&session_id)?;
+    // A child connection is closed on its own; the parent session keeps running.
+    if state.dap.inner.lock().await.children.remove(&session_id).is_some() {
+        return Ok(());
+    }
     // A stale stop is an idempotent no-op; it must never stop the replacement.
     terminate(state.dap.take_owned(&session_id, None).await).await;
     Ok(())
@@ -495,6 +710,37 @@ mod lifecycle_tests {
         let command = piscis_kernel::proc::tokio_command("agentz-owned-fixture-never-spawn-this");
         let error = manager.spawn_owned(&lease, command).await.err().unwrap();
         assert_eq!(error, "DAP start was superseded or stopped");
+    }
+    #[tokio::test]
+    async fn tcp_adapter_connect_waits_for_listener_and_respects_revocation() {
+        let manager = DapManager::new();
+        let (lease, _) = manager.reserve(id()).await.unwrap();
+        let port = free_loopback_port().unwrap();
+        // The adapter starts listening only after the first attempts have failed.
+        let listener_task = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await.unwrap();
+            let _ = listener.accept().await;
+        });
+        assert!(connect_adapter(&manager, &lease, port).await.is_ok());
+        listener_task.abort();
+        manager.take_owned(&lease.session_id, None).await;
+        let error = connect_adapter(&manager, &lease, port).await.err().unwrap();
+        assert_eq!(error, "DAP start was superseded or stopped");
+    }
+    #[tokio::test]
+    async fn revoking_the_parent_drops_child_connections() {
+        let manager = DapManager::new();
+        let (lease, _) = manager.reserve(id()).await.unwrap();
+        {
+            let mut inner = manager.inner.lock().await;
+            inner.adapter_port = Some(1);
+            inner.children.insert(id(), Box::new(tokio::io::sink()));
+        }
+        manager.take_owned(&lease.session_id, None).await;
+        let inner = manager.inner.lock().await;
+        assert!(inner.children.is_empty());
+        assert!(inner.adapter_port.is_none());
     }
     #[test]
     fn malformed_remote_never_becomes_local() {

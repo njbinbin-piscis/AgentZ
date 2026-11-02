@@ -73,13 +73,13 @@ export default function BottomPanel({
     ];
     if (bgReq) list.push({ id: "bgtask", label: t("ide.bgOutputTab") || "Background output" });
     if (ui.outputChannels.length) list.push({ id: "output", label: t("ide.output") || "Output", count: ui.outputChannels.length });
-    if (ui.debugOutput.length || ui.running) list.push({ id: "debug", label: t("ide.debugConsole") || "Debug Console", count: ui.debugOutput.length });
+    if (projectDir || ui.debugOutput.length || ui.running) list.push({ id: "debug", label: t("ide.debugConsole") || "Debug Console", count: ui.debugOutput.length });
     if (ui.treeViews.length) list.push({ id: "views", label: t("ide.views") || "Views", count: ui.treeViews.length });
     if (ui.scm.length) list.push({ id: "scm", label: t("ide.sourceControl") || "Source Control", count: scmCount });
     if (ui.tests.length) list.push({ id: "tests", label: t("ide.testing") || "Testing", count: ui.tests.length });
     if (ui.webviews.length) list.push({ id: "webviews", label: t("ide.webviews") || "Webviews", count: ui.webviews.length });
     return list;
-  }, [t, bgReq, ui.outputChannels.length, ui.debugOutput.length, ui.running, ui.treeViews.length, ui.scm.length, ui.tests.length, ui.webviews.length, scmCount]);
+  }, [t, bgReq, projectDir, ui.outputChannels.length, ui.debugOutput.length, ui.running, ui.treeViews.length, ui.scm.length, ui.tests.length, ui.webviews.length, scmCount]);
 
   // If the active tab disappears (extension unloaded), fall back to terminal.
   const current = tabs.some((tb) => tb.id === activeTab) ? activeTab : "terminal";
@@ -158,7 +158,7 @@ export default function BottomPanel({
 
         {current === "debug" && (
           <div className="ide-bottom-pane scroll">
-            <DebugView />
+            <DebugView projectDir={projectDir} />
           </div>
         )}
 
