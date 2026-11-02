@@ -133,3 +133,32 @@ export function buildWebviewSrcDoc(html: string, enableScripts: boolean, nonce?:
   return `${doctype}<html><head>${injection}</head><body>${body}</body></html>`;
 }
 
+/** Nonce the host page's CSP trusts (Tauri injects one into script-src/style-src). */
+export function appCspNonce(): string | undefined {
+  const fromPage = typeof document !== "undefined"
+    ? document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce
+    : undefined;
+  if (fromPage) return fromPage;
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : undefined;
+}
+
+/**
+ * Document for the file HTML preview iframe. Inline scripts/styles get the
+ * host nonce (the iframe inherits the host CSP, which blocks un-nonced inline
+ * code). Pair with `sandbox="allow-scripts"` and NO allow-same-origin so the
+ * page runs in an opaque origin and cannot reach the app or Tauri IPC. The
+ * extra policy blocks network calls, form posts, plugins and <base>.
+ */
+export function buildHtmlPreviewSrcDoc(html: string, nonce = appCspNonce()): string {
+  const validNonce = nonce && /^[A-Za-z0-9+/_=-]{16,128}$/.test(nonce) ? nonce : undefined;
+  if (!validNonce) return html;
+  const csp = [
+    `script-src 'nonce-${validNonce}'`,
+    "connect-src 'none'",
+    "form-action 'none'",
+    "object-src 'none'",
+    "base-uri 'none'",
+  ].join("; ");
+  const body = setInlineNonces(html, validNonce, true, true, undefined);
+  return `<meta http-equiv="Content-Security-Policy" content="${csp}">${body}`;
+}

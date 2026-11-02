@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.42] - 2026-11-02
+
+### Fixed
+
+- **Scripts run in HTML file previews.** The HTML preview in the editor and the agent file preview used a sandbox without `allow-scripts`, so page JavaScript never ran. Previews now run scripts in an isolated origin: no access to the app, no network requests, no form posts. `localStorage` and external CDN scripts are not available there.
+
 ## [1.0.41] - 2026-11-02
 
 ### Added

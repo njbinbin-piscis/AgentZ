@@ -2,7 +2,7 @@
 
 **English** | [简体中文](RELEASE.zh-CN.md)
 
-Current source version: **1.0.41**. See the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md), [historical support baseline](docs/upgrade/evidence/AZ-005-support-matrix.md), [current upgrade progress](docs/upgrade/progress.md), [1.0.41 release notes](docs/upgrade/release-notes-1.0.41.md), and [1.0.41 checklist](docs/upgrade/release-checklist-1.0.41.md) for the recorded scope and checks.
+Current source version: **1.0.42**. See the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md), [historical support baseline](docs/upgrade/evidence/AZ-005-support-matrix.md), [current upgrade progress](docs/upgrade/progress.md), [1.0.42 release notes](docs/upgrade/release-notes-1.0.42.md), and [1.0.42 checklist](docs/upgrade/release-checklist-1.0.42.md) for the recorded scope and checks.
 
 ## Build and distribution boundary
 

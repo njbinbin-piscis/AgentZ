@@ -4,6 +4,7 @@ import { ideApi } from "../../services/tauri/ide";
 import { recordUserRecentEdit } from "../../services/tauri/chat";
 import type { FileContent } from "../codez/types";
 import Markdown from "../codez/Markdown";
+import { buildHtmlPreviewSrcDoc } from "../../extensions/ui/webviewSecurity";
 import ImagePreview from "../codez/ImagePreview";
 import { isHtmlPath, isImagePath, isMarkdownPath } from "../codez/FileIcon";
 import {
@@ -52,9 +53,10 @@ function languageForPath(path: string, lang: string | null | undefined): string 
 }
 
 function HtmlPreviewPane({ content }: { content: string }) {
+  const srcDoc = useMemo(() => buildHtmlPreviewSrcDoc(content), [content]);
   return (
     <div className="agentz-workz-preview-html">
-      <iframe title="HTML preview" sandbox="allow-same-origin" srcDoc={content} />
+      <iframe title="HTML preview" sandbox="allow-scripts allow-forms allow-modals" srcDoc={srcDoc} />
     </div>
   );
 }

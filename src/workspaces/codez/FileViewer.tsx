@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import CodeEditor, { type EditorConflictBannerProps } from "./CodeEditor";
 import ImagePreview from "./ImagePreview";
@@ -6,6 +7,7 @@ import NotebookEditor from "../../extensions/notebook/NotebookEditor";
 import { isHtmlPath, isMarkdownPath, isPreviewablePath } from "./FileIcon";
 import type { OpenTab, TabViewMode } from "./types";
 import "./MarkdownPreview.css";
+import { buildHtmlPreviewSrcDoc } from "../../extensions/ui/webviewSecurity";
 
 interface FileViewerProps {
   tab: OpenTab;
@@ -18,12 +20,13 @@ interface FileViewerProps {
 }
 
 function HtmlPreview({ content }: { content: string }) {
+  const srcDoc = useMemo(() => buildHtmlPreviewSrcDoc(content), [content]);
   return (
     <div className="agentz-html-preview">
       <iframe
         title="HTML preview"
-        sandbox="allow-same-origin"
-        srcDoc={content}
+        sandbox="allow-scripts allow-forms allow-modals"
+        srcDoc={srcDoc}
       />
     </div>
   );
