@@ -364,6 +364,7 @@ export default function CodeZWorkspace(props: IDEProps) {
                 reveal={s.reveal && s.reveal.path === s.activeTab.path ? s.reveal : null}
                 onChange={s.handleEditorChange}
                 onViewModeChange={(mode) => s.setTabViewMode(s.activeTab!.path, mode)}
+                onOpenInBrowser={projectDir ? () => void s.openFileInBrowser(s.activeTab!.path) : undefined}
                 onSave={() => {
                   const p = s.activeTabPathRef.current;
                   if (p && !p.startsWith("diff:")) s.saveFile(p);

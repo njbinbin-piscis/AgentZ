@@ -16,6 +16,8 @@ interface FileViewerProps {
   onChange: (value: string) => void;
   onSave?: () => void;
   onViewModeChange: (mode: TabViewMode) => void;
+  /** Load this file in the embedded browser over file:// (full JS/network). */
+  onOpenInBrowser?: () => void;
   conflict?: EditorConflictBannerProps | null;
 }
 
@@ -39,6 +41,7 @@ export default function FileViewer({
   onChange,
   onSave,
   onViewModeChange,
+  onOpenInBrowser,
   conflict,
 }: FileViewerProps) {
   const { t } = useTranslation();
@@ -92,6 +95,11 @@ export default function FileViewer({
           >
             {t("ide.viewPreview")}
           </button>
+          {onOpenInBrowser && isHtmlPath(tab.path) && !tab.isReadOnly && (
+            <button type="button" onClick={onOpenInBrowser} title={t("ide.openInBrowserHint")}>
+              {t("ide.openInBrowser")}
+            </button>
+          )}
         </div>
       )}
 

@@ -15,11 +15,12 @@ import { getBgTerminal, subscribeBgTerminal } from "../../services/bgTerminal";
 import { extHostResourceSnapshot } from "../../services/tauri/extHostResource";
 import { graphIndexResourceSnapshot } from "../../services/tauri/graphIndexResource";
 import { fileUriString } from "../../services/tauri/editorUri";
-import { BROWSER_TAB_PATH, isBrowserTab } from "./browserTab";
+import { BROWSER_TAB_PATH, isBrowserTab, localFileUrl } from "./browserTab";
 import { getActiveChatSession } from "../../services/activeChatSession";
 import {
   browserClose,
   browserCloseGuard,
+  browserNavigate,
   onBrowserChanged,
   type PickedElement,
 } from "../../services/tauri/browser";
@@ -224,6 +225,24 @@ export function useCodezWorkspace({
       isBrowserTab(cur) ? tabsRef.current[0]?.path ?? null : cur,
     );
   }, [browserOpen, projectDir]);
+
+  /** Open a local file (HTML) in the embedded browser tab via file://. */
+  const openFileInBrowser = useCallback(
+    async (path: string) => {
+      if (!projectDir || path.startsWith("agentz-remote://")) return;
+      const abs = joinProjectPath(projectDir, path);
+      try {
+        await browserNavigate(getActiveChatSession() ?? "", localFileUrl(abs));
+      } catch (e) {
+        // eslint-disable-next-line no-alert
+        window.alert(String(e));
+        return;
+      }
+      onBrowserOpenChange?.(true);
+      setActiveTabPath(BROWSER_TAB_PATH);
+    },
+    [projectDir, onBrowserOpenChange],
+  );
 
   const requestBrowserClose = useCallback(async (): Promise<boolean> => {
     try {
@@ -1463,6 +1482,6 @@ export function useCodezWorkspace({
   ]);
 
   return {
-    t, ideRef, sidebarTab, sidebarCollapsed, switchSidebarTab, gitModified, gitAdded, bottomOpen, setBottomOpen, sidebarWidth, fileTree, showHiddenFiles, toggleShowHiddenFiles, fileTreeFocusPath, fileTreeSelection, openFile, scheduleWorkspaceRefresh, handleFileTreeSelect, handleFileTreeContextMenu, fileTreeRef, explorerExpanded, setExplorerExpanded, revealInFile, openDiff, startSidebarResize, headerTabs, activeTabPath, setActiveTabPath, handleTabClose, saveFile, handleTabContextMenu, closeAllTabs, closeSavedTabs, closeOtherTabs, reloadTabFromDisk, tabContextMenu, setTabContextMenu, setRemoteDialogOpen, fileLoading, fileLoadError, setFileLoadError, browserRefreshSignal, agentBrowserAction, requestBrowserClose, activeTab, reveal, handleEditorChange, setTabViewMode, activeTabPathRef, diskConflicts, handleViewConflictDiff, handleAcceptDiskConflict, handleKeepMineConflict, startBottomResize, bottomTab, setBottomTab, bottomHeight, openBottomPanel, openExtensionsSidebar, remoteDialogOpen, paletteOpen, setPaletteOpen, paletteMode, tabs, paletteCommands, fileTreeContextMenu, setFileTreeContextMenu, projectDirRef,
+    t, ideRef, sidebarTab, sidebarCollapsed, switchSidebarTab, gitModified, gitAdded, bottomOpen, setBottomOpen, sidebarWidth, fileTree, showHiddenFiles, toggleShowHiddenFiles, fileTreeFocusPath, fileTreeSelection, openFile, scheduleWorkspaceRefresh, handleFileTreeSelect, handleFileTreeContextMenu, fileTreeRef, explorerExpanded, setExplorerExpanded, revealInFile, openDiff, startSidebarResize, headerTabs, activeTabPath, setActiveTabPath, handleTabClose, saveFile, handleTabContextMenu, closeAllTabs, closeSavedTabs, closeOtherTabs, reloadTabFromDisk, tabContextMenu, setTabContextMenu, setRemoteDialogOpen, fileLoading, fileLoadError, setFileLoadError, browserRefreshSignal, agentBrowserAction, requestBrowserClose, openFileInBrowser, activeTab, reveal, handleEditorChange, setTabViewMode, activeTabPathRef, diskConflicts, handleViewConflictDiff, handleAcceptDiskConflict, handleKeepMineConflict, startBottomResize, bottomTab, setBottomTab, bottomHeight, openBottomPanel, openExtensionsSidebar, remoteDialogOpen, paletteOpen, setPaletteOpen, paletteMode, tabs, paletteCommands, fileTreeContextMenu, setFileTreeContextMenu, projectDirRef,
   };
 }

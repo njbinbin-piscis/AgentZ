@@ -834,6 +834,24 @@ pub(crate) struct SubagentOutcome {
     pub model_fallback: bool,
 }
 
+/// Failure of one sub-agent attempt. `retryable` means nothing ran yet (model
+/// could not be resolved, or the first LLM call failed before any tool use),
+/// so retrying on the parent's model cannot repeat side effects.
+struct SubagentAttemptError {
+    error: anyhow::Error,
+    retryable: bool,
+}
+
+impl SubagentAttemptError {
+    fn fatal(error: anyhow::Error) -> Self {
+        Self { error, retryable: false }
+    }
+}
+
+/// Runs a sub-agent on its preferred model (agent manifest, then the global
+/// flash model). If that model cannot serve the run - e.g. its API key
+/// expired - retry once on the parent's model: the parent turn is already
+/// working with it, so the sub-agent can too.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_subagent_with_options(
     app: tauri::AppHandle,
@@ -848,23 +866,92 @@ pub(crate) async fn run_subagent_with_options(
     budget: crate::runtime::task_budget::BudgetScope,
     options: SubagentOptions,
 ) -> Result<SubagentOutcome> {
+    let first = run_subagent_attempt(
+        app.clone(),
+        db.clone(),
+        settings.clone(),
+        plan_store.clone(),
+        lsp_manager.clone(),
+        workspace_root.clone(),
+        system_prompt.clone(),
+        task.clone(),
+        cancel.clone(),
+        budget.clone(),
+        options.clone(),
+        false,
+    )
+    .await;
+    match first {
+        Ok(outcome) => Ok(outcome),
+        Err(e) if e.retryable && !cancel.load(std::sync::atomic::Ordering::Relaxed) => {
+            tracing::warn!("sub-agent failed on its own model, retrying on the parent model: {}", e.error);
+            run_subagent_attempt(
+                app,
+                db,
+                settings,
+                plan_store,
+                lsp_manager,
+                workspace_root,
+                system_prompt,
+                task,
+                cancel,
+                budget,
+                options,
+                true,
+            )
+            .await
+            .map(|mut o| {
+                o.model_fallback = true;
+                o
+            })
+            .map_err(|e2| e2.error.context(format!("(first attempt: {})", e.error)))
+        }
+        Err(e) => Err(e.error),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_subagent_attempt(
+    app: tauri::AppHandle,
+    db: Arc<Mutex<piscis_kernel::store::db::Database>>,
+    settings: Arc<Mutex<Settings>>,
+    plan_store: PlanStore,
+    lsp_manager: Arc<LspManager>,
+    workspace_root: String,
+    system_prompt: String,
+    task: String,
+    cancel: Arc<AtomicBool>,
+    budget: crate::runtime::task_budget::BudgetScope,
+    options: SubagentOptions,
+    use_parent_model: bool,
+) -> std::result::Result<SubagentOutcome, SubagentAttemptError> {
     let max_concurrent = crate::commands::data_scope::resolve_global_config_dir(&app)
         .map(|d| crate::commands::delegation::load_config(&d).max_concurrent)
         .unwrap_or(crate::commands::delegation::DEFAULT_MAX_CONCURRENT);
     let _slot = crate::commands::delegation::try_acquire(max_concurrent)
-        .map_err(|e| anyhow!(e))?;
+        .map_err(|e| SubagentAttemptError::fatal(anyhow!(e)))?;
     let flash_id = crate::commands::data_scope::resolve_global_config_dir(&app)
         .ok()
         .and_then(|dir| crate::commands::flash::load_flash_provider_id(&dir));
     let (runtime, model_fallback) = {
         let s = settings.lock().await;
-        let preferred = options
-            .provider_id
-            .clone()
-            .filter(|id| s.find_llm_provider(id).is_some())
-            .or_else(|| flash_id.filter(|id| s.find_llm_provider(id).is_some()));
+        let preferred = if use_parent_model {
+            None
+        } else {
+            options
+                .provider_id
+                .clone()
+                .filter(|id| s.find_llm_provider(id).is_some())
+                .or_else(|| flash_id.filter(|id| s.find_llm_provider(id).is_some()))
+        };
         let fallback = preferred.is_none();
-        (resolve_llm_runtime(&s, preferred.as_deref())?, fallback)
+        // A preferred model with no usable key fails here; the caller then
+        // retries on the parent's model. The parent's own model failing is final.
+        let rt = resolve_llm_runtime(&s, preferred.as_deref()).map_err(|e| SubagentAttemptError {
+            error: e,
+            retryable: preferred.is_some(),
+        })?;
+        (rt, fallback)
     };
 
     let mut registry = build_subagent_registry(
@@ -1078,7 +1165,14 @@ pub(crate) async fn run_subagent_with_options(
             timed_out: false,
             model_fallback,
         }),
-        Ok(Err(e)) => Err(anyhow!("sub-agent failed: {e}")),
+        Ok(Err(e)) => Err(SubagentAttemptError {
+            error: anyhow!("sub-agent failed: {e}"),
+            // Only when this attempt used a non-parent model and had no
+            // side effects yet; the parent's model is the last resort.
+            retryable: !model_fallback
+                && tool_calls == 0
+                && edited_paths.is_empty(),
+        }),
         Err(_) => Ok(SubagentOutcome {
             edited_paths,
             text: format!(

@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.43] - 2026-11-02
+
+### Added
+
+- **Open HTML in the built-in browser.** The HTML file toolbar has an *Open in browser* button that loads the file over `file://` in the built-in browser tab, with full scripts, storage and network.
+
+### Fixed
+
+- **Sub-agents fall back to the parent model.** A sub-agent whose own model (agent setting or global flash model) cannot run, for example because its API key expired, is retried once on the model the parent turn is using. This only happens before it has used a tool or edited a file.
+
 ## [1.0.42] - 2026-11-02
 
 ### Fixed
