@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.44] - 2026-11-02
+
+### Fixed
+
+- **Timed-out chat forms no longer stay pinned.** When `chat_ui` gave up waiting for an answer (5 minutes) and the agent continued with defaults, the form stayed at the bottom of the conversation. It is now retired at the deadline; a new listen request restarts the wait.
+
 ## [1.0.43] - 2026-11-02
 
 ### Added
