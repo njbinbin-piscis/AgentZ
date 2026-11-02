@@ -13,6 +13,13 @@ const zh = {
     search: "搜索",
   },
 
+  notifications: {
+    title: "通知",
+    refresh: "刷新",
+    clear: "清空",
+    loading: "加载中…",
+    empty: "暂无通知",
+  },
   studio: {
     agents: "智能体",
     teams: "团队",
@@ -486,6 +493,7 @@ const zh = {
   },
   app: {
     saveBeforeProjectSwitch: "切换项目前，请先保存或关闭已编辑的文件和未保存的草稿。",
+    projectOpenElsewhere: "{{path}} 已在另一个 AgentZ 窗口中打开。",
     projectSwitchSaveFailed: "无法保存工作区状态，已取消项目切换。",
     saveBeforeProjectClose: "关闭项目前，请先保存或关闭已编辑的文件和未保存的草稿。",
     projectCloseSaveFailed: "无法保存工作区状态，已取消关闭项目。",
@@ -653,6 +661,7 @@ const zh = {
   },
 
   settings: {
+    conflict: "设置已在另一个 AgentZ 窗口中被修改，已重新加载最新值，请检查后再保存。",
     delegationTitle: "子智能体委派",
     delegationDescription: "控制主智能体是否可以把工作交给子智能体，让子任务的过程不占用主上下文。",
     delegationMode: "委派模式",

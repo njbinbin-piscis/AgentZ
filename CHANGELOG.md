@@ -5,6 +5,22 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Clear notifications.** The notifications dropdown has a Clear button next to Refresh.
+
+### Fixed
+
+- **One project per AgentZ window.** Opening a project that another running instance already has open is refused with a message, instead of two windows sharing one project's state.
+- **Background tasks survive a second instance.** A second window no longer marks the first window's running background tasks as interrupted or takes over their continuations; each running task holds an OS-level lease.
+- **Workspace state is not wiped by other windows.** `workspace.json` is written atomically, and a window without a project no longer erases the last-opened project unless the user explicitly closed it.
+- **Concurrent settings saves.** `config.json` writes take a cross-process lock. Saving a form that another window changed in the meantime is refused, and the latest values are reloaded. Settings also refresh when the window regains focus.
+- **SQLite busy errors across instances.** The kernel database and `index.db` wait up to 5 s for a lock instead of failing immediately (engine `Database::open` sets `busy_timeout`).
+- **Duplicate notifications.** A run retried several times showed one notification per attempt. The dropdown now shows one row per task, the unread count counts tasks, and opening a row marks all of that task's notices read.
+- **Notification strings are translated.** The dropdown title, the bell tooltip, the Refresh, Clear, loading and empty texts are localized.
+
 ## [1.0.40] - 2026-11-02
 
 ### Added

@@ -780,6 +780,9 @@ impl Database {
         let conn = Connection::open(path)
             .with_context(|| format!("Failed to open database at {:?}", path))?;
 
+        // Other app instances may hold the write lock briefly; wait instead of
+        // failing immediately with SQLITE_BUSY.
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         // Enable WAL mode for better concurrent read performance
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
 

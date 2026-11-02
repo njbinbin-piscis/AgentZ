@@ -6,7 +6,8 @@
 //! `interrupted` and (b) re-dispatch continuations that were parked when
 //! the app closed.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex as StdMutex;
 
 use piscis_kernel::background::BgSnapshot;
@@ -31,11 +32,55 @@ fn now_unix_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// OS-locked lease files for tasks running in this process; the OS drops
+/// them if the process dies, so other instances can tell live from stale.
+static LEASES: StdMutex<Option<HashMap<String, std::fs::File>>> = StdMutex::new(None);
+
+fn lease_path(project_dir: &str, bg_id: &str) -> Option<PathBuf> {
+    if project_dir.contains("://") {
+        return None;
+    }
+    let safe: String = bg_id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect();
+    Some(
+        Path::new(project_dir)
+            .join(".agentz")
+            .join("bg-owners")
+            .join(format!("{safe}.lease")),
+    )
+}
+
+fn update_lease(project_dir: &str, bg_id: &str, running: bool) {
+    let Some(path) = lease_path(project_dir, bg_id) else {
+        return;
+    };
+    let mut guard = LEASES.lock().unwrap();
+    let map = guard.get_or_insert_with(HashMap::new);
+    if running {
+        if map.contains_key(bg_id) {
+            return;
+        }
+        if let Ok(Some(file)) = crate::runtime::os_lock::try_lock(&path) {
+            map.insert(bg_id.to_string(), file);
+        }
+    } else if map.remove(bg_id).is_some() {
+        let _ = std::fs::remove_file(&path);
+    }
+}
+
+fn lease_held(project_dir: &str, bg_id: &str) -> bool {
+    lease_path(project_dir, bg_id)
+        .is_some_and(|p| crate::runtime::os_lock::is_held(&p).unwrap_or(false))
+}
+
 /// Mirror a ready/terminal snapshot into the project DB (best-effort).
 pub async fn record_snapshot(app: &AppHandle, snap: &BgSnapshot, kind: &str) {
     if snap.workspace_root.is_empty() {
         return;
     }
+    update_lease(&snap.workspace_root, &snap.id, snap.status == "running");
     let Ok((db, _settings)) = open_project_kernel_state(app, &snap.workspace_root) else {
         return;
     };
@@ -117,6 +162,12 @@ static RECONCILED: StdMutex<Option<HashSet<String>>> = StdMutex::new(None);
 /// processes died with the previous app instance) become `interrupted`,
 /// and persisted continuations are re-dispatched through the hub.
 pub async fn reconcile_project(app: &AppHandle, state: &AppState, project_dir: &str) {
+    // The owning instance reconciles its own tasks and continuations.
+    if let Ok(config_dir) = crate::commands::data_scope::resolve_global_config_dir(app) {
+        if crate::runtime::project_lock::held_elsewhere(&config_dir, project_dir) {
+            return;
+        }
+    }
     {
         let mut guard = RECONCILED.lock().unwrap();
         let set = guard.get_or_insert_with(HashSet::new);
@@ -132,7 +183,7 @@ pub async fn reconcile_project(app: &AppHandle, state: &AppState, project_dir: &
                     .background_runs
                     .get(&id)
                     .is_some_and(|e| e.snapshot().status == "running");
-                if !live {
+                if !live && !lease_held(project_dir, &id) {
                     let _ = guard.mark_background_task_status(&id, "interrupted");
                 }
             }

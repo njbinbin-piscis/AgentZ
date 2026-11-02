@@ -72,9 +72,18 @@ export async function listNotifications(scopeHandle: string, limit = 50): Promis
   return { notices: page.notices.map(notice), unread_count: page.unread_count as number };
 }
 
-export async function markNotificationRead(scopeHandle: string, eventKey: string): Promise<boolean> {
+/** Marks the notice and, when `taskId` is given, every other notice of that task. */
+export async function markNotificationRead(scopeHandle: string, eventKey: string, taskId?: string): Promise<boolean> {
   id(scopeHandle, 256); id(eventKey, 512);
-  const result: unknown = await invoke("notification_inbox_mark_read", { scopeHandle, eventKey });
+  if (taskId !== undefined) id(taskId, 256);
+  const result: unknown = await invoke("notification_inbox_mark_read", { scopeHandle, eventKey, taskId: taskId ?? null });
   if (typeof result !== "boolean") throw new Error("Invalid inbox mark-read result");
   return result;
+}
+
+export async function clearNotifications(scopeHandle: string): Promise<number> {
+  id(scopeHandle, 256);
+  const result: unknown = await invoke("notification_inbox_clear", { scopeHandle });
+  if (!Number.isSafeInteger(result) || (result as number) < 0) throw new Error("Invalid inbox clear result");
+  return result as number;
 }

@@ -11,6 +11,8 @@ import { preflightWorkspaceNavigation } from "./services/workspaceNavigation";
 import {
   workspaceLoad,
   workspaceSave,
+  projectLockAcquire,
+  projectLockRelease,
   workspaceCloseAck,
   type EditorSnapshot,
   type LayoutSnapshot,
@@ -210,6 +212,25 @@ export default function App() {
     ? graphIndexVisualState(graphIndexStatus)
     : null;
   const [settingsToast, setSettingsToast] = useState<string | null>(null);
+  const flashToast = useCallback((message: string, ms = 5000) => {
+    setSettingsToast(message);
+    window.setTimeout(() => setSettingsToast((cur) => (cur === message ? null : cur)), ms);
+  }, []);
+  /** False when another AgentZ instance already has `dir` open. */
+  const claimProject = useCallback(
+    async (dir: string) => {
+      try {
+        const lock = await projectLockAcquire(dir);
+        if (lock.status !== "held_elsewhere") return true;
+        flashToast(t("app.projectOpenElsewhere", { path: dir }));
+        return false;
+      } catch (e) {
+        console.error("project lock failed:", e);
+        return true;
+      }
+    },
+    [flashToast, t],
+  );
   const [ideWikiOpenPath, setIdeWikiOpenPath] = useState<{ path: string; nonce: number } | null>(
     null,
   );
@@ -380,6 +401,11 @@ export default function App() {
             if (cancelled) return;
           }
         }
+        if (!(await claimProject(restoredDir))) {
+          if (!cancelled) setWorkspaceReady(true);
+          return;
+        }
+        if (cancelled) return;
         setProjectDir(restoredDir);
         setWorkspaceReady(true);
       })
@@ -498,6 +524,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Another instance may have saved config.json while this window was in the background.
+    const onFocus = () => notifySettingsRefresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
+  useEffect(() => {
     const syncFont = () => {
       setFontScale(getUiFontScale());
       setEditorBaseFontSizeState(getEditorBaseFontSize());
@@ -571,6 +604,9 @@ export default function App() {
     if (!navigationOwned) projectNavigationBusy.current = true;
     try {
       if (projectDir && normProjectPath(dir) === normProjectPath(projectDir)) return true;
+      if (!(await claimProject(dir))) return false;
+      let switched = false;
+      try {
       const readSnapshot = () => {
         if (!liveEditorSnapshot.current) throw new Error("Live editor snapshot unavailable");
         return { ...buildWorkspaceSnapshot(), editor: liveEditorSnapshot.current() };
@@ -598,6 +634,8 @@ export default function App() {
       if (previousScope) await revokeProjectScope(previousScope.handle);
       if (!stillCurrent()) return false;
       setProjectDir(dir);
+      switched = true;
+      if (projectDir) void projectLockRelease(projectDir).catch(() => {});
       if (!isRemoteDir(dir)) {
         workzProjectAdd(dir)
           .then((ov) => setRecentProjects(ov.projects.filter((p) => p.exists)))
@@ -610,13 +648,16 @@ export default function App() {
         }
       }
       return true;
+      } finally {
+        if (!switched) void projectLockRelease(dir).catch(() => {});
+      }
     } catch (e) {
       console.error("switchProject failed:", e);
     } finally {
       if (!navigationOwned) projectNavigationBusy.current = false;
     }
     },
-    [projectDir, t, buildWorkspaceSnapshot],
+    [projectDir, t, buildWorkspaceSnapshot, claimProject],
   );
 
   useEffect(() => {
@@ -744,6 +785,8 @@ export default function App() {
       setChatInsertElement(null);
       void browserCloseAll().catch(() => {});
       setProjectDir(null);
+      void projectLockRelease(projectDir).catch(() => {});
+      void workspaceSave({ ...checked.snapshot, project_dir: null }, true).catch(() => {});
     } catch (e) {
       console.error("closeProject failed:", e);
     } finally {

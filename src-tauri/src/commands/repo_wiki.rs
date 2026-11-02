@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use piscis_kernel::llm::{self, LlmMessage, LlmRequest, MessageContent};
-use rusqlite::{params, Connection};
+use rusqlite::params;
 use sha2::{Digest, Sha256};
 use tauri::AppHandle;
 
@@ -26,10 +26,6 @@ use crate::commands::graph_db::{
     export_repo_memory_markdown, open_graph_db, query_repo_notes, sync_from_graph_doc, RepoNote,
 };
 use crate::commands::symbols::{extract_file_skeleton, SymbolSkeleton};
-
-fn index_db_path(root: &Path) -> PathBuf {
-    root.join(".agentz").join("index.db")
-}
 
 /// Per-module aggregate stats accumulated from the index.
 #[derive(Default)]
@@ -230,7 +226,7 @@ fn collect_module_skeleton(
 
 /// Build the Track 1 deterministic architecture wiki markdown for `root`.
 pub fn generate(root: &Path, project_name: &str) -> Result<String, String> {
-    let conn = Connection::open(index_db_path(root)).map_err(|e| format!("open index db: {e}"))?;
+    let conn = crate::commands::codebase::open_index_db(root)?;
     let has_chunks: i64 = conn
         .query_row("SELECT COUNT(*) FROM chunks", [], |r| r.get(0))
         .unwrap_or(0);
@@ -239,7 +235,7 @@ pub fn generate(root: &Path, project_name: &str) -> Result<String, String> {
         build_index(root)?;
     }
 
-    let conn = Connection::open(index_db_path(root)).map_err(|e| format!("open index db: {e}"))?;
+    let conn = crate::commands::codebase::open_index_db(root)?;
     let mut stmt = conn
         .prepare("SELECT path, COUNT(*) FROM chunks GROUP BY path")
         .map_err(|e| format!("prepare: {e}"))?;

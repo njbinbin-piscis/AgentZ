@@ -13,6 +13,13 @@ const en = {
     search: "Search",
   },
 
+  notifications: {
+    title: "Notifications",
+    refresh: "Refresh",
+    clear: "Clear",
+    loading: "Loading…",
+    empty: "No notifications",
+  },
   studio: {
     agents: "Agents",
     teams: "Teams",
@@ -497,6 +504,7 @@ const en = {
   },
   app: {
     saveBeforeProjectSwitch: "Save or close your edited files and unsaved drafts before switching projects.",
+    projectOpenElsewhere: "{{path}} is already open in another AgentZ window.",
     projectSwitchSaveFailed: "Could not preserve the workspace. Project switching was cancelled.",
     saveBeforeProjectClose: "Save or close your edited files and unsaved drafts before closing the project.",
     projectCloseSaveFailed: "Could not preserve the workspace. Project closing was cancelled.",
@@ -665,6 +673,7 @@ const en = {
   },
 
   settings: {
+    conflict: "Settings were changed in another AgentZ window. The latest values have been reloaded; review them and save again.",
     delegationTitle: "Sub-agent delegation",
     delegationDescription:
       "Controls whether the main agent can hand work to sub-agents so their steps stay out of the main context.",

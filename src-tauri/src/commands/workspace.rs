@@ -172,13 +172,49 @@ pub async fn workspace_load(app: AppHandle) -> Result<Option<WorkspaceSnapshot>,
     Ok(Some(sanitize_snapshot(snap)))
 }
 
+/// `explicit_close` is set when the user closed the project. Otherwise an instance
+/// without a project (e.g. one refused by the project lock) keeps the saved project.
 #[tauri::command]
-pub async fn workspace_save(app: AppHandle, snapshot: WorkspaceSnapshot) -> Result<(), String> {
+pub async fn workspace_save(
+    app: AppHandle,
+    snapshot: WorkspaceSnapshot,
+    explicit_close: Option<bool>,
+) -> Result<(), String> {
     let dir = resolve_global_config_dir(&app)?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = workspace_state_path(&dir);
     let snap = sanitize_snapshot(snapshot);
+    if snap.project_dir.is_none() && !explicit_close.unwrap_or(false) {
+        let saved = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|t| serde_json::from_str::<WorkspaceSnapshot>(&t).ok())
+            .is_some_and(|s| s.project_dir.is_some());
+        if saved {
+            return Ok(());
+        }
+    }
     let text = serde_json::to_string_pretty(&snap).map_err(|e| e.to_string())?;
-    std::fs::write(workspace_state_path(&dir), text).map_err(|e| e.to_string())?;
+    let tmp = path.with_extension(format!("json.{}.tmp", std::process::id()));
+    std::fs::write(&tmp, text).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        e.to_string()
+    })?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn project_lock_acquire(
+    app: AppHandle,
+    project_dir: String,
+) -> Result<crate::runtime::project_lock::Acquire, String> {
+    let dir = resolve_global_config_dir(&app)?;
+    crate::runtime::project_lock::acquire(&dir, &project_dir)
+}
+
+#[tauri::command]
+pub async fn project_lock_release(project_dir: String) -> Result<(), String> {
+    crate::runtime::project_lock::release(&project_dir);
     Ok(())
 }
 

@@ -124,6 +124,7 @@ pub fn run() {
             commands::gateway::spawn_inbound_consumer(app.handle().clone());
             // Hydrate the persisted cloud marketplace base URL override.
             commands::marketplace::hydrate_cloud_base_override(app.handle());
+            commands::settings::init_settings_lock(app.handle());
             // Background tasks: route registry completions into session
             // continuations + UI events.
             if let Some(state) = app.try_state::<AppState>() {
@@ -150,6 +151,7 @@ pub fn run() {
             commands::chat_events::chat_current_run,
             commands::notification_inbox::notification_inbox_list,
             commands::notification_inbox::notification_inbox_mark_read,
+            commands::notification_inbox::notification_inbox_clear,
             commands::automation_reminder::automation_reminder_status,
             commands::automation_reminder::automation_reminder_set,
             commands::automation_reminder::automation_reminder_disable,
@@ -479,6 +481,8 @@ pub fn run() {
             commands::workspace::workspace_load,
             commands::workspace::workspace_save,
             commands::workspace::workspace_close_ack,
+            commands::workspace::project_lock_acquire,
+            commands::workspace::project_lock_release,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the AgentZ desktop application")

@@ -58,8 +58,23 @@ export function workspaceLoad(): Promise<WorkspaceSnapshot | null> {
   return invoke<WorkspaceSnapshot | null>("workspace_load");
 }
 
-export function workspaceSave(snapshot: WorkspaceSnapshot): Promise<void> {
-  return invoke<void>("workspace_save", { snapshot });
+/** `explicitClose` clears the saved project; otherwise a project-less snapshot keeps it. */
+export function workspaceSave(snapshot: WorkspaceSnapshot, explicitClose = false): Promise<void> {
+  return invoke<void>("workspace_save", { snapshot, explicitClose });
+}
+
+export type ProjectLockResult =
+  | { status: "acquired" }
+  | { status: "already_held" }
+  | { status: "held_elsewhere"; holder_pid?: number | null };
+
+/** One instance per project: refuses a project another AgentZ process has open. */
+export function projectLockAcquire(projectDir: string): Promise<ProjectLockResult> {
+  return invoke<ProjectLockResult>("project_lock_acquire", { projectDir });
+}
+
+export function projectLockRelease(projectDir: string): Promise<void> {
+  return invoke<void>("project_lock_release", { projectDir });
 }
 
 export function workspaceCloseAck(): Promise<void> {

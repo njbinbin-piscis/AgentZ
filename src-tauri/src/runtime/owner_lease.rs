@@ -85,55 +85,7 @@ fn lease_path(project: &Path, run: &str, attempt: &str) -> Result<PathBuf, Strin
         .join(format!("{run}.{attempt}.lease")))
 }
 
-/// `Ok(true)` when the exclusive lock was taken, `Ok(false)` when another live handle holds it.
-#[cfg(windows)]
-fn try_exclusive(file: &File) -> Result<bool, String> {
-    use std::os::windows::io::AsRawHandle;
-    use windows_sys::Win32::Foundation::ERROR_LOCK_VIOLATION;
-    use windows_sys::Win32::Storage::FileSystem::{
-        LockFileEx, LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
-    };
-    use windows_sys::Win32::System::IO::OVERLAPPED;
-    // SAFETY: OVERLAPPED is plain data; an all-zero value is a valid offset-0 request.
-    let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
-    // SAFETY: the handle is owned by `file` for the duration of the call; the byte-range lock
-    // covers byte 0 only and is released when the handle closes.
-    let ok = unsafe {
-        LockFileEx(
-            file.as_raw_handle() as _,
-            LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
-            0,
-            1,
-            0,
-            &mut overlapped,
-        )
-    };
-    if ok != 0 {
-        return Ok(true);
-    }
-    let error = std::io::Error::last_os_error();
-    if error.raw_os_error() == Some(ERROR_LOCK_VIOLATION as i32) {
-        Ok(false)
-    } else {
-        Err(format!("owner lease lock failed: {error}"))
-    }
-}
-
-/// `Ok(true)` when the exclusive lock was taken, `Ok(false)` when another live handle holds it.
-#[cfg(unix)]
-fn try_exclusive(file: &File) -> Result<bool, String> {
-    use std::os::unix::io::AsRawFd;
-    // SAFETY: the descriptor is valid for the lifetime of `file`; flock has no memory effects.
-    if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-        return Ok(true);
-    }
-    let error = std::io::Error::last_os_error();
-    if error.kind() == std::io::ErrorKind::WouldBlock {
-        Ok(false)
-    } else {
-        Err(format!("owner lease lock failed: {error}"))
-    }
-}
+use super::os_lock::try_exclusive;
 
 impl OwnerLease {
     /// Creates the lease for a binding and holds it. Fails if a live handle already holds it.

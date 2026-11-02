@@ -62,10 +62,13 @@ export interface LlmSettings {
   /** User-entered list prices per provider + model (per million tokens). */
   model_prices?: ModelPrice[];
   mcp_servers: McpServerConfig[];
+  /** Revision the form was loaded from; stale saves fail with `settings_conflict`. */
+  revision?: string;
 }
 
 export interface SettingsResponse extends LlmSettings {
   config_dir: string;
+  revision: string;
   is_configured: boolean;
   secret_references: SecretReference[];
 }

@@ -303,6 +303,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [configDir, setConfigDir] = useState("");
+  const [revision, setRevision] = useState<string | undefined>(undefined);
   const [configured, setConfigured] = useState(false);
   const [secretPresence, setSecretPresence] = useState<Record<string, boolean>>({});
   const [initialMcpMaps, setInitialMcpMaps] = useState<Record<string, { env: string[]; headers: string[] }>>({});
@@ -324,6 +325,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
         const data = await getSettings();
         if (cancelled) return;
         setConfigDir(data.config_dir);
+        setRevision(data.revision);
         setConfigured(data.is_configured);
         setSecretPresence(Object.fromEntries(data.secret_references.map(({ reference, exists }) => [reference, exists])));
         setInitialMcpMaps(Object.fromEntries(data.mcp_servers.map((server) => [server.name, {
@@ -404,7 +406,8 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
           (["command", "url", "args"] as const).some((field) => `mcp:${server.name}:${field}` === reference));
         return validProvider && validMcp;
       });
-      const result = await saveSettingsWithSecrets(updates, deletions, replacements);
+      const result = await saveSettingsWithSecrets({ ...updates, revision }, deletions, replacements);
+      setRevision(result.revision);
       setPendingSecretDeletes([]);
       setConfigured(result.is_configured);
       setSecretPresence(Object.fromEntries(result.secret_references.map(({ reference, exists }) => [reference, exists])));
@@ -428,11 +431,27 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
       notifySettingsRefresh();
       onClose();
     } catch (e) {
-      setError(String(e));
+      if (String(e).includes("settings_conflict")) {
+        try {
+          const fresh = await getSettings();
+          setRevision(fresh.revision);
+          setSecretPresence(Object.fromEntries(fresh.secret_references.map(({ reference, exists }) => [reference, exists])));
+          setInitialMcpMaps(Object.fromEntries(fresh.mcp_servers.map((server) => [server.name, {
+            env: Object.keys(server.env), headers: Object.keys(server.headers ?? {}),
+          }])));
+          setPendingSecretDeletes([]);
+          setForm(toForm(fresh));
+        } catch {
+          /* keep the stale form; the error below still explains the refusal */
+        }
+        setError(t("settings.conflict"));
+      } else {
+        setError(String(e));
+      }
     } finally {
       setBusy(false);
     }
-  }, [form, onClose, flashProviderId, pendingSecretDeletes, initialMcpMaps]);
+  }, [form, onClose, flashProviderId, pendingSecretDeletes, initialMcpMaps, revision, t]);
 
   const provider = form.provider || "anthropic";
   const apiKeyField = KEY_FIELDS[provider] ?? "anthropic_api_key";

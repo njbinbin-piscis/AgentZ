@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { getProjectScope, useProjectScope } from "../services/tauri/projectScope";
-import { listNotifications, markNotificationRead, type InboxPage, type NoticeKind, type TaskNotice } from "../services/tauri/notificationInbox";
+import { clearNotifications, listNotifications, markNotificationRead, type InboxPage, type NoticeKind, type TaskNotice } from "../services/tauri/notificationInbox";
 import { pollReminders } from "../services/tauri/automationReminder";
 import { coalesce, FOCUS_REFRESH_GAP_MS } from "../utils/coalesce";
 import { canPortalToBody, useFixedPopupPosition } from "../utils/popupPosition";
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function NotificationInbox({ projectDir, onOpenTask }: Props) {
+  const { t } = useTranslation();
   const scope = useProjectScope(projectDir);
   const projectRef = useRef(projectDir);
   projectRef.current = projectDir;
@@ -95,11 +97,22 @@ export default function NotificationInbox({ projectDir, onOpenTask }: Props) {
     setOpen(false);
     onOpenTask(notice.task_id);
     try {
-      await markNotificationRead(scope.handle, notice.event_key);
+      await markNotificationRead(scope.handle, notice.event_key, notice.task_id);
       if (projectRef.current === projectDir && scopeRef.current === scope.handle) await refresh();
     } catch (cause) {
       if (projectRef.current === projectDir && scopeRef.current === scope.handle) setError(String(cause));
     }
+  }
+
+  async function clearAll() {
+    if (!projectDir || !scope) return;
+    setBusy(true);
+    try {
+      await clearNotifications(scope.handle);
+      if (projectRef.current === projectDir && scopeRef.current === scope.handle) { setPage({ notices: [], unread_count: 0 }); setError(null); }
+    } catch (cause) {
+      if (projectRef.current === projectDir && scopeRef.current === scope.handle) setError(String(cause));
+    } finally { setBusy(false); }
   }
 
   if (!projectDir) return null;
@@ -111,15 +124,15 @@ export default function NotificationInbox({ projectDir, onOpenTask }: Props) {
       aria-label="Notifications"
       style={popoverStyle}
     >
-      <div className="agentz-notification-heading"><strong>Notifications</strong><button type="button" onClick={() => void refresh()} disabled={busy}>Refresh</button></div>
+      <div className="agentz-notification-heading"><strong>{t("notifications.title")}</strong><span className="agentz-notification-actions"><button type="button" onClick={() => void clearAll()} disabled={busy || !page?.notices.length}>{t("notifications.clear")}</button><button type="button" onClick={() => void refresh()} disabled={busy}>{t("notifications.refresh")}</button></span></div>
       {error && <p role="alert">{error}</p>}
-      {busy && !page && <p>Loading…</p>}
-      {page && page.notices.length === 0 && <p>No notifications</p>}
+      {busy && !page && <p>{t("notifications.loading")}</p>}
+      {page && page.notices.length === 0 && <p>{t("notifications.empty")}</p>}
       {page?.notices.map((item) => <NoticeRow key={item.event_key} item={item} onOpen={() => void openTask(item)} />)}
     </div>
   ) : null;
   return <div ref={rootRef} className="agentz-notification-inbox">
-    <button type="button" className="agentz-titlebar-icon" aria-label="Notifications" title="Notifications" aria-expanded={open}
+    <button type="button" className="agentz-titlebar-icon" aria-label={t("notifications.title")} title={t("notifications.title")} aria-expanded={open}
       onClick={() => { setOpen((wasOpen) => !wasOpen); if (!open) void refresh(); }}>
       <span aria-hidden="true">✉</span>{page && page.unread_count > 0 && <span className="agentz-notification-count">{page.unread_count}</span>}
     </button>

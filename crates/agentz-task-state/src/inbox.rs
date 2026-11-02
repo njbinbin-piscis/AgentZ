@@ -221,10 +221,30 @@ impl InboxStore {
     }
 
     pub fn recent(&self, limit: usize) -> Result<Vec<Notice>, String> {
-        let limit = limit.clamp(1, 100) as i64;
-        let mut stmt = self.conn.prepare(
+        self.query_notices(
             "SELECT event_key,task_id,kind,summary,created_ms,read_ms FROM notices ORDER BY created_ms DESC,event_key LIMIT ?1",
-        ).map_err(|e| e.to_string())?;
+            limit,
+        )
+    }
+
+    /// Latest notice per task. A task with any unread notice reports the
+    /// latest one as unread, so one run retried N times shows up once.
+    pub fn recent_by_task(&self, limit: usize) -> Result<Vec<Notice>, String> {
+        self.query_notices(
+            "SELECT event_key,task_id,kind,summary,created_ms,
+                    CASE WHEN unread>0 THEN NULL ELSE read_ms END
+             FROM (SELECT n.*,
+                          ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY created_ms DESC,event_key) AS rn,
+                          SUM(read_ms IS NULL) OVER (PARTITION BY task_id) AS unread
+                   FROM notices n)
+             WHERE rn=1 ORDER BY created_ms DESC,event_key LIMIT ?1",
+            limit,
+        )
+    }
+
+    fn query_notices(&self, sql: &str, limit: usize) -> Result<Vec<Notice>, String> {
+        let limit = limit.clamp(1, 100) as i64;
+        let mut stmt = self.conn.prepare(sql).map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map([limit], |row| {
                 let kind: String = row.get(2)?;
@@ -246,6 +266,38 @@ impl InboxStore {
             })
             .map_err(|e| e.to_string())?;
         rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn unread_task_count(&self) -> Result<u64, String> {
+        let count: i64 = self
+            .conn
+            .query_row(
+                "SELECT count(DISTINCT task_id) FROM notices WHERE read_ms IS NULL",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        u64::try_from(count).map_err(|e| e.to_string())
+    }
+
+    pub fn mark_task_read(&mut self, task_id: &str, read_ms: i64) -> Result<usize, String> {
+        if read_ms < 0 {
+            return Err("invalid read timestamp".into());
+        }
+        self.conn
+            .execute(
+                "UPDATE notices SET read_ms=?2 WHERE task_id=?1 AND read_ms IS NULL",
+                params![task_id, read_ms],
+            )
+            .map_err(|e| e.to_string())
+    }
+
+    /// Delete all notices. Source fingerprints and reconcile cursors stay, so
+    /// unchanged sources do not repost what the user just cleared.
+    pub fn clear(&mut self) -> Result<usize, String> {
+        self.conn
+            .execute("DELETE FROM notices", [])
             .map_err(|e| e.to_string())
     }
 
@@ -310,6 +362,37 @@ mod tests {
         changed.summary = "Different".into();
         assert!(reopened.post(&changed).is_err());
         drop(reopened);
+        let _ = std::fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn retried_attempts_collapse_to_one_task_row_and_clear_empties() {
+        let path = std::env::temp_dir().join(format!("agentz-inbox-{}", uuid::Uuid::new_v4()));
+        let mut store = InboxStore::open(&path).unwrap();
+        for (key, task, ms) in [("a:1", "t1", 10), ("a:2", "t1", 20), ("a:3", "t1", 30), ("b:1", "t2", 15)] {
+            store
+                .post(&Notice {
+                    event_key: key.into(),
+                    task_id: task.into(),
+                    kind: NoticeKind::Failed,
+                    summary: "Task failed".into(),
+                    created_ms: ms,
+                    read_ms: None,
+                })
+                .unwrap();
+        }
+        store.mark_read("a:3", 40).unwrap();
+        let rows = store.recent_by_task(10).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].event_key, "a:3");
+        assert_eq!(rows[0].read_ms, None);
+        assert_eq!(store.unread_task_count().unwrap(), 2);
+        assert_eq!(store.mark_task_read("t1", 50).unwrap(), 2);
+        assert_eq!(store.recent_by_task(10).unwrap()[0].read_ms, Some(40));
+        assert_eq!(store.unread_task_count().unwrap(), 1);
+        assert_eq!(store.clear().unwrap(), 4);
+        assert!(store.recent_by_task(10).unwrap().is_empty());
+        drop(store);
         let _ = std::fs::remove_dir_all(path);
     }
 

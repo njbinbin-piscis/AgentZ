@@ -60,8 +60,8 @@ pub async fn notification_inbox_list(
                 tracing::warn!(%error, "approval inbox reconciliation unavailable");
             }
         }
-        let notices = store.recent(limit)?;
-        let unread_count = store.unread_count()?;
+        let notices = store.recent_by_task(limit)?;
+        let unread_count = store.unread_task_count()?;
         Ok(InboxPage {
             notices: enrich_notices(scope.project(), notices),
             unread_count,
@@ -75,9 +75,13 @@ pub async fn notification_inbox_mark_read(
     state: State<'_, AppState>,
     scope_handle: String,
     event_key: String,
+    task_id: Option<String>,
 ) -> Result<bool, String> {
     if event_key.is_empty() || event_key.len() > 512 {
         return Err("invalid notification event key".into());
+    }
+    if task_id.as_ref().is_some_and(|t| t.is_empty() || t.len() > 256) {
+        return Err("invalid notification task id".into());
     }
     let read_ms = clock_ms()?;
     let _lease = state.environment_access.execution().await;
@@ -85,7 +89,27 @@ pub async fn notification_inbox_mark_read(
         if !scope.project().join(".agentz/inbox.db").exists() {
             return Ok(false);
         }
-        InboxStore::open(scope.project())?.mark_read(&event_key, read_ms)
+        let mut store = InboxStore::open(scope.project())?;
+        let marked = store.mark_read(&event_key, read_ms)?;
+        match task_id {
+            Some(task) => Ok(store.mark_task_read(&task, read_ms)? > 0 || marked),
+            None => Ok(marked),
+        }
+    })
+}
+
+#[tauri::command]
+pub async fn notification_inbox_clear(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+    scope_handle: String,
+) -> Result<usize, String> {
+    let _lease = state.environment_access.execution().await;
+    super::project_scope::with_verified_scope(&state, &window, &scope_handle, |scope| {
+        if !scope.project().join(".agentz/inbox.db").exists() {
+            return Ok(0);
+        }
+        InboxStore::open(scope.project())?.clear()
     })
 }
 

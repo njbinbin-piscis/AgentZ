@@ -39,10 +39,20 @@ fn index_db_path(root: &Path) -> PathBuf {
     root.join(".agentz").join("index.db")
 }
 
+/// Open `index.db` with WAL and a busy timeout so concurrent instances wait
+/// for each other instead of failing with SQLITE_BUSY.
+pub(crate) fn open_index_db(root: &Path) -> Result<Connection, String> {
+    let conn = Connection::open(index_db_path(root)).map_err(|e| format!("open index db: {e}"))?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("index db busy_timeout: {e}"))?;
+    let _ = conn.pragma_update(None, "journal_mode", "WAL");
+    Ok(conn)
+}
+
 fn open_index(root: &Path) -> Result<Connection, String> {
     let dir = root.join(".agentz");
     std::fs::create_dir_all(&dir).map_err(|e| format!("create .agentz failed: {e}"))?;
-    let conn = Connection::open(index_db_path(root)).map_err(|e| format!("open index db: {e}"))?;
+    let conn = open_index_db(root)?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS chunks (
             id INTEGER PRIMARY KEY,

@@ -9,12 +9,57 @@ use piscis_kernel::store::settings::{LlmProviderConfig, McpServerConfig, Setting
 
 use crate::commands::chat::resolve_config_dir;
 
-// Serialize writes from the settings IPC surface across load-modify-save.
-// Other configuration writers still need a shared cross-surface contract.
+// Serialize load-modify-save of `config.json`: the tokio mutex covers this
+// process, the OS file lock covers other running AgentZ instances.
 static SETTINGS_WRITE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+static SETTINGS_LOCK_PATH: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 
-pub(crate) async fn settings_write_guard() -> tokio::sync::MutexGuard<'static, ()> {
-    SETTINGS_WRITE_LOCK.lock().await
+pub(crate) fn init_settings_lock(app: &AppHandle) {
+    if let Ok(dir) = resolve_config_dir(app) {
+        let _ = SETTINGS_LOCK_PATH.set(dir.join("config.json.lock"));
+    }
+}
+
+pub(crate) struct SettingsWriteGuard {
+    _local: tokio::sync::MutexGuard<'static, ()>,
+    _file: Option<std::fs::File>,
+}
+
+pub(crate) async fn settings_write_guard() -> SettingsWriteGuard {
+    let local = SETTINGS_WRITE_LOCK.lock().await;
+    let file = match SETTINGS_LOCK_PATH.get() {
+        Some(path) => {
+            let path = path.clone();
+            tokio::task::spawn_blocking(move || {
+                crate::runtime::os_lock::lock_with_timeout(&path, std::time::Duration::from_secs(5))
+            })
+            .await
+            .ok()
+            .and_then(|r| r.map_err(|e| eprintln!("config.json lock: {e}")).ok())
+        }
+        None => None,
+    };
+    SettingsWriteGuard {
+        _local: local,
+        _file: file,
+    }
+}
+
+/// Content hash of `config.json`, used to detect writes by other instances
+/// between a settings read and the following save.
+fn settings_revision(config_dir: &std::path::Path) -> String {
+    use sha2::{Digest, Sha256};
+    let bytes = std::fs::read(config_dir.join("config.json")).unwrap_or_default();
+    hex::encode(&Sha256::digest(&bytes)[..8])
+}
+
+fn check_revision(config_dir: &str, expected: &Option<String>) -> Result<(), String> {
+    match expected {
+        Some(rev) if *rev != settings_revision(std::path::Path::new(config_dir)) => {
+            Err("settings_conflict".into())
+        }
+        _ => Ok(()),
+    }
 }
 
 /// MCP server config exposed to / from the settings UI (M6).
@@ -110,6 +155,10 @@ pub struct SaveLlmSettings {
     pub model_prices: Vec<piscis_kernel::store::settings::ModelPrice>,
     #[serde(default)]
     pub mcp_servers: Vec<McpServerDto>,
+    /// Revision the form was loaded from; a mismatch means another instance
+    /// saved in between and the save is refused with `settings_conflict`.
+    #[serde(default)]
+    pub revision: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -122,6 +171,8 @@ pub struct SecretReplacement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmSettingsDto {
     pub config_dir: String,
+    #[serde(default)]
+    pub revision: String,
     pub is_configured: bool,
     pub secret_references: Vec<SecretReferenceDto>,
     pub provider: String,
@@ -400,6 +451,7 @@ fn provider_to_dto(p: &LlmProviderConfig) -> LlmProviderDto {
 
 fn to_dto(settings: &Settings, config_dir: String) -> LlmSettingsDto {
     LlmSettingsDto {
+        revision: settings_revision(std::path::Path::new(&config_dir)),
         config_dir,
         is_configured: settings.is_configured(),
         secret_references: secret_references(settings),
@@ -667,6 +719,7 @@ pub async fn save_settings(
     validate_scalar_secret_updates(&updates)?;
     let _write_guard = settings_write_guard().await;
     let (mut settings, config_dir) = load_settings(&app)?;
+    check_revision(&config_dir, &updates.revision)?;
 
     apply_settings_updates(&mut settings, updates);
     settings.save().map_err(|e| e.to_string())?;
@@ -685,6 +738,7 @@ pub async fn save_settings_with_secrets(
 ) -> Result<LlmSettingsDto, String> {
     let _write_guard = settings_write_guard().await;
     let (mut settings, config_dir) = load_settings(&app)?;
+    check_revision(&config_dir, &updates.revision)?;
     apply_settings_transaction(&mut settings, updates, deletions, replacements)?;
     settings.save().map_err(|error| error.to_string())?;
     sync_approval_broker(&app, &settings);
