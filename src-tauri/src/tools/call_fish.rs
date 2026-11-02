@@ -78,6 +78,12 @@ impl Tool for CallFishTool {
         true
     }
 
+    fn manages_own_timeout(&self) -> bool {
+        // The sub-agent run enforces its own deadline (default 900 s) and returns
+        // partial findings; the kernel's 150 s tool cap would cut it off early.
+        true
+    }
+
     async fn call(&self, input: Value, ctx: &ToolContext) -> anyhow::Result<ToolResult> {
         let action = input
             .get("action")

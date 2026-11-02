@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.47] - 2026-11-03
+
+### Fixed
+
+- **`call_fish` sub-agents no longer time out at 150 s.** `call_fish` did not declare its own timeout, so the engine's 150 s tool cap cut off any Fish run that took longer, while `delegate` and `task` were fine. It now uses the sub-agent's own deadline (default 900 s) and returns partial findings on expiry.
+
 ## [1.0.46] - 2026-11-03
 
 ### Fixed
