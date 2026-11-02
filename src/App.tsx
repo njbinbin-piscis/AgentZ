@@ -33,6 +33,8 @@ import { confirmTerminalCloseOnProjectChange, destroyAllTerminals } from "./work
 import { getSettings } from "./services/tauri/settings";
 import { setLanguage } from "./i18n";
 import { onSettingsRefresh, notifySettingsRefresh } from "./services/settingsRefresh";
+import { OPEN_LINK_EVENT, installLinkInterceptor, openExternal } from "./services/linkRouter";
+import { openPath } from "./services/tauri";
 import {
   getAppearanceTheme,
   toggleAppearanceTheme,
@@ -530,6 +532,35 @@ export default function App() {
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);
+
+  // Clicking a link must never navigate the webview itself (the whole UI would
+  // be replaced by that page). Web pages open in the built-in browser, project
+  // files in the previewer, anything else with the system default program.
+  const linkCtxRef = useRef({ mode, projectDir });
+  linkCtxRef.current = { mode, projectDir };
+  useEffect(
+    () =>
+      installLinkInterceptor((target) => {
+        const { mode: m, projectDir: dir } = linkCtxRef.current;
+        if (target.kind === "ignore") return;
+        if (target.kind === "external") {
+          void openExternal(target.url).catch(() => {});
+          return;
+        }
+        if (!dir || (m !== "codez" && m !== "workz")) {
+          if (target.kind === "url") void openExternal(target.url).catch(() => {});
+          else if (/^([A-Za-z]:[\\/]|\/)/.test(target.path)) void openPath(target.path).catch(() => {});
+          else if (dir) {
+            const sep = dir.includes("\\") ? "\\" : "/";
+            const rel = target.path.replace(/^\.[\\/]/, "").replace(/[\\/]/g, sep);
+            void openPath(`${dir.replace(/[\\/]+$/, "")}${sep}${rel}`).catch(() => {});
+          }
+          return;
+        }
+        window.dispatchEvent(new CustomEvent(OPEN_LINK_EVENT, { detail: { mode: m, target } }));
+      }),
+    [],
+  );
 
   useEffect(() => {
     const syncFont = () => {

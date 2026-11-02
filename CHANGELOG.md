@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.46] - 2026-11-03
+
+### Fixed
+
+- **Clicking a link no longer blanks the UI.** Links in agent output used to navigate the whole webview to the target page. They are now intercepted: web addresses open in the built-in browser, project files open in the previewer, and file types the previewer cannot show (Office, archives, installers, media, folders) open with the system default program. BotZ, which has no built-in browser, opens web links in the system browser and files with the system default program. Binary files opened from CodeZ now also fall back to the system program.
+
 ## [1.0.45] - 2026-11-02
 
 ### Added

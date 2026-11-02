@@ -16,6 +16,8 @@ import { extHostResourceSnapshot } from "../../services/tauri/extHostResource";
 import { graphIndexResourceSnapshot } from "../../services/tauri/graphIndexResource";
 import { fileUriString } from "../../services/tauri/editorUri";
 import { BROWSER_TAB_PATH, isBrowserTab, localFileUrl } from "./browserTab";
+import { OPEN_LINK_EVENT, openExternal, opensWithSystem, type OpenLinkDetail } from "../../services/linkRouter";
+import { openPath } from "../../services/tauri";
 import { getActiveChatSession } from "../../services/activeChatSession";
 import {
   browserClose,
@@ -227,12 +229,15 @@ export function useCodezWorkspace({
   }, [browserOpen, projectDir]);
 
   /** Open a local file (HTML) in the embedded browser tab via file://. */
-  const openFileInBrowser = useCallback(
-    async (path: string) => {
-      if (!projectDir || path.startsWith("agentz-remote://")) return;
-      const abs = joinProjectPath(projectDir, path);
+  /** Load a web address in the built-in browser tab (falls back to the system browser). */
+  const openUrlInBrowser = useCallback(
+    async (url: string) => {
+      if (!projectDir) {
+        void openExternal(url).catch(() => {});
+        return;
+      }
       try {
-        await browserNavigate(getActiveChatSession() ?? "", localFileUrl(abs));
+        await browserNavigate(getActiveChatSession() ?? "", url);
       } catch (e) {
         // eslint-disable-next-line no-alert
         window.alert(String(e));
@@ -242,6 +247,14 @@ export function useCodezWorkspace({
       setActiveTabPath(BROWSER_TAB_PATH);
     },
     [projectDir, onBrowserOpenChange],
+  );
+
+  const openFileInBrowser = useCallback(
+    async (path: string) => {
+      if (!projectDir || path.startsWith("agentz-remote://")) return;
+      await openUrlInBrowser(localFileUrl(joinProjectPath(projectDir, path)));
+    },
+    [projectDir, openUrlInBrowser],
   );
 
   const requestBrowserClose = useCallback(async (): Promise<boolean> => {
@@ -926,7 +939,11 @@ export function useCodezWorkspace({
           return;
         }
         if (fc.is_binary) {
-          setFileLoadError(t("ide.binaryFileError", { name: path.split("/").pop() || path }));
+          // Not viewable here: hand it to the system's default program.
+          setFileLoading(null);
+          openPath(fullPath).catch(() =>
+            setFileLoadError(t("ide.binaryFileError", { name: path.split("/").pop() || path })),
+          );
           return;
         }
         const newTab: OpenTab = {
@@ -1440,15 +1457,33 @@ export function useCodezWorkspace({
     };
     window.addEventListener("agentz-show-terminal", onShowTerminal);
     window.addEventListener("agentz-open-extensions", onOpenExt);
+    // Links clicked in chat/markdown: web -> built-in browser, file -> viewer or OS.
+    const onOpenLink = (e: Event) => {
+      const detail = (e as CustomEvent<OpenLinkDetail>).detail;
+      if (!detail || detail.mode !== "codez") return;
+      const target = detail.target;
+      if (target.kind === "url") {
+        void openUrlInBrowser(target.url);
+      } else if (target.kind === "file") {
+        if (opensWithSystem(target.path, { pdfPreview: false })) {
+          const full = projectDirRef.current ? joinProjectPath(projectDirRef.current, target.path) : target.path;
+          openPath(full).catch((err) => setFileLoadError(String(err)));
+        } else {
+          void openFile(target.path);
+        }
+      }
+    };
+    window.addEventListener(OPEN_LINK_EVENT, onOpenLink);
     window.addEventListener("agentz-open-file", onOpenFile);
     window.addEventListener("agentz-open-palette", onOpenPalette);
     return () => {
       window.removeEventListener("agentz-show-terminal", onShowTerminal);
       window.removeEventListener("agentz-open-extensions", onOpenExt);
+      window.removeEventListener(OPEN_LINK_EVENT, onOpenLink);
       window.removeEventListener("agentz-open-file", onOpenFile);
       window.removeEventListener("agentz-open-palette", onOpenPalette);
     };
-  }, [openBottomPanel, openExtensionsSidebar, openFile, setPaletteMode, setPaletteOpen]);
+  }, [openBottomPanel, openExtensionsSidebar, openFile, openUrlInBrowser, setPaletteMode, setPaletteOpen]);
 
   useEffect(() => {
     if (!projectDir || !onWorkspacePatch) return;

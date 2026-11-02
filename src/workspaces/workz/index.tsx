@@ -1,10 +1,14 @@
+import { useEffect, useRef } from "react";
 import TaskPanel from "../../components/TaskPanel";
 import SessionSkillRevisions from "./SessionSkillRevisions";
 import AgentTaskReview from "./AgentTaskReview";
 import AgentFilePreview from "./AgentFilePreview";
 import BrowserPanel from "../codez/BrowserPanel";
 import { BROWSER_TAB_PATH } from "../codez/browserTab";
-import { browserElementPlaceholder } from "../../services/tauri/browser";
+import { browserElementPlaceholder, browserNavigate } from "../../services/tauri/browser";
+import { OPEN_LINK_EVENT, openExternal, opensWithSystem, type OpenLinkDetail } from "../../services/linkRouter";
+import { openPath } from "../../services/tauri";
+import { resolveArtifactFullPath } from "./artifactPaths";
 import CollabBoard from "./CollabBoard";
 import WorkflowRunPanel from "./WorkflowRunPanel";
 import WorkflowRunsList from "./WorkflowRunsList";
@@ -47,6 +51,39 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
   const s = useWorkzSessionStore(props);
   const bg = useBackgroundTasks(props.projectDir);
   const mergedRunningIds = [...new Set([...s.runningIds, ...bg.runningSessionIds])];
+
+  // Links clicked in the conversation: web -> built-in browser, file -> preview
+  // pane, unsupported file types -> the system default program.
+  const sRef = useRef(s);
+  sRef.current = s;
+  useEffect(() => {
+    const onOpenLink = (e: Event) => {
+      const detail = (e as CustomEvent<OpenLinkDetail>).detail;
+      if (!detail || detail.mode !== "workz") return;
+      const cur = sRef.current;
+      const target = detail.target;
+      if (target.kind === "url") {
+        const sid = cur.selectedId;
+        if (!sid) {
+          void openExternal(target.url).catch(() => {});
+          return;
+        }
+        browserNavigate(sid, target.url)
+          .then(() => cur.setPreviewPath(BROWSER_TAB_PATH))
+          .catch((err) => cur.setError(String(err)));
+      } else if (target.kind === "file" && cur.projectDir) {
+        const base = cur.worktree?.worktree_path ?? (cur.isFree ? cur.freeTaskWorkspace : null);
+        if (opensWithSystem(target.path, { pdfPreview: true })) {
+          const full = resolveArtifactFullPath(cur.projectDir, target.path, base);
+          openPath(full).catch((err) => cur.setError(String(err)));
+        } else {
+          cur.setPreviewPath(target.path);
+        }
+      }
+    };
+    window.addEventListener(OPEN_LINK_EVENT, onOpenLink);
+    return () => window.removeEventListener(OPEN_LINK_EVENT, onOpenLink);
+  }, []);
 
   return (
     <div className="agentz-agent" ref={s.panelRef}>
