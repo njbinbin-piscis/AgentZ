@@ -221,7 +221,7 @@ pub(super) async fn maybe_llm_rename_session_title(
         (runtime, s.llm_read_timeout_secs.max(30))
     };
 
-    let client = llm::build_client_with_timeout(
+    let client = llm::build_client_with_options(
         &runtime.provider,
         &runtime.api_key,
         if runtime.base_url.is_empty() {
@@ -230,6 +230,7 @@ pub(super) async fn maybe_llm_rename_session_title(
             Some(&runtime.base_url)
         },
         read_timeout,
+        runtime.options.clone().with_session(session_id),
     );
     let client = budget.guard_with_source(client, "background");
 

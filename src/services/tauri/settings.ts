@@ -58,6 +58,7 @@ export interface LlmSettings {
   minimax_api_key: string;
   zhipu_api_key: string;
   kimi_api_key: string;
+  opencode_api_key: string;
   llm_providers: LlmProviderConfig[];
   /** User-entered list prices per provider + model (per million tokens). */
   model_prices?: ModelPrice[];

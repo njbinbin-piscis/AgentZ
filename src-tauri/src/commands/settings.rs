@@ -150,6 +150,8 @@ pub struct SaveLlmSettings {
     pub minimax_api_key: String,
     pub zhipu_api_key: String,
     pub kimi_api_key: String,
+    #[serde(default)]
+    pub opencode_api_key: String,
     pub llm_providers: Vec<LlmProviderDto>,
     #[serde(default)]
     pub model_prices: Vec<piscis_kernel::store::settings::ModelPrice>,
@@ -201,6 +203,8 @@ pub struct LlmSettingsDto {
     pub minimax_api_key: String,
     pub zhipu_api_key: String,
     pub kimi_api_key: String,
+    #[serde(default)]
+    pub opencode_api_key: String,
     pub llm_providers: Vec<LlmProviderDto>,
     #[serde(default)]
     pub model_prices: Vec<piscis_kernel::store::settings::ModelPrice>,
@@ -213,7 +217,7 @@ pub struct SecretReferenceDto {
     pub exists: bool,
 }
 
-const GLOBAL_SECRET_REFS: [&str; 7] = [
+const GLOBAL_SECRET_REFS: [&str; 8] = [
     "model:anthropic",
     "model:openai",
     "model:deepseek",
@@ -221,6 +225,7 @@ const GLOBAL_SECRET_REFS: [&str; 7] = [
     "model:minimax",
     "model:zhipu",
     "model:kimi",
+    "model:opencode",
 ];
 
 fn secret_slot_mut<'a>(
@@ -235,6 +240,7 @@ fn secret_slot_mut<'a>(
         "model:minimax" => Ok(&mut settings.minimax_api_key),
         "model:zhipu" => Ok(&mut settings.zhipu_api_key),
         "model:kimi" => Ok(&mut settings.kimi_api_key),
+        "model:opencode" => Ok(&mut settings.opencode_api_key),
         _ => {
             if let Some((name, field)) = reference
                 .strip_prefix("mcp:")
@@ -335,6 +341,7 @@ fn secret_references(settings: &Settings) -> Vec<SecretReferenceDto> {
         &settings.minimax_api_key,
         &settings.zhipu_api_key,
         &settings.kimi_api_key,
+        &settings.opencode_api_key,
     ];
     let mut references: Vec<SecretReferenceDto> = GLOBAL_SECRET_REFS
         .iter()
@@ -481,6 +488,7 @@ fn to_dto(settings: &Settings, config_dir: String) -> LlmSettingsDto {
         minimax_api_key: String::new(),
         zhipu_api_key: String::new(),
         kimi_api_key: String::new(),
+        opencode_api_key: String::new(),
         llm_providers: settings.llm_providers.iter().map(provider_to_dto).collect(),
         model_prices: settings.model_prices.clone(),
         mcp_servers: settings.mcp_servers.iter().map(mcp_to_dto).collect(),
@@ -651,6 +659,7 @@ fn validate_scalar_secret_updates(updates: &SaveLlmSettings) -> Result<(), Strin
         &updates.minimax_api_key,
         &updates.zhipu_api_key,
         &updates.kimi_api_key,
+        &updates.opencode_api_key,
     ];
     if global_keys.iter().any(|value| !value.is_empty())
         || updates
@@ -987,6 +996,7 @@ mod secret_response_tests {
             minimax_api_key: marker.into(),
             zhipu_api_key: marker.into(),
             kimi_api_key: marker.into(),
+            opencode_api_key: marker.into(),
             ..Settings::default()
         };
         settings.llm_providers.push(LlmProviderConfig {

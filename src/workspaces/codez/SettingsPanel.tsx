@@ -43,6 +43,7 @@ const PROVIDER_KEYS = [
   "minimax",
   "zhipu",
   "kimi",
+  "opencode",
   "custom",
 ] as const;
 
@@ -54,6 +55,7 @@ const MODEL_PLACEHOLDERS: Record<string, string> = {
   minimax: "MiniMax-M2.5",
   zhipu: "glm-5",
   kimi: "kimi-k2.5",
+  opencode: "kimi-k3",
   custom: "your-model-id",
 };
 
@@ -67,6 +69,8 @@ const PROVIDER_BASE_URLS: Record<string, string> = {
 const BASE_URL_PROVIDERS = ["custom", "qwen", "deepseek", "openai"];
 
 function nextBaseUrl(current: string, prevProvider: string, nextProvider: string): string {
+  // Providers without an address field use their built-in endpoint.
+  if (!BASE_URL_PROVIDERS.includes(nextProvider)) return "";
   const prevDefault = PROVIDER_BASE_URLS[prevProvider];
   if (current.trim() && current !== prevDefault) return current;
   if (nextProvider === "custom") return "";
@@ -81,6 +85,7 @@ const KEY_FIELDS: Record<string, keyof LlmSettings> = {
   minimax: "minimax_api_key",
   zhipu: "zhipu_api_key",
   kimi: "kimi_api_key",
+  opencode: "opencode_api_key",
   custom: "openai_api_key",
 };
 
@@ -111,6 +116,7 @@ const DEFAULT_FORM: LlmSettings = {
   minimax_api_key: "",
   zhipu_api_key: "",
   kimi_api_key: "",
+  opencode_api_key: "",
   llm_providers: [],
   model_prices: [],
   mcp_servers: [],
@@ -290,6 +296,7 @@ function toForm(data: SettingsResponse): LlmSettings {
     minimax_api_key: data.minimax_api_key || "",
     zhipu_api_key: data.zhipu_api_key || "",
     kimi_api_key: data.kimi_api_key || "",
+    opencode_api_key: data.opencode_api_key || "",
     llm_providers: data.llm_providers ?? [],
     model_prices: data.model_prices ?? [],
     mcp_servers: data.mcp_servers ?? [],
@@ -467,6 +474,7 @@ export default function SettingsPanel({ onClose, projectDir = null }: SettingsPa
       minimax: t("settings.providerMinimax"),
       zhipu: t("settings.providerZhipu"),
       kimi: t("settings.providerKimi"),
+      opencode: t("settings.providerOpencode"),
       custom: t("settings.providerCustom"),
     };
     return map[p] || p;

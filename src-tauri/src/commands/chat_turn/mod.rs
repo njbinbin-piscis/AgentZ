@@ -689,7 +689,7 @@ pub async fn run_agentz_turn(
             Some(&runtime.base_url)
         },
         read_timeout,
-        runtime.options,
+        runtime.options.clone().with_session(&session_id),
     );
 
     let system_prompt = build_turn_system_prompt(

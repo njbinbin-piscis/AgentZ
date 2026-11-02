@@ -267,7 +267,7 @@ pub fn compute_context_budget(context_window: u32, max_tokens: u32) -> usize {
 /// Build the appropriate client based on provider name
 /// Sampling / reasoning options applied to every request a client sends.
 /// `None` fields keep the provider's server-side default.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ClientOptions {
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
@@ -276,8 +276,45 @@ pub struct ClientOptions {
     /// thinking disabled, which is required because reasoning traces are
     /// not persisted in message history.
     pub thinking: Option<bool>,
+    /// Conversation id, for providers that require one (OpenCode Go).
+    /// `None` makes the client generate one for its own lifetime.
+    pub session_id: Option<String>,
 }
 
+impl ClientOptions {
+    pub fn with_session(mut self, session_id: impl Into<String>) -> Self {
+        let id = session_id.into();
+        if valid_session_id(id.trim()) {
+            self.session_id = Some(id.trim().to_string());
+        }
+        self
+    }
+}
+
+fn valid_session_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 200 && id.chars().all(|c| c.is_ascii_graphic() && c != '"' && c != '\\')
+}
+
+/// Headers a provider requires on every request.
+///
+/// OpenCode Go rejects requests without `x-opencode-session` (400
+/// `MissingSessionID`) and asks clients to identify themselves.
+fn provider_headers(provider: &str, session_id: Option<&str>) -> Vec<(String, String)> {
+    match provider {
+        "opencode" => {
+            let session = session_id
+                .map(str::trim)
+                .filter(|id| valid_session_id(id))
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("agentz-{}", uuid::Uuid::new_v4()));
+            vec![
+                ("x-opencode-session".into(), session),
+                ("user-agent".into(), format!("AgentZ/{}", env!("CARGO_PKG_VERSION"))),
+            ]
+        }
+        _ => Vec::new(),
+    }
+}
 /// Default endpoint for OpenAI-compatible named providers.
 pub fn default_base_url(provider: &str) -> Option<&'static str> {
     match provider {
@@ -287,6 +324,7 @@ pub fn default_base_url(provider: &str) -> Option<&'static str> {
         "minimax" => Some("https://api.minimax.io/v1"),
         "zhipu" => Some("https://api.z.ai/api/paas/v4"),
         "kimi" | "moonshot" => Some("https://api.moonshot.cn/v1"),
+        "opencode" => Some("https://opencode.ai/inference/go/openai/v1"),
         _ => None,
     }
 }
@@ -327,6 +365,7 @@ pub fn build_client_with_options(
                 base_url.unwrap_or(default),
                 read_timeout_secs,
             )
+            .with_headers(provider_headers(provider, options.session_id.as_deref()))
             .with_options(options),
         ),
         None => Box::new(
@@ -382,5 +421,19 @@ mod tests {
         let with_overhead = estimate_request_input_tokens(&messages, Some("你是一个助手"), &tools);
         let messages_only: usize = messages.iter().map(super::estimate_message_tokens).sum();
         assert!(with_overhead > messages_only);
+    }
+
+    #[test]
+    fn opencode_provider_sends_session_header_and_has_default_endpoint() {
+        let headers = super::provider_headers("opencode", Some("sess-1"));
+        assert!(headers.iter().any(|(n, v)| n == "x-opencode-session" && v == "sess-1"));
+        assert!(headers.iter().any(|(n, v)| n == "user-agent" && v.starts_with("AgentZ/")));
+        let generated = super::provider_headers("opencode", Some("bad\nid"));
+        assert!(generated.iter().any(|(n, v)| n == "x-opencode-session" && v.starts_with("agentz-")));
+        assert!(super::provider_headers("openai", Some("sess-1")).is_empty());
+        assert_eq!(
+            super::default_base_url("opencode"),
+            Some("https://opencode.ai/inference/go/openai/v1")
+        );
     }
 }

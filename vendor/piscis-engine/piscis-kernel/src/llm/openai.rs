@@ -16,6 +16,8 @@ pub struct OpenAiClient {
     base_url: String,
     http: Client,
     options: super::ClientOptions,
+    /// Provider-required headers sent on every request.
+    headers: Vec<(String, String)>,
 }
 
 /// Returns true if the model name indicates vision/multimodal capability.
@@ -264,6 +266,7 @@ impl OpenAiClient {
             base_url: base_url.trim_end_matches('/').to_string(),
             http,
             options: super::ClientOptions::default(),
+            headers: Vec::new(),
         }
     }
 
@@ -272,6 +275,17 @@ impl OpenAiClient {
         self
     }
 
+    pub fn with_headers(mut self, headers: Vec<(String, String)>) -> Self {
+        self.headers = headers;
+        self
+    }
+
+    fn apply_headers(&self, mut request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        for (name, value) in &self.headers {
+            request = request.header(name.as_str(), value.as_str());
+        }
+        request
+    }
     fn thinking_block_key(&self, model: &str) -> String {
         format!("{}|{}", self.base_url, model.to_lowercase())
     }
@@ -299,9 +313,7 @@ impl OpenAiClient {
         loop {
             let body = self.build_body(req);
             let response = self
-                .http
-                .post(&url)
-                .bearer_auth(&self.api_key)
+                .apply_headers(self.http.post(&url).bearer_auth(&self.api_key))
                 .json(&body)
                 .send()
                 .await
@@ -1288,6 +1300,7 @@ mod tests {
                 temperature: Some(0.3),
                 top_p: Some(0.9),
                 thinking: Some(true),
+                session_id: None,
             },
         );
         let body = client.build_body(&request_for_model("deepseek-v4-flash"));

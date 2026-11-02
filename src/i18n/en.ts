@@ -772,6 +772,7 @@ const en = {
     providerMinimax: "MiniMax",
     providerZhipu: "Zhipu AI (GLM)",
     providerKimi: "Kimi (Moonshot)",
+    providerOpencode: "OpenCode Go",
     providerCustom: "Custom OpenAI-compatible API",
     visionEnabled: "Enable vision (image input)",
     visionEnabledHint: "When enabled, multimodal models can understand attached images in chat.",

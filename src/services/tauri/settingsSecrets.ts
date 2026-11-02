@@ -8,6 +8,7 @@ const GLOBAL_KEYS = [
   ["minimax_api_key", "model:minimax"],
   ["zhipu_api_key", "model:zhipu"],
   ["kimi_api_key", "model:kimi"],
+  ["opencode_api_key", "model:opencode"],
 ] as const;
 
 export interface SecretReplacement {

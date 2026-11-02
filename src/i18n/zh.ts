@@ -758,6 +758,7 @@ const zh = {
     providerMinimax: "MiniMax（稀宇科技）",
     providerZhipu: "智谱 AI（GLM）",
     providerKimi: "Kimi（月之暗面 Moonshot）",
+    providerOpencode: "OpenCode Go",
     providerCustom: "自定义 OpenAI 兼容 API",
     visionEnabled: "启用视觉（图片输入）",
     visionEnabledHint: "开启后，多模态模型可理解聊天中附加的图片。",

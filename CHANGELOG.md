@@ -5,10 +5,11 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.41] - 2026-11-02
 
 ### Added
 
+- **OpenCode Go provider.** Pick *OpenCode Go* in Settings → Models; the endpoint is built in, so only the API key is needed. Requests carry a stable `x-opencode-session` for the conversation and an AgentZ user agent, which OpenCode requires (it returned 400 `MissingSessionID` otherwise). A model set up earlier as a custom OpenAI-compatible endpoint must be switched to this provider.
 - **Clear notifications.** The notifications dropdown has a Clear button next to Refresh.
 
 ### Fixed

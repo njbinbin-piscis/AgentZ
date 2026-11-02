@@ -55,6 +55,7 @@ pub(super) struct SettingsSnapshot {
     minimax_api_key: String,
     zhipu_api_key: String,
     kimi_api_key: String,
+    opencode_api_key: String,
 }
 
 pub(super) fn snapshot_settings(settings: &Settings) -> SettingsSnapshot {
@@ -73,6 +74,7 @@ pub(super) fn snapshot_settings(settings: &Settings) -> SettingsSnapshot {
         minimax_api_key: settings.minimax_api_key.clone(),
         zhipu_api_key: settings.zhipu_api_key.clone(),
         kimi_api_key: settings.kimi_api_key.clone(),
+        opencode_api_key: settings.opencode_api_key.clone(),
     }
 }
 
@@ -91,6 +93,7 @@ pub(super) fn restore_settings(settings: &mut Settings, snap: SettingsSnapshot) 
     settings.minimax_api_key = snap.minimax_api_key;
     settings.zhipu_api_key = snap.zhipu_api_key;
     settings.kimi_api_key = snap.kimi_api_key;
+    settings.opencode_api_key = snap.opencode_api_key;
 }
 
 fn set_provider_api_key(settings: &mut Settings, provider: &str, key: &str) {
@@ -102,6 +105,7 @@ fn set_provider_api_key(settings: &mut Settings, provider: &str, key: &str) {
         "minimax" => settings.minimax_api_key = key.to_string(),
         "zhipu" => settings.zhipu_api_key = key.to_string(),
         "kimi" | "moonshot" => settings.kimi_api_key = key.to_string(),
+        "opencode" => settings.opencode_api_key = key.to_string(),
         _ => settings.openai_api_key = key.to_string(),
     }
 }
@@ -195,6 +199,7 @@ pub(super) fn resolve_llm_runtime(
                 temperature: provider.temperature,
                 top_p: provider.top_p,
                 thinking: provider.thinking,
+                session_id: None,
             },
             stream: provider.stream,
         });
@@ -235,6 +240,7 @@ pub(super) fn resolve_llm_runtime(
                     temperature: first.temperature,
                     top_p: first.top_p,
                     thinking: first.thinking,
+                    session_id: None,
                 },
                 stream: first.stream,
             });
@@ -259,6 +265,7 @@ pub(super) fn resolve_llm_runtime(
             temperature: settings.temperature,
             top_p: settings.top_p,
             thinking: settings.thinking,
+            session_id: None,
         },
         stream: None,
     })
@@ -921,7 +928,7 @@ pub(crate) async fn run_subagent_with_options(
         )
     };
 
-    let client = llm::build_client_with_timeout(
+    let client = llm::build_client_with_options(
         &runtime.provider,
         &runtime.api_key,
         if runtime.base_url.is_empty() {
@@ -930,6 +937,7 @@ pub(crate) async fn run_subagent_with_options(
             Some(&runtime.base_url)
         },
         read_timeout,
+        runtime.options.clone(),
     );
     let client = budget.guard(client);
 

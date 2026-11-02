@@ -52,7 +52,7 @@ pub struct LlmProviderConfig {
     pub id: String,
     /// Human-readable display label shown in dropdowns
     pub label: String,
-    /// Provider type: "anthropic" | "openai" | "deepseek" | "qwen" | "minimax" | "zhipu" | "kimi" | "custom"
+    /// Provider type: "anthropic" | "openai" | "deepseek" | "qwen" | "minimax" | "zhipu" | "kimi" | "opencode" | "custom"
     pub provider: String,
     /// Model name (e.g. "gpt-4o", "claude-opus-4-5")
     pub model: String,
@@ -277,6 +277,8 @@ pub struct Settings {
     /// Kimi (Moonshot AI) API key
     #[serde(default)]
     pub kimi_api_key: String,
+    #[serde(default)]
+    pub opencode_api_key: String,
     /// Active LLM provider: "anthropic" | "openai" | "custom" | "deepseek" | "qwen"
     #[serde(default = "default_provider")]
     pub provider: String,
@@ -822,6 +824,7 @@ impl Default for Settings {
             minimax_api_key: String::new(),
             zhipu_api_key: String::new(),
             kimi_api_key: String::new(),
+            opencode_api_key: String::new(),
             provider: default_provider(),
             model: default_model(),
             custom_base_url: String::new(),
@@ -970,6 +973,7 @@ impl Settings {
             Self::try_decrypt_field(&store, &mut settings.minimax_api_key, strict_secrets)?;
             Self::try_decrypt_field(&store, &mut settings.zhipu_api_key, strict_secrets)?;
             Self::try_decrypt_field(&store, &mut settings.kimi_api_key, strict_secrets)?;
+            Self::try_decrypt_field(&store, &mut settings.opencode_api_key, strict_secrets)?;
             Self::try_decrypt_field(&store, &mut settings.feishu_app_secret, strict_secrets)?;
             Self::try_decrypt_field(&store, &mut settings.wecom_bot_secret, strict_secrets)?;
             Self::try_decrypt_field(&store, &mut settings.dingtalk_app_secret, strict_secrets)?;
@@ -1033,6 +1037,7 @@ impl Settings {
             Self::encrypt_field(&store, &mut clone.minimax_api_key, &mut encrypt)?;
             Self::encrypt_field(&store, &mut clone.zhipu_api_key, &mut encrypt)?;
             Self::encrypt_field(&store, &mut clone.kimi_api_key, &mut encrypt)?;
+            Self::encrypt_field(&store, &mut clone.opencode_api_key, &mut encrypt)?;
             Self::encrypt_field(&store, &mut clone.feishu_app_secret, &mut encrypt)?;
             Self::encrypt_field(&store, &mut clone.wecom_bot_secret, &mut encrypt)?;
             Self::encrypt_field(&store, &mut clone.dingtalk_app_secret, &mut encrypt)?;
@@ -1124,6 +1129,7 @@ impl Settings {
             || !self.minimax_api_key.trim().is_empty()
             || !self.zhipu_api_key.trim().is_empty()
             || !self.kimi_api_key.trim().is_empty()
+            || !self.opencode_api_key.trim().is_empty()
             || is_local_ollama_openai_provider(&self.provider, &self.custom_base_url)
     }
 
@@ -1142,6 +1148,7 @@ impl Settings {
             "minimax" => &self.minimax_api_key,
             "zhipu" => &self.zhipu_api_key,
             "kimi" | "moonshot" => &self.kimi_api_key,
+            "opencode" => &self.opencode_api_key,
             _ => &self.anthropic_api_key,
         }
     }
@@ -1153,6 +1160,7 @@ impl Settings {
             temperature: self.temperature,
             top_p: self.top_p,
             thinking: self.thinking,
+            session_id: None,
         }
     }
 
