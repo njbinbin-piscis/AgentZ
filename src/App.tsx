@@ -480,7 +480,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    return onSettingsRefresh(() => {
+    return onSettingsRefresh(({ silent }) => {
+      if (silent) return;
       setSettingsToast(t("settings.savedEffectHint"));
       window.setTimeout(() => setSettingsToast((cur) => (cur === t("settings.savedEffectHint") ? null : cur)), 3200);
     });
@@ -525,7 +526,7 @@ export default function App() {
 
   useEffect(() => {
     // Another instance may have saved config.json while this window was in the background.
-    const onFocus = () => notifySettingsRefresh();
+    const onFocus = () => notifySettingsRefresh({ silent: true });
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);

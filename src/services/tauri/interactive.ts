@@ -8,6 +8,11 @@ export function respondInteractiveUi(
   return invoke<void>("respond_interactive_ui", { requestId, values });
 }
 
+/** Request ids that a blocking `chat_ui` tool is still waiting on. */
+export function pendingInteractiveIds(): Promise<string[]> {
+  return invoke<string[]>("pending_interactive_ids");
+}
+
 /** Resolve a pending shell/file-write confirmation from the Agent harness. */
 export function respondPermissionRequest(
   requestId: string,

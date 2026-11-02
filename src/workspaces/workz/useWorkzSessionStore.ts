@@ -381,7 +381,7 @@ export function useWorkzSessionStore({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const { pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards } =
+  const { cards, pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards, restoreCard } =
     useInteractiveCards();
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequestCard | null>(null);
 
@@ -749,6 +749,10 @@ export function useWorkzSessionStore({
       ) {
         handleAgentEvent(evt);
         return;
+      }
+      // A failed chat_ui / chat_ui_listen call means nobody waits on its form any more.
+      if (evt.type === "tool_end" && (evt.name === "chat_ui" || evt.name === "chat_ui_listen")) {
+        handleAgentEvent(evt);
       }
       if (!liveRef.current) return;
 
@@ -1644,6 +1648,6 @@ export function useWorkzSessionStore({
   }, [agents, t]);
 
   return {
-    t, i18n, panelRef, dragOver, toast, overview, projectDir, tasks, groups, groupErrors, collapsed, selectedId, runningIds, toggleGroup, openSession, newSessionIn, deleteSessionIn, addProject, removeProject, previewPath, isFree, freeTaskWorkspace, isSwarmTeam, swarmMainTab, setSwarmMainTab, activePoolId, scrollRef, steps, busy, sessionRef, pendingCards, permissionRequest, setPermissionRequest, markSubmitted, markActionSent, setGoal, taskBound, setIsolate, taRef, refreshGitChanges, showToast, setError, worktree, setPreviewPath, error, planItems, setPlanItems, taskPanelOpen, setTaskPanelOpen, managedWorkspace, cwdOptions, changeCwd, isolate, startMode, setStartMode, startBase, setStartBase, teams, activeTeam, selectedTeam, teamOptions, handleTeamChange, agents, activeAgentId, agentOptions, handleAgentChange, setBoardOpen, isWorkflowTeam, workflowRunId, setWorkflowRunId, workflowStatus, setWorkflowStatus, setWorkflowOpen, setRunsOpen, setReviewTask, goal, detectAtMention, detectSlash, run, stopActive, canSend, onKeyDown, handlePaste, modelId, modelOptions, setModelId, showModelSelector, showGenericComposerTools, installedSkills, enabledSkills, setEnabledSkills, connectors, enabledConnectors, setEnabledConnectors, mention, mentionMatches, pickMention, slash, slashMatches, pickSlash, slashLabel, composerModeNotice, attachment, attachmentPreview, handleAttach, clearAttachment, boardOpen, workflowOpen, runsOpen, reviewTask, refreshTasks,
+    t, i18n, panelRef, dragOver, toast, overview, projectDir, tasks, groups, groupErrors, collapsed, selectedId, runningIds, toggleGroup, openSession, newSessionIn, deleteSessionIn, addProject, removeProject, previewPath, isFree, freeTaskWorkspace, isSwarmTeam, swarmMainTab, setSwarmMainTab, activePoolId, scrollRef, steps, busy, sessionRef, pendingCards, permissionRequest, setPermissionRequest, markSubmitted, markActionSent, cards, restoreCard, setGoal, taskBound, setIsolate, taRef, refreshGitChanges, showToast, setError, worktree, setPreviewPath, error, planItems, setPlanItems, taskPanelOpen, setTaskPanelOpen, managedWorkspace, cwdOptions, changeCwd, isolate, startMode, setStartMode, startBase, setStartBase, teams, activeTeam, selectedTeam, teamOptions, handleTeamChange, agents, activeAgentId, agentOptions, handleAgentChange, setBoardOpen, isWorkflowTeam, workflowRunId, setWorkflowRunId, workflowStatus, setWorkflowStatus, setWorkflowOpen, setRunsOpen, setReviewTask, goal, detectAtMention, detectSlash, run, stopActive, canSend, onKeyDown, handlePaste, modelId, modelOptions, setModelId, showModelSelector, showGenericComposerTools, installedSkills, enabledSkills, setEnabledSkills, connectors, enabledConnectors, setEnabledConnectors, mention, mentionMatches, pickMention, slash, slashMatches, pickSlash, slashLabel, composerModeNotice, attachment, attachmentPreview, handleAttach, clearAttachment, boardOpen, workflowOpen, runsOpen, reviewTask, refreshTasks,
   };
 }

@@ -321,7 +321,7 @@ export function useAssistantSession({
   );
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequestCard | null>(null);
 
-  const { pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards } =
+  const { cards, pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards, restoreCard } =
     useInteractiveCards();
 
   const sessionRef = useRef<string | null>(null);
@@ -793,6 +793,10 @@ export function useAssistantSession({
         if (evt.type === "done" || evt.type === "cancelled") setPermissionRequest(null);
         handleAgentEvent(evt);
         return;
+      }
+      // A failed chat_ui / chat_ui_listen call means nobody waits on its form any more.
+      if (evt.type === "tool_end" && (evt.name === "chat_ui" || evt.name === "chat_ui_listen")) {
+        handleAgentEvent(evt);
       }
       if (!busyRef.current) return;
 
@@ -1809,6 +1813,6 @@ export function useAssistantSession({
           : t("chat.placeholderFollowUp");
 
   return {
-    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, exportCurrent, importFromFile, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, onModeChange, onPlanDecision, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
+    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, exportCurrent, importFromFile, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, cards, restoreCard, onModeChange, onPlanDecision, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
   };
 }

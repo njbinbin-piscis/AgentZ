@@ -7,6 +7,12 @@ import InteractiveCard from "../../components/chat/InteractiveCard";
 import PermissionCard, { type PermissionRequestCard } from "../../components/chat/PermissionCard";
 import ToolTrace, { interleaveTools, type ToolTraceItem } from "../../components/ToolTrace";
 import type { InteractiveCardState } from "../../hooks/useInteractiveCards";
+import { InteractiveCardsContext } from "../../components/chat/InteractiveCardsContext";
+import { useRestoreChatUiCards } from "../../hooks/useInteractiveCards";
+import type { UiDefinition } from "../../components/chat/interactiveUi/protocol";
+
+const NO_CARDS: Record<string, InteractiveCardState> = {};
+const NOOP_RESTORE = () => {};
 import Markdown from "./Markdown";
 
 export interface AssistantChatMessage {
@@ -27,6 +33,9 @@ interface AssistantMessageListProps {
   queuedView: string[];
   onRemoveQueued?: (index: number) => void;
   pendingCards: InteractiveCardState[];
+  /** Every card of this session (answered ones included), keyed by request id. */
+  allCards?: Record<string, InteractiveCardState>;
+  onRestoreCard?: (requestId: string, uiDefinition: UiDefinition) => void;
   scrollRef: RefObject<HTMLDivElement>;
   /** Older history exists in the DB beyond what is loaded in `messages`. */
   hasMoreOlder?: boolean;
@@ -36,7 +45,7 @@ interface AssistantMessageListProps {
   onForkCheckpoint: (messageId: string, fullHistory: boolean) => void | Promise<void>;
   onRestoreCheckpoint: (messageId: string) => void | Promise<void>;
   onUndoTurn?: (turnId: string) => void | Promise<void>;
-  onCardSubmitted: (requestId: string) => void;
+  onCardSubmitted: (requestId: string, values?: Record<string, unknown>) => void;
   onCardActionSent: (requestId: string) => void;
   onPlanModeChange?: (mode: "plan" | "agent") => void;
   onPlanBuild?: (planPath: string) => void;
@@ -114,6 +123,8 @@ function AssistantMessageList({
   queuedView,
   onRemoveQueued,
   pendingCards,
+  allCards,
+  onRestoreCard,
   scrollRef,
   hasMoreOlder = false,
   onLoadOlder,
@@ -197,7 +208,37 @@ function AssistantMessageList({
     return () => el.removeEventListener("scroll", onScroll);
   }, [onScroll, scrollRef]);
 
+  const chatUiItems = useMemo(
+    () => [...messages.flatMap((m) => m.tools ?? []), ...toolSteps].filter((tool) => tool.name === "chat_ui"),
+    [messages, toolSteps],
+  );
+  const settledIds = useRestoreChatUiCards(chatUiItems, allCards ?? NO_CARDS, onRestoreCard ?? NOOP_RESTORE);
+  const cardsContext = useMemo(
+    () => ({
+      cards: allCards ?? {},
+      settledIds: onRestoreCard ? settledIds : undefined,
+      onSubmitted: onCardSubmitted,
+      onActionSent: onCardActionSent,
+      onPlanModeChange,
+      onPlanBuild,
+    }),
+    [allCards, settledIds, onRestoreCard, onCardSubmitted, onCardActionSent, onPlanModeChange, onPlanBuild],
+  );
+  // Forms that already sit in the message flow (as chat_ui tool steps) are not
+  // repeated at the bottom.
+  const inlineCardIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of messages) for (const tool of m.tools ?? []) if (tool.name === "chat_ui") ids.add(tool.id);
+    for (const tool of toolSteps) if (tool.name === "chat_ui") ids.add(tool.id);
+    return ids;
+  }, [messages, toolSteps]);
+  const bottomCards = useMemo(
+    () => pendingCards.filter((c) => !inlineCardIds.has(c.requestId)),
+    [pendingCards, inlineCardIds],
+  );
+
   return (
+    <InteractiveCardsContext.Provider value={cardsContext}>
     <div className="agentz-assistant-messages" ref={scrollRef}>
       {hasHiddenOlder && (
         <button type="button" className="agentz-load-more-msgs" onClick={() => void loadOlder()}>
@@ -296,14 +337,14 @@ function AssistantMessageList({
           )}
         </div>
       ))}
-      {pendingCards.map((card) => (
+      {bottomCards.map((card) => (
         <div key={card.requestId} className="agentz-msg assistant">
           <InteractiveCard
             requestId={card.requestId}
             uiDefinition={card.uiDefinition}
             listenOpen={card.listenOpen}
             wizardStepHint={card.wizardStepHint}
-            onSubmitted={() => onCardSubmitted(card.requestId)}
+            onSubmitted={(values) => onCardSubmitted(card.requestId, values)}
             onActionSent={() => onCardActionSent(card.requestId)}
             onPlanModeChange={onPlanModeChange}
             onPlanBuild={onPlanBuild}
@@ -314,6 +355,7 @@ function AssistantMessageList({
         <PermissionCard request={permissionRequest} onResolved={onPermissionResolved} />
       )}
     </div>
+    </InteractiveCardsContext.Provider>
   );
 }
 

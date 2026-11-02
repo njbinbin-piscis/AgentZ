@@ -1144,6 +1144,7 @@ const en = {
     noProject: "Open a project folder first.",
     interactiveSubmit: "Submit",
     interactiveSubmitted: "Submitted",
+    interactiveNoAnswer: "No answer — the agent continued with defaults.",
     interactiveSubmitFailed: "Submit failed. Try again.",
     interactiveExpired: "This form has expired. Send a new message to continue.",
     interactiveFixErrors: "Fix the highlighted fields before continuing.",

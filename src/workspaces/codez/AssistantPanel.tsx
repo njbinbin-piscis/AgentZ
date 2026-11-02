@@ -132,6 +132,8 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         queuedView={s.queuedView}
         onRemoveQueued={s.removeQueued}
         pendingCards={s.pendingCards}
+        allCards={s.cards}
+        onRestoreCard={s.restoreCard}
         scrollRef={s.scrollRef}
         hasMoreOlder={s.hasMoreOlder}
         onLoadOlder={s.loadOlderHistory}

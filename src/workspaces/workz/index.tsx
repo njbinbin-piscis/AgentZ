@@ -93,6 +93,8 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
             selectedId={s.selectedId}
             sessionId={s.sessionRef.current}
             pendingCards={s.pendingCards}
+            allCards={s.cards}
+            onRestoreCard={s.restoreCard}
             permissionRequest={s.permissionRequest}
             onClearPermission={() => s.setPermissionRequest(null)}
             onMarkCardSubmitted={s.markSubmitted}

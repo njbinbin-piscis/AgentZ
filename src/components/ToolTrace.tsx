@@ -1,8 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toolIcon, toolSummary } from "./toolDisplay";
 import { fileEditDiff, type FileEditDiff } from "./fileEditDiff";
 import { isSubagentCall, parseSubagent } from "./subagentCard";
+import InteractiveCard from "./chat/InteractiveCard";
+import {
+  InteractiveCardsContext,
+  parseChatUiDefinition,
+  parseInteractiveResponse,
+} from "./chat/InteractiveCardsContext";
+import type { UiDefinition } from "./chat/interactiveUi/protocol";
 import "./ToolTrace.css";
 import "./SubagentCard.css";
 
@@ -325,10 +332,66 @@ export function SubagentCard({ item }: { item: ToolTraceItem }) {
   );
 }
 
+/**
+ * A `chat_ui` form stays where it was asked: live while the backend still
+ * waits for an answer, then a grayed-out record (with what was submitted, or a
+ * note that nobody answered) that scrolls with the conversation.
+ */
+function ChatUiInline({ item }: { item: ToolTraceItem }) {
+  const { t } = useTranslation();
+  const ctx = useContext(InteractiveCardsContext);
+  const card = ctx?.cards[item.id];
+  const fromInput = useMemo(() => parseChatUiDefinition(item.input), [item.input]);
+
+  if (ctx && card && !card.submitted) {
+    return (
+      <div className="agentz-chat-ui-inline">
+        <InteractiveCard
+          key="live"
+          requestId={item.id}
+          uiDefinition={card.uiDefinition}
+          listenOpen={card.listenOpen}
+          wizardStepHint={card.wizardStepHint}
+          onSubmitted={(values) => ctx.onSubmitted(item.id, values)}
+          onActionSent={() => ctx.onActionSent(item.id)}
+          onPlanModeChange={ctx.onPlanModeChange}
+          onPlanBuild={ctx.onPlanBuild}
+        />
+      </div>
+    );
+  }
+
+  const definition = (card?.uiDefinition ?? fromInput) as UiDefinition | null;
+  // Still running with no live form (e.g. the session was switched away and
+  // back): show the plain tool row rather than a misleading "no answer".
+  if (!definition || (!card && item.status === "running")) return <ToolBatch items={[item]} />;
+  const values = parseInteractiveResponse(item.result) ?? card?.submittedValues ?? null;
+  // No result yet and the "is the backend still waiting?" check has not
+  // finished: keep the plain row instead of claiming nobody answered.
+  if (!values && item.result == null && ctx?.settledIds && !ctx.settledIds.has(item.id)) {
+    return <ToolBatch items={[item]} />;
+  }
+  const unanswered = !values && item.status !== "done";
+  return (
+    <div className="agentz-chat-ui-inline">
+      <InteractiveCard
+        key="readonly"
+        requestId={item.id}
+        uiDefinition={definition}
+        submittedValues={values}
+        readOnly
+        readOnlyNote={unanswered ? t("chat.interactiveNoAnswer") : null}
+      />
+    </div>
+  );
+}
+
 export default function ToolTrace({ items, hideEdits = false }: { items: ToolTraceItem[]; hideEdits?: boolean }) {
+  const chatUi = items.filter((item) => item.name === "chat_ui");
+  const chatUiIds = new Set(chatUi.map((c) => c.id));
   const subagents = items.filter((item) => isSubagentCall(item));
   const subagentIds = new Set(subagents.map((s) => s.id));
-  const rest = items.filter((item) => !subagentIds.has(item.id));
+  const rest = items.filter((item) => !subagentIds.has(item.id) && !chatUiIds.has(item.id));
   const edits = rest.flatMap((item) => {
     if (item.status === "error" || hideEdits) return [];
     const diff = fileEditDiff(item.name, item.input);
@@ -343,6 +406,9 @@ export default function ToolTrace({ items, hideEdits = false }: { items: ToolTra
   return (
     <>
       {others.length > 0 && <ToolBatch items={others} />}
+      {chatUi.map((item) => (
+        <ChatUiInline key={item.id} item={item} />
+      ))}
       {subagents.map((item) => (
         <SubagentCard key={item.id} item={item} />
       ))}

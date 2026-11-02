@@ -724,3 +724,12 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* Frozen form kept in the message flow (history / timed out). */
+.interactive-card.ic-readonly {
+  opacity: 0.6;
+  filter: grayscale(0.6);
+}
+.interactive-card.ic-readonly * {
+  pointer-events: none;
+}

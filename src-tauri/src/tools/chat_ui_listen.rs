@@ -40,6 +40,12 @@ impl Tool for ChatUiListenTool {
         true
     }
 
+    /// Waits for the user up to its own 5-minute deadline; the loop's default
+    /// 150s tool cap would end the call early and leave the card orphaned.
+    fn manages_own_timeout(&self) -> bool {
+        true
+    }
+
     async fn call(&self, input: Value, ctx: &ToolContext) -> anyhow::Result<ToolResult> {
         let request_id = input
             .get("request_id")

@@ -18,6 +18,14 @@ pub async fn respond_interactive_ui(
     }
 }
 
+/// Request ids a `chat_ui` tool is still blocked on. A view that was switched
+/// away from and back to uses this to show the live form again.
+#[tauri::command]
+pub async fn pending_interactive_ids(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let map = state.interactive_responses.lock().await;
+    Ok(map.keys().cloned().collect())
+}
+
 /// Resolve a one-shot permission request emitted by the Agent harness.
 #[tauri::command]
 pub async fn respond_permission_request(

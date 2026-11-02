@@ -1,4 +1,4 @@
-﻿import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { INTERACTIVE_WAIT_MS, useInteractiveCards } from "./useInteractiveCards";
 import type { AgentEvent } from "../services/tauri/chat";
@@ -59,5 +59,21 @@ describe("useInteractiveCards wait timeout", () => {
     expect(ids()).toEqual(["a", "p"]);
     await advance(2000);
     expect(ids()).toEqual(["p"]);
+  });
+
+  it("retires the card when its chat_ui call ends in an error", async () => {
+    await act(async () => api.handleAgentEvent(show("a")));
+    await act(async () =>
+      api.handleAgentEvent({ type: "tool_end", id: "a", name: "chat_ui", result: "timed out", is_error: true } as unknown as AgentEvent),
+    );
+    expect(ids()).toEqual([]);
+  });
+
+  it("keeps the card when chat_ui ends normally (action flow)", async () => {
+    await act(async () => api.handleAgentEvent(show("a")));
+    await act(async () =>
+      api.handleAgentEvent({ type: "tool_end", id: "a", name: "chat_ui", result: "ok", is_error: false } as unknown as AgentEvent),
+    );
+    expect(ids()).toEqual(["a"]);
   });
 });

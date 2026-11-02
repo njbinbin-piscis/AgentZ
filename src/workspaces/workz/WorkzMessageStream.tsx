@@ -1,8 +1,14 @@
-import type { RefObject } from "react";
+import { useMemo, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { journalUndoTurn } from "../../services/tauri/chat";
 import PermissionCard, { type PermissionRequestCard } from "../../components/chat/PermissionCard";
 import InteractiveCard from "../../components/chat/InteractiveCard";
+import { InteractiveCardsContext } from "../../components/chat/InteractiveCardsContext";
+import { useRestoreChatUiCards } from "../../hooks/useInteractiveCards";
+import type { UiDefinition } from "../../components/chat/interactiveUi/protocol";
+
+const NO_CARDS: Record<string, InteractiveCardState> = {};
+const NOOP_RESTORE = () => {};
 import type { InteractiveCardState } from "../../hooks/useInteractiveCards";
 import ToolTrace, { interleaveTools } from "../../components/ToolTrace";
 import Markdown from "../codez/Markdown";
@@ -24,9 +30,11 @@ export interface WorkzMessageStreamProps {
   selectedId: string | null;
   sessionId: string | null;
   pendingCards: InteractiveCardState[];
+  allCards?: Record<string, InteractiveCardState>;
+  onRestoreCard?: (requestId: string, uiDefinition: UiDefinition) => void;
   permissionRequest: PermissionRequestCard | null;
   onClearPermission: () => void;
-  onMarkCardSubmitted: (requestId: string) => void;
+  onMarkCardSubmitted: (requestId: string, values?: Record<string, unknown>) => void;
   onMarkCardActionSent: (requestId: string) => void;
   onSelectScenario: (scenario: WorkzStarterScenario) => void;
   onRefreshGitChanges: () => void;
@@ -48,6 +56,8 @@ export default function WorkzMessageStream({
   selectedId,
   sessionId,
   pendingCards,
+  allCards,
+  onRestoreCard,
   permissionRequest,
   onClearPermission,
   onMarkCardSubmitted,
@@ -58,8 +68,28 @@ export default function WorkzMessageStream({
   onSetError,
 }: WorkzMessageStreamProps) {
   const { t } = useTranslation();
+  const chatUiItems = useMemo(
+    () => steps.flatMap((m) => (m.role === "assistant" ? m.tools : [])).filter((tool) => tool.name === "chat_ui"),
+    [steps],
+  );
+  const settledIds = useRestoreChatUiCards(chatUiItems, allCards ?? NO_CARDS, onRestoreCard ?? NOOP_RESTORE);
+  const cardsContext = useMemo(
+    () => ({
+      cards: allCards ?? {},
+      settledIds: onRestoreCard ? settledIds : undefined,
+      onSubmitted: onMarkCardSubmitted,
+      onActionSent: onMarkCardActionSent,
+    }),
+    [allCards, settledIds, onRestoreCard, onMarkCardSubmitted, onMarkCardActionSent],
+  );
+  const bottomCards = useMemo(() => {
+    const inline = new Set<string>();
+    for (const m of steps) if (m.role === "assistant") for (const tool of m.tools) if (tool.name === "chat_ui") inline.add(tool.id);
+    return pendingCards.filter((c) => !inline.has(c.requestId));
+  }, [steps, pendingCards]);
 
   return (
+    <InteractiveCardsContext.Provider value={cardsContext}>
     <div className="agentz-workz-steps-wrap">
       {isSwarmTeam && projectDir && (
         <div className="agentz-workz-swarm-tabs">
@@ -170,7 +200,7 @@ export default function WorkzMessageStream({
               </div>
             );
           })}
-          {pendingCards.map((card) => (
+          {bottomCards.map((card) => (
             <div key={card.requestId} className="agentz-workz-msg assistant">
               <div className="agentz-workz-msg-role">{t("agent.role")}</div>
               <div className="agentz-workz-msg-body">
@@ -179,7 +209,7 @@ export default function WorkzMessageStream({
                   uiDefinition={card.uiDefinition}
                   listenOpen={card.listenOpen}
                   wizardStepHint={card.wizardStepHint}
-                  onSubmitted={() => onMarkCardSubmitted(card.requestId)}
+                  onSubmitted={(values) => onMarkCardSubmitted(card.requestId, values)}
                   onActionSent={() => onMarkCardActionSent(card.requestId)}
                 />
               </div>
@@ -196,5 +226,6 @@ export default function WorkzMessageStream({
         </div>
       )}
     </div>
+    </InteractiveCardsContext.Provider>
   );
 }

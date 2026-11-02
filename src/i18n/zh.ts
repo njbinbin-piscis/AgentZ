@@ -1112,6 +1112,7 @@ const zh = {
     noProject: "请先打开项目文件夹。",
     interactiveSubmit: "提交",
     interactiveSubmitted: "已提交",
+    interactiveNoAnswer: "未回答，Agent 已按默认值继续。",
     interactiveSubmitFailed: "提交失败，请重试。",
     interactiveExpired: "表单已过期，请发送新消息继续。",
     interactiveFixErrors: "请先修正高亮字段。",

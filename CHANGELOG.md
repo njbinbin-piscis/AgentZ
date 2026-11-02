@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.45] - 2026-11-02
+
+### Added
+
+- **Chat forms stay in the conversation.** A `chat_ui` form now sits where the agent asked it and scrolls with the messages. Once answered or timed out it turns gray and read-only, showing what was submitted (or that nobody answered). Restored history shows the same grayed forms instead of nothing, and they cannot trigger actions.
+
+### Fixed
+
+- **Timed-out forms are removed for real.** `chat_ui` and `chat_ui_listen` were cut off by the engine's 150 s tool limit although they wait up to 5 minutes, so the form lingered. They now own their deadline, and a failed call retires its form immediately.
+- **Forms survive switching sessions.** Switching away from a running session and back no longer drops a form the agent is still waiting on; it is restored so you do not wait out the timeout.
+- **No "settings saved" toast on window focus.** Regaining focus reloads settings silently; the toast only appears after a real save.
+
 ## [1.0.44] - 2026-11-02
 
 ### Fixed

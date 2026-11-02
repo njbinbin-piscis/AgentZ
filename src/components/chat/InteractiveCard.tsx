@@ -45,7 +45,11 @@ interface InteractiveCardProps {
   listenOpen?: boolean;
   /** Suggested wizard step from patch */
   wizardStepHint?: number;
-  onSubmitted?: () => void;
+  onSubmitted?: (values?: Record<string, unknown>) => void;
+  /** Frozen, grayed-out record of a form that is no longer answerable (history, timeout). */
+  readOnly?: boolean;
+  /** Caption for a read-only card instead of the default "Submitted" badge. */
+  readOnlyNote?: string | null;
   onActionSent?: () => void;
   /** Accepted Plan/Agent mode from a suggest_enter card. */
   onPlanModeChange?: (mode: "plan" | "agent") => void;
@@ -85,6 +89,8 @@ export default function InteractiveCard({
   listenOpen = false,
   wizardStepHint,
   onSubmitted,
+  readOnly = false,
+  readOnlyNote = null,
   onActionSent,
   onPlanModeChange,
   onPlanBuild,
@@ -109,7 +115,7 @@ export default function InteractiveCard({
   );
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [submitted, setSubmitted] = useState(!!submittedValues);
+  const [submitted, setSubmitted] = useState(!!submittedValues || readOnly);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [actionSent, setActionSent] = useState(false);
@@ -248,7 +254,7 @@ export default function InteractiveCard({
         onActionSent?.();
       } else {
         setSubmitted(true);
-        onSubmitted?.();
+        onSubmitted?.(values);
       }
     } catch (e) {
       console.error("[InteractiveCard] respond error:", e);
@@ -506,7 +512,7 @@ export default function InteractiveCard({
   };
 
   return (
-    <div className={`interactive-card${submitted ? " ic-submitted" : ""}`}>
+    <div className={`interactive-card${submitted ? " ic-submitted" : ""}${readOnly ? " ic-readonly" : ""}`}>
       {uiDefinition.title && <div className="ic-title">{uiDefinition.title}</div>}
       {uiDefinition.description && <p className="ic-description">{uiDefinition.description}</p>}
       {cardKind === "plan_mode_suggest" && suggestCountdown != null && !submitted && (
@@ -566,7 +572,7 @@ export default function InteractiveCard({
 
       {submitError && !submitted && <div className="ic-form-error">{submitError}</div>}
       {submitted && (
-        <div className="ic-submitted-badge">{t("chat.interactiveSubmitted", { defaultValue: "Submitted" })}</div>
+        <div className="ic-submitted-badge">{readOnlyNote ?? t("chat.interactiveSubmitted", { defaultValue: "Submitted" })}</div>
       )}
     </div>
   );
