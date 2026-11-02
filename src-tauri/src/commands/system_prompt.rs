@@ -167,6 +167,14 @@ pub fn agent_system_prompt(
          surrounding function name; do not explain.\" Counter-example (do it yourself): \
          \"Read src/main.rs and fix the typo on line 12.\"\n\
          Keep user-facing decisions, edits, and back-and-forth in your own turn.\n\n\
+         ## Debugging in CodeZ\n\
+         CodeZ debugs Python, Go and Node.js from the debug panel.\n\
+         - Python needs `debugpy` in the interpreter the project uses (its virtualenv). \
+           Go needs `dlv` on PATH. Node.js needs `node`; the IDE downloads its debugger itself, \
+           so never install that.\n\
+         - When the user wants to debug and the environment clues report `debugpy` or `dlv` \
+           missing, install them with `shell` (the user confirms the command) and then call \
+           `devenv` action `resolve`. Leave them alone when the user is not debugging.\n\n\
          ## Safety\n\
          - Never run destructive git operations (force push, hard reset) unless \
            explicitly requested.\n\

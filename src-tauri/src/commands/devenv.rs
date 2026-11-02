@@ -660,6 +660,14 @@ fn specs_for(d: &Detected) -> Vec<ToolSpec> {
             false,
             "code navigation (lsp tool)",
         ));
+        v.push(spec(
+            "dlv",
+            "go",
+            &["dlv"],
+            &["version"],
+            false,
+            "debugging Go in CodeZ",
+        ));
     }
     if has("java") {
         v.push(spec(
@@ -848,6 +856,11 @@ fn install_hint(id: &str) -> String {
             "go install golang.org/x/tools/gopls@latest",
             "go install golang.org/x/tools/gopls@latest",
         ),
+        "dlv" => (
+            "go install github.com/go-delve/delve/cmd/dlv@latest (needs ~/go/bin on PATH)",
+            "go install github.com/go-delve/delve/cmd/dlv@latest (needs ~/go/bin on PATH)",
+            "go install github.com/go-delve/delve/cmd/dlv@latest (needs ~/go/bin on PATH)",
+        ),
         "java" | "javac" => (
             "winget install EclipseAdoptium.Temurin.21.JDK",
             "brew install openjdk",
@@ -933,6 +946,60 @@ fn os_name() -> &'static str {
     }
 }
 
+/// The interpreter CodeZ debugging will actually use: the project virtualenv, else PATH.
+fn python_interpreter(project: &Path) -> Option<PathBuf> {
+    let (bin, exe) = if cfg!(windows) {
+        ("Scripts", "python.exe")
+    } else {
+        ("bin", "python")
+    };
+    for venv in [".venv", "venv", "env"] {
+        let root = project.join(venv);
+        if root.join("pyvenv.cfg").is_file() {
+            let candidate = root.join(bin).join(exe);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    locate("python3")
+        .or_else(|| locate("python"))
+        .or_else(|| locate("py"))
+}
+
+fn probe_debugpy(project: &Path) -> ToolStatus {
+    let interpreter = python_interpreter(project);
+    let mut status = ToolStatus {
+        id: "debugpy".to_string(),
+        stack: "python".to_string(),
+        required: false,
+        found: false,
+        path: interpreter
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string()),
+        version: None,
+        required_version: None,
+        version_ok: None,
+        reason: "debugging Python in CodeZ".to_string(),
+        install_hint: "pip install debugpy".to_string(),
+    };
+    let Some(interpreter) = interpreter else {
+        status.install_hint = format!("{}; then pip install debugpy", install_hint("python"));
+        return status;
+    };
+    status.install_hint = format!(
+        "\"{}\" -m pip install debugpy",
+        interpreter.to_string_lossy()
+    );
+    if let Some(ver) = run_version(&interpreter, &["-m", "debugpy", "--version"]) {
+        status.found = true;
+        if !ver.is_empty() {
+            status.version = Some(ver);
+        }
+    }
+    status
+}
+
 fn probe(spec: ToolSpec) -> ToolStatus {
     let mut path: Option<PathBuf> = None;
     for exe in spec.exes {
@@ -982,7 +1049,10 @@ pub fn scan_blocking(project: &Path) -> DevEnvReport {
         .into_iter()
         .map(|s| std::thread::spawn(move || probe(s)))
         .collect();
-    let tools = handles.into_iter().filter_map(|h| h.join().ok()).collect();
+    let mut tools: Vec<ToolStatus> = handles.into_iter().filter_map(|h| h.join().ok()).collect();
+    if detected.stacks.contains("python") {
+        tools.push(probe_debugpy(project));
+    }
     DevEnvReport {
         os: os_name().to_string(),
         stacks: detected.stacks.iter().map(|s| s.to_string()).collect(),
@@ -1323,6 +1393,37 @@ mod tests {
             Some("21.0.2")
         );
         assert_eq!(parse_version("no digits"), None);
+    }
+
+    #[test]
+    fn go_projects_list_delve_as_an_optional_debug_tool() {
+        let mut detected = Detected::default();
+        detected.stacks.insert("go");
+        let specs = specs_for(&detected);
+        let dlv = specs.iter().find(|s| s.id == "dlv").expect("dlv spec");
+        assert!(!dlv.required);
+        assert!(install_hint("dlv").contains("go-delve/delve"));
+    }
+
+    #[test]
+    fn debugpy_is_probed_through_the_project_virtualenv() {
+        let dir = std::env::temp_dir().join(format!("agentz-debugpy-{}", uuid::Uuid::new_v4()));
+        let bin = dir
+            .join(".venv")
+            .join(if cfg!(windows) { "Scripts" } else { "bin" });
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::write(dir.join(".venv").join("pyvenv.cfg"), "home = test\n").unwrap();
+        let exe = bin.join(if cfg!(windows) { "python.exe" } else { "python" });
+        std::fs::write(&exe, b"not a real interpreter").unwrap();
+        let status = probe_debugpy(&dir);
+        assert!(!status.required);
+        assert!(!status.found);
+        let expected = exe.to_string_lossy().to_string();
+        assert_eq!(status.path.as_deref(), Some(expected.as_str()));
+        assert!(status.install_hint.contains(&expected));
+        assert!(status.install_hint.contains("pip install debugpy"));
+        assert!(dir.starts_with(std::env::temp_dir()));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

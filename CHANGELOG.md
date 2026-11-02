@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Debugging Python, Go and Node.js in CodeZ.** The debug panel now has a launch configuration picker and a start button. Configurations come from `.vscode/launch.json` (comments and trailing commas allowed) and from auto-detected templates: Flask, FastAPI, Django and the current file for Python; the main package, current file and package tests for Go; the package entry and current file for Node.js. Python uses the project virtualenv, Go uses Delve (`dlv`), and Node.js uses js-debug, downloaded once on first use.
 - **A fuller debug session.** Breakpoints added or removed while running take effect immediately, stopping opens the file and highlights the line, variables expand, watch expressions re-evaluate on every stop, and the debug console evaluates expressions in the paused frame.
+- **The agent can set up debugging.** Environment checks now report `debugpy` (probed with the project virtualenv) and `dlv` as optional tools, with install commands. When the user wants to debug and one is missing, the agent installs it with the user's confirmation. Node.js debugging needs only `node`; the IDE downloads its debugger.
 
 ### Fixed
 
