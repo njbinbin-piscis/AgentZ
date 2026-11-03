@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "agentz-desktop"
-version = "1.0.49"
+version = "1.0.50"
 dependencies = [
  "aes",
  "agentz-task-state",

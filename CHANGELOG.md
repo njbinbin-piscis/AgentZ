@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.50] - 2026-11-04
+
+### Fixed
+
+- **Linux and macOS release builds compile again.** `code_run` diagnosis helpers were unused outside Windows, and `-D warnings` failed those jobs for 1.0.49, so GitHub only published the Windows installers. The helpers now compile for Windows and for tests.
+- **Engine pin is piscis-engine `v0.8.73`.** The same tool-guidance changes are tagged upstream. The installer still builds the vendored copy.
+
 ## [1.0.49] - 2026-11-03
 
 ### Added

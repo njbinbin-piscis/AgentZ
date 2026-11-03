@@ -420,6 +420,8 @@ impl Tool for CodeRunTool {
 
 /// Heuristic diagnosis for common build/test failure patterns.
 /// `No module named 'C:\...\file.py'` is a path passed to `python -m`, not a missing package.
+/// Only the Windows command runner calls this. Tests compile it on every OS.
+#[cfg(any(windows, test))]
 fn quoted_module_looks_like_path(output: &str) -> bool {
     let lower = output.to_ascii_lowercase();
     let Some(at) = lower.find("no module named") else {
@@ -441,10 +443,12 @@ fn quoted_module_looks_like_path(output: &str) -> bool {
 }
 
 /// cmd.exe does not treat these as syntax; they are PowerShell.
+#[cfg(any(windows, test))]
 fn looks_like_powershell(text: &str) -> bool {
     text.contains('$') || text.contains("@'") || text.contains("@\"")
 }
 
+#[cfg(any(windows, test))]
 fn diagnose(output: &str, command: &str) -> Option<String> {
     let out_lower = output.to_lowercase();
     let cmd_lower = command.to_lowercase();
