@@ -17,6 +17,7 @@ import { graphIndexResourceSnapshot } from "../../services/tauri/graphIndexResou
 import { fileUriString } from "../../services/tauri/editorUri";
 import { BROWSER_TAB_PATH, isBrowserTab, localFileUrl } from "./browserTab";
 import { OPEN_LINK_EVENT, openExternal, opensWithSystem, type OpenLinkDetail } from "../../services/linkRouter";
+import { rewriteRemoteBrowserUrl } from "../../extensions/remotePorts";
 import { openPath } from "../../services/tauri";
 import { getActiveChatSession } from "../../services/activeChatSession";
 import {
@@ -237,7 +238,8 @@ export function useCodezWorkspace({
         return;
       }
       try {
-        await browserNavigate(getActiveChatSession() ?? "", url);
+        const opened = await rewriteRemoteBrowserUrl(projectDir, url);
+        await browserNavigate(getActiveChatSession() ?? "", opened);
       } catch (e) {
         // eslint-disable-next-line no-alert
         window.alert(String(e));

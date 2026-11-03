@@ -34,6 +34,16 @@ describe("resolveArtifactFullPath", () => {
     ).toBe("D:/projects/AgentZ/MODULE_DEPENDENCY_GRAPH.md");
   });
 
+  it("keeps a remote POSIX absolute path on that machine instead of appending it", () => {
+    const project = "agentz-remote://ssh-remote+box/home/tt/Projects/pv-platform";
+    expect(
+      resolveArtifactFullPath(project, "/home/tt/Projects/pv-platform/frontend/js/preview-pane.js"),
+    ).toBe("agentz-remote://ssh-remote+box/home/tt/Projects/pv-platform/frontend/js/preview-pane.js");
+    expect(resolveArtifactFullPath(project, "frontend/js/preview-pane.js")).toBe(
+      "agentz-remote://ssh-remote+box/home/tt/Projects/pv-platform/frontend/js/preview-pane.js",
+    );
+  });
+
   it("joins plain relative paths onto the workspace root when set", () => {
     expect(resolveArtifactFullPath("/repo", "docs/plan.md")).toBe("/repo/docs/plan.md");
     expect(resolveArtifactFullPath("/repo", "docs/plan.md", "/repo/.worktrees/wt-1")).toBe(

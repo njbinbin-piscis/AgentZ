@@ -69,6 +69,19 @@ describe("useInteractiveCards wait timeout", () => {
     expect(ids()).toEqual([]);
   });
 
+  it("a later message retires an unanswered Build card, and a finished turn no longer keeps it", async () => {
+    await act(async () => {
+      api.handleAgentEvent(show("p", "plan_mode_build"));
+      api.handleAgentEvent(show("a"));
+      api.handleAgentEvent({ type: "done" } as unknown as AgentEvent);
+    });
+    expect(ids()).toEqual(["p"]);
+    await act(async () => api.dismissPlanBuilds());
+    expect(ids()).toEqual([]);
+    await act(async () => api.handleAgentEvent({ type: "done" } as unknown as AgentEvent));
+    expect(ids()).toEqual([]);
+  });
+
   it("keeps the card when chat_ui ends normally (action flow)", async () => {
     await act(async () => api.handleAgentEvent(show("a")));
     await act(async () =>

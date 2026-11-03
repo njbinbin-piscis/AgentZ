@@ -351,16 +351,22 @@ pub async fn dap_start(
     // and must not revoke an existing owner before validation.
     let remote = validate_remote_dir(remote_dir.as_deref())?;
     let tcp = tcp.unwrap_or(false);
-    if tcp && remote.is_some() {
-        return Err("debug adapters that use TCP are not supported on remote targets yet".into());
-    }
-    // `{port}` in the arguments is replaced by a free loopback port.
+    // `{port}` is the port the adapter listens on. Locally that is also where
+    // the client connects. On a remote, the adapter listens on the remote
+    // loopback and a forward carries that port back to this machine.
     let (args, port) = if tcp {
-        let port = free_loopback_port()?;
-        let shown = port.to_string();
+        let remote_port = free_loopback_port()?;
+        let mut connect_port = remote_port;
+        if let Some(uri) = &remote {
+            let broker = crate::remote::manager().ok_or("remote broker unavailable")?;
+            let target = broker.wait_for_authority(&uri.authority).await?;
+            let fwd = crate::remote::forward::start(&target, remote_port, Some(remote_port)).await?;
+            connect_port = fwd.local_port;
+        }
+        let shown = remote_port.to_string();
         (
             args.iter().map(|a| a.replace("{port}", &shown)).collect::<Vec<_>>(),
-            Some(port),
+            Some(connect_port),
         )
     } else {
         (args, None)

@@ -25,7 +25,7 @@ impl Tool for PlanWriteTool {
          then persist the full plan here. Each step must be atomic and list expected \
          artifacts plus verifiable evidence. Agent mode: update the same file to track \
          step status and execution records as you work. \
-         Paths must be relative like `.agentz/plans/<name>.md`.\n\
+         Omit `path` so the write goes to this session's plan file. Do not invent a second filename.\n\
          REQUIRED FORMAT: steps are level-2 headings `## Step N: step-id — title` (exactly two `#`, \
          NOT `###`), followed by bold-field bullets: `- **状态**: pending`, `- **描述**: …`, \
          `- **依赖**: …`, `- **预期产物**: …`, `- **验收证据**: …`, `- **执行记录**: …`. \
@@ -42,7 +42,7 @@ impl Tool for PlanWriteTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Relative path under workspace, must be `.agentz/plans/*.md`. Defaults to session-scoped path."
+                    "description": "Omit this. The session plan path is already in the prompt (`.agentz/plans/<session>.md`). Passing another filename creates a second plan that the next turn will not load."
                 },
                 "content": {
                     "type": "string",

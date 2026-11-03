@@ -74,3 +74,60 @@ pub async fn debug_adapter_ensure(app: AppHandle, name: String) -> Result<String
     }
     Ok(entry.to_string_lossy().into_owned())
 }
+
+#[derive(serde::Serialize)]
+pub struct JsDebugRemote {
+    pub node: String,
+    pub script: String,
+}
+
+/// Copy a local js-debug tree to the connected remote and return the remote node plus script.
+#[tauri::command]
+pub async fn debug_adapter_publish_remote(
+    state: tauri::State<'_, crate::state::AppState>,
+    entry: String,
+    workspace: String,
+) -> Result<JsDebugRemote, String> {
+    let uri = crate::remote::vfs::parse(&workspace).ok_or("workspace is not a remote project")?;
+    let entry_path = std::path::PathBuf::from(&entry);
+    let js_root = entry_path
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or("js-debug entry is not inside its src directory")?;
+    let (target, server) = state.ext_host.deployment_snapshot().await?;
+    if target.is_local() {
+        return Err("js-debug upload is only for a remote workspace".into());
+    }
+    if !target.authority().eq_ignore_ascii_case(&uri.authority) {
+        return Err("connected remote does not match this workspace".into());
+    }
+    let server = server.ok_or("remote server is not deployed")?;
+    let remote_dir = format!(
+        "{}/js-debug-{}",
+        server.home.trim_end_matches('/'),
+        JS_DEBUG_VERSION
+    );
+    let script = format!("{remote_dir}/js-debug/src/dapDebugServer.js");
+    let present = target
+        .run(&format!(
+            "test -f {} && echo yes || true",
+            crate::remote::shell_quote(&script)
+        ))
+        .await?;
+    if present.trim() != "yes" {
+        let archive = crate::remote::tar_dir(js_root).await?;
+        target
+            .run_with_stdin(
+                &format!(
+                    "mkdir -p {d} && tar -xf - -C {d}",
+                    d = crate::remote::shell_quote(&remote_dir)
+                ),
+                &archive,
+            )
+            .await?;
+    }
+    Ok(JsDebugRemote {
+        node: server.node.clone(),
+        script,
+    })
+}

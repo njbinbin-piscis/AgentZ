@@ -19,15 +19,16 @@ impl Tool for FileListTool {
     }
 
     fn description(&self) -> &str {
-        "List directory contents as structured JSON. Returns file names, sizes, modification times, \
+        "List one directory. The path parameter accepts only a directory, never a file (a file returns `Not a directory`; use file_read). Returns file names, sizes, modification times, \
          and whether each entry is a file or directory. \
          Much easier for AI to parse than 'shell cmd dir' output. \
          Use recursive=true with max_depth to explore directory trees. \
          \
          Examples: \
-         - List C:\\Tribon\\M3: path=C:\\Tribon\\M3 \
-         - List all subdirs of C:\\: path=C:\\, recursive=false \
-         - Explore a project tree: path=C:\\MyProject, recursive=true, max_depth=3"
+         - List the workspace: path=. \
+         - List a subdirectory: path=src \
+         - Explore a tree: path=src, recursive=true, max_depth=3 \
+         An absolute directory is only a path format and must still be inside the authorized workspace. On Windows it looks like C:\\MyProject; on Linux and macOS like /home/me/proj."
     }
 
     fn input_schema(&self) -> Value {
@@ -36,7 +37,7 @@ impl Tool for FileListTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Directory path to list. Relative paths are resolved from workspace root (e.g. 'src' lists the src/ directory inside the workspace). Defaults to workspace root if omitted."
+                    "description": "DIRECTORY ONLY. A file path is invalid. Relative paths resolve from the workspace root (for example 'src' lists the src directory). Defaults to the workspace root when omitted."
                 },
                 "recursive": {
                     "type": "boolean",
@@ -82,7 +83,7 @@ impl Tool for FileListTool {
         }
         if !path.is_dir() {
             return Ok(ToolResult::err(format!(
-                "Not a directory: {}",
+                "Not a directory: {}. path accepts only a directory. To read this file, use file_read.",
                 display_path(&path)
             )));
         }

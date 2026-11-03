@@ -52,7 +52,7 @@ impl Tool for FileSearchTool {
     }
 
     fn description(&self) -> &str {
-        "Search for files by name pattern (glob) or search file contents by regex (grep). \
+        "Search inside a directory. The path parameter accepts only a directory, never a file. \
          Equivalent to the Glob and Grep tools used by Cursor AI. \
          \
          Actions: \
@@ -65,9 +65,10 @@ impl Tool for FileSearchTool {
          To search one file, pass its parent directory and set include to that file name, or use file_read. \
          \
          Tips: \
-         - To find all .py files under C:\\MyApp: action=glob, pattern=**/*.py, path=C:\\MyApp \
-         - To find all files containing 'TBRuntime': action=grep, pattern=TBRuntime, path=C:\\Tribon \
-         - To search only in .ini files: action=grep, pattern=password, include=*.ini, path=C:\\"
+         - Find .py files: action=glob, pattern=**/*.py, path=src \
+         - Find a string: action=grep, pattern=TBRuntime, path=. \
+         - Limit by name: action=grep, pattern=password, include=*.ini, path=src \
+         Absolute directories must still be inside the authorized workspace (Windows C:\\MyProject, Linux and macOS /home/me/proj)."
     }
 
     fn input_schema(&self) -> Value {
@@ -85,7 +86,7 @@ impl Tool for FileSearchTool {
                 },
                 "path": {
                     "type": "string",
-                    "description": "Directory to search in. Must be a directory, never a file. A file path returns an error (`Path is not a directory`) instead of 'No matches'. To search one file, pass its parent directory and set include to the file name, or use file_read. Relative paths resolve from the workspace root. Defaults to the workspace root when omitted."
+                    "description": "DIRECTORY ONLY. A file path is invalid and returns `Path is not a directory`. Pass the parent directory, and to limit the search to one file set include to that file name (or use file_read). Relative paths resolve from the workspace root. Defaults to the workspace root when omitted."
                 },
                 "include": {
                     "type": "string",

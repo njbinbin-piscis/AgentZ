@@ -407,6 +407,23 @@ pub async fn deploy(
     host_js: &Path,
     node_resources: Option<&Path>,
 ) -> Result<DeployedServer, String> {
+    // The launch script is POSIX. Native Windows remotes are refused before any upload.
+    let os_name = match target.run("uname -s").await {
+        Ok(text) => {
+            let name = text.trim().to_string();
+            if name != "Linux" && name != "Darwin" {
+                return Err(format!(
+                    "native {name} remotes are not supported; use WSL or a Linux host"
+                ));
+            }
+            name
+        }
+        Err(_) => {
+            return Err(
+                "native Windows remotes are not supported; use WSL or a Linux host".into(),
+            );
+        }
+    };
     let bytes = std::fs::read(host_js).map_err(|e| format!("read {}: {e}", host_js.display()))?;
     let version = fnv1a(&bytes);
 
@@ -445,6 +462,11 @@ pub async fn deploy(
 
     let node = match node {
         Some(n) => n,
+        None if os_name == "Darwin" => {
+            return Err(
+                "macOS remote has no Node 18 or newer; install Node on the target".into(),
+            );
+        }
         None => upload_node(target, &home, &arch, node_resources).await?,
     };
 
@@ -550,7 +572,7 @@ pub async fn sync_extensions(
     Ok(mapped)
 }
 
-async fn tar_dir(dir: &Path) -> Result<Vec<u8>, String> {
+pub(crate) async fn tar_dir(dir: &Path) -> Result<Vec<u8>, String> {
     let out = piscis_kernel::proc::tokio_command("tar")
         .arg("-cf")
         .arg("-")
@@ -580,6 +602,52 @@ pub fn runs_on_workspace(manifest: &serde_json::Value) -> bool {
         }
         Some(serde_json::Value::String(k)) => k == "workspace",
         _ => manifest.get("main").is_some(),
+    }
+}
+
+/// Why an extension must not be copied to this remote, if it cannot run there.
+pub fn extension_remote_block(dir: &Path, platform: &str, arch: &str) -> Option<String> {
+    if let Some(manifest) = read_manifest(dir) {
+        if let Some(os) = manifest.get("os").and_then(|v| v.as_array()) {
+            if !os.is_empty() && !os.iter().any(|v| v.as_str() == Some(platform)) {
+                return Some(format!("package os does not include {platform}"));
+            }
+        }
+        if let Some(cpu) = manifest.get("cpu").and_then(|v| v.as_array()) {
+            if !cpu.is_empty() && !cpu.iter().any(|v| v.as_str() == Some(arch)) {
+                return Some(format!("package cpu does not include {arch}"));
+            }
+        }
+    }
+    let mut bins = Vec::new();
+    collect_native_bins(dir, 0, &mut bins);
+    let markers = ["win32", "darwin", "linux"];
+    let labeled: Vec<&String> = bins
+        .iter()
+        .filter(|path| markers.iter().any(|marker| path.contains(marker)))
+        .collect();
+    if labeled.is_empty() || labeled.iter().any(|path| path.contains(platform)) {
+        return None;
+    }
+    Some(format!("native binaries are not built for {platform}"))
+}
+
+fn collect_native_bins(dir: &Path, depth: usize, out: &mut Vec<String>) {
+    if depth > 6 || out.len() > 64 {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_native_bins(&path, depth + 1, out);
+            continue;
+        }
+        if path.extension().and_then(|ext| ext.to_str()) == Some("node") {
+            out.push(path.to_string_lossy().replace('\\', "/"));
+        }
     }
 }
 

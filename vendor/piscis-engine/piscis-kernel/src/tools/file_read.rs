@@ -109,8 +109,8 @@ impl Tool for FileReadTool {
     fn description(&self) -> &str {
         "Read the contents of a known file. Returns text with line numbers, or base64 for images. \
          IMPORTANT: This tool reads FILE CONTENT only — do NOT use it to list directory contents. \
-         To list files in a directory, use file_list or shell with 'dir C:\\SomePath /b'. \
-         If you get 'permission denied', use shell with 'Get-Content \"path\"' or 'type \"path\"' instead. \
+         To list files in a directory, use file_list. \
+         If you get 'permission denied', the host refused this path. Do not retry it through the shell. \
          Paths: relative paths (e.g. src/auth/auth.service.ts) are resolved from workspace root — prefer relative paths when reading files inside the workspace. \
          Use offset/limit for large files to avoid reading the whole file at once.\n\
          \n\
@@ -119,8 +119,7 @@ impl Tool for FileReadTool {
          You MUST pay attention to this label: if a file is GBK-encoded (common in legacy Chinese projects, \
          system logs, .ini/.cfg files from older Windows software), the content you receive has been \
          decoded to Unicode for you to read — but if you need to write it back, you must be aware that \
-         the original encoding is GBK, not UTF-8. Use shell with PowerShell to write GBK files: \
-         `[System.IO.File]::WriteAllText(path, content, [System.Text.Encoding]::GetEncoding('gbk'))`. \
+         the original encoding is GBK, not UTF-8. file_write always writes UTF-8. To keep GBK, on Windows use the shell tool with PowerShell `[System.IO.File]::WriteAllText(path, content, [System.Text.Encoding]::GetEncoding('gbk'))`; on Linux and macOS use a program that selects the encoding, such as Python. \
          For UTF-8-BOM files, file_write and file_edit will automatically preserve the BOM on write-back."
     }
 
@@ -130,7 +129,7 @@ impl Tool for FileReadTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to the file. Relative paths (e.g. src/auth/auth.service.ts) are resolved from workspace root — prefer relative paths when working inside the workspace. Use absolute paths for files outside the workspace."
+                    "description": "Path to the file. Relative paths (for example src/auth/auth.service.ts) resolve from the workspace root; prefer those. An absolute path is only a path format: the host still rejects paths outside the authorized workspace, so do not use one to reach the system temp directory, installed skills, or other files outside the project."
                 },
                 "offset": {
                     "type": "integer",
@@ -241,13 +240,21 @@ impl Tool for FileReadTool {
 
         let raw = std::fs::read(&path).map_err(|e| {
             let hint = if e.kind() == std::io::ErrorKind::PermissionDenied {
-                format!(
-                    "Failed to read file: {} (os error 5 - 拒绝访问)\n\
-                     提示：该文件受系统权限保护，无法直接读取。\
-                     请改用 shell 工具（如 `Get-Content` 或 `type`）以当前用户权限读取，\
-                     或确认文件路径是否正确。",
-                    display_path_for_tool(&path, &ctx.workspace_root)
-                )
+                let shown = display_path_for_tool(&path, &ctx.workspace_root);
+                #[cfg(windows)]
+                {
+                    format!(
+                        "Failed to read file: {shown} ({e})\n\
+                         该文件受系统权限保护。不要改用 shell 绕过。确认路径在授权的工作区内。"
+                    )
+                }
+                #[cfg(not(windows))]
+                {
+                    format!(
+                        "Failed to read file: {shown} ({e})\n\
+                         The host refused this path. Do not retry it through the shell. The path must stay inside the authorized workspace."
+                    )
+                }
             } else {
                 format!("Failed to read file: {}", e)
             };

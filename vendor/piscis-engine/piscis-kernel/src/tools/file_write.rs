@@ -163,16 +163,16 @@ impl Tool for FileWriteTool {
     fn description(&self) -> &str {
         "Write content to a file. Creates the file and all parent directories if they don't exist. \
          Completely overwrites existing content — use file_edit if you only want to change part of a file. \
-         Paths: use relative paths (e.g. src/auth/auth.service.ts) to write inside the current workspace root. \
-         Use absolute paths only when writing outside the workspace. \
-         Note: writing to system directories (C:\\Windows\\, C:\\Program Files\\) will fail with permission denied — \
-         write to user directories (C:\\Users\\name\\, Desktop, Documents) or the workspace instead.\n\
+         Paths: relative paths (for example src/auth/auth.service.ts) resolve from the workspace root; prefer those. \
+         An absolute path is only a path format. The host still rejects paths outside the authorized workspace. \
+         Protected system directories fail on every platform (on Windows, C:\\Windows and C:\\Program Files).\n\
          \n\
          Encoding: this tool always writes UTF-8. If the target file already exists and has a UTF-8 BOM \
          (common for files created by Notepad or PowerShell on Windows), the BOM is automatically preserved. \
          WARNING: do NOT use file_write for files that must stay in GBK/GB18030 or other non-UTF-8 encodings \
-         (e.g. legacy config files, files consumed by older Chinese software). For those, use shell with \
-         `[System.IO.File]::WriteAllText(path, content, [System.Text.Encoding]::GetEncoding('gbk'))` instead. \
+         (for example legacy config files). To keep GBK, on Windows use the shell tool with PowerShell \
+         `[System.IO.File]::WriteAllText(path, content, [System.Text.Encoding]::GetEncoding('gbk'))`. \
+         On Linux and macOS use a program that selects the encoding, such as Python. \
          If you are unsure of a file's original encoding, read it first with file_read and check the \
          '[encoding: ...]' label in the result header."
     }
@@ -183,7 +183,7 @@ impl Tool for FileWriteTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to the file. Relative paths (e.g. src/auth/auth.service.ts) are resolved from workspace root — prefer relative paths when working inside the workspace. Use absolute paths only for files outside the workspace."
+                    "description": "Path to the file. Relative paths (for example src/auth/auth.service.ts) resolve from the workspace root; prefer those. An absolute path is only a path format: the host still rejects paths outside the authorized workspace."
                 },
                 "content": {
                     "type": "string",
@@ -382,7 +382,7 @@ impl Tool for FileEditTool {
          then restores the BOM on write-back — so BOM-bearing files are handled transparently. \
          However, file_edit only supports UTF-8 and UTF-8-BOM files. Do NOT use file_edit on \
          GBK/GB18030 files — the byte-level mismatch will corrupt the file. If file_read reports \
-         '[encoding: gbk]' for a file, edit it via shell with PowerShell string replacement instead."
+         '[encoding: gbk]' for a file, do not use file_edit. On Windows, edit it through the shell tool with PowerShell. On Linux and macOS, use a program that selects the encoding."
     }
 
     fn input_schema(&self) -> Value {

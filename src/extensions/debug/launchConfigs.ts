@@ -105,15 +105,24 @@ function isRemote(dir: string): boolean {
 }
 
 /** Debug-adapter command for the interpreter the project actually uses. */
+function remoteRoot(dir: string): string {
+  const rest = dir.slice("agentz-remote://".length);
+  const slash = rest.indexOf("/");
+  return slash < 0 ? "/" : decodeURIComponent(rest.slice(slash));
+}
+
 export async function findPythonInterpreter(dir: string, readText: ReadText): Promise<string> {
-  if (isRemote(dir)) return "python";
-  const win = isWindowsPath(dir);
+  const remote = isRemote(dir);
+  const win = !remote && isWindowsPath(dir);
   for (const venv of [".venv", "venv", "env", ".env"]) {
     // pyvenv.cfg is a small text file every virtualenv has, so it is a cheap probe.
     if ((await readText(`${venv}/pyvenv.cfg`)) !== null) {
-      return `${dir.replace(/[\\/]+$/, "")}/${venv}/${win ? "Scripts/python.exe" : "bin/python"}`;
+      const exe = `${venv}/${win ? "Scripts/python.exe" : "bin/python"}`;
+      if (remote) return `${remoteRoot(dir).replace(/\/+$/, "")}/${exe}`;
+      return `${dir.replace(/[\\/]+$/, "")}/${exe}`;
     }
   }
+  if (remote) return "python3";
   return win ? "python" : "python3";
 }
 
@@ -295,6 +304,9 @@ export async function loadLaunchConfigs(dir: string, readText: ReadText): Promis
 /** Which debug adapter downloads a configuration needs. */
 export type EnsureAdapter = (name: "js-debug") => Promise<string>;
 
+/** Places a local js-debug install on the remote and returns the remote node and script. */
+export type PublishJsDebug = (entry: string, workspace: string) => Promise<{ node: string; script: string }>;
+
 /**
  * Like `prepareLaunch`, and also resolves adapters that are not plain commands:
  * Delve for Go, and js-debug (downloaded on first use) for Node.js.
@@ -304,6 +316,7 @@ export async function prepareLaunchWithAdapter(
   ctx: VarContext,
   interpreter: string,
   ensureAdapter: EnsureAdapter,
+  publishJsDebug?: PublishJsDebug,
 ): Promise<LaunchConfig> {
   const resolved = prepareLaunch(config, ctx, interpreter);
   if ((resolved.type === "go" || resolved.type === "delve") && !resolved.__adapter) {
@@ -314,7 +327,13 @@ export async function prepareLaunchWithAdapter(
     resolved.type = "pwa-node";
     if (!resolved.__adapter) {
       const entry = await ensureAdapter("js-debug");
-      resolved.__adapter = { command: "node", args: [entry, "{port}", "127.0.0.1"], tcp: true };
+      if (isRemote(ctx.workspaceFolder)) {
+        if (!publishJsDebug) throw new Error("js-debug must be uploaded to the remote before debugging");
+        const published = await publishJsDebug(entry, ctx.workspaceFolder);
+        resolved.__adapter = { command: published.node, args: [published.script, "{port}", "127.0.0.1"], tcp: true };
+      } else {
+        resolved.__adapter = { command: "node", args: [entry, "{port}", "127.0.0.1"], tcp: true };
+      }
     }
   }
   return resolved;

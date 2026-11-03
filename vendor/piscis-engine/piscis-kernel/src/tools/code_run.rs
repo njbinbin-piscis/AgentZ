@@ -30,34 +30,26 @@ impl Tool for CodeRunTool {
 
     fn description(&self) -> &str {
         #[cfg(windows)]
-        return "Run commands inside a Windows AppContainer with access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled. The command is cmd.exe syntax, passed through unchanged with UTF-8 output: double quotes work as usual (python -c \"print('hi')\", node -e \"console.log(1)\"), && / || / & / | / > chain and redirect, %VAR% expands, ! is literal. For PowerShell syntax use the shell tool. Other platforms do not execute this tool because an OS sandbox is unavailable.";
+        return "Run commands inside a Windows AppContainer with access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled. The command is cmd.exe syntax, passed through unchanged with UTF-8 output: double quotes work as usual (python -c \"print('hi')\", node -e \"console.log(1)\"), && / || / & / | / > chain and redirect, %VAR% expands, ! is literal. For PowerShell syntax use the shell tool. Set cwd to the workspace root with \".\", not a drive-letter path. Examples: command=\"cargo test\", cwd=\".\" ; command=\"python main.py\", cwd=\".\" ; command=\"npm run build\", cwd=\".\".";
 
         #[cfg(not(windows))]
-        return "Unavailable: this platform does not have an enabled operating-system command sandbox. Commands are not executed.";
-
-        #[allow(unreachable_code)]
-        "Run a shell command in a project directory and capture its output as the current OS user. \
-         Operating-system containment is not enabled; approval and workspace scoping do not block access to other resources. \
-         Designed for coding tasks: building, testing, linting, running scripts. \
-         Returns exit_code, stdout, stderr, and duration_ms. \
-         Use `cwd` to set the project root (e.g. where Cargo.toml / package.json lives). \
-         Examples: \
-         - Build Rust: command=\"cargo build\", cwd=\"C:\\\\myproject\" \
-         - Run tests:  command=\"cargo test\", cwd=\"C:\\\\myproject\" \
-         - Python:     command=\"python main.py\", cwd=\"C:\\\\myproject\" \
-         - Node:       command=\"npm run build\", cwd=\"C:\\\\myproject\" \
-         - Lint:       command=\"cargo clippy -- -D warnings\", cwd=\"C:\\\\myproject\" \
-         Prefer this over `shell` for code execution — output is structured and \
-         long outputs are automatically trimmed to keep context window usage low."
+        "Unavailable: this platform does not have an enabled operating-system command sandbox. Foreground commands are not executed."
     }
 
     fn input_schema(&self) -> Value {
+        // The tool description is cfg-gated, and this schema is not. Keep the
+        // Windows shell rules out of the string Linux and macOS models read.
+        let command_description = if cfg!(windows) {
+            "cmd.exe command, for example \"cargo test\", \"python main.py\", \"npm run build\". Not PowerShell: `$variables` and `@'` here-strings fail here; use the shell tool with interpreter powershell. Do not pass a file path to `python -m unittest`; use `python -m unittest discover -s <directory>` or `python <file.py>`."
+        } else {
+            "Command for an explicit background run via /bin/sh, for example \"cargo test\" or \"python main.py\". Foreground code_run does not execute on this platform. Do not pass a file path to `python -m unittest`; use `python -m unittest discover -s <directory>` or `python <file.py>`."
+        };
         json!({
             "type": "object",
             "properties": {
                 "command": {
                     "type": "string",
-                    "description": "Command to run (e.g. \"cargo test\", \"python main.py\", \"npm run build\")"
+                    "description": command_description
                 },
                 "cwd": {
                     "type": "string",
@@ -427,7 +419,32 @@ impl Tool for CodeRunTool {
 }
 
 /// Heuristic diagnosis for common build/test failure patterns.
-#[cfg(windows)]
+/// `No module named 'C:\...\file.py'` is a path passed to `python -m`, not a missing package.
+fn quoted_module_looks_like_path(output: &str) -> bool {
+    let lower = output.to_ascii_lowercase();
+    let Some(at) = lower.find("no module named") else {
+        return false;
+    };
+    let tail = &output[at..];
+    let bytes = tail.as_bytes();
+    let Some(open) = bytes.iter().position(|b| *b == b'\'' || *b == b'"') else {
+        return false;
+    };
+    let quote = bytes[open];
+    let rest = &tail[open + 1..];
+    let name = rest
+        .find(quote as char)
+        .map(|end| &rest[..end])
+        .unwrap_or(rest);
+    let name = name.to_ascii_lowercase();
+    name.contains('\\') || name.contains('/') || name.contains(':') || name.ends_with(".py")
+}
+
+/// cmd.exe does not treat these as syntax; they are PowerShell.
+fn looks_like_powershell(text: &str) -> bool {
+    text.contains('$') || text.contains("@'") || text.contains("@\"")
+}
+
 fn diagnose(output: &str, command: &str) -> Option<String> {
     let out_lower = output.to_lowercase();
     let cmd_lower = command.to_lowercase();
@@ -469,6 +486,12 @@ fn diagnose(output: &str, command: &str) -> Option<String> {
             );
         }
         if out_lower.contains("modulenotfounderror") || out_lower.contains("importerror") {
+            if quoted_module_looks_like_path(output) {
+                return Some(
+                    "The name Python could not import is a file path, not a module. `python -m unittest` takes a module name. Run `python -m unittest discover -s <directory>`, or run the file directly with `python <file.py>`. This is not a missing package."
+                        .to_string(),
+                );
+            }
             return Some("Missing Python module. Run `pip install <module>` or check your virtual environment is activated.".to_string());
         }
         if out_lower.contains("failed") && cmd_lower.contains("pytest") {
@@ -500,6 +523,12 @@ fn diagnose(output: &str, command: &str) -> Option<String> {
         );
     }
     if out_lower.contains("command not found") || out_lower.contains("is not recognized") {
+        if cfg!(windows) && (looks_like_powershell(command) || looks_like_powershell(output)) {
+            return Some(
+                "This looks like PowerShell (`$variables` or `@'` here-strings), but code_run executes cmd.exe. Use the shell tool with interpreter \"powershell\"."
+                    .to_string(),
+            );
+        }
         return Some(
             "Command not found. Ensure the tool is installed and on PATH, or use an absolute path."
                 .to_string(),
@@ -546,6 +575,16 @@ mod tests {
             assert!(description.contains("sandbox disabled"));
         } else {
             assert!(description.contains("Commands are not executed"));
+        }
+        let command = tool.input_schema()["properties"]["command"]["description"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        if cfg!(windows) {
+            assert!(command.contains("cmd.exe"));
+        } else {
+            assert!(!command.contains("cmd.exe"));
+            assert!(command.contains("/bin/sh"));
         }
     }
 
@@ -615,5 +654,49 @@ mod tests {
         assert!(result.is_error);
         assert!(result.content.contains("inside workspace_root"));
         assert!(result.content.contains("\"termination\":\"not_started\""));
+    }
+
+    #[test]
+    fn diagnose_does_not_call_a_path_a_missing_package() {
+        let output = "ModuleNotFoundError: No module named 'C:\\\\Temp\\\\test_tasks'";
+        let hint = diagnose(output, "python -m unittest -v C:\\Temp\\test_tasks.py").unwrap();
+        assert!(hint.contains("file path"));
+        assert!(!hint.to_ascii_lowercase().contains("pip install"));
+    }
+
+    #[test]
+    fn diagnose_still_suggests_pip_for_a_real_module_name() {
+        let hint = diagnose(
+            "ModuleNotFoundError: No module named 'requests'",
+            "python app.py",
+        )
+        .unwrap();
+        assert!(hint.contains("pip install"));
+    }
+
+    #[test]
+    fn diagnose_points_powershell_syntax_at_the_shell_tool() {
+        let hint = diagnose(
+            "'$root' is not recognized as an internal or external command",
+            "$root='C:\\work'; @'\nhello\n'@",
+        )
+        .unwrap();
+        if cfg!(windows) {
+            assert!(hint.contains("powershell"));
+            assert!(!hint.contains("on PATH"));
+        } else {
+            // code_run does not run cmd.exe here, so PowerShell syntax is not the diagnosis.
+            assert!(hint.contains("on PATH"));
+        }
+    }
+
+    #[test]
+    fn diagnose_keeps_path_advice_for_a_missing_program() {
+        let hint = diagnose(
+            "'cargo' is not recognized as an internal or external command",
+            "cargo test",
+        )
+        .unwrap();
+        assert!(hint.contains("on PATH"));
     }
 }

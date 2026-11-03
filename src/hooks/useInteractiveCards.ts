@@ -173,6 +173,27 @@ export function useInteractiveCards() {
 
   const clearCards = useCallback(() => setCards({}), []);
 
+  /**
+   * The plan-ready Build card outlives its turn on purpose, so the user can
+   * accept it after the plan finishes. A later message means they did not
+   * accept it: retire the card instead of leaving it pinned under the chat.
+   */
+  const dismissPlanBuilds = useCallback(() => {
+    setCards((prev) => {
+      let changed = false;
+      const next: Record<string, InteractiveCardState> = {};
+      for (const [id, card] of Object.entries(prev)) {
+        if (!card.submitted && card.uiDefinition.kind === "plan_mode_build") {
+          changed = true;
+          next[id] = { ...card, submitted: true, listenOpen: false, waitDeadlineMs: undefined };
+        } else {
+          next[id] = card;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
   /** Re-create a card whose backend tool call is still waiting (view was reloaded). */
   const restoreCard = useCallback((requestId: string, uiDefinition: UiDefinition) => {
     setCards((prev) =>
@@ -189,6 +210,7 @@ export function useInteractiveCards() {
     markSubmitted,
     markActionSent,
     clearCards,
+    dismissPlanBuilds,
     restoreCard,
   };
 }

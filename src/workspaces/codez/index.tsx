@@ -317,6 +317,7 @@ export default function CodeZWorkspace(props: IDEProps) {
             ) : isBrowserTab(s.activeTabPath) && browserOpen ? (
               <BrowserPanel
                 sessionId={chatSessionId ?? ""}
+                projectDir={projectDir}
                 onClose={() => s.handleTabClose(BROWSER_TAB_PATH)}
                 onSendElementToChat={(el) => onSendElementToChat?.(el)}
                 onScreenshotToChat={(base64) => onScreenshotToChat?.(base64)}

@@ -174,12 +174,18 @@ export class ExtensionService {
     conv.setRemoteAuthority(authority);
 
     if (authority) {
-      const remotePaths = await invoke<Record<string, string>>("remote_sync_extensions", {
-        extensions: extensions.map((e) => ({ id: e.id, version: e.version, extension_path: e.extensionPath })),
-      });
+      const synced = await invoke<{ paths: Record<string, string>; skipped: { id: string; reason: string }[] }>(
+        "remote_sync_extensions",
+        {
+          extensions: extensions.map((e) => ({ id: e.id, version: e.version, extension_path: e.extensionPath })),
+        },
+      );
+      for (const skip of synced.skipped) {
+        extensionUiStore.appendHostLog(`extension ${skip.id} is not runnable on this remote: ${skip.reason}`);
+      }
       extensions = extensions
-        .filter((e) => remotePaths[e.id])
-        .map((e) => ({ ...e, extensionPath: remotePaths[e.id] }));
+        .filter((e) => synced.paths[e.id])
+        .map((e) => ({ ...e, extensionPath: synced.paths[e.id] }));
     }
 
     this.rpc = new RPCProtocol(this.transport);

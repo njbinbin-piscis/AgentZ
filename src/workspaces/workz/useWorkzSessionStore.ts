@@ -381,7 +381,7 @@ export function useWorkzSessionStore({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const { cards, pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards, restoreCard } =
+  const { cards, pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards, dismissPlanBuilds, restoreCard } =
     useInteractiveCards();
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequestCard | null>(null);
 
@@ -827,6 +827,8 @@ export function useWorkzSessionStore({
   const creatingProjectlessRef = useRef(false);
 
   runRef.current = async (text: string, att: ChatAttachment | null) => {
+    // A new message declines a plan the user has not accepted.
+    dismissPlanBuilds();
     if (isFree && !sessionRef.current && !selectedId && creatingProjectlessRef.current) return;
     const request = ++openTaskRequestRef.current;
     setError(null);

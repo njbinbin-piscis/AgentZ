@@ -150,6 +150,16 @@ impl Tool for ShellTool {
     }
 
     fn input_schema(&self) -> Value {
+        let interpreter_description = if cfg!(windows) {
+            "Windows interpreter to use. Defaults to PowerShell."
+        } else {
+            "Ignored. This tool does not execute commands on this platform."
+        };
+        let elevated_description = if cfg!(windows) {
+            "Unsupported. Elevated execution is refused to preserve the AppContainer boundary."
+        } else {
+            "Ignored. This tool does not execute commands on this platform."
+        };
         json!({
             "type": "object",
             "properties": {
@@ -157,11 +167,11 @@ impl Tool for ShellTool {
                 "interpreter": {
                     "type": "string",
                     "enum": ["powershell", "powershell32", "cmd"],
-                    "description": "Windows interpreter to use. Defaults to PowerShell."
+                    "description": interpreter_description
                 },
                 "elevated": {
                     "type": "boolean",
-                    "description": "Unsupported. Elevated execution is refused to preserve the AppContainer boundary."
+                    "description": elevated_description
                 },
                 "cwd": {
                     "type": "string",
@@ -676,6 +686,16 @@ mod tests {
             assert!(description.contains("Elevated execution"));
         } else {
             assert!(description.contains("Commands are not executed"));
+        }
+        let interpreter = tool.input_schema()["properties"]["interpreter"]["description"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        if cfg!(windows) {
+            assert!(interpreter.contains("PowerShell"));
+        } else {
+            assert!(!interpreter.contains("PowerShell"));
+            assert!(interpreter.contains("does not execute"));
         }
     }
 

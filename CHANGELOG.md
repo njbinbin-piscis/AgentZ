@@ -5,6 +5,23 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.49] - 2026-11-03
+
+### Added
+
+- **Remote preview through the built-in browser.** While a remote project is open, listening ports (already up, and ones that appear later) are forwarded to this machine. Opening `localhost` or `127.0.0.1` in the built-in browser uses that forward, including when the local port number differs.
+- **Debug on a Linux remote.** Python uses the remote virtualenv. Delve and js-debug listen on the remote loopback and the IDE connects through a port forward. js-debug is uploaded to the remote and run with the remote Node.
+
+### Fixed
+
+- **Opening a file in a remote project.** An absolute `/home/...` path is kept on the remote machine instead of being appended to the workspace. A doubled workspace root is collapsed before the file is read, and a missing file reports which machine answered.
+- **The plan Build card goes away when you keep talking.** Sending another message, or pressing Cancel, closes the card without starting the plan. Build still runs the plan.
+- **Tool guidance matches what the tools accept.** `file_list` and `file_search` say their path is a directory. `code_run` no longer tells you to `pip install` when `python -m` was given a file path, and on Windows it points PowerShell syntax at the shell tool. Command examples are not written as if every platform were Windows. Skills are no longer described as files the agent should read outside the workspace.
+
+### Changed
+
+- **Remote targets.** Linux remotes are supported (a bundled Node is uploaded when the target has none). macOS remotes need Node 18 or newer already installed. A native Windows remote is refused, with a pointer to WSL or a Linux host. Extensions whose native binaries do not match the remote are left installed locally and are not copied.
+
 ## [1.0.48] - 2026-11-03
 
 ### Added

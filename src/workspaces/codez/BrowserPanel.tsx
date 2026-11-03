@@ -21,6 +21,7 @@ import {
   type ScrollInfo,
 } from "../../services/tauri/browser";
 import "./BrowserPanel.css";
+import { rewriteRemoteBrowserUrl } from "../../extensions/remotePorts";
 
 const SHOT_POLL_MIN_MS = 1200;
 const SHOT_POLL_MAX_MS = 6000;
@@ -37,6 +38,8 @@ const EMPTY_SCROLL: ScrollInfo = {
 interface BrowserPanelProps {
   /** Chat session whose browser tab this panel shows. */
   sessionId: string;
+  /** Active project, so localhost opens through a remote port forward. */
+  projectDir?: string | null;
   onClose: () => void;
   onSendElementToChat: (el: PickedElement) => void;
   onScreenshotToChat: (base64: string) => void;
@@ -70,6 +73,7 @@ function rectStyle(el: PickedElement, img: HTMLImageElement): React.CSSPropertie
  */
 export default function BrowserPanel({
   sessionId,
+  projectDir = null,
   onClose,
   onSendElementToChat,
   onScreenshotToChat,
@@ -347,7 +351,8 @@ export default function BrowserPanel({
     setError(null);
     try {
       await syncViewport();
-      const finalUrl = await browserNavigate(sessionIdRef.current, url);
+      const opened = await rewriteRemoteBrowserUrl(projectDir, url);
+      const finalUrl = await browserNavigate(sessionIdRef.current, opened);
       setAddress(finalUrl || url);
       await syncViewport();
       await refreshShot();
@@ -357,7 +362,7 @@ export default function BrowserPanel({
     } finally {
       setLoading(false);
     }
-  }, [address, refreshShot, refreshScrollInfo, syncViewport]);
+  }, [address, projectDir, refreshShot, refreshScrollInfo, syncViewport]);
 
   const toPageCoords = (e: React.MouseEvent<HTMLDivElement>) => {
     const img = imgRef.current;

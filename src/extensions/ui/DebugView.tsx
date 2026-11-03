@@ -151,6 +151,7 @@ function LaunchBar({ projectDir }: { projectDir: string }) {
           extensionUiStore.appendDebugOutput(`Preparing debug adapter ${name} (downloaded on first use)…`);
           return invoke<string>("debug_adapter_ensure", { name });
         },
+        (entry, workspace) => invoke("debug_adapter_publish_remote", { entry, workspace }),
       );
       await debugController.start(launch);
     } catch (e) {

@@ -321,7 +321,7 @@ export function useAssistantSession({
   );
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequestCard | null>(null);
 
-  const { cards, pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards, restoreCard } =
+  const { cards, pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards, dismissPlanBuilds, restoreCard } =
     useInteractiveCards();
 
   const sessionRef = useRef<string | null>(null);
@@ -935,6 +935,9 @@ export function useAssistantSession({
   );
 
   runTurnRef.current = async (turn: QueuedTurn) => {
+    // Any new turn declines a plan the user has not accepted yet. Accepting
+    // Build starts a turn too, and retiring that card is what should happen.
+    dismissPlanBuilds();
     const done = composerDbgMark("runTurn");
     // The turn is bound to its own session from the start (the backend
     // honours a client-provided id). Several sessions may be in flight at

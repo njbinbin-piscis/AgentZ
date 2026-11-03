@@ -6,12 +6,47 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { spawn, ChildProcess } from "node:child_process";
+import { spawn, execFile, ChildProcess } from "node:child_process";
 import { watch as watchFs, FSWatcher } from "node:fs";
 import { connect, Socket } from "node:net";
 import { EventEmitter } from "node:events";
 
 const MAX_WATCHED_DIRS = 8000;
+
+/** Where this server process actually is. Shown when a stat misses, so a path that looks right can be told apart from a read that hit the wrong machine. */
+function serverWhere(): string {
+  return `agentz-server ${process.platform} cwd ${process.cwd().replace(/\\/g, "/")}`;
+}
+
+/**
+ * Stat `file`, and if the workspace root was joined onto an already-absolute
+ * remote path (`/proj/home/tt/...` while cwd is `/proj`), stat the collapsed path.
+ */
+async function locateOnServer(file: string): Promise<{ path: string; stat: import("node:fs").Stats }> {
+  const cwd = process.cwd().replace(/\\/g, "/").replace(/\/+$/, "");
+  const normalized = file.replace(/\\/g, "/");
+  const doubled = cwd && cwd !== "/" ? `${cwd}/${cwd.replace(/^\//, "")}` : "";
+  const candidates = doubled && normalized.startsWith(doubled)
+    ? [normalized, `${cwd}${normalized.slice(doubled.length)}`]
+    : [normalized];
+  let last: NodeJS.ErrnoException | undefined;
+  for (const candidate of candidates) {
+    try {
+      return { path: candidate, stat: await fs.stat(candidate) };
+    } catch (err) {
+      const error = err as NodeJS.ErrnoException;
+      if (error.code !== "ENOENT") throw err;
+      last = error;
+    }
+  }
+  const error = last ?? new Error(`ENOENT: no such file or directory, stat '${file}'`);
+  error.message = `${error.message} (${serverWhere()})`;
+  throw error;
+}
+
+async function statOnServer(file: string): Promise<import("node:fs").Stats> {
+  return (await locateOnServer(file)).stat;
+}
 
 /**
  * Recursive watcher built from per-directory (non-recursive) watches, skipping
@@ -118,13 +153,15 @@ interface ListeningPort {
   process: string | null;
 }
 
-// Linux: parse /proc/net/tcp{,6} (no ss/netstat dependency); state 0A = LISTEN.
+// Linux: parse /proc/net/tcp{,6}. If those files are missing (macOS), ask lsof.
 async function listListeningPorts(): Promise<ListeningPort[]> {
   const seen = new Map<number, ListeningPort>();
+  let sawProc = false;
   for (const file of ["/proc/net/tcp", "/proc/net/tcp6"]) {
     let text: string;
     try {
       text = await fs.readFile(file, "utf8");
+      sawProc = true;
     } catch {
       continue;
     }
@@ -138,7 +175,31 @@ async function listListeningPorts(): Promise<ListeningPort[]> {
       seen.set(port, { port, address: loopback ? "localhost" : "any", process: null });
     }
   }
-  return [...seen.values()].sort((a, b) => a.port - b.port);
+  if (sawProc) return [...seen.values()].sort((a, b) => a.port - b.port);
+  return listListeningPortsLsof();
+}
+
+function listListeningPortsLsof(): Promise<ListeningPort[]> {
+  return new Promise((resolve) => {
+    execFile("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN"], { timeout: 5000 }, (err, stdout) => {
+      if (err) {
+        resolve([]);
+        return;
+      }
+      const seen = new Map<number, ListeningPort>();
+      for (const line of stdout.split("\n").slice(1)) {
+        const cols = line.trim().split(/\s+/);
+        const name = cols.length >= 2 ? cols[cols.length - 2] : "";
+        const match = /:(\d+)$/.exec(name);
+        if (!match) continue;
+        const port = Number(match[1]);
+        if (!port || seen.has(port)) continue;
+        const loopback = name.includes("127.0.0.1") || name.includes("[::1]");
+        seen.set(port, { port, address: loopback ? "localhost" : "any", process: null });
+      }
+      resolve([...seen.values()].sort((a, b) => a.port - b.port));
+    });
+  });
 }
 
 interface TreeNode {
@@ -311,14 +372,13 @@ export class AgentzServer {
           pathSep: path.sep,
         };
       case "fs.stat": {
-        const s = await fs.stat(str("path"));
+        const s = await statOnServer(str("path"));
         return { size: s.size, mtimeMs: s.mtimeMs, isFile: s.isFile(), isDirectory: s.isDirectory() };
       }
       case "fs.readFile": {
-        const file = str("path");
-        const s = await fs.stat(file);
-        if (s.size > MAX_READ_BYTES) throw new Error(`file too large: ${s.size} bytes`);
-        return { base64: (await fs.readFile(file)).toString("base64") };
+        const located = await locateOnServer(str("path"));
+        if (located.stat.size > MAX_READ_BYTES) throw new Error(`file too large: ${located.stat.size} bytes`);
+        return { base64: (await fs.readFile(located.path)).toString("base64") };
       }
       case "fs.writeFile": {
         const file = str("path");

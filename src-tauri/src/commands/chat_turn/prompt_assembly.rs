@@ -18,6 +18,8 @@ pub(crate) struct SkillManifest {
     pub slug: String,
     pub name: String,
     pub description: String,
+    /// On disk, outside the workspace. Not shown to the agent: file_read would be refused.
+    #[allow(dead_code)]
     pub path: std::path::PathBuf,
     /// Builtin tool names this skill wants enabled while active.
     pub tools: Vec<String>,
@@ -72,16 +74,16 @@ pub(super) fn skills_context(config_dir: &std::path::Path, enabled: &[String]) -
             .iter()
             .map(|s| {
                 format!(
-                    "- **{}** — {}\n  (read `{}` for full instructions before using)",
-                    s.name,
-                    s.description,
-                    s.path.display()
+                    "- **{}** — {}",
+                    s.name, s.description
                 )
             })
             .collect();
         return Some(format!(
-            "## Available skills\nYou have these installed skills. When a task matches one, \
-             read its SKILL.md first, then follow it:\n{}",
+            "## Available skills\nYou have these installed skills. Each line is a name and a \
+             one-line description. The skill file lives outside the workspace, so do not \
+             file_read it. When a task matches one, ask the user to enable it; once enabled, \
+             the full instructions are injected into this prompt and those are what you follow:\n{}",
             lines.join("\n")
         ));
     }
@@ -897,5 +899,26 @@ mod tests {
         let block = read_ref_block(&dir.to_string_lossy(), "doc.md").expect("file inlined");
         assert!(block.contains("[truncated,"));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn disabled_skills_are_named_without_a_path_to_read() {
+        let dir = std::env::temp_dir().join(format!("agentz-skill-{}", uuid::Uuid::new_v4()));
+        let skill = dir.join("skills").join("installed").join("demo");
+        std::fs::create_dir_all(&skill).unwrap();
+        std::fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: Demo\ndescription: Demonstrates a skill\n---\nFollow these steps.\n",
+        )
+        .unwrap();
+        let listed = skills_context(&dir, &[]).expect("skill listed");
+        assert!(listed.contains("Demo"));
+        assert!(listed.contains("do not"));
+        assert!(!listed.contains("SKILL.md"));
+        assert!(!listed.contains("Follow these steps."));
+        let enabled = skills_context(&dir, &["Demo"]).expect("skill enabled");
+        assert!(enabled.contains("Follow these steps."));
+        assert!(dir.starts_with(std::env::temp_dir()));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

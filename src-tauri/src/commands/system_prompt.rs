@@ -211,7 +211,8 @@ pub fn plan_mode_context(session_plan_path: &str) -> String {
             - After each round, decide if more questions are needed; repeat until you cannot \
               ask meaningful clarifying questions.\n\
             - Do NOT write the plan while key ambiguities remain.\n\
-         3. **Write plan** — only then call `plan_write` to `{plan_path}` (atomic steps + 预期产物 + 验收证据).\n\
+         3. **Write plan** — only then call `plan_write` to `{plan_path}` (atomic steps + 预期产物 + 验收证据). \
+            This session has one plan file. Do not invent another name under `.agentz/plans/`.\n\
          4. **Finish** — immediately call `plan_mode_ui` action=`plan_ready` (shows Build button, stops loop).\n\
             Do NOT ask the user to manually switch modes.\n\n\
          ### Plan file schema\n\
@@ -235,7 +236,9 @@ pub fn agent_active_plan_context(plan_rel_path: &str, plan_excerpt: Option<&str>
          2. For multi-step work, create matching `plan_todo` items from pending steps.\n\
          3. Execute one step at a time; after each step update **状态** and **执行记录** \
             in the plan file and attach **验收证据**.\n\
-         4. Mark plan frontmatter `status` → `executing`, then `completed` when done.\n",
+         4. Mark plan frontmatter `status` → `executing`, then `completed` when done.\n\
+         The path above is the only plan for this session. If the excerpt names a different file, \
+         ignore that name and keep using this path.\n",
         path = plan_rel_path,
     );
     if let Some(excerpt) = plan_excerpt.map(str::trim).filter(|s| !s.is_empty()) {

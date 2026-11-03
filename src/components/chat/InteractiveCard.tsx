@@ -217,11 +217,12 @@ export default function InteractiveCard({
   const handleAction = async (block: UiBlock, button: UiButton) => {
     if (submitted || submitting) return;
 
-    // Plan ready: Build does not block on tool channel (turn already ended).
+    // Plan ready: the turn has already ended, so neither button talks to the tool.
+    // Build starts execution; 取消 only closes the card.
     if (cardKind === "plan_mode_build") {
       setSubmitting(true);
       try {
-        onPlanBuild?.(planPath);
+        if (button.value !== "dismiss") onPlanBuild?.(planPath);
         setSubmitted(true);
         onSubmitted?.();
       } finally {

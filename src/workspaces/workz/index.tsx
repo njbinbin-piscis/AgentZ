@@ -7,6 +7,7 @@ import BrowserPanel from "../codez/BrowserPanel";
 import { BROWSER_TAB_PATH } from "../codez/browserTab";
 import { browserElementPlaceholder, browserNavigate } from "../../services/tauri/browser";
 import { OPEN_LINK_EVENT, openExternal, opensWithSystem, type OpenLinkDetail } from "../../services/linkRouter";
+import { rewriteRemoteBrowserUrl } from "../../extensions/remotePorts";
 import { openPath } from "../../services/tauri";
 import { resolveArtifactFullPath } from "./artifactPaths";
 import CollabBoard from "./CollabBoard";
@@ -68,7 +69,8 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
           void openExternal(target.url).catch(() => {});
           return;
         }
-        browserNavigate(sid, target.url)
+        rewriteRemoteBrowserUrl(cur.projectDir, target.url)
+          .then((opened) => browserNavigate(sid, opened))
           .then(() => cur.setPreviewPath(BROWSER_TAB_PATH))
           .catch((err) => cur.setError(String(err)));
       } else if (target.kind === "file" && cur.projectDir) {
@@ -151,6 +153,7 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
             <div className="agentz-workz-preview browser">
               <BrowserPanel
                 sessionId={s.selectedId}
+                projectDir={s.projectDir}
                 onClose={() => s.setPreviewPath(null)}
                 onSendElementToChat={(el) => {
                   const token = browserElementPlaceholder(el);

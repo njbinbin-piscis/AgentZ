@@ -33,6 +33,10 @@ it("prefers a project virtualenv for the interpreter", async () => {
   expect(await findPythonInterpreter("/proj", files({ "venv/pyvenv.cfg": "" }))).toBe("/proj/venv/bin/python");
   expect(await findPythonInterpreter("/proj", files({}))).toBe("python3");
   expect(await findPythonInterpreter("C:/proj", files({}))).toBe("python");
+  expect(
+    await findPythonInterpreter("agentz-remote://ssh-remote+box/home/tt/app", files({ ".venv/pyvenv.cfg": "" })),
+  ).toBe("/home/tt/app/.venv/bin/python");
+  expect(await findPythonInterpreter("agentz-remote://ssh-remote+box/home/tt/app", files({}))).toBe("python3");
 });
 
 it("detects Flask and FastAPI apps and disables the reloader", async () => {

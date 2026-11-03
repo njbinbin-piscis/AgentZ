@@ -80,7 +80,7 @@ fn plan_ready_ui(plan_path: &str, summary: &str) -> Value {
         "blocks": [
             {
                 "type": "text",
-                "content": format!("执行计划已写入 `{plan_path}`。点击下方 **Build** 退出 Plan 模式并开始执行。")
+                "content": format!("执行计划已写入 `{plan_path}`。点击 **Build** 退出 Plan 模式并开始执行。不认可这份计划时点 **取消**，或直接在输入框继续提问，面板会自动关闭。")
             },
             {
                 "type": "actions",
@@ -91,6 +91,13 @@ fn plan_ready_ui(plan_path: &str, summary: &str) -> Value {
                         "variant": "primary",
                         "emit": "action",
                         "value": "build"
+                    },
+                    {
+                        "id": "dismiss",
+                        "label": "取消",
+                        "variant": "secondary",
+                        "emit": "action",
+                        "value": "dismiss"
                     }
                 ]
             }

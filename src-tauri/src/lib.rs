@@ -317,6 +317,7 @@ pub fn run() {
             commands::dap::dap_stop,
             commands::dap::dap_tcp_child,
             commands::debug_adapters::debug_adapter_ensure,
+            commands::debug_adapters::debug_adapter_publish_remote,
             // chat session management
             commands::session::chat_list_sessions,
             commands::session::chat_get_messages,

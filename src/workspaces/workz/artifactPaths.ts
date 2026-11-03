@@ -81,11 +81,48 @@ export function relativizeArtifactPath(raw: string, roots: Array<string | null |
  * `D:\projects\AgentZ/D:/projects/AgentZ/…`) are used as-is, and a path
  * already containing the root is relativized first — never double-joined.
  */
+function remoteWorkspace(dir: string): { authority: string; path: string } | null {
+  const prefix = "agentz-remote://";
+  if (!dir.startsWith(prefix)) return null;
+  const rest = dir.slice(prefix.length);
+  const slash = rest.indexOf("/");
+  const authority = decodeURIComponent(slash < 0 ? rest : rest.slice(0, slash));
+  const path = slash < 0 ? "/" : decodeURIComponent(rest.slice(slash));
+  return authority ? { authority, path } : null;
+}
+
+function remoteUri(authority: string, path: string): string {
+  return `agentz-remote://${authority}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+/**
+ * Join a file onto an `agentz-remote://` project.
+ * A POSIX absolute path (`/home/...`) is a path on the remote machine. Stripping
+ * its leading slash and appending it to the workspace turns it into
+ * `/proj/home/...`, which the remote server then fails to stat.
+ */
+function resolveRemotePath(projectDir: string, relativePath: string): string | null {
+  const remote = remoteWorkspace(projectDir);
+  if (!remote) return null;
+  const root = remote.path.replace(/\/+$/, "") || "/";
+  let target = normalizePathSlashes(relativePath).replace(/^\.\//, "");
+  const doubled = `${root}/${root.replace(/^\//, "")}`;
+  if (root !== "/" && target.startsWith(doubled)) target = `${root}${target.slice(doubled.length)}`;
+  if (target.startsWith("/")) {
+    return remoteUri(remote.authority, target);
+  }
+  const full = root === "/" ? `/${target.replace(/^\/+/, "")}` : `${root}/${target.replace(/^\/+/, "")}`;
+  return remoteUri(remote.authority, full);
+}
+
 export function resolveArtifactFullPath(
   projectDir: string,
   relativePath: string,
   workspaceDir?: string | null,
 ): string {
+  const remoteBase = workspaceDir && remoteWorkspace(workspaceDir) ? workspaceDir : projectDir;
+  const remotePath = resolveRemotePath(remoteBase, relativePath);
+  if (remotePath && remoteWorkspace(remoteBase)) return remotePath;
   const roots = [workspaceDir, projectDir].filter(
     (r): r is string => Boolean(r?.trim()),
   );

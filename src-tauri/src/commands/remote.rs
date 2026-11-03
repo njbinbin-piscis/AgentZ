@@ -14,6 +14,18 @@ use crate::remote::{self, vfs, DevcontainerUp, LocalExtension, RemoteTarget};
 use crate::state::AppState;
 
 #[derive(Debug, Serialize)]
+pub struct SkippedExtension {
+    pub id: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RemoteExtensionSync {
+    pub paths: HashMap<String, String>,
+    pub skipped: Vec<SkippedExtension>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct RemoteTargets {
     pub ssh_hosts: Vec<String>,
     pub wsl_distros: Vec<String>,
@@ -136,24 +148,54 @@ pub async fn remote_devcontainer_up(workspace: String) -> Result<DevcontainerUp,
 pub async fn remote_sync_extensions(
     state: State<'_, AppState>,
     extensions: Vec<LocalExtension>,
-) -> Result<HashMap<String, String>, String> {
+) -> Result<RemoteExtensionSync, String> {
     let mgr = state.ext_host.clone();
     let (target, server) = mgr.deployment_snapshot().await?;
     if target.is_local() {
-        return Ok(extensions
-            .into_iter()
-            .map(|e| (e.id, e.extension_path))
-            .collect());
+        return Ok(RemoteExtensionSync {
+            paths: extensions
+                .into_iter()
+                .map(|e| (e.id, e.extension_path))
+                .collect(),
+            skipped: Vec::new(),
+        });
     }
     let server = server.ok_or("remote server not deployed")?;
+    let info = mgr.request("info", json!({})).await.ok();
+    let platform = info
+        .as_ref()
+        .and_then(|v| v.get("platform"))
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let arch = info
+        .as_ref()
+        .and_then(|v| v.get("arch"))
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let mut skipped = Vec::new();
     let workspace_side: Vec<LocalExtension> = extensions
         .into_iter()
         .filter(|e| {
-            remote::read_manifest(Path::new(&e.extension_path))
-                .is_some_and(|m| remote::runs_on_workspace(&m))
+            let manifest = remote::read_manifest(Path::new(&e.extension_path));
+            if !manifest.as_ref().is_some_and(|m| remote::runs_on_workspace(m)) {
+                return false;
+            }
+            if let (Some(platform), Some(arch)) = (&platform, &arch) {
+                if let Some(reason) =
+                    remote::extension_remote_block(Path::new(&e.extension_path), platform, arch)
+                {
+                    skipped.push(SkippedExtension {
+                        id: e.id.clone(),
+                        reason,
+                    });
+                    return false;
+                }
+            }
+            true
         })
         .collect();
-    remote::sync_extensions(&target, &server.home, &workspace_side).await
+    let paths = remote::sync_extensions(&target, &server.home, &workspace_side).await?;
+    Ok(RemoteExtensionSync { paths, skipped })
 }
 
 /// Generic passthrough to the agentz-server control plane.
