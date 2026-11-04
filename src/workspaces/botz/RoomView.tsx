@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
   chatCancel,
@@ -27,6 +27,7 @@ import {
   type BoardStatus,
   type BotzRoom,
 } from "../../services/tauri/botz";
+import "../../components/ChatComposer.css";
 import Markdown from "../codez/Markdown";
 import ToolTrace, { interleaveTools, upsertToolStep, truncateToolResultForUi, type ToolTraceItem } from "../../components/ToolTrace";
 import Avatar from "./Avatar";
@@ -118,6 +119,181 @@ function SessionTranscript({ messages, live }: { messages: MessageDto[]; live?: 
   );
 }
 
+function MentionText({ text }: { text: string }) {
+  const parts = text.split(/(@\S+)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("@") ? (
+          <span key={i} className="botz-mention">
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+function dragSize(
+  event: ReactMouseEvent,
+  axis: "x" | "y",
+  size: number,
+  bounds: [number, number],
+  onMove: (next: number) => void,
+) {
+  event.preventDefault();
+  const start = axis === "y" ? event.clientY : event.clientX;
+  const move = (e: MouseEvent) => {
+    const delta = axis === "y" ? start - e.clientY : start - e.clientX;
+    onMove(Math.min(bounds[1], Math.max(bounds[0], size + delta)));
+  };
+  const up = () => {
+    window.removeEventListener("mousemove", move);
+    window.removeEventListener("mouseup", up);
+  };
+  window.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", up);
+}
+
+function formatClock(iso: string): string {
+  let dateStr = iso;
+  if (dateStr && !/[Zz]$/.test(dateStr) && !/[+-]\d{2}:\d{2}$/.test(dateStr)) dateStr = `${iso}Z`;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function mentionAt(text: string, caret: number): { start: number; query: string } | null {
+  const match = /(^|\s)@([^\s@]*)$/.exec(text.slice(0, caret));
+  if (!match) return null;
+  return { start: caret - match[2].length - 1, query: match[2] };
+}
+
+function BotzComposer({
+  value,
+  onChange,
+  onSubmit,
+  busy,
+  onStop,
+  placeholder,
+  canSend,
+  sendLabel,
+  stopLabel,
+  hint,
+  names,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  busy?: boolean;
+  onStop?: () => void;
+  placeholder: string;
+  canSend: boolean;
+  sendLabel: string;
+  stopLabel: string;
+  hint: string;
+  names: string[];
+}) {
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const [caret, setCaret] = useState(value.length);
+  const at = mentionAt(value, caret);
+  const matches = at
+    ? names.filter((name) => name.toLowerCase().includes(at.query.toLowerCase())).slice(0, 8)
+    : [];
+
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 140)}px`;
+  }, [value]);
+
+  const pick = (name: string) => {
+    if (!at) return;
+    const next = `${value.slice(0, at.start)}@${name} ${value.slice(caret)}`;
+    const nextCaret = at.start + name.length + 2;
+    onChange(next);
+    setCaret(nextCaret);
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      ta?.focus();
+      ta?.setSelectionRange(nextCaret, nextCaret);
+    });
+  };
+
+  return (
+    <div className="agentz-composer-wrap">
+      <div className={`agentz-composer${busy ? " is-busy" : ""}`}>
+        <textarea
+          ref={taRef}
+          className="agentz-composer-input"
+          value={value}
+          placeholder={placeholder}
+          rows={1}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setCaret(e.target.selectionStart ?? e.target.value.length);
+          }}
+          onKeyUp={(e) => setCaret(e.currentTarget.selectionStart ?? value.length)}
+          onClick={(e) => setCaret(e.currentTarget.selectionStart ?? value.length)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
+            if (matches.length > 0 && e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              pick(matches[0]);
+              return;
+            }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (canSend) onSubmit();
+            }
+          }}
+        />
+        {matches.length > 0 && (
+          <div className="botz-mention-pop" role="listbox">
+            {matches.map((name) => (
+              <button key={name} type="button" onMouseDown={(e) => { e.preventDefault(); pick(name); }}>
+                @{name}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="agentz-composer-footer">
+          <div className="agentz-composer-footer-left">
+            <span className="botz-composer-hint">{hint}</span>
+          </div>
+          <div className="agentz-composer-footer-right">
+            {busy && onStop ? (
+              <span className="agentz-composer-stop-wrap">
+                <span className="agentz-composer-stop-ring" aria-hidden />
+                <button type="button" className="agentz-composer-stop-icon" onClick={onStop} title={stopLabel}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" rx="1" />
+                  </svg>
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className={`agentz-composer-send-icon${canSend ? " ready" : ""}`}
+                onClick={onSubmit}
+                disabled={!canSend}
+                title={sendLabel}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M12 19V5M5 12l7-7 7 7" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RoomView({ room, agents, active, onRoomChange, onRoomSynced, focusKoi, onActivity }: RoomViewProps) {
   const { t, i18n } = useTranslation();
   const [poolId, setPoolId] = useState<string | null>(room.pool_id ?? null);
@@ -144,6 +320,11 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showBoard, setShowBoard] = useState(true);
+  const layoutKey = `botz-layout-${room.id}`;
+  const [boardHeight, setBoardHeight] = useState(220);
+  const [drawerWidth, setDrawerWidth] = useState(420);
+  const [drawerTab, setDrawerTab] = useState<"chat" | "observe">("chat");
+  const [watchOpen, setWatchOpen] = useState(false);
   const [reviewing, setReviewing] = useState<KoiTodo | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -344,8 +525,30 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
   const focusNonce = focusKoi?.nonce;
   const focusId = focusKoi?.koiId;
   useEffect(() => {
-    if (focusNonce && focusId) setDesk(focusId);
+    if (focusNonce && focusId) {
+      setDesk(focusId);
+      setDrawerTab("chat");
+    }
   }, [focusNonce, focusId]);
+
+  useEffect(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(layoutKey) ?? "{}") as {
+        board?: number;
+        drawer?: number;
+        tab?: string;
+      };
+      if (typeof raw.board === "number") setBoardHeight(Math.min(560, Math.max(120, raw.board)));
+      if (typeof raw.drawer === "number") setDrawerWidth(Math.min(760, Math.max(280, raw.drawer)));
+      if (raw.tab === "observe" || raw.tab === "chat") setDrawerTab(raw.tab);
+    } catch {
+      /* keep defaults */
+    }
+  }, [layoutKey]);
+
+  useEffect(() => {
+    localStorage.setItem(layoutKey, JSON.stringify({ board: boardHeight, drawer: drawerWidth, tab: drawerTab }));
+  }, [layoutKey, boardHeight, drawerWidth, drawerTab]);
 
   const deskTodos = useMemo(
     () => (desk && desk !== COORDINATOR ? todos.filter((td) => td.owner_id === desk) : []),
@@ -477,6 +680,14 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
   const coordActivity = activity[COORDINATOR] ?? (busy ? "thinking" : "idle");
   const memberById = useMemo(() => new Map(members.map((m) => [m.koi_id, m])), [members]);
   const deskMember = desk && desk !== COORDINATOR ? memberById.get(desk) : undefined;
+  const paneOpen = desk !== null || watchOpen;
+  const mentionNames = members.map((m) => m.name).filter(Boolean);
+  const handoffs = useMemo(() => [...feed].sort((a, b) => a.id - b.id), [feed]);
+  const mentionCount = handoffs.filter((m) => /@\S/.test(m.content)).length;
+  const nameOf = (id: string) => {
+    if (!id || id === COORDINATOR || id === "coordinator") return t("botz.coordinator");
+    return memberById.get(id)?.name ?? id;
+  };
 
   return (
     <div className="botz-room" hidden={!active}>
@@ -524,9 +735,21 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
               ))}
             </select>
           </label>
-          <button type="button" className={showBoard ? "active" : ""} onClick={() => setShowBoard((v) => !v)}>
-            {t("botz.board")}
-          </button>
+          <span className="botz-room-tools">
+            <button
+              type="button"
+              className={paneOpen && drawerTab === "observe" ? "active" : ""}
+              onClick={() => {
+                setWatchOpen(true);
+                setDrawerTab("observe");
+              }}
+            >
+              {t("botz.tabObserve")}
+            </button>
+            <button type="button" className={showBoard ? "active" : ""} onClick={() => setShowBoard((v) => !v)}>
+              {t("botz.board")}
+            </button>
+          </span>
         </div>
         {error && (
           <div className="botz-error" onClick={() => setError(null)}>
@@ -536,7 +759,10 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
         <div className="botz-floor">
           <div
             className={`botz-desk boss ${desk === COORDINATOR ? "selected" : ""}`}
-            onClick={() => setDesk(COORDINATOR)}
+            onClick={() => {
+              setDesk(COORDINATOR);
+              setDrawerTab("chat");
+            }}
             title={t("botz.coordinator")}
           >
             {bubbles[COORDINATOR] && <div className="botz-bubble">{bubbles[COORDINATOR].text}</div>}
@@ -555,7 +781,10 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
                 <div
                   key={m.koi_id}
                   className={`botz-desk ${desk === m.koi_id ? "selected" : ""}`}
-                  onClick={() => setDesk(m.koi_id)}
+                  onClick={() => {
+                    setDesk(m.koi_id);
+                    setDrawerTab("chat");
+                  }}
                   title={m.role}
                 >
                   {bubbles[m.koi_id] && <div className="botz-bubble">{bubbles[m.koi_id].text}</div>}
@@ -579,139 +808,184 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
           </div>
         </div>
         {showBoard && (
-          <div className="botz-board">
-            {BOARD_COLUMNS.map((col) => {
-              const items = todos.filter((td) => col.statuses.includes(td.status));
-              return (
-                <div
-                  key={col.key}
-                  className={`botz-board-col ${dragId && col.drop ? "droppable" : ""}`}
-                  onDragOver={(e) => {
-                    if (col.drop && dragId) e.preventDefault();
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const id = dragId;
-                    setDragId(null);
-                    if (col.drop && id && todos.find((x) => x.id === id)?.status !== col.drop) {
-                      void moveTodo(id, col.drop);
-                    }
-                  }}
-                >
-                  <div className="botz-board-head">
-                    {t(`botz.col_${col.key}`)} <span>{items.length}</span>
-                  </div>
-                  {items.map((td) => {
-                    const owner = memberById.get(td.owner_id);
-                    return (
-                      <div
-                        key={td.id}
-                        className={`botz-card ${td.status}`}
-                        draggable={td.status !== "in_progress"}
-                        onDragStart={(e) => {
-                          e.dataTransfer.effectAllowed = "move";
-                          setDragId(td.id);
-                        }}
-                        onDragEnd={() => setDragId(null)}
-                        title={td.description}
-                        onClick={() => {
-                          if (td.status === "needs_review") {
-                            setReviewing(td);
-                          } else if (owner) {
-                            setDesk(owner.koi_id);
-                            setTodoSel(td.id);
-                          }
-                        }}
-                      >
-                        <span className="botz-card-owner" style={{ background: owner?.color || "#7c6af7" }}>
-                          {owner?.icon || "🐟"}
-                        </span>
-                        <span className="botz-card-title">
-                          {parentOf(td, todos) && (
-                            <span className="botz-card-parent" title={parentOf(td, todos)?.title}>
-                              ↳{" "}
+          <>
+            <div
+              className="botz-resize-h"
+              onMouseDown={(e) => dragSize(e, "y", boardHeight, [120, 560], setBoardHeight)}
+            />
+            <div className="botz-board" style={{ height: boardHeight }}>
+              {BOARD_COLUMNS.map((col) => {
+                const items = todos.filter((td) => col.statuses.includes(td.status));
+                return (
+                  <div
+                    key={col.key}
+                    className={`botz-board-col ${dragId && col.drop ? "droppable" : ""}`}
+                    onDragOver={(e) => {
+                      if (col.drop && dragId) e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const id = dragId;
+                      setDragId(null);
+                      if (col.drop && id && todos.find((x) => x.id === id)?.status !== col.drop) {
+                        void moveTodo(id, col.drop);
+                      }
+                    }}
+                  >
+                    <div className="botz-board-head">
+                      {t(`botz.col_${col.key}`)} <span>{items.length}</span>
+                    </div>
+                    <div className="botz-board-cards">
+                      {items.map((td) => {
+                        const owner = memberById.get(td.owner_id);
+                        return (
+                          <div
+                            key={td.id}
+                            className={`botz-card ${td.status}`}
+                            draggable={td.status !== "in_progress"}
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = "move";
+                              setDragId(td.id);
+                            }}
+                            onDragEnd={() => setDragId(null)}
+                            title={td.description}
+                            onClick={() => {
+                              if (td.status === "needs_review") {
+                                setReviewing(td);
+                              } else if (owner) {
+                                setDesk(owner.koi_id);
+                                setTodoSel(td.id);
+                                setDrawerTab("chat");
+                              }
+                            }}
+                          >
+                            <span className="botz-card-owner" style={{ background: owner?.color || "#7c6af7" }}>
+                              {owner?.icon || "🐟"}
                             </span>
-                          )}
-                          {td.title}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+                            <span className="botz-card-title">
+                              {parentOf(td, todos) && (
+                                <span className="botz-card-parent" title={parentOf(td, todos)?.title}>
+                                  ↳{" "}
+                                </span>
+                              )}
+                              {td.title}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
-      {desk && (
-        <aside className="botz-drawer">
-          <div className="botz-drawer-head">
-            <strong>{desk === COORDINATOR ? t("botz.coordinator") : (deskMember?.name ?? desk)}</strong>
-            {deskMember?.role && <span className="botz-drawer-role">{deskMember.role}</span>}
-            <button type="button" onClick={() => setDesk(null)} title={t("common.close")}>
-              ✕
-            </button>
-          </div>
-          {desk !== COORDINATOR && (
-            <div className="botz-drawer-todos">
-              {deskTodos.length === 0 && <span className="botz-empty">{t("botz.noAssignments")}</span>}
-              {deskTodos.map((td) => (
-                <button
-                  type="button"
-                  key={td.id}
-                  className={`${td.status} ${td.id === todoSel ? "active" : ""}`}
-                  onClick={() => setTodoSel(td.id)}
-                  title={td.description}
-                >
-                  {td.title}
+      {paneOpen && (
+        <>
+          <div
+            className="botz-resize-v"
+            onMouseDown={(e) => dragSize(e, "x", drawerWidth, [280, 760], setDrawerWidth)}
+          />
+          <aside className="botz-drawer" style={{ width: drawerWidth }}>
+            <div className="botz-drawer-head">
+              <div className="botz-drawer-tabs">
+                <button type="button" className={drawerTab === "chat" ? "active" : ""} onClick={() => setDrawerTab("chat")}>
+                  {t("botz.tabChat")}
                 </button>
-              ))}
-            </div>
-          )}
-          <SessionTranscript messages={transcript} live={openSessionId ? live[openSessionId] : undefined} />
-          {desk === COORDINATOR ? (
-            <div className="botz-composer">
-              <textarea
-                value={input}
-                placeholder={t("botz.composerPlaceholder")}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    void sendToTeam();
-                  }
+                <button type="button" className={drawerTab === "observe" ? "active" : ""} onClick={() => setDrawerTab("observe")}>
+                  {t("botz.tabObserve")}
+                  {mentionCount > 0 && <span className="botz-tab-count">{mentionCount}</span>}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDesk(null);
+                  setWatchOpen(false);
                 }}
-              />
-              {busy ? (
-                <button type="button" onClick={() => void chatCancel(taskKeyRef.current)}>
-                  {t("botz.stop")}
-                </button>
-              ) : (
-                <button type="button" disabled={!input.trim() || !poolId} onClick={() => void sendToTeam()}>
-                  {t("botz.send")}
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="botz-composer">
-              <textarea
-                value={memberInput}
-                placeholder={t("botz.memberPlaceholder", { name: deskMember?.name ?? desk })}
-                onChange={(e) => setMemberInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    void assignToMember();
-                  }
-                }}
-              />
-              <button type="button" disabled={!memberInput.trim() || !poolId} onClick={() => void assignToMember()}>
-                {t("botz.assign")}
+                title={t("common.close")}
+              >
+                ✕
               </button>
             </div>
-          )}
-        </aside>
+            {drawerTab === "observe" ? (
+              <div className="botz-observe">
+                <div className="botz-observe-hint">{t("botz.observeHint")}</div>
+                {handoffs.length === 0 && <div className="botz-empty">{t("botz.observeEmpty")}</div>}
+                {handoffs.map((msg) => {
+                  const todo = msg.todo_id ? todos.find((td) => td.id === msg.todo_id) : undefined;
+                  return (
+                    <article key={msg.id} className="botz-handoff">
+                      <header>
+                        <strong>{nameOf(msg.sender_id)}</strong>
+                        {todo && <span className="botz-handoff-todo">{todo.title}</span>}
+                        <time>{formatClock(msg.created_at)}</time>
+                      </header>
+                      <p>
+                        <MentionText text={msg.content} />
+                      </p>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : desk ? (
+              <>
+                <div className="botz-drawer-who">
+                  <strong>{desk === COORDINATOR ? t("botz.coordinator") : (deskMember?.name ?? desk)}</strong>
+                  {deskMember?.role && <span className="botz-drawer-role">{deskMember.role}</span>}
+                </div>
+                {desk !== COORDINATOR && (
+                  <div className="botz-drawer-todos">
+                    {deskTodos.length === 0 && <span className="botz-empty">{t("botz.noAssignments")}</span>}
+                    {deskTodos.map((td) => (
+                      <button
+                        type="button"
+                        key={td.id}
+                        className={`${td.status} ${td.id === todoSel ? "active" : ""}`}
+                        onClick={() => setTodoSel(td.id)}
+                        title={td.description}
+                      >
+                        {td.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <SessionTranscript messages={transcript} live={openSessionId ? live[openSessionId] : undefined} />
+                {desk === COORDINATOR ? (
+                  <BotzComposer
+                    value={input}
+                    onChange={setInput}
+                    onSubmit={() => void sendToTeam()}
+                    busy={busy}
+                    onStop={() => void chatCancel(taskKeyRef.current)}
+                    placeholder={t("botz.composerPlaceholder")}
+                    canSend={Boolean(input.trim() && poolId)}
+                    sendLabel={t("botz.send")}
+                    stopLabel={t("botz.stop")}
+                    hint={t("botz.composerHint")}
+                    names={mentionNames}
+                  />
+                ) : (
+                  <BotzComposer
+                    value={memberInput}
+                    onChange={setMemberInput}
+                    onSubmit={() => void assignToMember()}
+                    placeholder={t("botz.memberPlaceholder", { name: deskMember?.name ?? desk })}
+                    canSend={Boolean(memberInput.trim() && poolId)}
+                    sendLabel={t("botz.assign")}
+                    stopLabel={t("botz.stop")}
+                    hint={t("botz.composerHint")}
+                    names={mentionNames}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="botz-empty botz-drawer-pick">{t("botz.memberHint")}</div>
+            )}
+          </aside>
+        </>
       )}
 
       {reviewing && (

@@ -293,12 +293,14 @@
 .botz-room {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
 }
 
 .botz-room-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -323,10 +325,26 @@
   margin-left: auto;
 }
 
+.botz-room-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.botz-room-tools button {
+  margin-left: 0;
+}
+
+.botz-drawer-tabs button.active {
+  border-color: var(--accent, #7c6af7);
+  color: #d9d2ff;
+}
+
 .botz-floor {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -343,6 +361,10 @@
   gap: 18px 22px;
   width: 100%;
   max-width: 900px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  align-content: start;
 }
 
 .botz-desk {
@@ -509,15 +531,37 @@
   }
 }
 
+.botz-resize-h,
+.botz-resize-v {
+  flex: none;
+  background: transparent;
+}
+
+.botz-resize-h {
+  height: 6px;
+  cursor: row-resize;
+}
+
+.botz-resize-v {
+  width: 6px;
+  cursor: col-resize;
+  align-self: stretch;
+}
+
+.botz-resize-h:hover,
+.botz-resize-v:hover {
+  background: rgba(124, 106, 247, 0.45);
+}
+
 /* ── Board ── */
 .botz-board {
+  flex: none;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
   gap: 8px;
-  padding: 8px 12px 12px;
-  max-height: 34%;
-  min-height: 120px;
-  overflow: auto;
+  padding: 4px 12px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-top: 1px solid var(--border, #2a2a38);
   background: var(--bg-secondary, #15151d);
 }
@@ -526,14 +570,27 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  min-width: 0;
+  min-width: 140px;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .botz-board-head {
+  flex: none;
   font-size: 11px;
   font-weight: 600;
   opacity: 0.7;
   text-transform: uppercase;
+}
+
+.botz-board-cards {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .botz-board-head span {
@@ -577,12 +634,15 @@
 
 /* ── Drawer ── */
 .botz-drawer {
-  width: min(440px, 42%);
+  flex: none;
+  width: 420px;
+  max-width: 70%;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border, #2a2a38);
   background: var(--bg-secondary, #15151d);
   min-height: 0;
+  min-width: 0;
 }
 
 .botz-drawer-head {
@@ -599,6 +659,130 @@
   border: none;
   color: inherit;
   cursor: pointer;
+}
+
+.botz-drawer-tabs {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.botz-drawer-tabs button {
+  margin-left: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.botz-tab-count {
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: rgba(124, 106, 247, 0.25);
+  font-size: 10px;
+}
+
+.botz-drawer-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border, #2a2a38);
+}
+
+.botz-observe {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 12px 16px;
+}
+
+.botz-observe-hint,
+.botz-composer-hint {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.botz-observe-hint {
+  margin-bottom: 8px;
+}
+
+.botz-handoff {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border, #2a2a38);
+  font-size: 13px;
+}
+
+.botz-handoff header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.botz-handoff time {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+.botz-handoff-todo {
+  font-size: 11px;
+  opacity: 0.7;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.botz-handoff p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.botz-mention {
+  color: #c7bfff;
+  font-weight: 600;
+}
+
+.botz-mention-pop {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 48px;
+  z-index: 6;
+  max-height: 160px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #3a3a4a);
+  background: var(--bg-elev-2, #1b1b26);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.botz-mention-pop button {
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.botz-mention-pop button:hover {
+  background: rgba(124, 106, 247, 0.16);
+}
+
+.botz-drawer-pick {
+  padding: 16px 12px;
 }
 
 .botz-drawer-role {

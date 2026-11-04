@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.51] - 2026-11-04
+
+### Added
+
+- **BotZ is documented as a third mode.** The README describes bots, routines, offices and how a coordinator splits work onto the board.
+- **The office layout can be resized.** The board collapses and its height can be dragged; cards scroll inside each column. Member desks scroll on their own when they overflow. The chat pane width can be dragged, and both sizes are remembered per office.
+- **An observation tab for handoffs.** The chat pane has Chat and Watch tabs. Watch lists pool messages in time order and highlights `@mentions`. Typing `@` in the composer offers member names. The composer uses the same rounded input as CodeZ and WorkZ.
+
 ## [1.0.50] - 2026-11-04
 
 ### Fixed

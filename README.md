@@ -2,14 +2,15 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-AgentZ is a desktop AI IDE (current source version **1.0.50**; local engineering and automated acceptance gates pass, see the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md)). It puts an editor and autonomous agents in one app on a shared agent kernel. You can edit code by hand in the editor, or hand a goal to an agent that works in an isolated git worktree and comes back for review.
+AgentZ is a desktop AI IDE (current source version **1.0.51**; local engineering and automated acceptance gates pass, see the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md)). It puts an editor and autonomous agents in one app on a shared agent kernel. You can edit code by hand in the editor, or hand a goal to an agent that works in an isolated git worktree and comes back for review.
 
-The UI has two first-class modes, switched from the title bar:
+The UI has three first-class modes, switched from the title bar:
 
 | Mode | What it does |
 | --- | --- |
 | **CodeZ** | Editor-centric. Monaco, file tree, search, Git, terminal, LSP and debugging, with a toggleable AI chat on the right. Close to Cursor. |
 | **WorkZ** | Task-centric. Submit a goal and the agent plans, edits and runs tools on its own. Each task runs on its own branch; afterwards you review the diff and merge, open a PR or discard. Agents can also be grouped into teams. Close to Codex. |
+| **BotZ** | Agent-centric. Each bot keeps a long-running chat, memory and scheduled routines. A team works in its own office directory: the coordinator splits the goal, and finished work is reviewed, sent back or merged. |
 
 The kernel comes from [`piscis-engine`](https://github.com/njbinbin-piscis/piscis-engine) (`piscis-core`, `piscis-kernel` and `piscis-ide-tools`, currently pinned at `v0.8.71`). AgentZ itself implements the desktop host, the IDE, the extension host and remote development. The repository is licensed under [Apache-2.0](LICENSE).
 
@@ -35,9 +36,16 @@ Open a local folder, or connect to a remote host from the status bar and open a 
 - **Built-in seeds.** The first run writes the Architect, Coder, Reviewer, Researcher and Writer agents, plus the `fullstack-squad` and `research-duo` teams.
 - Plain sessions do not have to be bound to a project; the working directory is set in Settings.
 
+## BotZ
+
+- **Bots.** Agents created in the resource library show up on the roster. Opening one starts a long-running chat: it remembers notes, and you can edit that memory directly. When the daily token budget is spent, wait until the next day or raise the cap in the side panel.
+- **Routines.** Schedule a prompt for a bot, either at a fixed time each day or every few minutes, and run it immediately when you want.
+- **Offices.** Each office is one team bound to its own local directory, isolated from the others. Members and the collaboration contract can be filled from a team template. Offices cannot be created on a remote directory.
+- **Collaboration.** Give the coordinator a goal and it splits the work onto members' desks. The board columns are to do, in progress, blocked or in review, and done. A review can quote a diff line, request changes, approve, or approve and merge.
+
 ## Agent capabilities
 
-Both modes run the same agent loop. They differ in the tool surface, the context and where artifacts land.
+All three modes run the same agent loop. They differ in the tool surface, the context and where artifacts land.
 
 - **Models.** Anthropic, OpenAI, DeepSeek, Qwen, MiniMax, Zhipu, Kimi and custom OpenAI-compatible endpoints. Multiple named models, temperature, top_p, thinking mode, streaming and vision input are configurable. API keys stay on the local machine.
 - **Policy.** Strict, balanced and developer presets. Model and tool iterations per task are capped (default 200). Whether the agent auto-continues while plan todos are still open is a setting; it never auto-continues past a question to you.
@@ -80,13 +88,14 @@ Native `.node` modules need prebuilt binaries matching the host Node ABI. On rem
 ```
 AgentZ/
 ├── src/                        # Vite + React + TypeScript UI
-│   ├── App.tsx                 # CodeZ / WorkZ switching, projects and settings
+│   ├── App.tsx                 # CodeZ / WorkZ / BotZ switching, projects and settings
 │   ├── i18n/                   # English and Chinese
 │   ├── extensions/             # Renderer-side extension RPC, remote URIs
 │   ├── services/tauri/         # Frontend wrappers for host commands
 │   └── workspaces/
 │       ├── codez/              # Editor, chat, Git, terminal, browser, remote dialog
-│       └── workz/              # Tasks, teams, collaboration board, workflows
+│       ├── workz/              # Tasks, teams, collaboration board, workflows
+│       └── botz/               # Bot roster, long-term memory, routines, team offices
 ├── src-tauri/                  # Tauri 2 desktop host (agentz-desktop)
 │   └── src/
 │       ├── commands/           # IDE, chat, Git, remote, extensions, marketplace, workflows…
