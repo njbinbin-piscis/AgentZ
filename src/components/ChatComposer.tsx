@@ -136,6 +136,12 @@ export interface ChatComposerProps {
   onSubmit: () => void;
   onStop: () => void;
   busy: boolean;
+  /**
+   * While a turn is running, a non-empty composer shows Send instead of Stop.
+   * The running animation stays. Click queues the draft; Stop returns when the
+   * composer is empty again.
+   */
+  sendWhileBusy?: boolean;
   placeholder: string;
   canSend?: boolean;
   textareaRef?: RefObject<HTMLTextAreaElement>;
@@ -185,6 +191,7 @@ export default function ChatComposer({
   onSubmit,
   onStop,
   busy,
+  sendWhileBusy = false,
   placeholder,
   canSend: canSendProp,
   textareaRef,
@@ -423,11 +430,25 @@ export default function ChatComposer({
             {busy ? (
               <span className="agentz-composer-stop-wrap">
                 <span className="agentz-composer-stop-ring" aria-hidden />
-                <button type="button" className="agentz-composer-stop-icon" onClick={onStop} title={stopTitle}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="6" y="6" width="12" height="12" rx="1" />
-                  </svg>
-                </button>
+                {sendWhileBusy && canSend ? (
+                  <button
+                    type="button"
+                    className="agentz-composer-send-icon ready agentz-composer-send-busy"
+                    onClick={onSubmit}
+                    disabled={locked}
+                    title={sendTitle}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                  </button>
+                ) : (
+                  <button type="button" className="agentz-composer-stop-icon" onClick={onStop} title={stopTitle}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="6" y="6" width="12" height="12" rx="1" />
+                    </svg>
+                  </button>
+                )}
               </span>
             ) : (
               <button

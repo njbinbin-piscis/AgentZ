@@ -299,6 +299,11 @@
   box-shadow: 0 0 0 1px rgba(124, 106, 247, 0.28);
 }
 
+.agentz-composer-send-busy {
+  position: relative;
+  z-index: 1;
+}
+
 .agentz-composer-stop-icon:hover {
   background: color-mix(in srgb, #f87171 18%, var(--bg-elev-2, #1b1b26));
   color: #f87171;

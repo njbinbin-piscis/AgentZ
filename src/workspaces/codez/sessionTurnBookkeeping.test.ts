@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SessionTurnBookkeeping } from "./sessionTurnBookkeeping";
+import { SessionTurnBookkeeping, queueRestoreIndex } from "./sessionTurnBookkeeping";
 
 interface Turn {
   sessionId: string;
@@ -60,6 +60,27 @@ describe("SessionTurnBookkeeping", () => {
     book.enqueueFront(taken!);
     expect(book.queueFor("a").map((x) => x.text)).toEqual(["a2", "a1"]);
     expect(book.queueFor("b")).toEqual([]);
+  });
+
+  it("inserts a turn back at an index that still exists", () => {
+    const book = new SessionTurnBookkeeping<Turn>();
+    book.enqueue(turn("a", "a1"));
+    book.enqueue(turn("a", "a3"));
+    book.insertAt("a", 1, turn("a", "a2"));
+    expect(book.queueFor("a").map((x) => x.text)).toEqual(["a1", "a2", "a3"]);
+    book.insertAt("a", 99, turn("a", "a4"));
+    expect(book.queueFor("a").map((x) => x.text)).toEqual(["a1", "a2", "a3", "a4"]);
+  });
+
+  it("restores an edited turn beside neighbors that are still queued", () => {
+    // A B [edited] D, then A entered the iteration and E was appended.
+    expect(queueRestoreIndex(["b", "d", "e"], ["a", "b"], ["d"])).toBe(1);
+    // A and B both entered; D is still waiting.
+    expect(queueRestoreIndex(["d", "e"], ["a", "b"], ["d"])).toBe(0);
+    // Everything that was queued is gone; a message typed during the edit stays behind.
+    expect(queueRestoreIndex(["e"], ["a", "b"], ["d"])).toBe(0);
+    // The following message was removed; the one after it is the anchor.
+    expect(queueRestoreIndex(["b", "e"], ["a", "b"], ["d", "e"])).toBe(1);
   });
 
   it("rekeys a queue when the backend renames the session", () => {

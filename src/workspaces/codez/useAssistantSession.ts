@@ -83,7 +83,7 @@ import { useProjectScope } from "../../services/tauri/projectScope";
 import { collectArtifactsFromToolSteps, pathFromToolEvent } from "../workz/agentArtifacts";
 import "./AssistantPanel.css";
 import { isConfigured } from "../../services/tauri/settings";
-import { SessionTurnBookkeeping } from "./sessionTurnBookkeeping";
+import { SessionTurnBookkeeping, queueRestoreIndex } from "./sessionTurnBookkeeping";
 import {
   SETTINGS_CLOSED_EVENT,
   hasFirstTaskDone,
@@ -155,6 +155,8 @@ interface AssistantPanelProps {
 }
 
 interface QueuedTurn {
+  /** Stable identity so an edit can return to this slot after neighbors leave. */
+  id: string;
   text: string;
   attachment: ChatAttachment | null;
   clearPlan: false;
@@ -164,6 +166,17 @@ interface QueuedTurn {
   displayText?: string;
   /** Mode for this turn when React state has not yet caught up (mode switch + immediate send). */
   chatModeOverride?: ChatMode;
+}
+
+interface QueueEditAnchor {
+  sessionId: string;
+  beforeIds: string[];
+  afterIds: string[];
+  base: QueuedTurn;
+}
+
+function queuedTurn(turn: Omit<QueuedTurn, "id">): QueuedTurn {
+  return { ...turn, id: crypto.randomUUID() };
 }
 
 /**
@@ -369,6 +382,11 @@ export function useAssistantSession({
   // instead of in panel-wide singletons. `busy` / `queuedView` below are only
   // projections of whichever session is currently on screen.
   const turnBookRef = useRef(new SessionTurnBookkeeping<QueuedTurn>());
+  const queueEditRef = useRef<QueueEditAnchor | null>(null);
+  const inputRef = useRef(input);
+  const chipsRef = useRef(composerChips);
+  inputRef.current = input;
+  chipsRef.current = composerChips;
   const [runningIds, setRunningIds] = useState<string[]>([]);
   /** Id reserved for the not-yet-sent new session in view (no DB row yet). */
   const draftSessionIdRef = useRef<string | null>(null);
@@ -737,13 +755,13 @@ export function useAssistantSession({
         if (willResume) {
           autoResumeBySessionRef.current.set(sid, attempts + 1);
           const { prompt, label } = autoResumeTextRef.current;
-          enqueueTurn({
+          enqueueTurn(queuedTurn({
             text: prompt,
             displayText: label,
             attachment: null,
             clearPlan: false,
             sessionId: sid,
-          });
+          }));
           if (isViewed) setToast(t("chat.turnTimeoutResuming"));
           composerDbg("auto-resume queued", {
             attempt: attempts + 1,
@@ -992,6 +1010,70 @@ export function useAssistantSession({
     [syncQueuedView, t],
   );
 
+  const restoreEditedTurn = useCallback((turn: QueuedTurn) => {
+    const anchor = queueEditRef.current;
+    if (!anchor) return;
+    const currentIds = turnBookRef.current.queueFor(anchor.sessionId).map((item) => item.id);
+    const index = queueRestoreIndex(currentIds, anchor.beforeIds, anchor.afterIds);
+    turnBookRef.current.insertAt(anchor.sessionId, index, { ...turn, sessionId: anchor.sessionId });
+    queueEditRef.current = null;
+    syncQueuedView(anchor.sessionId);
+    if (!turnBookRef.current.isRunning(anchor.sessionId)) {
+      const next = turnBookRef.current.shiftNext(anchor.sessionId);
+      syncQueuedView(anchor.sessionId);
+      if (next) void runTurnRef.current(next);
+    }
+  }, [syncQueuedView]);
+
+  const parkQueueEdit = useCallback(() => {
+    const anchor = queueEditRef.current;
+    if (!anchor) return;
+    const text = composePromptWithChips(chipsRef.current, inputRef.current);
+    const attachment = extractImageAttachment(chipsRef.current);
+    const turn = text.trim() || attachment
+      ? {
+          ...anchor.base,
+          text,
+          attachment,
+          displayText: text.trim() ? undefined : anchor.base.displayText,
+        }
+      : anchor.base;
+    restoreEditedTurn(turn);
+    clearComposer();
+  }, [clearComposer, restoreEditedTurn]);
+
+  const editQueued = useCallback((index: number) => {
+    const key = sessionRef.current ?? draftSessionIdRef.current;
+    if (!key) return;
+    if (queueEditRef.current) {
+      setToast(t("chat.queueEditPending"));
+      return;
+    }
+    if (inputRef.current.trim() || chipsRef.current.length > 0) {
+      setToast(t("chat.queueEditComposerBusy"));
+      return;
+    }
+    const queue = [...turnBookRef.current.queueFor(key)];
+    const turn = queue[index];
+    if (!turn) return;
+    queueEditRef.current = {
+      sessionId: key,
+      beforeIds: queue.slice(0, index).map((item) => item.id),
+      afterIds: queue.slice(index + 1).map((item) => item.id),
+      base: turn,
+    };
+    turnBookRef.current.takeAt(key, index);
+    syncQueuedView(key);
+    setInput(turn.text);
+    if (turn.attachment) {
+      const preview = turn.attachment.data
+        ? `data:${turn.attachment.media_type};base64,${turn.attachment.data}`
+        : "";
+      setComposerChips([createImageAttachmentChip(turn.attachment, preview)]);
+    }
+    requestAnimationFrame(() => taRef.current?.focus());
+  }, [syncQueuedView, t]);
+
   runTurnRef.current = async (turn: QueuedTurn) => {
     // Any new turn declines a plan the user has not accepted yet. Accepting
     // Build starts a turn too, and retiring that card is what should happen.
@@ -1095,6 +1177,9 @@ export function useAssistantSession({
           ...queued,
           sessionId: res.session_id,
         }));
+        if (queueEditRef.current?.sessionId === turnSessionId) {
+          queueEditRef.current = { ...queueEditRef.current, sessionId: res.session_id };
+        }
       }
       effectiveSessionId = res.session_id;
       const viewingNow = sessionRef.current === effectiveSessionId;
@@ -1188,7 +1273,7 @@ export function useAssistantSession({
       // in-flight turn queues it; other sessions running in the background
       // must not block (or swallow) this send.
       const key = viewSessionKey();
-      const turn: QueuedTurn = { text, attachment: att, clearPlan: false, sessionId: key };
+      const turn = queuedTurn({ text, attachment: att, clearPlan: false, sessionId: key });
       if (turnBookRef.current.isRunning(key)) {
         enqueueTurn(turn);
       } else {
@@ -1223,6 +1308,21 @@ export function useAssistantSession({
       done();
       return;
     }
+    if (queueEditRef.current?.sessionId === viewSessionKey()) {
+      const anchor = queueEditRef.current;
+      if (!anchor) return;
+      clearComposer();
+      autoResumeBySessionRef.current.delete(viewSessionKey());
+      inputHistory.push(text);
+      restoreEditedTurn({
+        ...anchor.base,
+        text,
+        attachment: pendingAttachment,
+        displayText: text.trim() ? undefined : anchor.base.displayText,
+      });
+      done();
+      return;
+    }
     if (!projectDir) {
       setError(t("chat.noProject"));
       done();
@@ -1249,6 +1349,8 @@ export function useAssistantSession({
     busy,
     mention,
     clearComposer,
+    restoreEditedTurn,
+    viewSessionKey,
   ]);
 
   const onModeChange = useCallback(
@@ -1269,13 +1371,13 @@ export function useAssistantSession({
         path: planPath,
       });
       const key = viewSessionKey();
-      const turn: QueuedTurn = {
+      const turn = queuedTurn({
         text: prompt,
         attachment: null,
         clearPlan: false,
         sessionId: key,
         chatModeOverride: "agent",
-      };
+      });
       if (turnBookRef.current.isRunning(key)) {
         enqueueTurn(turn);
       } else {
@@ -1292,7 +1394,7 @@ export function useAssistantSession({
       onModeChange(mode);
       if (mode !== "plan") return;
       const key = viewSessionKey();
-      const turn: QueuedTurn = {
+      const turn = queuedTurn({
         text: t("chat.planEnterPrompt", {
           defaultValue: "已进入 Plan 模式，请继续：澄清需求并编写执行计划。",
         }),
@@ -1300,7 +1402,7 @@ export function useAssistantSession({
         clearPlan: false,
         sessionId: key,
         chatModeOverride: "plan",
-      };
+      });
       // The halted turn may still be winding down; queue if so.
       if (turnBookRef.current.isRunning(key)) {
         enqueueTurn(turn);
@@ -1377,6 +1479,7 @@ export function useAssistantSession({
   }, [showSessions, refreshSessions]);
 
   const newSession = useCallback(() => {
+    parkQueueEdit();
     setPermissionRequest(null);
     // Detach the view only: any turn in flight keeps running in the
     // background under its own session, and its queue stays with it. The
@@ -1404,10 +1507,11 @@ export function useAssistantSession({
     // A pending `chat_ui` card belongs to the turn that produced it, so a fresh
     // session must start empty — otherwise the stale form reappears here.
     clearCards();
-  }, [projectDir, clearSessionArtifacts, clearCards, discardStreamDelta]);
+  }, [projectDir, clearSessionArtifacts, clearCards, discardStreamDelta, parkQueueEdit]);
 
   const switchSession = useCallback(
     async (id: string, source?: string) => {
+      if (id !== sessionRef.current) parkQueueEdit();
       setPermissionRequest(null);
       // Re-selecting the session already on screen must not reload it from
       // the DB — that would wipe the in-flight stream and tool trace.
@@ -1492,6 +1596,7 @@ export function useAssistantSession({
       discardStreamDelta,
       syncBusyView,
       syncQueuedView,
+      parkQueueEdit,
     ],
   );
 
@@ -1878,6 +1983,6 @@ export function useAssistantSession({
           : t("chat.placeholderFollowUp");
 
   return {
-    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, exportCurrent, importFromFile, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, interruptQueued, steerQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, cards, restoreCard, onModeChange, onPlanDecision, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
+    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, exportCurrent, importFromFile, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, interruptQueued, steerQueued, editQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, cards, restoreCard, onModeChange, onPlanDecision, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
   };
 }

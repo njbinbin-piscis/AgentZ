@@ -56,9 +56,15 @@ export class SessionTurnBookkeeping<T extends SessionTurnLike> {
 
   /** Put a follow-up at the front of its session queue. */
   enqueueFront(turn: T): readonly T[] {
-    const queue = this.queues.get(turn.sessionId) ?? [];
-    queue.unshift(turn);
-    this.queues.set(turn.sessionId, queue);
+    return this.insertAt(turn.sessionId, 0, turn);
+  }
+
+  /** Insert a follow-up at `index`, clamped to the queue that exists now. */
+  insertAt(sessionId: string, index: number, turn: T): readonly T[] {
+    const queue = this.queues.get(sessionId) ?? [];
+    const at = Math.max(0, Math.min(index, queue.length));
+    queue.splice(at, 0, turn);
+    this.queues.set(sessionId, queue);
     return queue;
   }
 
@@ -81,4 +87,26 @@ export class SessionTurnBookkeeping<T extends SessionTurnLike> {
   clearQueues(): void {
     this.queues.clear();
   }
+}
+
+/**
+ * Where a queued message returns after the user edits it.
+ * `beforeIds` / `afterIds` are the neighbors at the moment it left the queue.
+ * Neighbors that have already entered the iteration are skipped, so the slot
+ * slides forward. Messages added while editing stay behind that slot.
+ */
+export function queueRestoreIndex(
+  currentIds: readonly string[],
+  beforeIds: readonly string[],
+  afterIds: readonly string[],
+): number {
+  for (const id of afterIds) {
+    const at = currentIds.indexOf(id);
+    if (at >= 0) return at;
+  }
+  for (let i = beforeIds.length - 1; i >= 0; i--) {
+    const at = currentIds.indexOf(beforeIds[i]);
+    if (at >= 0) return at + 1;
+  }
+  return 0;
 }

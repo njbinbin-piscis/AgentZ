@@ -5,6 +5,13 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.53] - 2026-11-05
+
+### Added
+
+- **A queued CodeZ message can be edited and put back.** The pencil returns it to the composer. Enter inserts it next to the neighbors that are still waiting, so messages that already entered the iteration do not leave it behind newer ones.
+- **The composer button can queue a follow-up without stopping.** While a turn is running and the composer is empty, the button stays Stop and keeps spinning. Once there is text or an attachment it becomes Send, the ring stays, and a click adds the draft to the queue. The composer then clears and the button is Stop again.
+
 ## [1.0.52] - 2026-11-05
 
 ### Added

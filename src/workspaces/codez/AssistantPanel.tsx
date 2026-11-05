@@ -133,6 +133,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         onRemoveQueued={s.removeQueued}
         onInterruptQueued={s.interruptQueued}
         onSteerQueued={s.steerQueued}
+        onEditQueued={s.editQueued}
         pendingCards={s.pendingCards}
         allCards={s.cards}
         onRestoreCard={s.restoreCard}
@@ -211,6 +212,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         onSubmit={s.submit}
         onStop={s.stopCurrent}
         busy={s.busy}
+        sendWhileBusy
         placeholder={s.inputPlaceholder}
         canSend={s.canSend}
         inputDisabled={!projectDir}

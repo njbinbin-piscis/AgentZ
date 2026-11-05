@@ -1183,6 +1183,9 @@ const en = {
     queueSteerNext: "Keep going and insert this as guidance for the next iteration",
     queueSteerInserted: "Inserted for the next iteration as guidance to follow",
     queueSteerQueued: "No iteration is running, so the message stayed in the queue",
+    queueEditReturn: "Return to the composer to edit",
+    queueEditComposerBusy: "The composer already has text. Send or clear it before editing a queued message",
+    queueEditPending: "Finish the queued message in the composer (Enter puts it back) before editing another",
   },
 
   appChanges: {

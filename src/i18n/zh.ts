@@ -1151,6 +1151,9 @@ const zh = {
     queueSteerNext: "不中断，作为系统引导插入下一轮",
     queueSteerInserted: "已插入下一轮迭代：用户给出以下引导请关注",
     queueSteerQueued: "当前没有进行中的迭代，消息仍留在队列里",
+    queueEditReturn: "退回输入框重新编辑",
+    queueEditComposerBusy: "输入框里还有内容，先发送或清空再编辑排队消息",
+    queueEditPending: "正在编辑一条排队消息，回车放回队列后再编辑下一条",
   },
 
   appChanges: {

@@ -138,6 +138,7 @@ describe("queued follow-ups", () => {
   it("renders interrupt, steer, and remove actions", async () => {
     const onInterruptQueued = vi.fn();
     const onSteerQueued = vi.fn();
+    const onEditQueued = vi.fn();
     const onRemoveQueued = vi.fn();
     const scrollRef = createRef<HTMLDivElement>();
 
@@ -151,6 +152,7 @@ describe("queued follow-ups", () => {
           queuedView={["watch the failing test"]}
           onInterruptQueued={onInterruptQueued}
           onSteerQueued={onSteerQueued}
+          onEditQueued={onEditQueued}
           onRemoveQueued={onRemoveQueued}
           pendingCards={[]}
           scrollRef={scrollRef}
@@ -166,14 +168,17 @@ describe("queued follow-ups", () => {
 
     const interrupt = root!.root.findByProps({ "aria-label": "chat.queueInterruptSend" });
     const steer = root!.root.findByProps({ "aria-label": "chat.queueSteerNext" });
+    const edit = root!.root.findByProps({ "aria-label": "chat.queueEditReturn" });
     const remove = root!.root.findByProps({ "aria-label": "chat.removeFromQueue" });
     await act(async () => {
       interrupt.props.onClick();
       steer.props.onClick();
+      edit.props.onClick();
       remove.props.onClick();
     });
     expect(onInterruptQueued).toHaveBeenCalledWith(0);
     expect(onSteerQueued).toHaveBeenCalledWith(0);
+    expect(onEditQueued).toHaveBeenCalledWith(0);
     expect(onRemoveQueued).toHaveBeenCalledWith(0);
   });
 });
