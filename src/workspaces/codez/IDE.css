@@ -12,6 +12,23 @@
 }
 
 /* Main horizontal region: activity bar | sidebar | editor area. */
+.ide-project-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 0 8px;
+  background: var(--bg-elev, var(--bg-secondary));
+  border-bottom: 1px solid var(--border);
+}
+
+.ide-project-bar .agentz-location-badge {
+  flex: none;
+  margin-left: 8px;
+}
+
 .ide-body {
   display: flex;
   flex-direction: row;

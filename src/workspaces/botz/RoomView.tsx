@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   chatCancel,
   chatSend,
@@ -378,6 +379,41 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
     }
   }, [memberDraft, onRoomSynced, room.id, t]);
 
+  const memberAgentIds = useCallback(() => {
+    if (room.members && room.members.length > 0) return room.members;
+    return agents
+      .filter((a) => members.some((m) => m.koi_id === (a.koi_id ?? a.id) || m.koi_id === a.id))
+      .map((a) => a.id);
+  }, [agents, members, room.members]);
+
+  const removeMember = useCallback(
+    async (koiId: string) => {
+      const agent = agents.find((a) => a.koi_id === koiId || a.id === koiId);
+      if (!agent) return;
+      try {
+        const synced = await botzSetRoomMembers(
+          room.id,
+          memberAgentIds().filter((id) => id !== agent.id),
+        );
+        setPoolId(synced.pool_id);
+        onRoomSynced(synced.room);
+        if (desk === koiId) setDesk(null);
+        if (synced.kept_busy.length > 0) {
+          setNotice(t("botz.membersKeptBusy", { names: synced.kept_busy.join(", ") }));
+        }
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [agents, desk, memberAgentIds, onRoomSynced, room.id, t],
+  );
+
+  const changeDir = useCallback(async () => {
+    const picked = await openDialog({ directory: true, multiple: false, defaultPath: room.dir || undefined });
+    if (typeof picked !== "string" || picked === room.dir) return;
+    onRoomChange({ ...room, dir: picked, pool_id: null });
+  }, [onRoomChange, room]);
+
   const refresh = useCallback(async () => {
     if (!poolId) return;
     try {
@@ -693,8 +729,13 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
     <div className="botz-room" hidden={!active}>
       <div className="botz-room-main">
         <div className="botz-room-toolbar">
-          <span className="botz-room-dir" title={room.dir}>
-            📁 {room.dir}
+          <span className="botz-room-dir-row">
+            <span className="botz-room-dir" title={room.dir}>
+              📁 {room.dir}
+            </span>
+            <button type="button" title={t("botz.changeRoomDir")} onClick={() => void changeDir()}>
+              {t("botz.changeRoomDir")}
+            </button>
           </span>
           <span className="botz-room-members-anchor">
             <button
@@ -787,6 +828,18 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
                   }}
                   title={m.role}
                 >
+                  <button
+                    type="button"
+                    className="botz-desk-remove"
+                    title={t("botz.leaveRoom")}
+                    aria-label={t("botz.leaveRoom")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void removeMember(m.koi_id);
+                    }}
+                  >
+                    ×
+                  </button>
                   {bubbles[m.koi_id] && <div className="botz-bubble">{bubbles[m.koi_id].text}</div>}
                   {act === "waiting" && <div className="botz-alert">!</div>}
                   {desk !== m.koi_id && unreadFor(feed, m.koi_id, m.name, lastRead[m.koi_id] ?? 0) > 0 && (

@@ -210,6 +210,8 @@ pub fn run() {
             commands::platform::reveal_in_folder,
             commands::platform::composer_debug_log,
             commands::platform::platform_software_rendering,
+            commands::platform::app_launch_fresh,
+            commands::platform::app_open_instance,
             // AI chat (agent turn on the piscis-engine kernel)
             commands::chat::chat_send,
             commands::background::background_list,

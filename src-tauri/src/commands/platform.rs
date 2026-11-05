@@ -132,3 +132,43 @@ pub async fn composer_debug_log(app: AppHandle, line: String) -> Result<(), Stri
     .await
     .map_err(|e| format!("composer log task: {e}"))?
 }
+
+const FRESH_ENV: &str = "AGENTZ_FRESH";
+
+/// True when this process was started as an extra window and should not
+/// reopen the project the other window already has.
+#[tauri::command]
+pub fn app_launch_fresh() -> bool {
+    std::env::var(FRESH_ENV).ok().is_some_and(|v| v == "1")
+}
+
+/// Start another AgentZ process. It does not reopen the current project.
+#[tauri::command]
+pub fn app_open_instance() -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let mut cmd = std::process::Command::new(exe);
+    cmd.env(FRESH_ENV, "1");
+    if std::env::args().any(|arg| arg == "--software-rendering") {
+        cmd.arg("--software-rendering");
+    }
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    let mut child = cmd.spawn().map_err(|e| format!("could not start AgentZ: {e}"))?;
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
+}

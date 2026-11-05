@@ -19,6 +19,16 @@ export function revealInFolder(path: string): Promise<void> {
   return invoke<void>("reveal_in_folder", { path });
 }
 
+/** This process was opened as an extra window and should not restore the last project. */
+export function appLaunchFresh(): Promise<boolean> {
+  return invoke<boolean>("app_launch_fresh");
+}
+
+/** Start another AgentZ process, without the project this window has open. */
+export function openNewInstance(): Promise<void> {
+  return invoke<void>("app_open_instance");
+}
+
 /** Prompt the user to choose a project directory. Returns null if cancelled. */
 export async function openFolderDialog(defaultPath?: string | null): Promise<string | null> {
   const selected = await open({

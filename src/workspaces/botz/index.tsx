@@ -194,6 +194,24 @@ export default function BotZWorkspace({ projectDir }: BotZWorkspaceProps) {
     [roomMembers, syncedRoom],
   );
 
+  const leaveRoom = useCallback(
+    async (agent: AgentInfo, room: BotzRoom) => {
+      try {
+        const synced = await botzSetRoomMembers(
+          room.id,
+          roomMembers(room).filter((id) => id !== agent.id),
+        );
+        syncedRoom(synced.room);
+        setJoinError(
+          synced.kept_busy.length > 0 ? t("botz.membersKeptBusy", { names: synced.kept_busy.join(", ") }) : null,
+        );
+      } catch (e) {
+        setJoinError(String(e));
+      }
+    },
+    [roomMembers, syncedRoom, t],
+  );
+
   const botActivity = useCallback(
     (agent: AgentInfo): Activity => {
       const keys = [agent.koi_id, agent.id].filter(Boolean) as string[];
@@ -289,18 +307,31 @@ export default function BotZWorkspace({ projectDir }: BotZWorkspaceProps) {
                     <div className="botz-bot-rooms">
                       {inRooms.length === 0 && <span className="botz-empty">{t("botz.botNoRooms")}</span>}
                       {inRooms.map((r) => (
-                        <button
-                          type="button"
-                          key={r.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setView("rooms");
-                            setActiveRoom(r.id);
-                            setFocus({ roomId: r.id, koiId: a.koi_id ?? a.id, nonce: Date.now() });
-                          }}
-                        >
-                          🏢 {r.name}
-                        </button>
+                        <span key={r.id} className="botz-room-chip">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setView("rooms");
+                              setActiveRoom(r.id);
+                              setFocus({ roomId: r.id, koiId: a.koi_id ?? a.id, nonce: Date.now() });
+                            }}
+                          >
+                            🏢 {r.name}
+                          </button>
+                          <button
+                            type="button"
+                            className="botz-room-chip-x"
+                            title={t("botz.leaveRoom")}
+                            aria-label={t("botz.leaveRoom")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void leaveRoom(a, r);
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
                       ))}
                       {rooms.some((r) => !inRooms.includes(r)) && (
                         <div className="botz-join-room" onClick={(e) => e.stopPropagation()}>

@@ -17,6 +17,7 @@ import { getActiveChatSession, subscribeActiveChatSession } from "../../services
 import { isRecoveryPath, recoveryOriginalPath } from "./editorRecovery";
 import ExtensionsManager from "./ExtensionsManager";
 import IdeStatusBar from "./IdeStatusBar";
+import ProjectPathBar from "./ProjectPathBar";
 import RemoteConnectDialog from "./RemoteConnectDialog";
 import CommandPalette from "./CommandPalette";
 import {
@@ -41,6 +42,8 @@ export interface IDEProps {
   recentProjects?: WorkzProject[];
   onOpenRecentProject?: (dir: string) => void;
   onRemoveRecentProject?: (dir: string) => void;
+  onCloseProject?: () => void;
+  onRefreshRecent?: () => void;
   /** Send one or more relative paths from Explorer to the chat composer. */
   onSendToChat?: (paths: string[]) => void;
   /** Send selected terminal output to the chat composer. */
@@ -86,6 +89,8 @@ export default function CodeZWorkspace(props: IDEProps) {
     recentProjects = [],
     onOpenRecentProject,
     onRemoveRecentProject,
+    onCloseProject,
+    onRefreshRecent,
     onSendToChat,
     onSendTerminalToChat,
     browserOpen = false,
@@ -100,6 +105,15 @@ export default function CodeZWorkspace(props: IDEProps) {
 
   return (
     <div className="pond-ide" ref={s.ideRef}>
+      <ProjectPathBar
+        projectDir={projectDir}
+        recentProjects={recentProjects}
+        onOpenFolder={onOpenFolder}
+        onOpenRecentProject={onOpenRecentProject}
+        onRemoveRecentProject={onRemoveRecentProject}
+        onCloseProject={onCloseProject}
+        onRefreshRecent={onRefreshRecent}
+      />
       <div className="ide-body">
         {/* Activity bar (icon strip) */}
         <div className="ide-activity-bar">

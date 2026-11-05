@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.54] - 2026-11-05
+
+### Added
+
+- **The CodeZ folder lives in CodeZ.** The path, recent folders, close button, and local/remote badge moved from the main title bar to the top of CodeZ. WorkZ and BotZ keep their own directories.
+- **Open another AgentZ window.** A title-bar button starts a second process. It does not reopen the project the current window already has.
+- **A BotZ office can drop a member and change its directory.** Each bot card and each desk can remove that bot. The join-office control stays visible after two memberships. The office toolbar can pick a new working directory; the board then follows that folder.
+
 ## [1.0.53] - 2026-11-05
 
 ### Added

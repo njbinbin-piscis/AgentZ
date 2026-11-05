@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getProjectScope, pickProjectScope, restoreProjectScope, revokeProjectScope } from "./services/tauri/projectScope";
 import { isRemoteDir, OPEN_PROJECT_EVENT } from "./extensions/remoteTargets";
-import LocationBadge, { RemoteBoundaryBanner } from "./components/LocationBadge";
+import { RemoteBoundaryBanner } from "./components/LocationBadge";
 import { preflightWorkspaceNavigation } from "./services/workspaceNavigation";
 import {
   workspaceLoad,
@@ -34,7 +34,7 @@ import { getSettings } from "./services/tauri/settings";
 import { setLanguage } from "./i18n";
 import { onSettingsRefresh, notifySettingsRefresh } from "./services/settingsRefresh";
 import { OPEN_LINK_EVENT, installLinkInterceptor, openExternal } from "./services/linkRouter";
-import { openPath } from "./services/tauri";
+import { appLaunchFresh, openNewInstance, openPath } from "./services/tauri";
 import {
   getAppearanceTheme,
   toggleAppearanceTheme,
@@ -67,9 +67,8 @@ import {
   AssistantBubbleIcon,
   BrowserIcon,
   ChatIcon,
-  CloseIcon,
-  FolderIcon,
   MoonIcon,
+  NewWindowIcon,
   SettingsIcon,
   StoreIcon,
   SunIcon,
@@ -244,17 +243,6 @@ export default function App() {
   const [fontScaleOpen, setFontScaleOpen] = useState(false);
   const fontScaleRef = useRef<HTMLDivElement>(null);
   const fontScalePopoverRef = useRef<HTMLDivElement>(null);
-  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
-  const projectMenuRef = useRef<HTMLDivElement>(null);
-  const projectPopoverRef = useRef<HTMLDivElement>(null);
-  const projectPopoverStyle = useFixedPopupPosition(
-    projectMenuOpen,
-    projectMenuRef,
-    projectPopoverRef,
-    "down",
-    "text",
-    { align: "left", minWidth: 260, maxWidth: 340, maxHeight: 340 },
-  );
   const wikiPopoverStyle = useFixedPopupPosition(
     wikiMenuOpen,
     wikiMenuRef,
@@ -358,10 +346,16 @@ export default function App() {
     [scheduleWorkspaceSave],
   );
 
-  // Restore last session on startup.
+  // Restore last session on startup. A window opened from the title-bar
+  // button skips the project so it does not collide with this one.
   useEffect(() => {
     let cancelled = false;
-    void workspaceLoad()
+    void appLaunchFresh()
+      .catch(() => false)
+      .then((fresh) => {
+        if (cancelled || fresh) return null;
+        return workspaceLoad();
+      })
       .then(async (snap) => {
         if (cancelled || !snap?.project_dir) {
           setWorkspaceReady(true);
@@ -613,23 +607,6 @@ export default function App() {
     refreshRecentProjects();
   }, [refreshRecentProjects, mode]);
 
-  useEffect(() => {
-    if (!projectMenuOpen) return;
-    refreshRecentProjects();
-    const close = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        projectMenuRef.current &&
-        !projectMenuRef.current.contains(target) &&
-        !projectPopoverRef.current?.contains(target)
-      ) {
-        setProjectMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [projectMenuOpen, refreshRecentProjects]);
-
   const switchProject = useCallback(
     async (dir: string, navigationOwned = false) => {
     if (!navigationOwned && projectNavigationBusy.current) return false;
@@ -743,7 +720,6 @@ export default function App() {
 
   const openRecentProject = useCallback(
     async (dir: string) => {
-      setProjectMenuOpen(false);
       if (projectNavigationBusy.current) return;
       projectNavigationBusy.current = true;
       let mintedHandle: string | null = null;
@@ -1016,112 +992,15 @@ export default function App() {
           </span>
         </div>
 
-        <div className="agentz-project-menu" ref={projectMenuRef}>
-          <button
-            type="button"
-            className={`agentz-titlebar-icon agentz-titlebar-folder ${projectMenuOpen ? "active" : ""}`}
-            onClick={() => {
-              if (recentProjects.length === 0) {
-                void pickFolder();
-              } else {
-                setProjectMenuOpen((v) => !v);
-              }
-            }}
-            title={projectDir ? t("app.changeFolder") : t("app.openFolder")}
-            aria-label={projectDir ? t("app.changeFolder") : t("app.openFolder")}
-            aria-expanded={projectMenuOpen}
-          >
-            <FolderIcon />
-          </button>
-          {projectMenuOpen &&
-            (() => {
-              const node = (
-                <div
-                  ref={projectPopoverRef}
-                  className="agentz-project-popover is-fixed"
-                  role="menu"
-                  style={projectPopoverStyle}
-                >
-                  <button
-                    type="button"
-                    className="agentz-project-popover-pick"
-                    role="menuitem"
-                    onClick={() => {
-                      setProjectMenuOpen(false);
-                      void pickFolder();
-                    }}
-                  >
-                    {t("app.chooseFolder")}
-                  </button>
-                  {recentProjects.length > 0 && (
-                    <>
-                      <div className="agentz-project-popover-divider" />
-                      <div className="agentz-project-popover-heading">{t("app.recentProjects")}</div>
-                      <div className="agentz-project-popover-list">
-                        {recentProjects.map((p) => {
-                          const isCurrent = Boolean(
-                            projectDir && normProjectPath(p.path) === normProjectPath(projectDir),
-                          );
-                          return (
-                            <div
-                              key={p.path}
-                              className={`agentz-project-popover-row ${isCurrent ? "active" : ""}`}
-                            >
-                              <button
-                                type="button"
-                                className="agentz-project-popover-item"
-                                role="menuitem"
-                                title={p.path}
-                                onClick={() => void openRecentProject(p.path)}
-                              >
-                                <strong>{p.name}</strong>
-                                <span>{p.path}</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="agentz-project-popover-remove"
-                                title={t("app.removeRecentProject")}
-                                aria-label={t("app.removeRecentProject")}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeRecentProject(p.path);
-                                }}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-              return canPortalToBody() ? createPortal(node, document.body) : node;
-            })()}
-        </div>
-
-        <span
-          className={`agentz-project-path ${recentProjects.length > 0 ? "clickable" : ""}`}
-          title={projectDir ?? undefined}
-          onClick={() => {
-            if (recentProjects.length > 0) setProjectMenuOpen((v) => !v);
-            else void pickFolder();
-          }}
+        <button
+          type="button"
+          className="agentz-titlebar-icon"
+          onClick={() => void openNewInstance().catch((e) => flashToast(String(e)))}
+          title={t("app.newInstance")}
+          aria-label={t("app.newInstance")}
         >
-          {projectDir ?? t("app.noProjectOpen")}
-        </span>
-        {projectDir && (
-          <button
-            type="button"
-            className="agentz-titlebar-icon agentz-titlebar-close-project"
-            onClick={() => void closeProject()}
-            title={t("app.closeFolder")}
-            aria-label={t("app.closeFolder")}
-          >
-            <CloseIcon size={16} />
-          </button>
-        )}
+          <NewWindowIcon />
+        </button>
 
         <div className="agentz-titlebar-actions">
           {mode === "codez" && (
@@ -1383,7 +1262,6 @@ export default function App() {
             {t("app.modeBotZ")}
           </button>
         </div>
-        <LocationBadge dir={projectDir} />
       </header>
 
       {codeMapOpen && projectDir && (
@@ -1444,6 +1322,8 @@ export default function App() {
                 recentProjects={recentProjects}
                 onOpenRecentProject={(dir) => void openRecentProject(dir)}
                 onRemoveRecentProject={removeRecentProject}
+                onCloseProject={() => void closeProject()}
+                onRefreshRecent={refreshRecentProjects}
                 onSendToChat={handleSendToChat}
                 onSendTerminalToChat={handleSendTerminalToChat}
                 openPathRequest={ideWikiOpenPath}
