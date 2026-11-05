@@ -120,4 +120,60 @@ describe("AssistantMessageList per-turn undo (R10-11)", () => {
         { id: "a1", role: "assistant", text: "done 1", tools: [edit("restored")] },
       ]),
     ).toEqual([]);
-  });});
+  });
+});
+
+describe("queued follow-ups", () => {
+  let root: ReactTestRenderer | null = null;
+
+  afterEach(async () => {
+    if (root) {
+      await act(async () => {
+        root?.unmount();
+      });
+      root = null;
+    }
+  });
+
+  it("renders interrupt, steer, and remove actions", async () => {
+    const onInterruptQueued = vi.fn();
+    const onSteerQueued = vi.fn();
+    const onRemoveQueued = vi.fn();
+    const scrollRef = createRef<HTMLDivElement>();
+
+    await act(async () => {
+      root = create(
+        <AssistantMessageList
+          messages={[]}
+          toolSteps={[]}
+          turnDiffsByTurnId={{}}
+          busy
+          queuedView={["watch the failing test"]}
+          onInterruptQueued={onInterruptQueued}
+          onSteerQueued={onSteerQueued}
+          onRemoveQueued={onRemoveQueued}
+          pendingCards={[]}
+          scrollRef={scrollRef}
+          onForkCheckpoint={() => {}}
+          onRestoreCheckpoint={() => {}}
+          onCardSubmitted={() => {}}
+          onCardActionSent={() => {}}
+          permissionRequest={null}
+          onPermissionResolved={() => {}}
+        />,
+      );
+    });
+
+    const interrupt = root!.root.findByProps({ "aria-label": "chat.queueInterruptSend" });
+    const steer = root!.root.findByProps({ "aria-label": "chat.queueSteerNext" });
+    const remove = root!.root.findByProps({ "aria-label": "chat.removeFromQueue" });
+    await act(async () => {
+      interrupt.props.onClick();
+      steer.props.onClick();
+      remove.props.onClick();
+    });
+    expect(onInterruptQueued).toHaveBeenCalledWith(0);
+    expect(onSteerQueued).toHaveBeenCalledWith(0);
+    expect(onRemoveQueued).toHaveBeenCalledWith(0);
+  });
+});

@@ -45,6 +45,9 @@ pub struct ApprovalHooks {
     project: PathBuf,
     workspace: PathBuf,
     binding: Binding,
+    /// Latest checkout this turn is allowed to use. Updated when the same
+    /// workspace moves to a new branch or commit, so a team task does not stall.
+    live: Mutex<EnvSnapshot>,
     require_binding: bool,
     projectless_app_data: Option<PathBuf>,
     broker: ApprovalBroker,
@@ -285,7 +288,7 @@ impl ApprovalHooks {
             Some(explicit) => explicit,
             None => workspace != project || agentz_task_state::load(&project, session)?.is_some(),
         };
-        let mut binding = resolve_binding_for_mode(
+        let mut snapshot = resolve_env_snapshot(
             &project,
             &workspace,
             session,
@@ -294,12 +297,14 @@ impl ApprovalHooks {
             projectless_app_data.as_deref(),
         )
         .await?;
-        binding.attempt_id = identity.1.into();
-        binding.validate()?;
+        snapshot.binding.attempt_id = identity.1.into();
+        snapshot.binding.validate()?;
+        let binding = snapshot.binding.clone();
         Ok(Self {
             project,
             workspace,
             binding,
+            live: Mutex::new(snapshot),
             require_binding,
             projectless_app_data,
             broker,
@@ -348,13 +353,13 @@ impl ApprovalHooks {
     pub(crate) fn binding(&self) -> &Binding {
         &self.binding
     }
-    async fn fresh(&self, ev: &ToolHookEvent<'_>) -> Result<Binding, String> {
+    async fn fresh(&self, ev: &ToolHookEvent<'_>, adopt_head: bool) -> Result<Binding, String> {
         if ev.session_id != self.binding.task_id
             || agentz_task_state::canonical_root(ev.workspace_root)? != self.workspace
         {
             return Err("Tool invocation belongs to a different task/environment".into());
         }
-        let mut binding = resolve_binding_for_mode(
+        let mut snapshot = resolve_env_snapshot(
             &self.project,
             ev.workspace_root,
             ev.session_id,
@@ -363,16 +368,36 @@ impl ApprovalHooks {
             self.projectless_app_data.as_deref(),
         )
         .await?;
-        binding.attempt_id = self.binding.attempt_id.clone();
-        if binding != self.binding {
+        snapshot.binding.attempt_id = self.binding.attempt_id.clone();
+        let mut live = self
+            .live
+            .lock()
+            .map_err(|_| "Task environment binding lock poisoned".to_string())?;
+        if snapshot.binding == live.binding && snapshot.head == live.head {
+            return Ok(snapshot.binding);
+        }
+        // Still the same task directory. Follow the checkout so pool reads,
+        // reviewer assignment and later tools are not stuck. A command that
+        // already opened an approval is the exception: do not run it against
+        // a checkout the approval did not cover, and tell the agent to retry.
+        if snapshot.root == live.root {
+            if adopt_head {
+                let binding = snapshot.binding.clone();
+                *live = snapshot;
+                return Ok(binding);
+            }
             return Err(
-                "Task environment binding changed; restart with a newly authorized context".into(),
+                "The git checkout changed while this action was waiting for approval, so it was not started. Retry the same tool; it will run on the current checkout."
+                    .into(),
             );
         }
-        Ok(binding)
+        Err(format!(
+            "This turn stays in {}. The tool resolved to {}, so it was not started. Retry it without changing the task directory.",
+            live.root, snapshot.root
+        ))
     }
     async fn authorize(&self, ev: &ToolHookEvent<'_>) -> Result<(), String> {
-        let binding = self.fresh(ev).await?;
+        let binding = self.fresh(ev, true).await?;
         if self.cancel.load(Ordering::Relaxed) {
             return Err("Attempt cancelled".into());
         }
@@ -533,7 +558,7 @@ impl ApprovalHooks {
                 "Approval denied, expired or attempt cancelled; operation was not started".into(),
             );
         }
-        let actual = self.fresh(ev).await?;
+        let actual = self.fresh(ev, false).await?;
         let path = self.path();
         let boot = self.broker.boot_id().to_string();
         let expected = intent.clone();
@@ -712,6 +737,12 @@ pub(crate) async fn resolve_binding(
     resolve_binding_for_mode(project, workspace, session, run, require_binding, None).await
 }
 
+struct EnvSnapshot {
+    binding: Binding,
+    root: String,
+    head: String,
+}
+
 pub(crate) async fn resolve_binding_for_mode(
     project: &Path,
     workspace: &Path,
@@ -720,6 +751,26 @@ pub(crate) async fn resolve_binding_for_mode(
     require_binding: bool,
     projectless_app_data: Option<&Path>,
 ) -> Result<Binding, String> {
+    Ok(resolve_env_snapshot(
+        project,
+        workspace,
+        session,
+        run,
+        require_binding,
+        projectless_app_data,
+    )
+    .await?
+    .binding)
+}
+
+async fn resolve_env_snapshot(
+    project: &Path,
+    workspace: &Path,
+    session: &str,
+    run: &str,
+    require_binding: bool,
+    projectless_app_data: Option<&Path>,
+) -> Result<EnvSnapshot, String> {
     if let Some(app_data) = projectless_app_data {
         if agentz_task_state::load(project, session)?.is_some() {
             return Err("projectless session conflicts with a registered environment".into());
@@ -741,25 +792,41 @@ pub(crate) async fn resolve_binding_for_mode(
     .await?;
     let root = agentz_task_state::canonical_root(Path::new(&resolved))?;
     let record = agentz_task_state::load(project, session)?;
+    let observed_git = direct_git_identity(Path::new(&root)).await?;
+    // Managed tasks keep a stable fingerprint. The live checkout is tracked
+    // separately so a branch switch does not look like a new environment.
     let direct_git = if record.is_none() {
-        direct_git_identity(Path::new(&root)).await?
+        observed_git.clone()
     } else {
         Value::Null
     };
-    let version =
-        serde_json::to_string(&json!({"root":root,"record":record,"directGit":direct_git}))
-            .map_err(|e| e.to_string())?;
+    let head = observed_git
+        .get("head")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let version = serde_json::to_string(&json!({
+        "root": &root,
+        "record": &record,
+        "directGit": &direct_git
+    }))
+    .map_err(|e| e.to_string())?;
     let fingerprint = format!("{:x}", Sha256::digest(version.as_bytes()));
-    Ok(Binding {
-        project_id: agentz_task_state::canonical_root(project)?,
-        task_id: session.into(),
-        environment_id: record
-            .map(|record| record.environment_id)
-            .unwrap_or_else(|| format!("direct:{fingerprint}")),
-        binding_version: fingerprint,
-        run_id: run.into(),
-        attempt_id: run.into(),
-        capability_version: "agentz-hook-v1:piscis-v0.8.68".into(),
+    Ok(EnvSnapshot {
+        binding: Binding {
+            project_id: agentz_task_state::canonical_root(project)?,
+            task_id: session.into(),
+            environment_id: record
+                .as_ref()
+                .map(|record| record.environment_id.clone())
+                .unwrap_or_else(|| format!("direct:{fingerprint}")),
+            binding_version: fingerprint,
+            run_id: run.into(),
+            attempt_id: run.into(),
+            capability_version: "agentz-hook-v1:piscis-v0.8.68".into(),
+        },
+        root,
+        head,
     })
 }
 async fn direct_git_identity(root: &Path) -> Result<Value, String> {

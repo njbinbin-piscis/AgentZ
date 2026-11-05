@@ -11,6 +11,7 @@
 pub mod forward;
 #[cfg(test)]
 mod live_tests;
+pub mod llm_proxy;
 pub mod lsp;
 pub mod mirror;
 pub mod ssh_setup;

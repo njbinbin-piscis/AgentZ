@@ -452,13 +452,23 @@
 
 .agentz-turn-user.queued {
   position: relative;
-  opacity: 0.55;
+  opacity: 0.92;
 }
 
-.agentz-queue-remove {
+.agentz-turn-user.queued .agentz-task-card {
+  padding-right: 84px;
+}
+
+.agentz-queue-actions {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+}
+
+.agentz-queue-action,
+.agentz-queue-remove {
   width: 22px;
   height: 22px;
   border: none;
@@ -468,8 +478,18 @@
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
+.agentz-queue-action:hover {
+  color: #d9d2ff;
+  background: rgba(124, 106, 247, 0.22);
+}
+
+.agentz-queue-action.danger:hover,
 .agentz-queue-remove:hover {
   color: #f87171;
   background: rgba(248, 113, 113, 0.15);

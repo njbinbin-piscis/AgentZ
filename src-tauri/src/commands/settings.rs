@@ -437,6 +437,38 @@ fn load_settings(app: &AppHandle) -> Result<(Settings, String), String> {
     load_settings_from_dir(&config_dir)
 }
 
+pub(crate) struct ActiveLlmRoute {
+    pub provider: String,
+    pub base_url: String,
+    pub api_key: String,
+}
+
+/// Provider endpoint and key for a request that must leave from this machine.
+pub(crate) fn active_llm_route(app: &AppHandle) -> Result<ActiveLlmRoute, String> {
+    let (settings, _) = load_settings(app)?;
+    let provider = settings.provider.clone();
+    let api_key = settings.active_api_key().trim().to_string();
+    if api_key.is_empty() {
+        return Err("no API key configured in AgentZ settings".into());
+    }
+    let configured = settings.custom_base_url.trim().trim_end_matches('/').to_string();
+    let base_url = if !configured.is_empty() {
+        configured
+    } else if provider == "anthropic" {
+        "https://api.anthropic.com".to_string()
+    } else {
+        piscis_kernel::llm::default_base_url(&provider)
+            .unwrap_or("https://api.openai.com/v1")
+            .trim_end_matches('/')
+            .to_string()
+    };
+    Ok(ActiveLlmRoute {
+        provider,
+        base_url,
+        api_key,
+    })
+}
+
 fn provider_to_dto(p: &LlmProviderConfig) -> LlmProviderDto {
     LlmProviderDto {
         id: p.id.clone(),

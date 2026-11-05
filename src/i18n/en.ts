@@ -1179,6 +1179,10 @@ const en = {
     interactiveMaxSelections: "Select at most {{count}}",
     loadOlderMessages: "Load {{count}} older messages",
     removeFromQueue: "Remove from queue",
+    queueInterruptSend: "Stop the current iteration and send now",
+    queueSteerNext: "Keep going and insert this as guidance for the next iteration",
+    queueSteerInserted: "Inserted for the next iteration as guidance to follow",
+    queueSteerQueued: "No iteration is running, so the message stayed in the queue",
   },
 
   appChanges: {

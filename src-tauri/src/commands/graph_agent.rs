@@ -316,7 +316,7 @@ Legacy **`graph_search`** remains for module ids. Mention **`@graph <topic>`** i
     md.push('\n');
 
     if md.len() > MAX_BRIEF_CHARS {
-        md.truncate(MAX_BRIEF_CHARS);
+        md.truncate(utf8_prefix_len(&md, MAX_BRIEF_CHARS));
         md.push_str(
             "\n\n… [truncated — use `file_read .agentz/AGENT_CODING_BRIEF.md` for full brief]\n",
         );
@@ -352,11 +352,22 @@ pub fn coding_brief_excerpt(root: &Path, max_chars: usize) -> Option<String> {
     if content.len() <= max_chars {
         Some(content)
     } else {
+        let end = utf8_prefix_len(&content, max_chars);
         Some(format!(
             "{}\n… [truncated — full brief at `{CODING_BRIEF_PATH}`]",
-            &content[..max_chars]
+            &content[..end]
         ))
     }
+}
+
+/// Largest index `<= max_bytes` that is a char boundary. Slicing a UTF-8
+/// string at a raw byte budget panics when that byte sits inside a character.
+fn utf8_prefix_len(text: &str, max_bytes: usize) -> usize {
+    let mut end = max_bytes.min(text.len());
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    end
 }
 
 fn node_matches_query(n: &GraphNode, q: &str) -> bool {
@@ -737,6 +748,27 @@ Rust 后端，提供 Tauri 命令与 Agent 运行时。
         std::fs::write(dir.join(".agentz/graph.json"), json).unwrap();
         let out = search_graph(&dir, "auth", 5).unwrap();
         assert!(out.contains("auth"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn coding_brief_excerpt_does_not_slice_inside_a_character() {
+        let dir = std::env::temp_dir().join(format!(
+            "agentz-brief-cut-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join(".agentz")).unwrap();
+        // Byte 4500 (and 51200) falls on the middle byte of 线.
+        for (pad, limit) in [(4499usize, 4500usize), (51199, 51200)] {
+            let mut body = "a".repeat(pad);
+            body.push('线');
+            body.push_str(&"b".repeat(32));
+            std::fs::write(dir.join(CODING_BRIEF_PATH), &body).unwrap();
+            let excerpt = coding_brief_excerpt(&dir, limit).expect("brief");
+            assert!(excerpt.contains("truncated"), "{excerpt}");
+            assert!(!excerpt.contains('线'), "{excerpt}");
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -391,6 +391,11 @@ export function chatCancel(taskKey?: string | null): Promise<void> {
   return invoke<void>("chat_cancel", { taskKey: taskKey ?? null });
 }
 
+/** Deliver guidance to the running turn. False when no turn is listening. */
+export function chatSteer(sessionId: string, text: string): Promise<boolean> {
+  return invoke<boolean>("chat_steer", { sessionId, text });
+}
+
 /** Tell the host a session's composer selection, for turns it starts itself. */
 export function chatSetSessionProfile(
   sessionId: string,

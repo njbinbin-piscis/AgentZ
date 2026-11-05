@@ -916,7 +916,7 @@ mod tests {
         assert!(listed.contains("do not"));
         assert!(!listed.contains("SKILL.md"));
         assert!(!listed.contains("Follow these steps."));
-        let enabled = skills_context(&dir, &["Demo"]).expect("skill enabled");
+        let enabled = skills_context(&dir, &["Demo".to_string()]).expect("skill enabled");
         assert!(enabled.contains("Follow these steps."));
         assert!(dir.starts_with(std::env::temp_dir()));
         std::fs::remove_dir_all(&dir).unwrap();

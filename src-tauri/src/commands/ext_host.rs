@@ -339,6 +339,30 @@ fn route_control(app: &AppHandle, pending: &Pending, line: &str, generation: u64
                         "kind": v.get("kind"),
                     }),
                 );
+            } else if v.get("event").and_then(|e| e.as_str()) == Some("llm.call") {
+                let id = v.get("id").and_then(|i| i.as_u64()).unwrap_or(0);
+                let path = v
+                    .get("path")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let body = v
+                    .get("body")
+                    .and_then(|b| b.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let (status, text) = crate::remote::llm_proxy::forward(&app, &path, &body).await;
+                    let mgr = app.state::<AppState>().ext_host.clone();
+                    let _ = mgr
+                        .request_generation(
+                            "llm.reply",
+                            json!({ "id": id, "status": status, "body": text }),
+                            generation,
+                        )
+                        .await;
+                });
             } else if !remote::forward::on_server_event_generation(&v, generation) {
                 let _ = app.emit(REMOTE_EVENT, v);
             }

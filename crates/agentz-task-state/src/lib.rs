@@ -129,6 +129,18 @@ pub fn validate_requested_workspace(
     Ok(())
 }
 
+/// `git worktree list --porcelain -z`: the directory is a worktree of this repo.
+/// The branch may already have moved; that must not freeze the task.
+pub fn listed_worktree(output: &str, root: &str) -> bool {
+    output.split("\0\0").any(|block| {
+        block.split('\0').any(|field| {
+            field.strip_prefix("worktree ").is_some_and(|directory| {
+                canonical_root(Path::new(directory)).is_ok_and(|actual| actual == root)
+            })
+        })
+    })
+}
+
 /// `git worktree list --porcelain -z`: parse NUL fields so paths with newlines survive.
 pub fn registered_worktree(output: &str, root: &str, branch: &str) -> bool {
     output.split("\0\0").any(|block| {
@@ -492,6 +504,8 @@ mod tests {
         );
         assert!(registered_worktree(&output, &root, "workz/task-a"));
         assert!(!registered_worktree(&output, &root, "workz/task-b"));
+        assert!(listed_worktree(&output, &root));
+        assert!(!listed_worktree(&output, "/somewhere/else"));
     }
 
     #[test]

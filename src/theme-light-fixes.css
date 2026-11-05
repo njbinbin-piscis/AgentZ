@@ -19,6 +19,7 @@
 
 [data-theme="light"] .agentz-collab-card-cli { background: rgba(0, 0, 0, 0.06); color: #3f4a2c; }
 
+[data-theme="light"] .agentz-queue-action,
 [data-theme="light"] .agentz-queue-remove { background: rgba(0, 0, 0, 0.08); }
 
 [data-theme="light"] .agentz-nb { background: var(--bg-elev); color: var(--text); }

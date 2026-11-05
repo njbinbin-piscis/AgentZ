@@ -1147,6 +1147,10 @@ const zh = {
     interactiveMaxSelections: "最多选择 {{count}} 项",
     loadOlderMessages: "加载更早的 {{count}} 条消息",
     removeFromQueue: "从队列中移除",
+    queueInterruptSend: "中断当前迭代并立即发送",
+    queueSteerNext: "不中断，作为系统引导插入下一轮",
+    queueSteerInserted: "已插入下一轮迭代：用户给出以下引导请关注",
+    queueSteerQueued: "当前没有进行中的迭代，消息仍留在队列里",
   },
 
   appChanges: {

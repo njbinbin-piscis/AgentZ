@@ -81,7 +81,20 @@ pub async fn validate_task_environment(
         registered: task_environment::registered_worktree(&worktrees, &workspace_root, &branch),
         branch,
     };
-    task_environment::validate_managed(record, &snapshot)
+    // The registered branch is the task's starting point. Members and the
+    // coordinator check out other branches while they work. As long as this
+    // directory is still a worktree of the same repository, the task continues.
+    if record.kind != "managed-worktree"
+        || record.workspace_root != snapshot.workspace_root
+        || snapshot.project_git_dir != snapshot.workspace_git_dir
+        || !task_environment::listed_worktree(&worktrees, &snapshot.workspace_root)
+    {
+        return Err(
+            "task workspace is no longer a worktree of its repository; recreate the task checkout"
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 pub async fn resolve_task_workspace(

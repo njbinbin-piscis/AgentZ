@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.52] - 2026-11-05
+
+### Added
+
+- **Queued CodeZ messages can jump the line or steer the next iteration.** While a turn is running, each queued message has two actions besides delete: stop the current iteration and send that message now, or leave the iteration running and insert the text as guidance for the next iteration (`系统提示——用户给出以下引导请关注：…`). An image stays queued, because guidance is text only.
+- **Remote processes can call the model through AgentZ.** The remote server exposes a loopback OpenAI-compatible endpoint and points `OPENAI_BASE_URL` / `ANTHROPIC_BASE_URL` at it when those variables are unset. The desktop attaches the configured API key and calls the provider. Keys stay on this machine. Proxied calls are non-streaming.
+
+### Fixed
+
+- **Agent turns no longer panic on a multi-byte character boundary.** Truncating a coding brief, evaluating a workflow comparison, or cutting a long tool-output line no longer slices inside a character such as `线` (`end byte index … is not a char boundary`).
+- **A checkout change in the same directory no longer stalls the task.** A new tool call follows the current HEAD. A command already waiting for approval is not started against the new checkout; the error says to retry that tool. Switching the task to a different directory is still refused. A managed worktree remains usable when its branch name drifts, as long as the checkout is still a worktree of the same repository.
+
 ## [1.0.51] - 2026-11-04
 
 ### Added

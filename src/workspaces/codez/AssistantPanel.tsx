@@ -131,6 +131,8 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         busy={s.busy}
         queuedView={s.queuedView}
         onRemoveQueued={s.removeQueued}
+        onInterruptQueued={s.interruptQueued}
+        onSteerQueued={s.steerQueued}
         pendingCards={s.pendingCards}
         allCards={s.cards}
         onRestoreCard={s.restoreCard}

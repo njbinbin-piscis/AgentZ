@@ -47,6 +47,21 @@ export class SessionTurnBookkeeping<T extends SessionTurnLike> {
     return this.queues.get(id)?.shift();
   }
 
+  /** Remove the item at `index` and return it. */
+  takeAt(id: string, index: number): T | undefined {
+    const queue = this.queues.get(id);
+    if (!queue || index < 0 || index >= queue.length) return undefined;
+    return queue.splice(index, 1)[0];
+  }
+
+  /** Put a follow-up at the front of its session queue. */
+  enqueueFront(turn: T): readonly T[] {
+    const queue = this.queues.get(turn.sessionId) ?? [];
+    queue.unshift(turn);
+    this.queues.set(turn.sessionId, queue);
+    return queue;
+  }
+
   removeAt(id: string, index: number): void {
     this.queues.get(id)?.splice(index, 1);
   }

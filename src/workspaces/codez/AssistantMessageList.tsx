@@ -32,6 +32,8 @@ interface AssistantMessageListProps {
   busy: boolean;
   queuedView: string[];
   onRemoveQueued?: (index: number) => void;
+  onInterruptQueued?: (index: number) => void;
+  onSteerQueued?: (index: number) => void;
   pendingCards: InteractiveCardState[];
   /** Every card of this session (answered ones included), keyed by request id. */
   allCards?: Record<string, InteractiveCardState>;
@@ -122,6 +124,8 @@ function AssistantMessageList({
   busy,
   queuedView,
   onRemoveQueued,
+  onInterruptQueued,
+  onSteerQueued,
   pendingCards,
   allCards,
   onRestoreCard,
@@ -325,16 +329,47 @@ function AssistantMessageList({
       {queuedView.map((q, i) => (
         <div key={`q-${i}`} className="agentz-turn-user queued">
           <TaskCard text={q} />
-          {onRemoveQueued && (
-            <button
-              type="button"
-              className="agentz-queue-remove"
-              title={t("chat.removeFromQueue")}
-              onClick={() => onRemoveQueued(i)}
-            >
-              ✕
-            </button>
-          )}
+          <div className="agentz-queue-actions">
+            {onInterruptQueued && (
+              <button
+                type="button"
+                className="agentz-queue-action"
+                title={t("chat.queueInterruptSend")}
+                aria-label={t("chat.queueInterruptSend")}
+                onClick={() => onInterruptQueued(i)}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M4 4h4v16H4zM10 6l10 6-10 6V6z" />
+                </svg>
+              </button>
+            )}
+            {onSteerQueued && (
+              <button
+                type="button"
+                className="agentz-queue-action"
+                title={t("chat.queueSteerNext")}
+                aria-label={t("chat.queueSteerNext")}
+                onClick={() => onSteerQueued(i)}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M4 6h9v6H4z" />
+                  <path d="M8 16h11" />
+                  <path d="M15 12l4 4-4 4" />
+                </svg>
+              </button>
+            )}
+            {onRemoveQueued && (
+              <button
+                type="button"
+                className="agentz-queue-action danger"
+                title={t("chat.removeFromQueue")}
+                aria-label={t("chat.removeFromQueue")}
+                onClick={() => onRemoveQueued(i)}
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
       ))}
       {bottomCards.map((card) => (

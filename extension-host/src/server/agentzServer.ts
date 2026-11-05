@@ -9,6 +9,7 @@ import * as path from "node:path";
 import { spawn, execFile, ChildProcess } from "node:child_process";
 import { watch as watchFs, FSWatcher } from "node:fs";
 import { connect, Socket } from "node:net";
+import { createServer, Server as HttpServer, IncomingMessage, ServerResponse } from "node:http";
 import { EventEmitter } from "node:events";
 
 const MAX_WATCHED_DIRS = 8000;
@@ -320,9 +321,14 @@ const MAX_READ_BYTES = 64 * 1024 * 1024;
 export class AgentzServer {
   private procs = new Map<number, ChildProcess>();
   private nextProc = 1;
+  private llmWaiters = new Map<number, (reply: { status: number; body: string; error?: string }) => void>();
+  private nextLlm = 1;
+  private llmProxy: HttpServer | null = null;
+  llmProxyPort = 0;
 
   constructor(private readonly emit: Emit) {
     process.on("exit", () => this.stopChildren());
+    void this.startLlmProxy();
   }
 
   /** Stop processes, watchers and sockets this server started. */
@@ -370,6 +376,8 @@ export class AgentzServer {
           hostname: os.hostname(),
           cwd: process.cwd(),
           pathSep: path.sep,
+          llmProxyPort: this.llmProxyPort,
+          llmProxy: this.llmProxyPort ? `http://127.0.0.1:${this.llmProxyPort}/v1` : null,
         };
       case "fs.stat": {
         const s = await statOnServer(str("path"));
@@ -438,8 +446,20 @@ export class AgentzServer {
         this.procs.get(p.pid as number)?.kill();
         return true;
       }
+      case "llm.reply": {
+        const id = p.id as number;
+        const waiter = this.llmWaiters.get(id);
+        this.llmWaiters.delete(id);
+        waiter?.({
+          status: typeof p.status === "number" ? p.status : 502,
+          body: typeof p.body === "string" ? p.body : "",
+          error: typeof p.error === "string" ? p.error : undefined,
+        });
+        return true;
+      }
       case "shutdown":
         this.finishShutdown();
+        this.llmProxy?.close();
         return { ok: true };
       default:
         throw new Error(`unknown agentz method: ${method}`);
@@ -545,9 +565,106 @@ export class AgentzServer {
     return true;
   }
 
+  /** OpenAI-compatible endpoint on this machine. Requests are answered by the local AgentZ app, which holds the API key. */
+  private startLlmProxy(): Promise<void> {
+    const server = createServer((req, res) => {
+      void this.handleLlmHttp(req, res);
+    });
+    this.llmProxy = server;
+    return new Promise((resolve) => {
+      server.once("error", (e) => {
+        process.stderr.write(`[server] llm proxy: ${e.message}\n`);
+        resolve();
+      });
+      server.listen(0, "127.0.0.1", () => {
+        const addr = server.address();
+        if (addr && typeof addr === "object") this.llmProxyPort = addr.port;
+        resolve();
+      });
+    });
+  }
+
+  private handleLlmHttp(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const url = req.url ?? "";
+    if (req.method !== "POST" || !url.startsWith("/v1/")) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: { message: "only POST /v1/* is proxied through AgentZ" } }));
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = [];
+      let size = 0;
+      req.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size <= 1_500_000) chunks.push(chunk);
+      });
+      req.on("error", () => {
+        res.destroy();
+        resolve();
+      });
+      req.on("end", () => {
+        if (size > 1_500_000) {
+          res.writeHead(413, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: { message: "LLM request body is too large" } }));
+          resolve();
+          return;
+        }
+        const id = this.nextLlm++;
+        const timer = setTimeout(() => {
+          if (!this.llmWaiters.delete(id)) return;
+          res.writeHead(504, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: { message: "AgentZ did not answer the model request in time" } }));
+          resolve();
+        }, 180_000);
+        this.llmWaiters.set(id, (reply) => {
+          clearTimeout(timer);
+          const body = reply.error
+            ? JSON.stringify({ error: { message: reply.error } })
+            : reply.body;
+          res.writeHead(reply.error ? reply.status || 502 : reply.status || 200, {
+            "content-type": "application/json",
+          });
+          res.end(body);
+          resolve();
+        });
+        this.emit({
+          $agentz: "event",
+          event: "llm.call",
+          id,
+          path: url.split("?")[0],
+          body: Buffer.concat(chunks).toString("utf8"),
+        });
+      });
+    });
+  }
+
+  private proxyEnv(): Record<string, string> {
+    if (!this.llmProxyPort) return {};
+    const base = `http://127.0.0.1:${this.llmProxyPort}`;
+    return {
+      OPENAI_BASE_URL: `${base}/v1`,
+      OPENAI_API_KEY: "agentz",
+      ANTHROPIC_BASE_URL: base,
+      ANTHROPIC_API_KEY: "agentz",
+    };
+  }
+
+  private childEnv(): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    for (const [key, value] of Object.entries(this.proxyEnv())) {
+      if (!env[key]) env[key] = value;
+    }
+    return env;
+  }
+
   private exec(command: string, args: string[], cwd: string | undefined, timeoutMs: number): Promise<unknown> {
     return new Promise((resolve, reject) => {
-      const child = spawn(command, args, { cwd, shell: args.length === 0, windowsHide: true });
+      const child = spawn(command, args, {
+        cwd,
+        env: this.childEnv(),
+        shell: args.length === 0,
+        windowsHide: true,
+      });
       let stdout = "";
       let stderr = "";
       const timer = setTimeout(() => child.kill(), timeoutMs);
@@ -568,7 +685,12 @@ export class AgentzServer {
   // without shipping a native node-pty build per platform.
   private spawnStreaming(command: string, args: string[], cwd: string | undefined, env: Record<string, string> | undefined): { pid: number } {
     const pid = this.nextProc++;
-    const child = spawn(command, args, { cwd, env: { ...process.env, ...env }, shell: args.length === 0, windowsHide: true });
+    const child = spawn(command, args, {
+      cwd,
+      env: { ...this.childEnv(), ...env },
+      shell: args.length === 0,
+      windowsHide: true,
+    });
     this.procs.set(pid, child);
     const out = (stream: "stdout" | "stderr") => (d: Buffer) =>
       this.emit({ $agentz: "event", event: "proc.data", pid, stream, data: d.toString("utf8") });

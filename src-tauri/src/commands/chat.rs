@@ -702,6 +702,18 @@ pub async fn chat_set_session_profile(
     Ok(())
 }
 
+/// Insert guidance into the running turn. The agent loop reads it at the
+/// start of the next iteration and does not stop the current one.
+#[tauri::command]
+pub async fn chat_steer(session_id: String, text: String) -> Result<bool, String> {
+    let text = text.trim().to_string();
+    if session_id.trim().is_empty() || text.is_empty() {
+        return Err("session and guidance text are required".into());
+    }
+    let msg = format!("系统提示——用户给出以下引导请关注：\n{text}");
+    Ok(crate::runtime::turn_inbox::try_deliver(session_id.trim(), msg))
+}
+
 /// Stop an in-flight chat turn. With `task_key` it stops just that parallel
 /// Agent task; without one it stops the sequential IDE chat turn.
 #[tauri::command]

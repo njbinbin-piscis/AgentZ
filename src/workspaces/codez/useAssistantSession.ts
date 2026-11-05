@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   chatSend,
   chatCancel,
+  chatSteer,
   chatSetSessionProfile,
   onChatEvent,
   listSessions,
@@ -934,6 +935,63 @@ export function useAssistantSession({
     [syncQueuedView],
   );
 
+  const interruptQueued = useCallback(
+    (index: number) => {
+      const key = sessionRef.current ?? draftSessionIdRef.current;
+      if (!key) return;
+      const turn = turnBookRef.current.takeAt(key, index);
+      if (!turn) return;
+      turnBookRef.current.enqueueFront(turn);
+      syncQueuedView(key);
+      if (turnBookRef.current.isRunning(key)) {
+        void chatCancel(taskKeyBySessionRef.current.get(key) ?? null);
+        return;
+      }
+      const next = turnBookRef.current.shiftNext(key);
+      syncQueuedView(key);
+      if (next) void runTurnRef.current(next);
+    },
+    [syncQueuedView],
+  );
+
+  const steerQueued = useCallback(
+    (index: number) => {
+      const key = sessionRef.current ?? draftSessionIdRef.current;
+      if (!key) return;
+      const turn = turnBookRef.current.takeAt(key, index);
+      if (!turn) return;
+      const fileName = turn.attachment?.filename || turn.attachment?.path || "";
+      let guidance = turn.text.trim();
+      if (fileName) {
+        const note = `附件：${fileName}`;
+        guidance = guidance ? `${guidance}\n${note}` : note;
+      }
+      if (!guidance) {
+        turnBookRef.current.enqueueFront(turn);
+        syncQueuedView(key);
+        return;
+      }
+      syncQueuedView(key);
+      const restore = () => {
+        turnBookRef.current.enqueueFront(turn);
+        syncQueuedView(key);
+        setToast(t("chat.queueSteerQueued"));
+      };
+      void chatSteer(key, guidance).then((delivered) => {
+        if (!delivered) {
+          restore();
+          return;
+        }
+        if (turn.attachment) {
+          turnBookRef.current.enqueue({ ...turn, text: "", displayText: turn.displayText });
+          syncQueuedView(key);
+        }
+        setToast(t("chat.queueSteerInserted"));
+      }, restore);
+    },
+    [syncQueuedView, t],
+  );
+
   runTurnRef.current = async (turn: QueuedTurn) => {
     // Any new turn declines a plan the user has not accepted yet. Accepting
     // Build starts a turn too, and retiring that card is what should happen.
@@ -1111,10 +1169,14 @@ export function useAssistantSession({
         scheduleWorkspaceRefresh({ git: true, fileTree: true, force: true, delayMs: 0 });
       }
       // Drain this session's own follow-up queue, foreground or background.
-      const next = turnBookRef.current.shiftNext(effectiveSessionId);
-      if (next) {
-        syncQueuedView(effectiveSessionId);
-        void runTurnRef.current(next);
+      // Skip when an interrupt already started the next turn during the reload
+      // above: that path marks the session running before this resumes.
+      if (!turnBookRef.current.isRunning(effectiveSessionId)) {
+        const next = turnBookRef.current.shiftNext(effectiveSessionId);
+        if (next) {
+          syncQueuedView(effectiveSessionId);
+          void runTurnRef.current(next);
+        }
       }
       done();
     }
@@ -1816,6 +1878,6 @@ export function useAssistantSession({
           : t("chat.placeholderFollowUp");
 
   return {
-    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, exportCurrent, importFromFile, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, cards, restoreCard, onModeChange, onPlanDecision, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
+    t, i18n, panelRef, contextUsage, showSessions, setShowSessions, newSession, fork, exportCurrent, importFromFile, sessionRef, toast, showToast, dragOver, sessions, switchSession, removeSession, runningIds, stopCurrent, planItems, setPlanItems, busy, taskPanelOpen, setTaskPanelOpen, messages, toolSteps, turnDiffsByTurnId, queuedView, removeQueued, interruptQueued, steerQueued, pendingCards, scrollRef, hasMoreOlder, loadOlderHistory, onSelectPath, forkFromCheckpoint, restoreToCheckpoint, undoTurnChanges, markSubmitted, markActionSent, cards, restoreCard, onModeChange, onPlanDecision, modeOptions, onPlanBuild, permissionRequest, handlePermissionResolved, needsSetup, requestOpenSettings, error, setupError, firstTaskDone, firstTaskFailureHint, input, onInputChange, submit, inputPlaceholder, canSend, composerChips, setComposerChips, composerDbg, chipsSnapshot, taRef, onKeyDown, handlePaste, modelId, modelOptions, setModelId, handleAttach, chatMode, installedSkills, enabledSkills, setEnabledSkills, setToast, agents, activeAgent, setActiveAgent, modeNotice, slash, slashMatches, pickSlash, slashLabel, mention, matches, pickMention, CODEBASE_MENTION, GRAPH_MENTION,
   };
 }

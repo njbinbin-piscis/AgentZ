@@ -217,6 +217,7 @@ pub fn run() {
             commands::background::background_kill,
             commands::background::background_running_count,
             commands::chat::chat_cancel,
+            commands::chat::chat_steer,
             commands::chat::chat_set_session_profile,
             commands::diagnostics::diagnostics_export_logs,
             commands::diagnostics::diagnostics_preview_logs,

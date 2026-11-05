@@ -710,7 +710,7 @@ fn eval_expr(expr: &str, run: &WorkflowRun) -> bool {
     let strip = |s: &str| s.trim().trim_matches('"').trim_matches('\'').to_string();
 
     for (op, neg) in [("!contains", true), ("contains", false)] {
-        if let Some(idx) = expr.to_lowercase().find(op) {
+        if let Some(idx) = find_ascii_ignore_case(expr, op) {
             let key = &expr[..idx];
             let val = &expr[idx + op.len()..];
             let hay = get(key).to_lowercase();
@@ -719,12 +719,12 @@ fn eval_expr(expr: &str, run: &WorkflowRun) -> bool {
             return if neg { !hit } else { hit };
         }
     }
-    if let Some(idx) = expr.find("==") {
+    if let Some(idx) = find_ascii_ignore_case(expr, "==") {
         return get(&expr[..idx])
             .trim()
             .eq_ignore_ascii_case(&strip(&expr[idx + 2..]));
     }
-    if let Some(idx) = expr.find("!=") {
+    if let Some(idx) = find_ascii_ignore_case(expr, "!=") {
         return !get(&expr[..idx])
             .trim()
             .eq_ignore_ascii_case(&strip(&expr[idx + 2..]));
@@ -732,6 +732,23 @@ fn eval_expr(expr: &str, run: &WorkflowRun) -> bool {
     // Bare key truthiness.
     let v = get(expr).trim().to_lowercase();
     !(v.is_empty() || v == "false" || v == "0" || v == "no")
+}
+
+/// Index of `needle` in `hay`, ignoring ASCII case, always on a char boundary.
+/// `to_lowercase()` can change UTF-8 length, so its index must not be used to
+/// slice the original string.
+fn find_ascii_ignore_case(hay: &str, needle: &str) -> Option<usize> {
+    let needle_len = needle.len();
+    if needle_len == 0 || hay.len() < needle_len {
+        return None;
+    }
+    hay.char_indices().find_map(|(index, _)| {
+        let rest = &hay[index..];
+        (rest.len() >= needle_len
+            && rest.is_char_boundary(needle_len)
+            && rest[..needle_len].eq_ignore_ascii_case(needle))
+        .then_some(index)
+    })
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -913,5 +930,18 @@ mod tests {
             loop_step(None, 0, 3, false, &edges, "lp"),
             LoopDecision::Exit { .. }
         ));
+    }
+
+    #[test]
+    fn case_fold_that_changes_utf8_length_does_not_panic() {
+        // ﬁ (U+FB01) lowercases to "fi", one byte shorter. Three of them put a
+        // lowercased index on the middle byte of 线.
+        let shifted = format!("{}线 == done", "\u{fb01}".repeat(3));
+        assert!(!eval_expr(&shifted, &run_with(&[])));
+        let key = format!("{}status", "\u{fb01}".repeat(3));
+        let expr = format!("{key} == done");
+        let mut run = run_with(&[]);
+        run.blackboard.insert(key, Value::String("done".into()));
+        assert!(eval_expr(&expr, &run));
     }
 }

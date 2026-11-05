@@ -630,9 +630,10 @@ impl Tool for RemoteShell {
     }
     fn description(&self) -> &str {
         "Execute a POSIX shell command (sh -c) on the remote machine that hosts the workspace. \
-         Working directory defaults to the remote workspace root. background=true registers the \
-         command in the same background-task list as local commands (output, ready_port/ready_log, \
-         and process_kill)."
+         Working directory defaults to the remote workspace root. Model calls from that command \
+         go to 127.0.0.1 on the remote and are sent by this AgentZ app, which keeps the API key. \
+         background=true registers the command in the same background-task list as local commands \
+         (output, ready_port/ready_log, and process_kill)."
     }
     fn input_schema(&self) -> Value {
         json!({

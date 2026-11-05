@@ -126,7 +126,7 @@ pub fn cap_long_lines(s: &str) -> (String, usize) {
         let tail_chars = MAX_LINE_CHARS - head_chars - 40;
         let head_end = chars[head_chars - 1].0 + chars[head_chars - 1].1.len_utf8();
         let tail_start = chars[chars.len() - tail_chars].0;
-        out.push_str(&line[..head_end]);
+        out.push_str(&line[..char_boundary_index(line, head_end)]);
         out.push_str(&format!(
             " …[{} chars elided from long line]… ",
             chars.len() - head_chars - tail_chars

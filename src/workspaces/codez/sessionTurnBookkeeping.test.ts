@@ -51,6 +51,17 @@ describe("SessionTurnBookkeeping", () => {
     expect(book.queueFor("b").map((x) => x.text)).toEqual(["b1"]);
   });
 
+  it("moves a queued turn to the front of its own session", () => {
+    const book = new SessionTurnBookkeeping<Turn>();
+    book.enqueue(turn("a", "a1"));
+    book.enqueue(turn("a", "a2"));
+    const taken = book.takeAt("a", 1);
+    expect(taken?.text).toBe("a2");
+    book.enqueueFront(taken!);
+    expect(book.queueFor("a").map((x) => x.text)).toEqual(["a2", "a1"]);
+    expect(book.queueFor("b")).toEqual([]);
+  });
+
   it("rekeys a queue when the backend renames the session", () => {
     const book = new SessionTurnBookkeeping<Turn>();
     book.enqueue(turn("draft", "hello"));
