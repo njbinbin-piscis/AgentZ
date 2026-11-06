@@ -29,6 +29,11 @@
   margin-left: 8px;
 }
 
+.ide-project-bar .agentz-wiki-menu {
+  margin-left: auto;
+  flex: none;
+}
+
 .ide-body {
   display: flex;
   flex-direction: row;

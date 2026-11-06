@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import LocationBadge from "../../components/LocationBadge";
@@ -19,6 +19,7 @@ export default function ProjectPathBar({
   onRemoveRecentProject,
   onCloseProject,
   onRefreshRecent,
+  children,
 }: {
   projectDir: string | null;
   recentProjects: WorkzProject[];
@@ -27,6 +28,7 @@ export default function ProjectPathBar({
   onRemoveRecentProject?: (dir: string) => void;
   onCloseProject?: () => void;
   onRefreshRecent?: () => void;
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -151,6 +153,7 @@ export default function ProjectPathBar({
         </button>
       )}
       <LocationBadge dir={projectDir} />
+      {children}
     </div>
   );
 }

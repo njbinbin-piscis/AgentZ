@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { revealInFolder } from "../../services/tauri";
 import type { PickedElement } from "../../services/tauri/browser";
 import type { WorkzProject } from "../../services/tauri/workz";
+import type { IndexBuildStatus } from "../../services/tauri/graphIndex";
+import type { WikiBuildAction } from "../workz";
 import type { EditorSnapshot, LayoutSnapshot } from "../../services/tauri/workspace";
 import { canPortalToBody, useContextMenuPosition } from "../../utils/popupPosition";
 import FileTree from "./FileTree";
@@ -18,6 +20,7 @@ import { isRecoveryPath, recoveryOriginalPath } from "./editorRecovery";
 import ExtensionsManager from "./ExtensionsManager";
 import IdeStatusBar from "./IdeStatusBar";
 import ProjectPathBar from "./ProjectPathBar";
+import CodezWikiMenu from "./CodezWikiMenu";
 import RemoteConnectDialog from "./RemoteConnectDialog";
 import CommandPalette from "./CommandPalette";
 import {
@@ -44,6 +47,10 @@ export interface IDEProps {
   onRemoveRecentProject?: (dir: string) => void;
   onCloseProject?: () => void;
   onRefreshRecent?: () => void;
+  wikiBusy?: boolean;
+  graphIndexStatus?: IndexBuildStatus | null;
+  onOpenCodeMap?: () => void;
+  onWikiAction?: (action: WikiBuildAction) => void;
   /** Send one or more relative paths from Explorer to the chat composer. */
   onSendToChat?: (paths: string[]) => void;
   /** Send selected terminal output to the chat composer. */
@@ -91,6 +98,10 @@ export default function CodeZWorkspace(props: IDEProps) {
     onRemoveRecentProject,
     onCloseProject,
     onRefreshRecent,
+    wikiBusy = false,
+    graphIndexStatus = null,
+    onOpenCodeMap,
+    onWikiAction,
     onSendToChat,
     onSendTerminalToChat,
     browserOpen = false,
@@ -113,7 +124,17 @@ export default function CodeZWorkspace(props: IDEProps) {
         onRemoveRecentProject={onRemoveRecentProject}
         onCloseProject={onCloseProject}
         onRefreshRecent={onRefreshRecent}
-      />
+      >
+        {onWikiAction && onOpenCodeMap && (
+          <CodezWikiMenu
+            projectDir={projectDir}
+            busy={wikiBusy}
+            graphStatus={graphIndexStatus}
+            onOpenCodeMap={onOpenCodeMap}
+            onAction={onWikiAction}
+          />
+        )}
+      </ProjectPathBar>
       <div className="ide-body">
         {/* Activity bar (icon strip) */}
         <div className="ide-activity-bar">

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { canPortalToBody, useFixedPopupPosition } from "./utils/popupPosition";
@@ -24,7 +24,6 @@ import {
   readRepoMemory,
 } from "./services/tauri/repoWiki";
 import {
-  graphIndexVisualState,
   requestGraphIndex,
   useGraphIndexStatus,
 } from "./services/tauri/graphIndex";
@@ -72,7 +71,6 @@ import {
   SettingsIcon,
   StoreIcon,
   SunIcon,
-  WikiIcon,
 } from "./components/TitleBarIcons";
 import ProjectTemplateDialog from "./components/ProjectTemplateDialog";
 import { projectHasAgentz } from "./services/tauri/projectTemplates";
@@ -200,18 +198,10 @@ export default function App() {
   const [assistantPanelOpen, setAssistantPanelOpen] = useState(false);
   const [templateProjectDir, setTemplateProjectDir] = useState<string | null>(null);
   const [hasImAssistant, setHasImAssistant] = useState(false);
-  const [wikiBuildNonce, setWikiBuildNonce] = useState(0);
-  const [wikiBuildAction, setWikiBuildAction] = useState<WikiBuildAction>("overview");
   const [wikiBusy, setWikiBusy] = useState(false);
-  const [wikiMenuOpen, setWikiMenuOpen] = useState(false);
   const [codeMapOpen, setCodeMapOpen] = useState(false);
   const [graphIndexRefreshNonce, setGraphIndexRefreshNonce] = useState(0);
-  const wikiMenuRef = useRef<HTMLDivElement>(null);
-  const wikiPopoverRef = useRef<HTMLDivElement>(null);
   const graphIndexStatus = useGraphIndexStatus(projectDir, graphIndexRefreshNonce);
-  const graphIndexVisual = graphIndexStatus
-    ? graphIndexVisualState(graphIndexStatus)
-    : null;
   const [settingsToast, setSettingsToast] = useState<string | null>(null);
   const flashToast = useCallback((message: string, ms = 5000) => {
     setSettingsToast(message);
@@ -243,14 +233,6 @@ export default function App() {
   const [fontScaleOpen, setFontScaleOpen] = useState(false);
   const fontScaleRef = useRef<HTMLDivElement>(null);
   const fontScalePopoverRef = useRef<HTMLDivElement>(null);
-  const wikiPopoverStyle = useFixedPopupPosition(
-    wikiMenuOpen,
-    wikiMenuRef,
-    wikiPopoverRef,
-    "down",
-    "text",
-    { align: "right", minWidth: 210, maxWidth: 320, maxHeight: 340 },
-  );
   const fontScalePopoverStyle = useFixedPopupPosition(
     fontScaleOpen,
     fontScaleRef,
@@ -581,22 +563,6 @@ export default function App() {
     return () => document.removeEventListener("mousedown", close);
   }, [fontScaleOpen]);
 
-  useEffect(() => {
-    if (!wikiMenuOpen) return;
-    const close = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        wikiMenuRef.current &&
-        !wikiMenuRef.current.contains(target) &&
-        !wikiPopoverRef.current?.contains(target)
-      ) {
-        setWikiMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [wikiMenuOpen]);
-
   const refreshRecentProjects = useCallback(() => {
     workzOverview()
       .then((ov) => setRecentProjects(ov.projects.filter((p) => p.exists)))
@@ -854,7 +820,6 @@ export default function App() {
   const runWikiInIde = useCallback(
     async (action: WikiBuildAction) => {
       if (!projectDir || wikiBusy) return;
-      setWikiMenuOpen(false);
       setWikiBusy(true);
       try {
         if (action === "graph") {
@@ -885,27 +850,6 @@ export default function App() {
     [projectDir, wikiBusy, t],
   );
 
-  const triggerWikiInWorkz = useCallback(
-    (action: WikiBuildAction) => {
-      if (!projectDir || wikiBusy) return;
-      setWikiMenuOpen(false);
-      setWikiBuildAction(action);
-      setWikiBuildNonce((n) => n + 1);
-    },
-    [projectDir, wikiBusy],
-  );
-
-  const handleWikiAction = useCallback(
-    (action: WikiBuildAction) => {
-      if (mode === "workz") {
-        triggerWikiInWorkz(action);
-      } else {
-        void runWikiInIde(action);
-      }
-    },
-    [mode, runWikiInIde, triggerWikiInWorkz],
-  );
-
   useEffect(() => {
     const onOpenAnchor = (e: Event) => {
       const detail = (e as CustomEvent<{ path?: string }>).detail;
@@ -916,34 +860,6 @@ export default function App() {
     window.addEventListener("agentz:open-source-anchor", onOpenAnchor);
     return () => window.removeEventListener("agentz:open-source-anchor", onOpenAnchor);
   }, [mode]);
-
-  const wikiTitle = useMemo(() => {
-    if (!graphIndexStatus || wikiBusy) return t("agent.repoWikiHint");
-    switch (graphIndexVisual) {
-      case "indexing":
-        return t("agent.repoWikiGraphStatusIndexing");
-      case "ready":
-        return t("agent.repoWikiGraphStatusReady", { nodes: graphIndexStatus.nodes });
-      case "error":
-        return graphIndexStatus.last_error ?? t("agent.repoWikiGraphError");
-      default:
-        return t("agent.repoWikiHint");
-    }
-  }, [graphIndexStatus, graphIndexVisual, wikiBusy, t]);
-
-  const graphMenuStatusLabel = useMemo(() => {
-    if (!graphIndexStatus) return null;
-    switch (graphIndexVisual) {
-      case "indexing":
-        return t("agent.repoWikiGraphIndexing");
-      case "ready":
-        return t("agent.repoWikiGraphReadyShort", { nodes: graphIndexStatus.nodes });
-      case "error":
-        return t("agent.repoWikiGraphError");
-      default:
-        return t("agent.repoWikiGraphEmpty");
-    }
-  }, [graphIndexStatus, graphIndexVisual, t]);
 
   const handleThemeToggle = useCallback(() => {
     const next = toggleAppearanceTheme();
@@ -1037,97 +953,6 @@ export default function App() {
               <AssistantBubbleIcon />
             </button>
           )}
-          <div className="agentz-wiki-menu" ref={wikiMenuRef}>
-            <button
-              type="button"
-              className={[
-                "agentz-titlebar-icon",
-                wikiMenuOpen ? "active" : "",
-                wikiBusy ? "loading" : "",
-                !wikiBusy && graphIndexVisual === "indexing" ? "graph-indexing" : "",
-                !wikiBusy && graphIndexVisual === "ready" ? "graph-ready" : "",
-                !wikiBusy && graphIndexVisual === "error" ? "graph-error" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => setWikiMenuOpen((v) => !v)}
-              disabled={!projectDir || wikiBusy}
-              title={wikiTitle}
-              aria-label={t("agent.repoWiki")}
-              aria-expanded={wikiMenuOpen}
-              aria-haspopup="menu"
-            >
-              <WikiIcon />
-            </button>
-            {wikiMenuOpen &&
-              (() => {
-                const node = (
-                  <div
-                    ref={wikiPopoverRef}
-                    className="agentz-wiki-popover is-fixed"
-                    role="menu"
-                    style={wikiPopoverStyle}
-                  >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setWikiMenuOpen(false);
-                        setCodeMapOpen(true);
-                      }}
-                    >
-                      {t("agent.codeMapOpen")}
-                      <span>{t("agent.codeMapOpenHint")}</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleWikiAction("overview")}
-                    >
-                      {t("agent.repoWikiOverview")}
-                      <span>{t("agent.repoWikiOverviewHint")}</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleWikiAction("deep")}
-                    >
-                      {t("agent.repoWikiDeep")}
-                      <span>{t("agent.repoWikiDeepHint")}</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleWikiAction("memory")}
-                    >
-                      {t("agent.repoWikiMemory")}
-                      <span>{t("agent.repoWikiMemoryHint")}</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className={[
-                        graphIndexVisual === "indexing" ? "graph-indexing" : "",
-                        graphIndexVisual === "ready" ? "graph-ready" : "",
-                        graphIndexVisual === "error" ? "graph-error" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={() => handleWikiAction("graph")}
-                    >
-                      <span className="agentz-wiki-menu-row">
-                        {t("agent.repoWikiGraph")}
-                        {graphMenuStatusLabel && (
-                          <span className="agentz-wiki-graph-status">{graphMenuStatusLabel}</span>
-                        )}
-                      </span>
-                      <span>{t("agent.repoWikiGraphHint")}</span>
-                    </button>
-                  </div>
-                );
-                return canPortalToBody() ? createPortal(node, document.body) : node;
-              })()}
-          </div>
           <div className="agentz-font-scale-menu" ref={fontScaleRef}>
             <button
               type="button"
@@ -1324,6 +1149,10 @@ export default function App() {
                 onRemoveRecentProject={removeRecentProject}
                 onCloseProject={() => void closeProject()}
                 onRefreshRecent={refreshRecentProjects}
+                wikiBusy={wikiBusy}
+                graphIndexStatus={graphIndexStatus}
+                onOpenCodeMap={() => setCodeMapOpen(true)}
+                onWikiAction={(action) => void runWikiInIde(action)}
                 onSendToChat={handleSendToChat}
                 onSendTerminalToChat={handleSendTerminalToChat}
                 openPathRequest={ideWikiOpenPath}
@@ -1372,8 +1201,6 @@ export default function App() {
             onOpenFolder={pickFolder}
             onOpenProjectInCodeZ={(dir) => void openProjectInCodeZ(dir)}
             onOpenTaskWorktreeInCodeZ={openTaskWorktreeInCodeZ}
-            wikiBuildNonce={wikiBuildNonce}
-            wikiBuildAction={wikiBuildAction}
             onWikiBusyChange={setWikiBusy}
             onOpenLibrary={(initial) => {
               setLibraryInitial(initial ?? null);

@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.55] - 2026-11-06
+
+### Changed
+
+- **The repository wiki control lives in CodeZ.** The title-bar wiki icon moved to the right side of the CodeZ path bar. Code map, overview, deep wiki, memory, and the knowledge graph still run against the CodeZ project.
+
 ## [1.0.54] - 2026-11-05
 
 ### Added
