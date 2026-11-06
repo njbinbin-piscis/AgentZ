@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.58] - 2026-11-06
+
+### Fixed
+
+- **macOS installers build again.** GitHub retired the `macos-14` runner, and the 1.0.55–1.0.57 macOS jobs were cancelled before any step ran. Release builds now use `macos-15`.
+
 ## [1.0.57] - 2026-11-06
 
 ### Fixed
