@@ -131,3 +131,11 @@
   display: flex;
   flex-direction: column;
 }
+
+.agentz-preview-failed {
+  flex: none;
+  padding: 8px 12px;
+  font-size: 12px;
+  background: rgba(248, 113, 113, 0.14);
+  color: var(--text, #e8e8f0);
+}

@@ -600,6 +600,7 @@ const zh = {
     binaryFileError: "「{{name}}」是二进制文件，无法在编辑器中打开。",
     viewSource: "源代码",
     viewPreview: "预览",
+    previewFailed: "这个文件的预览打不开，已改回源代码。",
     openInBrowser: "在内置浏览器打开",
     openInBrowserHint: "以 file:// 在内置浏览器中加载此文件(完整脚本与网络能力)",
     openFile: "打开",

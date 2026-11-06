@@ -612,6 +612,7 @@ const en = {
     binaryFileError: '"{{name}}" is a binary file and cannot be opened in the editor.',
     viewSource: "Source",
     viewPreview: "Preview",
+    previewFailed: "Preview failed for this file, so it was opened as source.",
     openInBrowser: "Open in browser",
     openInBrowserHint: "Load this file in the built-in browser over file:// (full scripts and network)",
     openFile: "Open",

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import CodeEditor, { type EditorConflictBannerProps } from "./CodeEditor";
 import ImagePreview from "./ImagePreview";
@@ -22,7 +22,15 @@ interface FileViewerProps {
 }
 
 function HtmlPreview({ content }: { content: string }) {
-  const srcDoc = useMemo(() => buildHtmlPreviewSrcDoc(content), [content]);
+  const srcDoc = useMemo(() => {
+    try {
+      return buildHtmlPreviewSrcDoc(content);
+    } catch (e) {
+      console.error("[AgentZ] HTML preview failed", e);
+      return "";
+    }
+  }, [content]);
+  if (!srcDoc) return null;
   return (
     <div className="agentz-html-preview">
       <iframe
@@ -32,6 +40,33 @@ function HtmlPreview({ content }: { content: string }) {
       />
     </div>
   );
+}
+
+class PreviewErrorBoundary extends Component<
+  { resetKey: string; onError: () => void; children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[AgentZ] file preview failed", this.props.resetKey, error, info);
+    this.props.onError();
+  }
+
+  componentDidUpdate(prev: { resetKey: string }) {
+    if (this.state.failed && prev.resetKey !== this.props.resetKey) {
+      this.setState({ failed: false });
+    }
+  }
+
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
 }
 
 export default function FileViewer({
@@ -45,6 +80,12 @@ export default function FileViewer({
   conflict,
 }: FileViewerProps) {
   const { t } = useTranslation();
+  const [previewBroken, setPreviewBroken] = useState(false);
+  const storedMode = tab.viewMode ?? "editor";
+  const viewMode = storedMode === "preview" && previewBroken ? "editor" : storedMode;
+  useEffect(() => {
+    setPreviewBroken(false);
+  }, [tab.path]);
 
   if (tab.isDiff && tab.originalContent !== undefined) {
     return (
@@ -63,13 +104,15 @@ export default function FileViewer({
   if (tab.path.toLowerCase().endsWith(".ipynb") && !tab.isReadOnly) {
     return (
       <div className="agentz-file-view-body">
-        <NotebookEditor content={tab.content} onChange={onChange} />
+        <PreviewErrorBoundary resetKey={tab.path} onError={() => setPreviewBroken(true)}>
+          <NotebookEditor content={tab.content ?? ""} onChange={onChange} />
+        </PreviewErrorBoundary>
+        {previewBroken && <div className="agentz-preview-failed">{t("ide.previewFailed")}</div>}
       </div>
     );
   }
 
   const previewable = isPreviewablePath(tab.path);
-  const viewMode = tab.viewMode ?? "editor";
 
   if (viewMode === "image" && tab.previewData) {
     return (
@@ -91,7 +134,10 @@ export default function FileViewer({
           <button
             type="button"
             className={viewMode === "preview" ? "active" : ""}
-            onClick={() => onViewModeChange("preview")}
+            onClick={() => {
+              setPreviewBroken(false);
+              onViewModeChange("preview");
+            }}
           >
             {t("ide.viewPreview")}
           </button>
@@ -102,13 +148,22 @@ export default function FileViewer({
           )}
         </div>
       )}
+      {previewBroken && <div className="agentz-preview-failed">{t("ide.previewFailed")}</div>}
 
       {viewMode === "preview" && previewable ? (
-        isMarkdownPath(tab.path) ? (
-          <MarkdownPreview content={tab.content} />
-        ) : isHtmlPath(tab.path) ? (
-          <HtmlPreview content={tab.content} />
-        ) : null
+        <PreviewErrorBoundary
+          resetKey={tab.path}
+          onError={() => {
+            setPreviewBroken(true);
+            onViewModeChange("editor");
+          }}
+        >
+          {isMarkdownPath(tab.path) ? (
+            <MarkdownPreview content={tab.content ?? ""} />
+          ) : isHtmlPath(tab.path) ? (
+            <HtmlPreview content={tab.content ?? ""} />
+          ) : null}
+        </PreviewErrorBoundary>
       ) : (
         <CodeEditor
           tab={tab}

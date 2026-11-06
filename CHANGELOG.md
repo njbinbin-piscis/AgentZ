@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.56] - 2026-11-06
+
+### Fixed
+
+- **Restoring an old project no longer blanks the window.** A file that was left in preview and cannot be rendered opens as source instead, with a short notice. If restore still crashes the window, a recovery screen can reopen the same project without the previously open files.
+
 ## [1.0.55] - 2026-11-06
 
 ### Changed

@@ -723,13 +723,19 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
 
   const editorLanguage =
     monacoLanguageForFile(tab.path) || tab.language || "plaintext";
-  const isLargeDocument = tab.content.length > 200_000;
+  const source = typeof tab.content === "string" ? tab.content : "";
+  const isLargeDocument = source.length > 200_000;
 
   // Give Monaco a real file:// model URI so LSP providers (which match on the
   // same URI) and diagnostics line up instead of defaulting to inmemory://.
-  const editorModelPath = projectDir
-    ? fileUriString(`${projectDir}/${tab.path}`)
-    : undefined;
+  let editorModelPath: string | undefined;
+  if (projectDir) {
+    try {
+      editorModelPath = fileUriString(`${projectDir}/${tab.path}`);
+    } catch (e) {
+      console.error("[AgentZ] editor uri failed", tab.path, e);
+    }
+  }
 
   if (tab.isDiff && tab.originalContent !== undefined) {
     return (
@@ -739,7 +745,7 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
           theme={editorTheme}
           language={editorLanguage}
           original={tab.originalContent}
-          modified={tab.content}
+          modified={source}
           onMount={(diffEditor) => {
             diffEditorRef.current = diffEditor;
             diffEditor.updateOptions?.({ fontSize: getEffectiveEditorFontSize() });
@@ -806,7 +812,7 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
         // Keep edits in Monaco's persistent file-backed model. A controlled
         // value makes the wrapper revisit the buffer after every keystroke and
         // is a frequent source of scroll/cursor jitter in large files.
-        defaultValue={tab.content}
+        defaultValue={source}
         loading={<div className="ide-file-loading"><div className="ide-file-loading-spinner" /></div>}
         onChange={(v) => {
           const next = v || "";

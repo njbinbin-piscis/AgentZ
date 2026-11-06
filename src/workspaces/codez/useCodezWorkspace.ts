@@ -37,6 +37,7 @@ import type { FileNode, OpenTab, TabViewMode } from "./types";
 import type { EditorSnapshot, LayoutSnapshot } from "../../services/tauri/workspace";
 import { editorSnapshotFromTabs } from "../../services/tauri/workspace";
 import { isPreviewablePath } from "./FileIcon";
+import { consumeSkipEditorRestore } from "./editorRestoreGuard";
 import { useProjectEdgeActions, useProjectEdgeState } from "../../contexts/ProjectEdgeContext";
 import { normalizeRelPath, shouldWatchPath } from "../../utils/pathFilter";
 import {
@@ -443,7 +444,7 @@ export function useCodezWorkspace({
     }
     setSidebarCollapsed(layout.sidebar_collapsed);
     if (layout.sidebar_width >= 220) setSidebarWidth(layout.sidebar_width);
-    if (layout.explorer_expanded_paths?.length) {
+    if (Array.isArray(layout.explorer_expanded_paths) && layout.explorer_expanded_paths.length) {
       setExplorerExpanded(new Set(layout.explorer_expanded_paths));
       explorerExpandedInitRef.current = true;
     }
@@ -453,12 +454,20 @@ export function useCodezWorkspace({
       setBottomTab(layout.bottom_tab as BottomTab);
     }
     if (layout.bottom_height >= 120) setBottomHeight(layout.bottom_height);
+    if (consumeSkipEditorRestore()) {
+      setTabs([]);
+      setActiveTabPath(null);
+      setFileLoadError(null);
+      return;
+    }
 
     void (async () => {
+      try {
       const restored: OpenTab[] = [];
       let restoreFailed = false;
-      const previewPaths = new Set(editor.preview_paths ?? []);
-      for (const path of editor.open_paths) {
+      const previewPaths = new Set(Array.isArray(editor.preview_paths) ? editor.preview_paths : []);
+      const openPaths = Array.isArray(editor.open_paths) ? editor.open_paths : [];
+      for (const path of openPaths) {
         const fullPath = `${projectDir}/${path}`;
         const dirty = editor.dirty_buffers[path];
         if (isRecoveryPath(path)) {
@@ -480,7 +489,7 @@ export function useCodezWorkspace({
             path,
             name: path.split("/").pop() || path,
             language: fc.language,
-            content: dirty !== undefined ? dirty : fc.content,
+            content: dirty !== undefined ? dirty : String(fc.content ?? ""),
             isDirty: dirty !== undefined,
             isReadOnly: false,
             viewMode: previewPaths.has(path) && isPreviewablePath(path) ? "preview" : "editor",
@@ -515,6 +524,10 @@ export function useCodezWorkspace({
           ? editor.active_path
           : restored[0]?.path ?? null;
       setActiveTabPath(active);
+      } catch (e) {
+        console.error("[AgentZ] editor restore failed", e);
+        setFileLoadError("Some restored files could not be read. Available unsaved buffers have been retained.");
+      }
     })();
   }, [projectDir, workspaceRestore, setTabs]);
 

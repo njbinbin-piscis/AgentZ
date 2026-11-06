@@ -5,6 +5,7 @@ import "./i18n";
 import { initAppearanceTheme, initUiFontScale } from "./theme";
 import { initGraphicsMode } from "./utils/graphicsMode";
 import App from "./App";
+import AppErrorBoundary from "./AppErrorBoundary";
 import "./index.css";
 import "./theme-light-fixes.css";
 
@@ -14,6 +15,8 @@ initGraphicsMode();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </React.StrictMode>,
 );
