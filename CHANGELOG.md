@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.57] - 2026-11-06
+
+### Fixed
+
+- **Restored data of the wrong type no longer blanks the window.** Checkboxes, tags, assistant pickers, text fields, form blocks, options, and buttons are coerced before render. A saved boolean, number, or object is no longer passed to `includes`, `map`, or `trim`. Markdown class names and link URLs are treated as strings. Dropdowns, tag pickers, and team member lists use the same guards.
+
 ## [1.0.56] - 2026-11-06
 
 ### Fixed

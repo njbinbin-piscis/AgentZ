@@ -23,13 +23,15 @@ interface Props {
 const DROPDOWN_CAP = 80;
 
 export default function TagMultiSelect({
-  values,
-  options,
+  values: valuesProp,
+  options: optionsProp,
   onChange,
   placeholder,
   emptyText,
   maxVisible = 8,
 }: Props) {
+  const values = Array.isArray(valuesProp) ? valuesProp.filter((item): item is string => typeof item === "string") : [];
+  const options = Array.isArray(optionsProp) ? optionsProp : [];
   const { t } = useTranslation();
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);

@@ -1,23 +1,25 @@
 import type { ReactNode } from "react";
 import type { UiBlock } from "./protocol";
+import { asString } from "./initValues";
 
 export function ImageBlock({ block }: { block: UiBlock }) {
-  if (!block.url) return null;
+  const url = asString(block.url);
+  if (!url) return null;
   return (
     <figure className="ic-image-wrap">
-      <img className="ic-image" src={block.url} alt={block.alt || block.label || ""} loading="lazy" />
-      {block.label && <figcaption className="ic-image-caption">{block.label}</figcaption>}
+      <img className="ic-image" src={url} alt={asString(block.alt) || asString(block.label)} loading="lazy" />
+      {block.label && <figcaption className="ic-image-caption">{asString(block.label)}</figcaption>}
     </figure>
   );
 }
 
 export function CodePreviewBlock({ block }: { block: UiBlock }) {
-  const lang = block.language || "text";
+  const lang = asString(block.language) || "text";
   return (
     <div className="ic-code-preview">
-      {block.label && <div className="ic-code-label">{block.label}</div>}
+      {block.label && <div className="ic-code-label">{asString(block.label)}</div>}
       <pre className="ic-code-pre">
-        <code className={`language-${lang}`}>{block.content || ""}</code>
+        <code className={`language-${lang}`}>{asString(block.content)}</code>
       </pre>
     </div>
   );
@@ -60,7 +62,7 @@ export function LinkListBlock({
   onSelect: (v: string) => void;
   disabled: boolean;
 }) {
-  const items = block.options ?? [];
+  const items = Array.isArray(block.options) ? block.options : [];
   return (
     <div className="ic-field ic-link-list">
       {block.label && <div className="ic-label">{block.label}</div>}
@@ -103,7 +105,7 @@ export function FilePickerBlock({
       const { open } = await import("@tauri-apps/plugin-dialog");
       const selected = await open({
         multiple: !!block.multiple,
-        filters: block.accept
+        filters: typeof block.accept === "string" && block.accept
           ? [{ name: block.accept, extensions: block.accept.split(",").map((x) => x.trim().replace(/^\./, "")) }]
           : undefined,
       });
@@ -118,7 +120,7 @@ export function FilePickerBlock({
     <div className={`ic-field${error ? " ic-field-error" : ""}`}>
       {block.label && <label className="ic-label">{block.label}</label>}
       <div className="ic-file-picker-row">
-        <input type="text" className="ic-input" readOnly value={value} placeholder={block.placeholder || ""} />
+        <input type="text" className="ic-input" readOnly value={asString(value)} placeholder={block.placeholder || ""} />
         <button type="button" className="ic-btn ic-btn-default" onClick={pick} disabled={disabled}>
           Browse…
         </button>
@@ -135,7 +137,7 @@ export function LayoutBlock({
   block: UiBlock;
   renderChild: (child: UiBlock, index: number) => ReactNode;
 }) {
-  const children = block.blocks ?? [];
+  const children = Array.isArray(block.blocks) ? block.blocks : [];
   const className =
     block.type === "row"
       ? "ic-row"

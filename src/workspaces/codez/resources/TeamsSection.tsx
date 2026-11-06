@@ -11,6 +11,7 @@ import {
   type TeamManifest,
 } from "../../../services/tauri/teams";
 import { onSettingsRefresh } from "../../../services/settingsRefresh";
+import { asStringList } from "../../../components/chat/interactiveUi/initValues";
 import { emptyGraph, validateGraph } from "../../../services/tauri/workflow";
 import WorkflowDesigner from "../settings/WorkflowDesigner";
 import "../settings/StudioTab.css";
@@ -243,9 +244,9 @@ export default function TeamsSection({ view, editId, onEditDone, onWideLayout }:
                   <label key={a.id} className="agentz-studio-check">
                     <input
                       type="checkbox"
-                      checked={(teamForm.members ?? []).includes(a.id)}
+                      checked={asStringList(teamForm.members).includes(a.id)}
                       onChange={() =>
-                        setTeamForm({ ...teamForm, members: toggleInList(teamForm.members ?? [], a.id) })
+                        setTeamForm({ ...teamForm, members: toggleInList(asStringList(teamForm.members), a.id) })
                       }
                     />
                     {a.icon} {a.name}

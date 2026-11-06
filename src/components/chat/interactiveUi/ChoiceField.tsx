@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import DropdownSelect from "../../DropdownSelect";
 import type { UiBlock } from "./protocol";
 import { CUSTOM_OPTION_VALUE } from "./protocol";
+import { asStringList } from "./initValues";
 
 type ChoiceMode = "radio" | "checkbox" | "select";
 
@@ -20,8 +21,8 @@ export function ChoiceField({ block, mode, value, onChange, disabled, error }: C
   const allowCustom = !!block.allow_custom;
   const customLabel = block.custom_label || t("chat.interactiveOther", { defaultValue: "Other" });
 
-  const stringValue = mode === "checkbox" ? "" : (value as string) ?? "";
-  const arrayValue = mode === "checkbox" ? ((value as string[]) ?? []) : [];
+  const stringValue = mode === "checkbox" ? "" : typeof value === "string" ? value : "";
+  const arrayValue = mode === "checkbox" ? asStringList(value) : [];
 
   const usingCustom =
     mode === "checkbox"
@@ -58,7 +59,7 @@ export function ChoiceField({ block, mode, value, onChange, disabled, error }: C
     }
   };
 
-  const options = block.options ?? [];
+  const options = Array.isArray(block.options) ? block.options : [];
 
   return (
     <div className={`ic-field${error ? " ic-field-error" : ""}`}>

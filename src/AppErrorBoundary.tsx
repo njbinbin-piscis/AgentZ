@@ -3,18 +3,20 @@ import { requestSkipEditorRestore } from "./workspaces/codez/editorRestoreGuard"
 
 interface State {
   error: Error | null;
+  stack: string;
 }
 
 /** Last resort when a restored file crashes the tree and leaves #root empty. */
 export default class AppErrorBoundary extends Component<{ children: ReactNode }, State> {
-  state: State = { error: null };
+  state: State = { error: null, stack: "" };
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Pick<State, "error"> {
     return { error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[AgentZ] window render failed", error, info);
+    console.error("[AgentZ] window render failed", error, info.componentStack);
+    this.setState({ stack: info.componentStack ?? "" });
   }
 
   render() {
@@ -40,6 +42,9 @@ export default class AppErrorBoundary extends Component<{ children: ReactNode },
             : "A file or preview from the last session crashed the window. You can reopen the project without those files."}
         </p>
         <pre style={{ whiteSpace: "pre-wrap", opacity: 0.7 }}>{this.state.error.message}</pre>
+        {this.state.stack && (
+          <pre style={{ whiteSpace: "pre-wrap", opacity: 0.55, fontSize: 12 }}>{this.state.stack}</pre>
+        )}
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button type="button" onClick={() => window.location.reload()}>
             {zh ? "重新加载" : "Reload"}

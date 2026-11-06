@@ -23,6 +23,7 @@ import {
   ProgressBlock,
 } from "./interactiveUi/DisplayBlocks";
 import { collectValueBlocks, wizardStepCount, wizardStepLabel } from "./interactiveUi/flatten";
+import { asBlockList, asString, asStringList } from "./interactiveUi/initValues";
 import { buildInitialValuesFromDefinition, normalizeSubmittedValues } from "./interactiveUi/initValues";
 import { mergeDataModel } from "./interactiveUi/patch";
 import {
@@ -192,11 +193,11 @@ export default function InteractiveCard({
   ]);
 
   const activeBlocks = useMemo(() => {
-    if (isWizard && uiDefinition.steps?.length) {
+    if (isWizard && Array.isArray(uiDefinition.steps) && uiDefinition.steps.length) {
       const step = uiDefinition.steps[wizardStep];
-      return [...(step?.blocks ?? []), ...(uiDefinition.blocks ?? [])];
+      return [...asBlockList(step?.blocks), ...asBlockList(uiDefinition.blocks)];
     }
-    return uiDefinition.blocks ?? [];
+    return asBlockList(uiDefinition.blocks);
   }, [uiDefinition, isWizard, wizardStep]);
 
   const valueBlocks = useMemo(
@@ -338,7 +339,7 @@ export default function InteractiveCard({
             <LinkListBlock
               key={key}
               block={block}
-              value={(values[block.id!] as string) ?? ""}
+              value={asString(values[block.id!])}
               onSelect={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
             />
@@ -348,7 +349,7 @@ export default function InteractiveCard({
             <FilePickerBlock
               key={key}
               block={block}
-              value={(values[block.id!] as string) ?? ""}
+              value={asString(values[block.id!])}
               onChange={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
               error={fieldError}
@@ -360,7 +361,7 @@ export default function InteractiveCard({
               key={key}
               block={block}
               mode="radio"
-              value={(values[block.id!] as string) ?? ""}
+              value={asString(values[block.id!])}
               onChange={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
               error={fieldError}
@@ -372,7 +373,7 @@ export default function InteractiveCard({
               key={key}
               block={block}
               mode="checkbox"
-              value={(values[block.id!] as string[]) ?? []}
+              value={asStringList(values[block.id!])}
               onChange={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
               error={fieldError}
@@ -384,7 +385,7 @@ export default function InteractiveCard({
               key={key}
               block={block}
               mode="select"
-              value={(values[block.id!] as string) ?? ""}
+              value={asString(values[block.id!])}
               onChange={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
               error={fieldError}
@@ -395,7 +396,7 @@ export default function InteractiveCard({
             <TextInputBlock
               key={key}
               block={block}
-              value={(values[block.id!] as string) ?? ""}
+              value={asString(values[block.id!])}
               onChange={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
               error={fieldError}
@@ -441,7 +442,7 @@ export default function InteractiveCard({
             <DateTimeBlock
               key={key}
               block={block}
-              value={(values[block.id!] as string) ?? ""}
+              value={asString(values[block.id!])}
               onChange={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
               error={fieldError}
@@ -452,7 +453,7 @@ export default function InteractiveCard({
             <TagsBlock
               key={key}
               block={block}
-              value={(values[block.id!] as string[]) ?? []}
+              value={asStringList(values[block.id!])}
               onChange={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
               error={fieldError}
@@ -463,7 +464,7 @@ export default function InteractiveCard({
             <AssistantPickerBlock
               key={key}
               block={block}
-              value={(values[block.id!] as string[]) ?? []}
+              value={asStringList(values[block.id!])}
               onChange={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
               error={fieldError}
@@ -474,7 +475,7 @@ export default function InteractiveCard({
             <ProjectPickerBlock
               key={key}
               block={block}
-              value={(values[block.id!] as string) ?? ""}
+              value={asString(values[block.id!])}
               onChange={(v) => updateValue(block.id!, v)}
               disabled={formLocked || !!block.disabled}
               error={fieldError}

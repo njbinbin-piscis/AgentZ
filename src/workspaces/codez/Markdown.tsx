@@ -228,9 +228,10 @@ function Markdown({
   /** Optional handler when user clicks a `path/to/file.ext:line` code anchor. */
   onOpenSourceAnchor?: (anchor: { path: string; line: number; endLine?: number }) => void;
 }) {
+  const source = typeof content === "string" ? content : "";
   const fallback = (
     <pre className="agentz-markdown-fallback">
-      <code>{content}</code>
+      <code>{source}</code>
     </pre>
   );
 
@@ -245,17 +246,18 @@ function Markdown({
             rehypeKatex,
             rehypeHighlight,
           ]}
-          urlTransform={(url) =>
-            url.startsWith("file://") ||
-            url.startsWith("http://") ||
-            url.startsWith("https://") ||
-            url.startsWith("mailto:") ||
-            url.startsWith("#") ||
-            url.startsWith("/") ||
-            !url.includes(":")
-              ? url
-              : ""
-          }
+          urlTransform={(url) => {
+            const href = typeof url === "string" ? url : "";
+            return href.startsWith("file://") ||
+            href.startsWith("http://") ||
+            href.startsWith("https://") ||
+            href.startsWith("mailto:") ||
+            href.startsWith("#") ||
+            href.startsWith("/") ||
+            !href.includes(":")
+              ? href
+              : "";
+          }}
           components={{
             a: ({ children, href, target, ...props }) => {
               const opensNewWindow = target === "_blank" || /^https?:/i.test(href ?? "");
@@ -273,9 +275,15 @@ function Markdown({
             pre: ({ children }) => <>{children}</>,
             code: ({ className, children, ...props }) => {
               const text = extractText(children).replace(/\n$/, "");
-              const match = /language-([\w-]+)/.exec(className || "");
+              const rawClass = className as unknown;
+              const classText = typeof rawClass === "string"
+                ? rawClass
+                : Array.isArray(rawClass)
+                  ? rawClass.filter((item) => typeof item === "string").join(" ")
+                  : "";
+              const match = /language-([\w-]+)/.exec(classText);
               const lang = match?.[1]?.toLowerCase();
-              const isBlock = Boolean(className?.includes("language-") || text.includes("\n"));
+              const isBlock = Boolean(classText.includes("language-") || text.includes("\n"));
 
               if (isBlock) {
                 if (lang === "mermaid") {
@@ -355,7 +363,7 @@ function Markdown({
             ),
           }}
         >
-          {content}
+          {source}
         </ReactMarkdown>
       </RenderErrorBoundary>
     </div>

@@ -56,8 +56,8 @@ export interface DropdownSelectProps {
 
 /** Theme-aware single-select menu (replaces native `<select>` popup styling). */
 export default function DropdownSelect({
-  value,
-  options,
+  value: valueProp,
+  options: optionsProp,
   onChange,
   variant = "field",
   placement,
@@ -69,6 +69,8 @@ export default function DropdownSelect({
   icon,
   accentWhenSet,
 }: DropdownSelectProps) {
+  const value = typeof valueProp === "string" ? valueProp : "";
+  const options = Array.isArray(optionsProp) ? optionsProp : [];
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -187,8 +189,8 @@ export interface DropdownMultiSelectProps {
 
 /** Multi-select skills-style menu (CodeZ / WorkZ composer). */
 export function DropdownMultiSelect({
-  options,
-  selected,
+  options: optionsProp,
+  selected: selectedProp,
   onChange,
   label,
   disabled,
@@ -196,6 +198,8 @@ export function DropdownMultiSelect({
   onEmptyHintClick,
   icon,
 }: DropdownMultiSelectProps & { icon?: ReactNode }) {
+  const options = Array.isArray(optionsProp) ? optionsProp : [];
+  const selected = Array.isArray(selectedProp) ? selectedProp.filter((item): item is string => typeof item === "string") : [];
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);

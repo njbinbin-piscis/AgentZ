@@ -43,6 +43,7 @@ function MermaidBlock({ code }: { code: string }) {
 }
 
 export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
+  const source = typeof content === "string" ? content : "";
   return (
     <div className="agentz-md-preview">
       <ReactMarkdown
@@ -51,14 +52,20 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
         components={{
           code({ className, children, ...props }) {
             const text = String(children).replace(/\n$/, "");
-            const match = /language-(\w+)/.exec(className || "");
+            const rawClass = className as unknown;
+            const classText = typeof rawClass === "string"
+              ? rawClass
+              : Array.isArray(rawClass)
+                ? rawClass.filter((item) => typeof item === "string").join(" ")
+                : "";
+            const match = /language-(\w+)/.exec(classText);
             const lang = match?.[1]?.toLowerCase();
 
             if (lang === "mermaid") {
               return <MermaidBlock code={text} />;
             }
 
-            const isBlock = className?.includes("language-") || text.includes("\n");
+            const isBlock = classText.includes("language-") || text.includes("\n");
             if (isBlock) {
               return (
                 <pre className={className}>
@@ -74,7 +81,7 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
           },
         }}
       >
-        {content}
+        {source}
       </ReactMarkdown>
     </div>
   );

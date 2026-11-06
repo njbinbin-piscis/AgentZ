@@ -3,9 +3,10 @@ import { useTranslation } from "react-i18next";
 import DropdownSelect from "../../DropdownSelect";
 import Markdown from "../../../workspaces/codez/Markdown";
 import type { UiBlock, UiButton } from "./protocol";
+import { asString, asStringList } from "./initValues";
 
 export function TextBlock({ block }: { block: UiBlock }) {
-  const content = block.content || "";
+  const content = asString(block.content);
   if (!content.trim()) return null;
   return (
     <div className="ic-text">
@@ -29,7 +30,7 @@ export function SectionBlock({
           <Markdown content={block.description} compact />
         </div>
       )}
-      {renderChild && block.blocks?.map((child, i) => renderChild(child, i))}
+      {renderChild && (Array.isArray(block.blocks) ? block.blocks : []).map((child, i) => renderChild(child, i))}
     </div>
   );
 }
@@ -228,23 +229,24 @@ export function TagsBlock({
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState("");
-  const suggestions = new Set(block.options?.map((o) => o.value) ?? []);
+  const tags = asStringList(value);
+  const suggestions = new Set((Array.isArray(block.options) ? block.options : []).map((o) => o.value));
 
   const addTag = (raw: string) => {
     const tag = raw.trim();
-    if (!tag || value.includes(tag)) return;
-    if (typeof block.max === "number" && value.length >= block.max) return;
-    onChange([...value, tag]);
+    if (!tag || tags.includes(tag)) return;
+    if (typeof block.max === "number" && tags.length >= block.max) return;
+    onChange([...tags, tag]);
     setDraft("");
   };
 
-  const removeTag = (tag: string) => onChange(value.filter((x) => x !== tag));
+  const removeTag = (tag: string) => onChange(tags.filter((x) => x !== tag));
 
   return (
     <div className={`ic-field${error ? " ic-field-error" : ""}`}>
       {block.label && <label className="ic-label">{block.label}</label>}
       <div className="ic-tags">
-        {value.map((tag) => (
+        {tags.map((tag) => (
           <span key={tag} className="ic-tag">
             {tag}
             {!disabled && (
@@ -283,14 +285,14 @@ export function TagsBlock({
           ))}
         </datalist>
       )}
-      {block.options && block.options.length > 0 && (
+      {Array.isArray(block.options) && block.options.length > 0 && (
         <div className="ic-tag-suggestions">
           {block.options.map((opt) => (
             <button
               key={opt.value}
               type="button"
               className="ic-tag-suggestion"
-              disabled={disabled || value.includes(opt.value)}
+              disabled={disabled || tags.includes(opt.value)}
               onClick={() => addTag(opt.value)}
             >
               {opt.label}
@@ -317,16 +319,17 @@ export function AssistantPickerBlock({
   error?: string;
 }) {
   const { t } = useTranslation();
-  const options =
-    block.options?.map((o) => ({ id: o.value, name: o.label, description: o.description ?? "" })) ??
-    (block.suggestions ?? []).map((id) => ({ id, name: id, description: "" }));
+  const selected = asStringList(value);
+  const optionList = Array.isArray(block.options)
+    ? block.options.map((o) => ({ id: o.value, name: o.label, description: o.description ?? "" }))
+    : (Array.isArray(block.suggestions) ? block.suggestions : []).map((id) => ({ id, name: id, description: "" }));
 
   const toggle = (id: string) => {
-    const has = value.includes(id);
-    if (has) onChange(value.filter((x) => x !== id));
+    const has = selected.includes(id);
+    if (has) onChange(selected.filter((x) => x !== id));
     else {
-      if (typeof block.max === "number" && value.length >= block.max) return;
-      onChange([...value, id]);
+      if (typeof block.max === "number" && selected.length >= block.max) return;
+      onChange([...selected, id]);
     }
   };
 
@@ -334,11 +337,11 @@ export function AssistantPickerBlock({
     <fieldset className={`ic-fieldset${error ? " ic-field-error" : ""}`}>
       {block.label && <legend className="ic-legend">{block.label}</legend>}
       <div className="ic-koi-grid">
-        {options.map((k) => (
+        {optionList.map((k) => (
           <button
             key={k.id}
             type="button"
-            className={`ic-koi-card${value.includes(k.id) ? " ic-koi-selected" : ""}`}
+            className={`ic-koi-card${selected.includes(k.id) ? " ic-koi-selected" : ""}`}
             onClick={() => !disabled && toggle(k.id)}
             disabled={disabled}
           >
@@ -346,7 +349,7 @@ export function AssistantPickerBlock({
             {k.description && <span className="ic-koi-desc">{k.description}</span>}
           </button>
         ))}
-        {options.length === 0 && (
+        {optionList.length === 0 && (
           <span className="ic-muted">{t("chat.interactiveNoOptions", { defaultValue: "No options" })}</span>
         )}
       </div>
@@ -368,7 +371,7 @@ export function ProjectPickerBlock({
   disabled: boolean;
   error?: string;
 }) {
-  const options = block.options ?? [];
+  const options = Array.isArray(block.options) ? block.options : [];
 
   return (
     <div className={`ic-field${error ? " ic-field-error" : ""}`}>
@@ -402,7 +405,7 @@ export function ActionsBlock({
   disabled: boolean;
   submitting: boolean;
 }) {
-  const buttons = block.buttons?.length
+  const buttons = Array.isArray(block.buttons) && block.buttons.length
     ? block.buttons
     : [
         {
