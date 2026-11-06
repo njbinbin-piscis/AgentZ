@@ -9,6 +9,15 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      only:
+        description: Platforms to build
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - macos
 
 # tauri-action creates/updates the GitHub Release and uploads bundle assets.
 # Keep this at workflow scope as well as the per-job declarations below: it
@@ -45,6 +54,7 @@ jobs:
   # ── Linux (x86_64) ────────────────────────────────────────────────
   bundle-linux-x86_64:
     needs: release-readiness
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     name: Bundle Linux x86_64 (.deb + AppImage)
     runs-on: ubuntu-22.04
     timeout-minutes: 120
@@ -118,6 +128,7 @@ jobs:
   # x86_64 requires a full sysroot and breaks pkg-config without it.
   bundle-linux-aarch64:
     needs: release-readiness
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     name: Bundle Linux aarch64 (.deb + AppImage)
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
@@ -189,6 +200,7 @@ jobs:
   # ── Windows (x86_64) ─────────────────────────────────────────────
   bundle-windows-x86_64:
     needs: release-readiness
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     name: Bundle Windows x86_64 (NSIS .exe)
     runs-on: windows-latest
     timeout-minutes: 120
@@ -245,6 +257,7 @@ jobs:
   # Native build on GitHub's Windows ARM runner (Snapdragon / ARM64 PCs).
   bundle-windows-aarch64:
     needs: release-readiness
+    if: github.event_name != 'workflow_dispatch' || inputs.only == 'all'
     name: Bundle Windows aarch64 (NSIS .exe)
     runs-on: windows-11-arm
     timeout-minutes: 120
@@ -300,12 +313,13 @@ jobs:
   # ── macOS (x86_64 / Intel) ───────────────────────────────────────
   # Disabled: macos-13 runners are often unavailable (workflow stuck queued).
   # Use bundle-macos-universal instead (Intel + Apple Silicon in one .dmg).
+  # macos-14 was retired on 2026-11-02; both jobs run on macos-15 (Apple Silicon).
 
   # ── macOS (aarch64 / Apple Silicon) ──────────────────────────────
   bundle-macos-aarch64:
     needs: release-readiness
     name: Bundle macOS aarch64 (.dmg + .app)
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 120
     permissions:
       contents: write
@@ -364,7 +378,7 @@ jobs:
   bundle-macos-universal:
     needs: release-readiness
     name: Bundle macOS Universal (.dmg + .app)
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 150
     permissions:
       contents: write
