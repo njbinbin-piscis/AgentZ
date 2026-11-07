@@ -1604,14 +1604,6 @@ const zh = {
     merging: "合并中…",
     mergeOk: "已合并到 {{base}}。",
     mergeFail: "合并失败：{{msg}}",
-    rollbackSnapshot: "撤销本任务的文件改动",
-    rollbackSnapshotOk:
-      "已还原 {{restored}} 个文件，删除 {{deleted}} 个，保留任务新建的 {{kept}} 个。操作前的文件已备份到：{{backup}}",
-    rollbackNothing: "没有可撤销的文件改动。",
-    rollbackConfirm:
-      "这会把本任务修改过的 {{modified}} 个文件还原成任务开始前的内容。本任务新建了 {{created}} 个文件。\n\n操作前会先把这些文件当前的内容备份到项目的 .agentz/rollback-backups 文件夹。\n\n是否继续？",
-    rollbackDeleteCreated:
-      "是否同时删除本任务新建的 {{count}} 个文件？\n{{examples}}\n\n选“是”：删除（仍会先备份）。\n选“否”：保留这些文件。",
     rollbackTurn: "撤销本轮文件修改",
     rollbackTurnConfirm: "撤销这一轮智能体对文件的改动？\n\n被改过的文件会还原成改动前的内容，这一轮新建的文件会被删除。操作前会先把这些文件当前的内容备份到项目的 .agentz/rollback-backups 文件夹。",
     reviewUndoSome: "撤销选中的 {{count}} 个文件的改动？\n\n被改过的文件会还原，智能体新建的文件会被删除。操作前会先备份到项目的 .agentz/rollback-backups 文件夹。",

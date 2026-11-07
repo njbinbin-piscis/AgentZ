@@ -1654,14 +1654,6 @@ const en = {
     merging: "Merging…",
     mergeOk: "Merged into {{base}}.",
     mergeFail: "Merge failed: {{msg}}",
-    rollbackSnapshot: "Undo this task's file changes",
-    rollbackSnapshotOk:
-      "Restored {{restored}} file(s), deleted {{deleted}}, kept {{kept}} file(s) the task created. Files were backed up first to: {{backup}}",
-    rollbackNothing: "There are no file changes to undo.",
-    rollbackConfirm:
-      "This puts the {{modified}} file(s) this task modified back to their content before the task. The task created {{created}} file(s).\n\nThe current content of these files is copied first to the project's .agentz/rollback-backups folder.\n\nContinue?",
-    rollbackDeleteCreated:
-      "Also delete the {{count}} file(s) this task created?\n{{examples}}\n\nYes: delete them (a backup is still made first).\nNo: keep them.",
     rollbackTurn: "Undo turn file edits",
     rollbackTurnConfirm: "Undo the agent's file edits from this turn?\n\nModified files go back to their content before the turn, and files the turn created are deleted. The current content of these files is first backed up to the project's .agentz/rollback-backups folder.",
     reviewUndoSome: "Undo the changes to the {{count}} selected file(s)?\n\nModified files are restored and files the agent created are deleted. They are first backed up to the project's .agentz/rollback-backups folder.",

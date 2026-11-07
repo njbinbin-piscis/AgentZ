@@ -12,6 +12,8 @@ import {
   SESSION_SOURCES_PROJECT_SHARED,
   getMessages,
   deleteSession,
+  forkSession,
+  restoreCheckpoint,
   journalListPending,
   type AgentEvent,
   type ChatAttachment,
@@ -1574,6 +1576,44 @@ export function useWorkzSessionStore({
     [sameScope, openTask, scopeForDir],
   );
 
+  /** Branch the conversation at a message into a new task; the original is untouched. */
+  const forkFromCheckpoint = useCallback(
+    async (messageId: string, fullHistory: boolean) => {
+      const sid = sessionRef.current;
+      if (!sid || !projectDir || busy) return;
+      try {
+        const forked = await forkSession(sid, projectDir, undefined, messageId, fullHistory);
+        refreshTasks();
+        await openTask(forked.id);
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [busy, projectDir, refreshTasks, openTask],
+  );
+
+  /** Rewind this task to a message. Always confirmed; the removed messages are backed up first. */
+  const restoreToCheckpoint = useCallback(
+    async (messageId: string) => {
+      const sid = sessionRef.current;
+      if (!sid || !projectDir || busy) return;
+      const title = t("chat.checkpointRestoreTitle");
+      if (!(await confirmDialog(t("chat.checkpointRestoreConfirm"), { title }))) return;
+      // A task running in its own worktree keeps its edits there, where the
+      // project journal does not reach, so only offer file rollback otherwise.
+      const restoreFiles = worktree ? false : await confirmDialog(t("chat.checkpointRestoreFiles"), { title });
+      try {
+        await restoreCheckpoint(sid, messageId, projectDir, restoreFiles);
+        foregroundSessionRef.current = null;
+        await openTask(sid);
+        refreshGitChanges();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [busy, projectDir, worktree, openTask, refreshGitChanges, t],
+  );
+
   const lastInboxRequest = useRef<number | null>(null);
   useEffect(() => {
     if (!openTaskRequest || lastInboxRequest.current === openTaskRequest.nonce) return;
@@ -1916,6 +1956,6 @@ export function useWorkzSessionStore({
   }, [agents, t]);
 
   return {
-    t, i18n, panelRef, dragOver, toast, overview, projectDir, tasks, groups, groupErrors, collapsed, selectedId, runningIds, toggleGroup, openSession, newSessionIn, deleteSessionIn, addProject, removeProject, previewPath, isFree, freeTaskWorkspace, isSwarmTeam, swarmMainTab, setSwarmMainTab, activePoolId, scrollRef, steps, busy, sessionRef, pendingCards, permissionRequest, setPermissionRequest, markSubmitted, markActionSent, cards, restoreCard, setGoal, taskBound, setIsolate, taRef, refreshGitChanges, showToast, setError, worktree, setPreviewPath, error, planItems, setPlanItems, taskPanelOpen, setTaskPanelOpen, managedWorkspace, cwdOptions, changeCwd, isolate, startMode, setStartMode, startBase, setStartBase, teams, activeTeam, selectedTeam, teamOptions, handleTeamChange, agents, activeAgentId, agentOptions, handleAgentChange, setBoardOpen, isWorkflowTeam, workflowRunId, setWorkflowRunId, workflowStatus, setWorkflowStatus, setWorkflowOpen, setRunsOpen, setReviewTask, goal, detectAtMention, detectSlash, run, stopActive, canSend, queuedView, removeQueued, interruptQueued, steerQueued, editQueued, onKeyDown, handlePaste, modelId, modelOptions, setModelId, showModelSelector, showGenericComposerTools, installedSkills, enabledSkills, setEnabledSkills, connectors, enabledConnectors, setEnabledConnectors, mention, mentionMatches, pickMention, slash, slashMatches, pickSlash, slashLabel, composerModeNotice, attachment, attachmentPreview, handleAttach, clearAttachment, boardOpen, workflowOpen, runsOpen, reviewTask, refreshTasks,
+    t, i18n, panelRef, dragOver, toast, overview, projectDir, tasks, groups, groupErrors, collapsed, selectedId, runningIds, toggleGroup, openSession, forkFromCheckpoint, restoreToCheckpoint, newSessionIn, deleteSessionIn, addProject, removeProject, previewPath, isFree, freeTaskWorkspace, isSwarmTeam, swarmMainTab, setSwarmMainTab, activePoolId, scrollRef, steps, busy, sessionRef, pendingCards, permissionRequest, setPermissionRequest, markSubmitted, markActionSent, cards, restoreCard, setGoal, taskBound, setIsolate, taRef, refreshGitChanges, showToast, setError, worktree, setPreviewPath, error, planItems, setPlanItems, taskPanelOpen, setTaskPanelOpen, managedWorkspace, cwdOptions, changeCwd, isolate, startMode, setStartMode, startBase, setStartBase, teams, activeTeam, selectedTeam, teamOptions, handleTeamChange, agents, activeAgentId, agentOptions, handleAgentChange, setBoardOpen, isWorkflowTeam, workflowRunId, setWorkflowRunId, workflowStatus, setWorkflowStatus, setWorkflowOpen, setRunsOpen, setReviewTask, goal, detectAtMention, detectSlash, run, stopActive, canSend, queuedView, removeQueued, interruptQueued, steerQueued, editQueued, onKeyDown, handlePaste, modelId, modelOptions, setModelId, showModelSelector, showGenericComposerTools, installedSkills, enabledSkills, setEnabledSkills, connectors, enabledConnectors, setEnabledConnectors, mention, mentionMatches, pickMention, slash, slashMatches, pickSlash, slashLabel, composerModeNotice, attachment, attachmentPreview, handleAttach, clearAttachment, boardOpen, workflowOpen, runsOpen, reviewTask, refreshTasks,
   };
 }

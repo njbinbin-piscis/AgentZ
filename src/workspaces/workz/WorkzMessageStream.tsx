@@ -13,6 +13,7 @@ const NOOP_RESTORE = () => {};
 import type { InteractiveCardState } from "../../hooks/useInteractiveCards";
 import ToolTrace, { interleaveTools } from "../../components/ToolTrace";
 import Markdown from "../codez/Markdown";
+import { ForkMenu } from "../codez/AssistantMessageList";
 import PoolActivityFeed from "./PoolActivityFeed";
 import WorkzEmptyState, { type WorkzStarterScenario } from "./WorkzEmptyState";
 import type { AgentStep } from "./agentArtifacts";
@@ -47,6 +48,8 @@ export interface WorkzMessageStreamProps {
   onSteerQueued?: (index: number) => void;
   onEditQueued?: (index: number) => void;
   onRemoveQueued?: (index: number) => void;
+  onForkCheckpoint?: (messageId: string, fullHistory: boolean) => void | Promise<void>;
+  onRestoreCheckpoint?: (messageId: string) => void | Promise<void>;
 }
 
 export default function WorkzMessageStream({
@@ -78,6 +81,8 @@ export default function WorkzMessageStream({
   onSteerQueued,
   onEditQueued,
   onRemoveQueued,
+  onForkCheckpoint,
+  onRestoreCheckpoint,
 }: WorkzMessageStreamProps) {
   const { t } = useTranslation();
   const chatUiItems = useMemo(
@@ -185,6 +190,21 @@ export default function WorkzMessageStream({
                       {t("agent.working")}
                     </div>
                   ) : null}
+                  {m.role === "assistant" && m.id && !busy && onForkCheckpoint && onRestoreCheckpoint && (
+                    <div className="agentz-checkpoint">
+                      <span className="agentz-checkpoint-label">{t("chat.checkpoint")}</span>
+                      <ForkMenu onFork={(fullHistory) => void onForkCheckpoint(m.id!, fullHistory)} />
+                      <button
+                        type="button"
+                        data-testid={`workz-restore-${m.id}`}
+                        className="agentz-checkpoint-btn muted"
+                        onClick={() => void onRestoreCheckpoint(m.id!)}
+                        title={t("chat.checkpointRestore")}
+                      >
+                        {t("chat.checkpointRestore")}
+                      </button>
+                    </div>
+                  )}
                   {m.role === "assistant" && m.turnId && !isStreamingLast && projectDir && (
                     <div className="agentz-workz-turn-actions">
                       <button

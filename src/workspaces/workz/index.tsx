@@ -153,6 +153,8 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
             onSteerQueued={s.steerQueued}
             onEditQueued={s.editQueued}
             onRemoveQueued={s.removeQueued}
+            onForkCheckpoint={s.forkFromCheckpoint}
+            onRestoreCheckpoint={s.restoreToCheckpoint}
           />
           {s.previewPath === BROWSER_TAB_PATH && s.selectedId && (
             <div className="agentz-workz-preview browser">
@@ -252,9 +254,7 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
           onOpenFile={(path) => s.setPreviewPath(path)}
           onOpenReview={(wt) => s.setReviewTask(wt)}
           selectedId={s.selectedId}
-          hasSteps={s.steps.length > 0}
           onShowToast={s.showToast}
-          onSetError={s.setError}
           goal={s.goal}
           onGoalChange={(value, caret) => {
             s.setGoal(value);

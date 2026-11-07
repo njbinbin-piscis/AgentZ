@@ -247,8 +247,6 @@ pub fn run() {
             commands::agent_task::agent_task_merge_preview,
             commands::agent_task::agent_task_discard,
             commands::agent_task::agent_task_open_pr,
-            commands::agent_task::agent_task_rollback_snapshot,
-            commands::agent_task::agent_task_rollback_preview,
             // Embedded browser panel (CDP via chromiumoxide)
             commands::browser::browser_navigate,
             commands::browser::browser_list_tabs,

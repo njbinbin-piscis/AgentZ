@@ -1,11 +1,10 @@
 import { useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { confirmDialog } from "../../services/tauri/confirm";
 import ChatComposer from "../../components/ChatComposer";
 import DropdownSelect, { type DropdownOption } from "../../components/DropdownSelect";
 import { CODEBASE_MENTION, GRAPH_MENTION } from "../../hooks/useAtMention";
 import type { SlashCommandInfo } from "../../services/tauri/slashCommands";
-import { agentTaskApi, type AgentTaskInfo } from "../../services/tauri/agentTask";
+import { type AgentTaskInfo } from "../../services/tauri/agentTask";
 import type { ChatAttachment } from "../../services/tauri/chat";
 import type { InstalledSkill } from "../../services/tauri/workbench";
 import type { ConnectorInfo } from "../../services/tauri/connectors";
@@ -52,9 +51,7 @@ export interface WorkzComposerBarProps {
   selectedId: string | null;
   onOpenBrowser?: () => void;
   onOpenFile?: (path: string) => void;
-  hasSteps: boolean;
   onShowToast: (msg: string) => void;
-  onSetError: (err: string) => void;
   goal: string;
   onGoalChange: (value: string, caret?: number) => void;
   onRun: () => void;
@@ -126,9 +123,7 @@ export default function WorkzComposerBar({
   selectedId,
   onOpenBrowser,
   onOpenFile,
-  hasSteps,
   onShowToast,
-  onSetError,
   goal,
   onGoalChange,
   onRun,
@@ -369,56 +364,6 @@ export default function WorkzComposerBar({
               title={worktree.branch}
             >
               {t("agent.review")}
-            </button>
-          )}
-          {!worktree && selectedId && projectDir && hasSteps && (
-            <button
-              type="button"
-              className="agentz-workz-review-btn"
-              data-testid="workz-rollback-snapshot-btn"
-              disabled={busy}
-              onClick={async () => {
-                try {
-                  const items = await agentTaskApi.rollbackPreview(projectDir, selectedId);
-                  const created = items.filter((item) => item.created);
-                  const modified = items.length - created.length;
-                  if (items.length === 0) {
-                    onShowToast(t("agent.rollbackNothing"));
-                    return;
-                  }
-                  const go = await confirmDialog(
-                    t("agent.rollbackConfirm", { modified, created: created.length }),
-                    { title: t("agent.rollbackSnapshot") },
-                  );
-                  if (!go) return;
-                  // Deleting files the task created is a separate, explicit choice.
-                  const deleteCreated =
-                    created.length > 0 &&
-                    (await confirmDialog(
-                      t("agent.rollbackDeleteCreated", {
-                        count: created.length,
-                        examples: created
-                          .slice(0, 5)
-                          .map((item) => item.path)
-                          .join("\n"),
-                      }),
-                      { title: t("agent.rollbackSnapshot") },
-                    ));
-                  const out = await agentTaskApi.rollbackSnapshot(projectDir, selectedId, deleteCreated);
-                  onShowToast(
-                    t("agent.rollbackSnapshotOk", {
-                      restored: out.restored.length,
-                      deleted: out.deleted.length,
-                      kept: out.kept_created.length,
-                      backup: out.backup_dir ?? "-",
-                    }),
-                  );
-                } catch (e) {
-                  onSetError(String(e));
-                }
-              }}
-            >
-              {t("agent.rollbackSnapshot")}
             </button>
           )}
         </div>

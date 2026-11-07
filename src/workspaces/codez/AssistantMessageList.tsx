@@ -63,7 +63,7 @@ const LOAD_MORE = 10;
 /** Distance from the top (px) that trips the lazy-load of older messages. */
 const LOAD_AT_TOP_PX = 40;
 
-function ForkMenu({ onFork }: { onFork: (fullHistory: boolean) => void }) {
+export function ForkMenu({ onFork }: { onFork: (fullHistory: boolean) => void }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
