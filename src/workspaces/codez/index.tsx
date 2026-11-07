@@ -1,4 +1,5 @@
 import { useRef, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { revealInFolder } from "../../services/tauri";
 import type { PickedElement } from "../../services/tauri/browser";
@@ -90,6 +91,7 @@ export interface IDEProps {
 }
 
 export default function CodeZWorkspace(props: IDEProps) {
+  const { t } = useTranslation();
   const {
     projectDir,
     onOpenFolder,
@@ -363,32 +365,27 @@ export default function CodeZWorkspace(props: IDEProps) {
               />
             ) : s.activeTab && isRecoveryPath(s.activeTab.path) ? (
               <section
-                aria-label="Recovered unsaved draft"
+                aria-label={t("ide.recoveredDraft")}
                 style={{ padding: 16, overflow: "auto", height: "100%" }}
               >
-                <h3>Recovered unsaved draft</h3>
-                <p>Original file: {recoveryOriginalPath(s.activeTab.path) ?? "Unknown"}</p>
-                <p>
-                  This read-only copy preserves an older draft. Copy the text to review it; the
-                  current file has not been replaced.
-                </p>
+                <h3>{t("ide.recoveredDraft")}</h3>
+                <p>{t("ide.recoveredDraftOriginal", { path: recoveryOriginalPath(s.activeTab.path) ?? t("ide.recoveredDraftUnknown") })}</p>
+                <p>{t("ide.recoveredDraftBody")}</p>
                 <button
                   type="button"
                   onClick={() => {
                     void navigator.clipboard
                       .writeText(s.activeTab!.content)
                       .catch(() =>
-                        s.setFileLoadError(
-                          "Could not copy the recovered draft. Select and copy its text manually.",
-                        ),
+                        s.setFileLoadError(t("ide.recoveredDraftCopyFailed")),
                       );
                   }}
                 >
-                  Copy draft
+                  {t("ide.recoveredDraftCopy")}
                 </button>
                 <textarea
                   readOnly
-                  aria-label="Recovered draft text"
+                  aria-label={t("ide.recoveredDraftText")}
                   value={s.activeTab.content}
                   style={{ width: "100%", height: "70%", display: "block", marginTop: 12 }}
                 />

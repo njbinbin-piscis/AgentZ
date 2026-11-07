@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.59] - 2026-11-07
+
+### Fixed
+
+- **Queued message buttons stay visible on hover.** Hover tints the background and the icon. Delete turns red. Interrupt, steer, and edit turn light blue, including on the light theme.
+
+### Changed
+
+- **More interface text follows the selected language.** Search toggles, code copy, inline edit, recovered drafts, test runs, permission cards, the debugger, notebooks, notifications, and extension empty states now have English and Chinese strings.
+
 ## [1.0.58] - 2026-11-06
 
 ### Fixed

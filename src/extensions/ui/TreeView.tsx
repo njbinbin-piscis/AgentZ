@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import type { TreeItemDto } from "../common/dto";
 import { extensionService } from "../extensionService";
 
@@ -50,6 +51,7 @@ interface TreeViewProps {
 
 /** Renders a contributed vscode.TreeView, pulling children lazily over RPC. */
 export default function TreeView({ viewId, roots, version }: TreeViewProps) {
+  const { t } = useTranslation();
   const [rootItems, setRootItems] = useState<TreeItemDto[]>(roots);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function TreeView({ viewId, roots, version }: TreeViewProps) {
     void extensionService.getTreeChildren(viewId).then((kids) => setRootItems(kids as TreeItemDto[]));
   }, [viewId, roots, version]);
 
-  if (rootItems.length === 0) return <div className="agentz-tree-empty">No items</div>;
+  if (rootItems.length === 0) return <div className="agentz-tree-empty">{t("ext.noItems")}</div>;
   return (
     <div className="agentz-tree">
       {rootItems.map((item) => (

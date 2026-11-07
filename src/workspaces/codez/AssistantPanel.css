@@ -484,15 +484,22 @@
   padding: 0;
 }
 
+.agentz-queue-action svg {
+  display: block;
+  flex: none;
+  color: inherit;
+  pointer-events: none;
+}
+
 .agentz-queue-action:hover {
-  color: #d9d2ff;
-  background: rgba(124, 106, 247, 0.22);
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.2);
 }
 
 .agentz-queue-action.danger:hover,
 .agentz-queue-remove:hover {
   color: #f87171;
-  background: rgba(248, 113, 113, 0.15);
+  background: rgba(248, 113, 113, 0.22);
 }
 
 .agentz-assistant-empty {

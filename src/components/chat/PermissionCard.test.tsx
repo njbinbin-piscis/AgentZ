@@ -22,7 +22,7 @@ describe("bound approval card", () => {
     const done = vi.fn();
     await act(async () => { view = create(<PermissionCard request={request} onResolved={done} />); });
     const close = view!.root.findAllByType("button")[0];
-    expect(close.props.children).toBe("Dismiss");
+    expect(close.props.children).toBe("chat.permissionDismiss");
     await act(async () => { close.props.onClick(); });
     expect(done).toHaveBeenCalledOnce(); expect(respond).not.toHaveBeenCalled();
   });
@@ -156,7 +156,7 @@ describe("bound approval card", () => {
     respond.mockResolvedValue(undefined);
     const done = await render();
     const alwaysAllowBtn = view!.root.findAllByType("button")[2];
-    expect(alwaysAllowBtn.props.children).toBe("Always allow");
+    expect(alwaysAllowBtn.props.children).toBe("chat.permissionAlwaysAllow");
     await act(async () => { await alwaysAllowBtn.props.onClick(); });
     expect(respond).toHaveBeenCalledWith("approval:a", true, "digest-a", true);
     expect(done).toHaveBeenCalledOnce();

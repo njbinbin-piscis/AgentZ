@@ -7,6 +7,7 @@ import {
   type ErrorInfo,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -78,6 +79,7 @@ class RenderErrorBoundary extends Component<
 }
 
 function MermaidBlock({ code }: { code: string }) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,7 +121,7 @@ function MermaidBlock({ code }: { code: string }) {
   if (error) {
     return (
       <div className="agentz-codeblock agentz-mermaid-error">
-        <span className="agentz-code-lang">mermaid (parse error)</span>
+        <span className="agentz-code-lang">{t("ide.mermaidParseError")}</span>
         <pre>
           <code>{code}</code>
         </pre>
@@ -130,6 +132,7 @@ function MermaidBlock({ code }: { code: string }) {
 }
 
 function HtmlBlock({ code }: { code: string }) {
+  const { t } = useTranslation();
   const [html, setHtml] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
@@ -156,7 +159,7 @@ function HtmlBlock({ code }: { code: string }) {
   if (error) {
     return (
       <div className="agentz-codeblock">
-        <span className="agentz-code-lang">html (sanitize error)</span>
+        <span className="agentz-code-lang">{t("ide.htmlSanitizeError")}</span>
         <pre>
           <code>{code}</code>
         </pre>
@@ -173,6 +176,7 @@ function CodeBlock({
   children?: ReactNode;
   lang?: string;
 }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const copy = () => {
     const text = extractText(children);
@@ -185,7 +189,7 @@ function CodeBlock({
     <div className="agentz-codeblock">
       {lang && <span className="agentz-code-lang">{lang}</span>}
       <pre>{children}</pre>
-      <button className="agentz-codeblock-copy" onClick={copy} title="Copy code">
+      <button className="agentz-codeblock-copy" onClick={copy} title={t("ide.copyCode")}>
         {copied ? "✓" : "📋"}
       </button>
     </div>

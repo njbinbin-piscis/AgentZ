@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { debugStore, type Variable } from "../debug/debugStore";
 import { debugController } from "../debug/debugController";
 import { activeEditorFile } from "../debug/breakpoints";
@@ -80,6 +81,7 @@ function WatchRow({ expression, stopSeq, paused, onRemove }: {
   paused: boolean;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   const [result, setResult] = useState<WatchResult>(null);
   useEffect(() => {
     if (!paused) return;
@@ -106,7 +108,7 @@ function WatchRow({ expression, stopSeq, paused, onRemove }: {
           </div>
         )}
       </div>
-      <button type="button" className="agentz-debug-watch-remove" onClick={onRemove} title="Remove watch">
+      <button type="button" className="agentz-debug-watch-remove" onClick={onRemove} title={t("debug.removeWatch")}>
         ×
       </button>
     </div>
@@ -114,6 +116,7 @@ function WatchRow({ expression, stopSeq, paused, onRemove }: {
 }
 
 function LaunchBar({ projectDir }: { projectDir: string }) {
+  const { t } = useTranslation();
   const [configs, setConfigs] = useState<LaunchConfig[]>([]);
   const [selected, setSelected] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -137,7 +140,7 @@ function LaunchBar({ projectDir }: { projectDir: string }) {
     if (!config) return;
     setError(null);
     if (/\$\{file/.test(JSON.stringify(config)) && !activeEditorFile.path) {
-      setError("This configuration debugs the current file. Open a file in the editor first.");
+      setError(t("debug.needFile"));
       return;
     }
     setStarting(true);
@@ -165,7 +168,7 @@ function LaunchBar({ projectDir }: { projectDir: string }) {
     <div>
       <div className="agentz-debug-launch">
         <select value={selected} onChange={(e) => setSelected(Number(e.target.value))} disabled={configs.length === 0}>
-          {configs.length === 0 && <option value={0}>No launch configurations</option>}
+          {configs.length === 0 && <option value={0}>{t("debug.noConfigs")}</option>}
           {configs.map((c, i) => (
             <option key={`${i}:${c.name}`} value={i}>
               {c.name}
@@ -173,9 +176,9 @@ function LaunchBar({ projectDir }: { projectDir: string }) {
           ))}
         </select>
         <button type="button" className="agentz-debug-start" onClick={() => void start()} disabled={starting || configs.length === 0}>
-          {starting ? "Starting…" : "▶ Start Debugging"}
+          {starting ? t("debug.starting") : `▶ ${t("debug.start")}`}
         </button>
-        <span className="agentz-debug-idle">Click the editor gutter to set breakpoints. Configurations come from .vscode/launch.json.</span>
+        <span className="agentz-debug-idle">{t("debug.hint")}</span>
       </div>
       {error && <div className="agentz-debug-error">{error}</div>}
     </div>
@@ -184,6 +187,7 @@ function LaunchBar({ projectDir }: { projectDir: string }) {
 
 /** Debug session view: launch bar / toolbar + call stack + variables + watch + console. */
 export default function DebugView({ projectDir }: { projectDir?: string | null } = {}) {
+  const { t } = useTranslation();
   const dbg = useSyncExternalStore(debugStore.subscribe, debugStore.getSnapshot);
   const { debugOutput } = useExtensionUi();
   const { onSelectPath } = useProjectEdgeActions();
@@ -215,34 +219,34 @@ export default function DebugView({ projectDir }: { projectDir?: string | null }
       <div className="agentz-debug-toolbar">
         {dbg.active ? (
           <>
-            <button onClick={() => void debugController.continue()} disabled={dbg.running} title="Continue">
+            <button onClick={() => void debugController.continue()} disabled={dbg.running} title={t("debug.continue")}>
               ▶
             </button>
-            <button onClick={() => void debugController.stepOver()} disabled={dbg.running} title="Step over">
+            <button onClick={() => void debugController.stepOver()} disabled={dbg.running} title={t("debug.stepOver")}>
               ⤼
             </button>
-            <button onClick={() => void debugController.stepInto()} disabled={dbg.running} title="Step into">
+            <button onClick={() => void debugController.stepInto()} disabled={dbg.running} title={t("debug.stepInto")}>
               ⤓
             </button>
-            <button onClick={() => void debugController.stepOut()} disabled={dbg.running} title="Step out">
+            <button onClick={() => void debugController.stepOut()} disabled={dbg.running} title={t("debug.stepOut")}>
               ⤒
             </button>
-            <button onClick={() => void debugController.stop()} title="Stop" className="agentz-debug-stop">
+            <button onClick={() => void debugController.stop()} title={t("debug.stop")} className="agentz-debug-stop">
               ■
             </button>
-            <span className="agentz-debug-state">{dbg.running ? "running" : "paused"}</span>
+            <span className="agentz-debug-state">{dbg.running ? t("debug.running") : t("debug.paused")}</span>
           </>
         ) : projectDir ? (
           <LaunchBar projectDir={projectDir} />
         ) : (
-          <span className="agentz-debug-idle">Open a project to start debugging.</span>
+          <span className="agentz-debug-idle">{t("debug.needProject")}</span>
         )}
       </div>
 
       {dbg.active && (
         <div className="agentz-debug-cols">
           <div className="agentz-debug-col">
-            <div className="agentz-ext-view-title">Call Stack</div>
+            <div className="agentz-ext-view-title">{t("debug.callStack")}</div>
             {dbg.frames.length === 0 ? (
               <div className="agentz-debug-muted">—</div>
             ) : (
@@ -254,7 +258,7 @@ export default function DebugView({ projectDir }: { projectDir?: string | null }
                       <button
                         type="button"
                         className="agentz-debug-frame-open"
-                        title={`Open ${relative}`}
+                        title={t("debug.openFrame", { path: relative })}
                         onClick={() => onSelectPath(relative)}
                       >
                         {f.name}
@@ -266,7 +270,7 @@ export default function DebugView({ projectDir }: { projectDir?: string | null }
                     {!relative && (
                       <span className="agentz-debug-muted">
                         {" "}
-                        ({f.source ? "outside project" : "no source"})
+                        ({f.source ? t("debug.outsideProject") : t("debug.noSource")})
                       </span>
                     )}
                   </div>
@@ -275,7 +279,7 @@ export default function DebugView({ projectDir }: { projectDir?: string | null }
             )}
           </div>
           <div className="agentz-debug-col">
-            <div className="agentz-ext-view-title">Variables</div>
+            <div className="agentz-ext-view-title">{t("debug.variables")}</div>
             {dbg.variables.length === 0 ? (
               <div className="agentz-debug-muted">—</div>
             ) : (
@@ -285,7 +289,7 @@ export default function DebugView({ projectDir }: { projectDir?: string | null }
             )}
           </div>
           <div className="agentz-debug-col">
-            <div className="agentz-ext-view-title">Watch</div>
+            <div className="agentz-ext-view-title">{t("debug.watch")}</div>
             {watches.map((w, i) => (
               <WatchRow
                 key={`${i}:${w}`}
@@ -298,7 +302,7 @@ export default function DebugView({ projectDir }: { projectDir?: string | null }
             <input
               className="agentz-debug-input"
               value={watchDraft}
-              placeholder="Add expression, press Enter"
+              placeholder={t("debug.watchPlaceholder")}
               onChange={(e) => setWatchDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && watchDraft.trim()) {
@@ -311,13 +315,13 @@ export default function DebugView({ projectDir }: { projectDir?: string | null }
         </div>
       )}
 
-      <div className="agentz-ext-view-title">Debug Console</div>
-      <pre className="agentz-ext-debug">{debugOutput.length === 0 ? "No debug output." : debugOutput.join("\n")}</pre>
+      <div className="agentz-ext-view-title">{t("ide.debugConsole")}</div>
+      <pre className="agentz-ext-debug">{debugOutput.length === 0 ? t("debug.noOutput") : debugOutput.join("\n")}</pre>
       {paused && (
         <input
           className="agentz-debug-input"
           value={replDraft}
-          placeholder="Evaluate an expression in the paused frame, press Enter"
+          placeholder={t("debug.evalPlaceholder")}
           onChange={(e) => setReplDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") void runRepl();

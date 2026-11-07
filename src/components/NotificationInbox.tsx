@@ -121,7 +121,7 @@ export default function NotificationInbox({ projectDir, onOpenTask }: Props) {
       ref={popoverRef}
       className="agentz-notification-popover is-fixed"
       role="region"
-      aria-label="Notifications"
+      aria-label={t("notifications.title")}
       style={popoverStyle}
     >
       <div className="agentz-notification-heading"><strong>{t("notifications.title")}</strong><span className="agentz-notification-actions"><button type="button" onClick={() => void clearAll()} disabled={busy || !page?.notices.length}>{t("notifications.clear")}</button><button type="button" onClick={() => void refresh()} disabled={busy}>{t("notifications.refresh")}</button></span></div>

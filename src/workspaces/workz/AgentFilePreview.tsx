@@ -53,18 +53,20 @@ function languageForPath(path: string, lang: string | null | undefined): string 
 }
 
 function HtmlPreviewPane({ content }: { content: string }) {
+  const { t } = useTranslation();
   const srcDoc = useMemo(() => buildHtmlPreviewSrcDoc(content), [content]);
   return (
     <div className="agentz-workz-preview-html">
-      <iframe title="HTML preview" sandbox="allow-scripts allow-forms allow-modals" srcDoc={srcDoc} />
+      <iframe title={t("ide.htmlPreview")} sandbox="allow-scripts allow-forms allow-modals" srcDoc={srcDoc} />
     </div>
   );
 }
 
 function PdfPreviewPane({ dataUrl }: { dataUrl: string }) {
+  const { t } = useTranslation();
   return (
     <div className="agentz-workz-preview-pdf">
-      <iframe title="PDF preview" src={dataUrl} />
+      <iframe title={t("ide.pdfPreview")} src={dataUrl} />
     </div>
   );
 }

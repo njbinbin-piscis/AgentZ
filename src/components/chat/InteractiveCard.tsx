@@ -219,7 +219,7 @@ export default function InteractiveCard({
     if (submitted || submitting) return;
 
     // Plan ready: the turn has already ended, so neither button talks to the tool.
-    // Build starts execution; 取消 only closes the card.
+    // Build starts execution; cancel only closes the card.
     if (cardKind === "plan_mode_build") {
       setSubmitting(true);
       try {

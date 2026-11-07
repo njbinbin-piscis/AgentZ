@@ -250,7 +250,7 @@ export function TagsBlock({
           <span key={tag} className="ic-tag">
             {tag}
             {!disabled && (
-              <button type="button" className="ic-tag-remove" onClick={() => removeTag(tag)} aria-label="remove">
+              <button type="button" className="ic-tag-remove" onClick={() => removeTag(tag)} aria-label={t("chat.removeTag")}>
                 ×
               </button>
             )}

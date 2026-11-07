@@ -26,12 +26,13 @@ interface BottomPanelProps {
 }
 
 function TestNode({ item, controllerId, depth }: { item: TestItemDto; controllerId: string; depth: number }) {
+  const { t } = useTranslation();
   return (
     <div>
       <div className="agentz-tree-row" style={{ paddingLeft: 8 + depth * 14 }}>
         <button
           className="agentz-test-run"
-          title="Run test"
+          title={t("ide.runTest")}
           onClick={() => void extensionService.runTests(controllerId, [item.id])}
         >
           ▶

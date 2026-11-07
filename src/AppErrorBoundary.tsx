@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { appErrorCopy } from "./appErrorCopy";
 import { requestSkipEditorRestore } from "./workspaces/codez/editorRestoreGuard";
 
 interface State {
@@ -21,7 +22,7 @@ export default class AppErrorBoundary extends Component<{ children: ReactNode },
 
   render() {
     if (!this.state.error) return this.props.children;
-    const zh = typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh");
+    const copy = appErrorCopy(typeof navigator !== "undefined" ? navigator.language : "en");
     return (
       <div
         style={{
@@ -34,12 +35,10 @@ export default class AppErrorBoundary extends Component<{ children: ReactNode },
         }}
       >
         <h1 style={{ fontSize: 20, margin: "0 0 12px" }}>
-          {zh ? "界面在恢复时出错" : "The window failed while restoring"}
+          {copy.title}
         </h1>
         <p style={{ maxWidth: 560, lineHeight: 1.5, opacity: 0.85 }}>
-          {zh
-            ? "上次打开的文件或预览让界面崩溃了。可以不恢复那些文件，重新进入项目。"
-            : "A file or preview from the last session crashed the window. You can reopen the project without those files."}
+          {copy.body}
         </p>
         <pre style={{ whiteSpace: "pre-wrap", opacity: 0.7 }}>{this.state.error.message}</pre>
         {this.state.stack && (
@@ -47,7 +46,7 @@ export default class AppErrorBoundary extends Component<{ children: ReactNode },
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button type="button" onClick={() => window.location.reload()}>
-            {zh ? "重新加载" : "Reload"}
+            {copy.reload}
           </button>
           <button
             type="button"
@@ -56,7 +55,7 @@ export default class AppErrorBoundary extends Component<{ children: ReactNode },
               window.location.reload();
             }}
           >
-            {zh ? "不恢复已打开的文件" : "Reopen without restored files"}
+            {copy.skip}
           </button>
         </div>
       </div>

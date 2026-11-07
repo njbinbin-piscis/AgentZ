@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getPermissionPreview, respondPermissionRequest } from "../../services/tauri/interactive";
 import "./InteractiveCard.css";
 
@@ -24,6 +25,7 @@ export default function PermissionCard({
   request: PermissionRequestCard;
   onResolved: () => void;
 }) {
+  const { t } = useTranslation();
   const signalKey = `${signal.requestId}:${signal.approval?.digest ?? "legacy"}`;
   const [preview, setPreview] = useState<{ key: string; card: PermissionRequestCard } | null>(null);
   const [previewFailure, setPreviewFailure] = useState<{ key: string; message: string } | null>(null);
@@ -31,7 +33,7 @@ export default function PermissionCard({
   const previewError = previewFailure?.key === signalKey ? previewFailure.message : null;
   const request = signal.requestId.startsWith("approval:")
     ? (preview?.key === signalKey ? preview.card : {
-      ...signal, toolName: "", toolInput: null, description: "Loading trusted approval preview", approval: undefined,
+      ...signal, toolName: "", toolInput: null, description: t("chat.permissionLoading"), approval: undefined,
     }) : signal;
   useEffect(() => {
     if (!signal.requestId.startsWith("approval:")) return;
@@ -96,11 +98,15 @@ export default function PermissionCard({
 
   return (
     <section className="interactive-card agentz-permission-card" aria-live="polite">
-      <strong>Permission required</strong>
+      <strong>{t("chat.permissionRequired")}</strong>
       <p>{request.description}</p>
       {request.approval && (
-        <p className="agentz-permission-meta">Task: {request.approval.taskId} · Environment: {request.approval.environmentId}
-          <br />Expires: {new Date(request.approval.expiresMs).toLocaleString()}
+        <p className="agentz-permission-meta">
+          {t("chat.permissionTask")} {request.approval.taskId}
+          {" · "}
+          {t("chat.permissionEnvironment")} {request.approval.environmentId}
+          <br />
+          {t("chat.permissionExpires")} {new Date(request.approval.expiresMs).toLocaleString()}
         </p>
       )}
       {request.approval?.resource != null && <pre className="agentz-permission-resource">{JSON.stringify(request.approval.resource, null, 2)}</pre>}
@@ -108,19 +114,19 @@ export default function PermissionCard({
       <pre className="agentz-permission-input">{JSON.stringify(request.toolInput, null, 2)}</pre>
       {error && <div className="agentz-inline-edit-error">{error}</div>}
       {previewError && <div role="alert" className="agentz-inline-edit-error">{previewError}</div>}
-      {expired && <p role="status">This approval has expired. Request a new operation.</p>}
+      {expired && <p role="status">{t("chat.permissionExpired")}</p>}
       <div className="ic-actions">
         <button type="button" className="ic-btn ic-btn-default" disabled={submitting} onClick={() => localDismiss ? dismiss() : void resolve(false)}>
-          {localDismiss ? "Dismiss" : "Deny"}
+          {localDismiss ? t("chat.permissionDismiss") : t("chat.permissionDeny")}
         </button>
         <button type="button" className="ic-btn ic-btn-primary ic-primary" disabled={allowDisabled} onClick={() => void resolve(true)}>
-          Allow once
+          {t("chat.permissionAllowOnce")}
         </button>
         {previewError ? (
-          <button type="button" className="ic-btn ic-btn-default" onClick={() => setPreviewAttempt(attempt => attempt + 1)}>Retry preview</button>
+          <button type="button" className="ic-btn ic-btn-default" onClick={() => setPreviewAttempt(attempt => attempt + 1)}>{t("chat.permissionRetry")}</button>
         ) : (
           <button type="button" className="ic-btn ic-btn-always-allow" disabled={allowDisabled} onClick={() => void resolve(true, true)}>
-            Always allow
+            {t("chat.permissionAlwaysAllow")}
           </button>
         )}
       </div>

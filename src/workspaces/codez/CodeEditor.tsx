@@ -862,12 +862,12 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
         <div className="agentz-inline-edit">
           {inline.applied ? (
             <div className="agentz-inline-edit-bar">
-              <span className="agentz-inline-edit-hint">Review the inline diff:</span>
+              <span className="agentz-inline-edit-hint">{t("ide.inlineEditReview")}</span>
               <button className="agentz-inline-accept" onClick={acceptInline}>
-                Accept ⏎
+                {t("ide.inlineEditAccept")} ⏎
               </button>
               <button className="agentz-inline-edit-cancel" onClick={rejectInline}>
-                Reject ⎋
+                {t("ide.inlineEditReject")} ⎋
               </button>
             </div>
           ) : (
@@ -875,7 +875,7 @@ export default function CodeEditor({ tab, projectDir, onChange, onSave, reveal, 
               <input
                 autoFocus
                 className="agentz-inline-edit-input"
-                placeholder="Edit instruction… (Enter to generate, Esc to cancel)"
+                placeholder={t("ide.inlineEditPlaceholder")}
                 value={inline.instruction}
                 onChange={(e) =>
                   setInline((cur) => (cur ? { ...cur, instruction: e.target.value } : cur))

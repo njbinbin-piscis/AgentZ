@@ -22,6 +22,7 @@ interface FileViewerProps {
 }
 
 function HtmlPreview({ content }: { content: string }) {
+  const { t } = useTranslation();
   const srcDoc = useMemo(() => {
     try {
       return buildHtmlPreviewSrcDoc(content);
@@ -34,7 +35,7 @@ function HtmlPreview({ content }: { content: string }) {
   return (
     <div className="agentz-html-preview">
       <iframe
-        title="HTML preview"
+        title={t("ide.htmlPreview")}
         sandbox="allow-scripts allow-forms allow-modals"
         srcDoc={srcDoc}
       />

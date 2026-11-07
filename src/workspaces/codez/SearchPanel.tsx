@@ -119,21 +119,21 @@ export default function SearchPanel({ projectDir, onResultClick }: SearchPanelPr
         <div className="search-toggles">
           <button
             className={caseSensitive ? "active" : ""}
-            title="Match Case"
+            title={t("ide.matchCase")}
             onClick={() => setCaseSensitive((v) => !v)}
           >
             Aa
           </button>
           <button
             className={wholeWord ? "active" : ""}
-            title="Match Whole Word"
+            title={t("ide.matchWholeWord")}
             onClick={() => setWholeWord((v) => !v)}
           >
             ab
           </button>
           <button
             className={useRegex ? "active" : ""}
-            title="Use Regular Expression"
+            title={t("ide.useRegex")}
             onClick={() => setUseRegex((v) => !v)}
           >
             .*

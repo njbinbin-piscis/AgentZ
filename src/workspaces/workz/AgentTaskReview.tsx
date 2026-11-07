@@ -319,7 +319,7 @@ function TaskReviewContent({
             type="button"
             disabled={archived || busy || loading}
             onClick={() => setSortByImpact((v) => !v)}
-            title="Sort changed files by blast radius (importers count)"
+            title={t("agent.reviewSortHint")}
           >
             {sortByImpact ? t("agent.reviewSortImpact") : t("agent.reviewSortPath")}
           </button>

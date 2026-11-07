@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useExtensionUi } from "./useExtensionUi";
 import { formatCodiconText } from "../../workspaces/codez/IdeStatusBar";
 
 /** Renders vscode.window.showQuickPick / showInputBox overlays. */
 export default function QuickInput() {
+  const { t } = useTranslation();
   const { quickPick, inputBox } = useExtensionUi();
   const [filter, setFilter] = useState("");
   const [text, setText] = useState("");
@@ -131,7 +133,7 @@ export default function QuickInput() {
               </button>
             );
           })}
-          {items.length === 0 && <div className="agentz-quick-empty">No matching items</div>}
+          {items.length === 0 && <div className="agentz-quick-empty">{t("ext.noMatches")}</div>}
         </div>
         {qp.canPickMany && (
           <div className="agentz-quick-footer">
