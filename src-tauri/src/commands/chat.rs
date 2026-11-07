@@ -457,6 +457,12 @@ pub async fn dispatch_host_turn(
         .map(str::to_owned);
     let note_key = task_key.clone().unwrap_or_else(|| "-".into());
     let note_session = session_id.clone().unwrap_or_default();
+    let _session_cancel = crate::runtime::chat_cancel::SessionCancelRegistration::register(
+        state.session_cancel.clone(),
+        &note_session,
+        cancel.clone(),
+    )
+    .await;
     let registration = crate::runtime::chat_cancel::Registration::new(
         state.chat_cancel.clone(),
         state.task_cancel.clone(),
@@ -720,19 +726,24 @@ pub async fn chat_steer(session_id: String, text: String) -> Result<bool, String
 pub async fn chat_cancel(
     state: State<'_, AppState>,
     task_key: Option<String>,
+    session_id: Option<String>,
 ) -> Result<(), String> {
-    match task_key.as_deref().map(str::trim).filter(|k| !k.is_empty()) {
-        Some(key) => {
-            if let Some(flag) = state.task_cancel.lock().await.get(key) {
-                flag.store(true, Ordering::SeqCst);
-            }
+    let key = task_key.as_deref().map(str::trim).filter(|k| !k.is_empty());
+    let session = session_id.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    if key.is_none() && session.is_none() {
+        let slot = state.chat_cancel.lock().await;
+        if let Some(flag) = slot.as_ref() {
+            flag.store(true, Ordering::SeqCst);
         }
-        None => {
-            let slot = state.chat_cancel.lock().await;
-            if let Some(flag) = slot.as_ref() {
-                flag.store(true, Ordering::SeqCst);
-            }
+        return Ok(());
+    }
+    if let Some(key) = key {
+        if let Some(flag) = state.task_cancel.lock().await.get(key) {
+            flag.store(true, Ordering::SeqCst);
         }
+    }
+    if let Some(session) = session {
+        crate::runtime::chat_cancel::cancel_session(&state.session_cancel, session).await;
     }
     Ok(())
 }

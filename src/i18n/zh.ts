@@ -1443,6 +1443,8 @@ const zh = {
     artifactFilteredCount: "{{filtered}} / {{total}}",
     noMatchingArtifacts: "没有匹配过滤条件的产物。",
     placeholderBusy: "WorkZ 正在执行…",
+    taskStillRunning: "这个任务仍在运行{{held}}，新消息会排在它后面。若它已卡住，请按停止后再发送。",
+    taskStillRunningHeld: "（已约 {{minutes}} 分钟）",
     placeholder: "描述 WorkZ 任务（Enter 运行，Shift+Enter 换行，↑↓ 回顾历史发送）",
     swarmFeed: "团队动态",
     coordinatorChat: "协调者对话",

@@ -148,6 +148,11 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
             onRefreshGitChanges={s.refreshGitChanges}
             onShowToast={s.showToast}
             onSetError={s.setError}
+            queued={s.queuedView}
+            onInterruptQueued={s.interruptQueued}
+            onSteerQueued={s.steerQueued}
+            onEditQueued={s.editQueued}
+            onRemoveQueued={s.removeQueued}
           />
           {s.previewPath === BROWSER_TAB_PATH && s.selectedId && (
             <div className="agentz-workz-preview browser">

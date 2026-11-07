@@ -47,6 +47,9 @@ pub struct AppState {
     /// frontend-supplied task key so each isolated task can be stopped
     /// independently without affecting its siblings.
     pub task_cancel: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
+    /// Cancel flags keyed by session id, so Stop still reaches a WorkZ turn
+    /// after the UI has lost the frontend task key.
+    pub session_cancel: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
     /// Bounds how many Agent turns run concurrently (M7 task queue). Extra
     /// submissions wait here until a permit frees up, so a flood of parallel
     /// tasks degrades gracefully instead of starving the machine.
@@ -187,6 +190,7 @@ impl AppState {
             lsp_manager: Arc::new(LspManager::with_bridge_name("AgentZ")),
             chat_cancel: Arc::new(Mutex::new(None)),
             task_cancel: Arc::new(Mutex::new(HashMap::new())),
+            session_cancel: Arc::new(Mutex::new(HashMap::new())),
             agent_slots: Arc::new(Semaphore::new(agent_concurrency())),
             background_runs: crate::remote::register_background(Arc::new(
                 piscis_kernel::background::BackgroundRegistry::new(),

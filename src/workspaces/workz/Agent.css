@@ -1038,3 +1038,53 @@
   color: var(--text);
 }
 
+.agentz-workz-queue {
+  position: relative;
+  opacity: 0.92;
+}
+
+.agentz-workz-queue .agentz-task-card {
+  padding-right: 112px;
+}
+
+.agentz-workz-queue .agentz-queue-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+}
+
+.agentz-workz-queue .agentz-queue-action {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-dim, #9a9ab0);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.agentz-workz-queue .agentz-queue-action svg {
+  display: block;
+  flex: none;
+  color: inherit;
+  pointer-events: none;
+}
+
+.agentz-workz-queue .agentz-queue-action:hover {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.agentz-workz-queue .agentz-queue-action.danger:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.22);
+}
+

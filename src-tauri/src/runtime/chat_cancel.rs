@@ -91,6 +91,53 @@ impl Drop for Registration {
         }
     }
 }
+/// Removes its session entry on drop, and only if it still owns that entry.
+pub struct SessionCancelRegistration {
+    map: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
+    session_id: String,
+    flag: Arc<AtomicBool>,
+}
+
+impl SessionCancelRegistration {
+    pub async fn register(
+        map: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
+        session_id: &str,
+        flag: Arc<AtomicBool>,
+    ) -> Self {
+        map.lock().await.insert(session_id.to_owned(), flag.clone());
+        Self {
+            map,
+            session_id: session_id.to_owned(),
+            flag,
+        }
+    }
+}
+
+impl Drop for SessionCancelRegistration {
+    fn drop(&mut self) {
+        let map = self.map.clone();
+        let session_id = self.session_id.clone();
+        let flag = self.flag.clone();
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            runtime.spawn(async move {
+                let mut slots = map.lock().await;
+                if slots
+                    .get(&session_id)
+                    .is_some_and(|current| Arc::ptr_eq(current, &flag))
+                {
+                    slots.remove(&session_id);
+                }
+            });
+        }
+    }
+}
+
+pub async fn cancel_session(map: &Mutex<HashMap<String, Arc<AtomicBool>>>, session_id: &str) {
+    if let Some(flag) = map.lock().await.get(session_id) {
+        flag.store(true, Ordering::SeqCst);
+    }
+}
+
 pub async fn acquire(
     slots: Arc<Semaphore>,
     cancel: &AtomicBool,
@@ -174,6 +221,19 @@ mod tests {
         ));
         replacement.release().await;
         assert!(tasks.lock().await.is_empty());
+        let sessions = Arc::new(Mutex::new(HashMap::new()));
+        let session_flag = Arc::new(AtomicBool::new(false));
+        let session = SessionCancelRegistration::register(
+            sessions.clone(),
+            "session",
+            session_flag.clone(),
+        )
+        .await;
+        cancel_session(&sessions, "session").await;
+        assert!(session_flag.load(Ordering::SeqCst));
+        drop(session);
+        tokio::task::yield_now().await;
+        assert!(sessions.lock().await.is_empty());
         let direct = Registration::new(single.clone(), tasks.clone(), None, flag)
             .await
             .unwrap();

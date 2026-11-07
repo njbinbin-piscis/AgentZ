@@ -397,11 +397,12 @@ export default function WorkzComposerBar({
         onSubmit={onRun}
         onStop={onStop}
         busy={busy}
+        sendWhileBusy
         placeholder={
           !projectDir
             ? t("agent.noProject")
             : busy
-              ? t("agent.placeholderBusy")
+              ? t("chat.placeholderBusyQueue")
               : t("agent.placeholder")
         }
         canSend={canSend}

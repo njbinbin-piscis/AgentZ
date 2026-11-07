@@ -15,6 +15,7 @@ import Markdown from "../codez/Markdown";
 import PoolActivityFeed from "./PoolActivityFeed";
 import WorkzEmptyState, { type WorkzStarterScenario } from "./WorkzEmptyState";
 import type { AgentStep } from "./agentArtifacts";
+import WorkzQueuedList from "./WorkzQueuedList";
 
 export interface WorkzMessageStreamProps {
   projectDir: string | null;
@@ -40,6 +41,11 @@ export interface WorkzMessageStreamProps {
   onRefreshGitChanges: () => void;
   onShowToast: (msg: string) => void;
   onSetError: (err: string) => void;
+  queued?: string[];
+  onInterruptQueued?: (index: number) => void;
+  onSteerQueued?: (index: number) => void;
+  onEditQueued?: (index: number) => void;
+  onRemoveQueued?: (index: number) => void;
 }
 
 export default function WorkzMessageStream({
@@ -66,6 +72,11 @@ export default function WorkzMessageStream({
   onRefreshGitChanges,
   onShowToast,
   onSetError,
+  queued = [],
+  onInterruptQueued,
+  onSteerQueued,
+  onEditQueued,
+  onRemoveQueued,
 }: WorkzMessageStreamProps) {
   const { t } = useTranslation();
   const chatUiItems = useMemo(
@@ -200,6 +211,15 @@ export default function WorkzMessageStream({
               </div>
             );
           })}
+          {onInterruptQueued && onSteerQueued && onEditQueued && onRemoveQueued && (
+            <WorkzQueuedList
+              items={queued}
+              onInterrupt={onInterruptQueued}
+              onSteer={onSteerQueued}
+              onEdit={onEditQueued}
+              onRemove={onRemoveQueued}
+            />
+          )}
           {bottomCards.map((card) => (
             <div key={card.requestId} className="agentz-workz-msg assistant">
               <div className="agentz-workz-msg-role">{t("agent.role")}</div>

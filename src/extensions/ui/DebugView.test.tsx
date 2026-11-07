@@ -43,6 +43,6 @@ it("opens in-project stack frames and labels frames outside the project", () => 
   expect(openers).toHaveLength(1);
   act(() => openers[0].props.onClick());
   expect(onSelectPath).toHaveBeenCalledWith("src/a.ts");
-  expect(JSON.stringify(renderer!.toJSON())).toContain("outside project");
+  expect(JSON.stringify(renderer!.toJSON())).toContain("debug.outsideProject");
   act(() => renderer!.unmount());
 });

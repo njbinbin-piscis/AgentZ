@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   chatSend,
   chatCancel,
+  chatSteer,
   onChatEvent,
   listSessions,
   SESSION_SOURCE_WORKZ,
@@ -63,6 +64,8 @@ import {
 import { collectArtifacts, type AgentStep } from "./agentArtifacts";
 import { applySubagentProgress } from "../../components/subagentCard";
 import { applyToolEnd, applyToolStart, finalizeTools } from "./agentTools";
+import { isChatSendResult, isTaskGateBusy, taskGateHoldSeconds } from "./taskGate";
+import { queueRestoreIndex, SessionTurnBookkeeping } from "../codez/sessionTurnBookkeeping";
 import { workzGoalFromText } from "./taskTitle";
 import {
   chatSetSessionCwd,
@@ -78,6 +81,21 @@ import "./Agent.css";
 import type { LibraryInitialState } from "../codez/resources/types";
 
 export type WikiBuildAction = "overview" | "deep" | "memory" | "graph";
+
+interface WorkzQueuedTurn {
+  id: string;
+  sessionId: string;
+  text: string;
+  attachment: ChatAttachment | null;
+  displayText: string;
+}
+
+interface WorkzQueueEdit {
+  sessionId: string;
+  beforeIds: string[];
+  afterIds: string[];
+  base: WorkzQueuedTurn;
+}
 
 interface WorkZWorkspaceProps {
   projectDir: string | null;
@@ -425,6 +443,12 @@ export function useWorkzSessionStore({
   projectDirRef.current = projectDir;
   const runningSessionsRef = useRef<Set<string>>(new Set());
   const taskKeyBySessionRef = useRef<Map<string, string>>(new Map());
+  const queueBookRef = useRef(new SessionTurnBookkeeping<WorkzQueuedTurn>());
+  const queueEditRef = useRef<WorkzQueueEdit | null>(null);
+  const [queuedView, setQueuedView] = useState<string[]>([]);
+  const syncQueuedView = useCallback((sessionId: string | null) => {
+    setQueuedView(queueBookRef.current.queueFor(sessionId).map((item) => item.displayText));
+  }, []);
   const openTaskRequestRef = useRef(0);
 
   const markRunning = useCallback((id: string | null, on: boolean) => {
@@ -575,10 +599,23 @@ export function useWorkzSessionStore({
       return;
     }
     listSessions(projectDir, workzTaskSources, null)
-      .then(setTasks)
+      .then((listed) => {
+        setTasks(listed);
+        for (const task of listed) {
+          if (task.status === "running") markRunning(task.id, true);
+        }
+        const current = sessionRef.current;
+        if (
+          current &&
+          listed.some((task) => task.id === current && task.status === "running")
+        ) {
+          setBusy(true);
+          liveRef.current = true;
+        }
+      })
       .catch(() => setTasks([]));
     refreshGroups();
-  }, [projectDir, workzTaskSources, refreshGroups]);
+  }, [projectDir, workzTaskSources, refreshGroups, markRunning]);
 
   /** True once a task session (or workflow run) is bound — mode pickers lock. */
   const taskBound = selectedId !== null || workflowRunId !== null;
@@ -651,6 +688,25 @@ export function useWorkzSessionStore({
         }
         return;
       }
+      // A background-task continuation runs in this session and holds its gate.
+      // Show it as running, the way CodeZ does, so a foreground send waits
+      // behind it instead of failing while the composer still looks idle.
+      if (env.channel === "host_turn_started" && env.sessionId) {
+        const sid = env.sessionId;
+        const key = (env.payload as { taskKey?: string }).taskKey;
+        if (key) {
+          taskKeyBySessionRef.current.set(sid, key);
+          markRunning(sid, true);
+          if (sid === foregroundSessionRef.current && !liveRef.current) {
+            setError(null);
+            setBusy(true);
+            liveRef.current = true;
+            foregroundTaskKeyRef.current = key;
+            setSteps((prev) => [...prev, { role: "assistant", text: "", tools: [] }]);
+          }
+        }
+        return;
+      }
       // Turn completion must update every session — including background runs
       // after the user clicks「新建」— or the sidebar dot stays yellow forever.
       if (env.channel === "agent_final") {
@@ -671,6 +727,20 @@ export function useWorkzSessionStore({
               ? `${fin.error} (stopped after ${MAX_AUTO_RESUMES} automatic continuations — send a message to continue.)`
               : fin.error,
           );
+        }
+        const endedKey = env.sessionId ? taskKeyBySessionRef.current.get(env.sessionId) : undefined;
+        if (endedKey?.startsWith("host-bg-") && env.sessionId) {
+          taskKeyBySessionRef.current.delete(env.sessionId);
+          if (foregroundTaskKeyRef.current === endedKey) {
+            liveRef.current = false;
+            foregroundTaskKeyRef.current = null;
+            setBusy(false);
+            const next = queueBookRef.current.shiftNext(env.sessionId);
+            syncQueuedView(env.sessionId);
+            if (next && foregroundSessionRef.current === env.sessionId) {
+              void runRef.current(next.text, next.attachment);
+            }
+          }
         }
         markRunning(env.sessionId, false);
         setTasks((prev) =>
@@ -831,7 +901,7 @@ export function useWorkzSessionStore({
           break;
       }
     },
-    [handleAgentEvent, markRunning, flushStreamDelta],
+    [handleAgentEvent, markRunning, flushStreamDelta, syncQueuedView],
   );
 
   useEffect(() => {
@@ -982,28 +1052,46 @@ export function useWorkzSessionStore({
         }
       }
       const runCwd = managedDirectory ?? (isFree ? freeTaskWorkspace : null);
-      const res = await chatSend({
-        prompt: effectivePrompt,
-        displayPrompt: text,
-        sessionId: effectiveSessionId,
-        projectDir: projectDir!,
-        workspaceDir: wt?.worktree_path ?? runCwd,
-        requireTaskEnvironment: !!wt || effectiveIsolate,
-        attachment: att,
-        chatMode: "agent",
-        clearPlan: false,
-        modelId: showModelSelector ? modelId || null : null,
-        taskKey,
-        // Single-agent mode: run as the chosen persona. Team mode uses the
-        // coordinator path, so no per-agent persona is applied there.
-        agentId: activeTeam ? null : activeAgentId || null,
-        enabledSkills: showModelSelector && enabledSkills.length > 0 ? enabledSkills : null,
-        enabledConnectors: showModelSelector ? enabledConnectors : null,
-        sessionSource: activeTeam ? SESSION_SOURCE_WORKZ_TEAM : SESSION_SOURCE_WORKZ,
-        teamId: activeTeam || null,
-        poolId: activePoolRef.current,
-        preferZh: i18n.language.startsWith("zh"),
-      });
+      const sendOnce = () =>
+        chatSend({
+          prompt: effectivePrompt,
+          displayPrompt: text,
+          sessionId: effectiveSessionId,
+          projectDir: projectDir!,
+          workspaceDir: wt?.worktree_path ?? runCwd,
+          requireTaskEnvironment: !!wt || effectiveIsolate,
+          attachment: att,
+          chatMode: "agent",
+          clearPlan: false,
+          modelId: showModelSelector ? modelId || null : null,
+          taskKey,
+          // Single-agent mode: run as the chosen persona. Team mode uses the
+          // coordinator path, so no per-agent persona is applied there.
+          agentId: activeTeam ? null : activeAgentId || null,
+          enabledSkills: showModelSelector && enabledSkills.length > 0 ? enabledSkills : null,
+          enabledConnectors: showModelSelector ? enabledConnectors : null,
+          sessionSource: activeTeam ? SESSION_SOURCE_WORKZ_TEAM : SESSION_SOURCE_WORKZ,
+          teamId: activeTeam || null,
+          poolId: activePoolRef.current,
+          preferZh: i18n.language.startsWith("zh"),
+        });
+      let res = await sendOnce().catch((error) => error);
+      // Same wait as CodeZ: a background continuation holds this session's
+      // gate, so the message stays queued behind it instead of failing.
+      for (let attempt = 0; attempt < 150 && isTaskGateBusy(res); attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (!isForeground()) break;
+        res = await sendOnce().catch((error) => error);
+      }
+      if (!isForeground()) {
+        if (isTaskGateBusy(res)) return;
+      } else if (isTaskGateBusy(res)) {
+        const seconds = taskGateHoldSeconds(res);
+        const held =
+          seconds == null ? "" : t("agent.taskStillRunningHeld", { minutes: Math.max(1, Math.round(seconds / 60)) });
+        throw new Error(t("agent.taskStillRunning", { held }));
+      }
+      if (!isChatSendResult(res)) throw res;
       // The backend echoes the (pre-generated) session id; keep the maps in
       // sync in case it ever differs, then fold in the final assistant text.
       if (isFree && !startSession && runCwd && !managedDirectory) {
@@ -1057,7 +1145,8 @@ export function useWorkzSessionStore({
     } finally {
       // Clear the running flag for *this* run's own session — never the
       // session the user may have navigated to in the meantime.
-      markRunning(effectiveSessionId, false);
+      const owner = taskKeyBySessionRef.current.get(effectiveSessionId);
+      if (owner === taskKey || owner == null) markRunning(effectiveSessionId, false);
       if (startSession && startSession !== effectiveSessionId) {
         markRunning(startSession, false);
       }
@@ -1073,7 +1162,16 @@ export function useWorkzSessionStore({
       }
       refreshTasks();
       refreshGitChanges();
-      if (pendingResumeRef.current) {
+      let startedQueued = false;
+      if (isForeground()) {
+        const next = queueBookRef.current.shiftNext(effectiveSessionId);
+        syncQueuedView(effectiveSessionId);
+        if (next) {
+          startedQueued = true;
+          void runRef.current(next.text, next.attachment);
+        }
+      }
+      if (pendingResumeRef.current && !startedQueued) {
         pendingResumeRef.current = false;
         if (isForeground()) void runRef.current?.(t("chat.autoContinuePrompt"), null);
       }
@@ -1082,7 +1180,50 @@ export function useWorkzSessionStore({
 
   const run = useCallback(() => {
     const text = goal.trim();
-    if ((!text && !attachment) || busy) return;
+    if (!text && !attachment) return;
+    const editing = queueEditRef.current;
+    if (editing && editing.sessionId === (sessionRef.current ?? "")) {
+      const turn: WorkzQueuedTurn = {
+        ...editing.base,
+        text,
+        attachment,
+        displayText: text || editing.base.displayText,
+      };
+      const currentIds = queueBookRef.current.queueFor(editing.sessionId).map((item) => item.id);
+      const index = queueRestoreIndex(currentIds, editing.beforeIds, editing.afterIds);
+      queueBookRef.current.insertAt(editing.sessionId, index, turn);
+      queueEditRef.current = null;
+      syncQueuedView(editing.sessionId);
+      setGoal("");
+      clearAttachment();
+      if (!runningSessionsRef.current.has(editing.sessionId)) {
+        const next = queueBookRef.current.shiftNext(editing.sessionId);
+        syncQueuedView(editing.sessionId);
+        if (next) void runRef.current(next.text, next.attachment);
+      }
+      return;
+    }
+    const sessionId = sessionRef.current;
+    if (busy && sessionId && !(activeTeam && teams.find((tm) => tm.id === activeTeam)?.mode === "workflow")) {
+      const displayText =
+        attachment && !text
+          ? `📎 ${attachment.filename ?? attachment.path ?? t("chat.attachment")}`
+          : attachment
+            ? `${text}${text ? "\n" : ""}📎 ${attachment.filename ?? attachment.path ?? t("chat.attachment")}`
+            : text;
+      queueBookRef.current.enqueue({
+        id: crypto.randomUUID(),
+        sessionId,
+        text,
+        attachment,
+        displayText,
+      });
+      syncQueuedView(sessionId);
+      if (text) inputHistory.push(text);
+      setGoal("");
+      clearAttachment();
+      return;
+    }
     autoResumeRef.current = 0;
     if (!projectDir) {
       setError(t("agent.noProject"));
@@ -1107,7 +1248,7 @@ export function useWorkzSessionStore({
     setGoal("");
     clearAttachment();
     void runRef.current(text, pendingAttachment);
-  }, [goal, attachment, busy, projectDir, clearAttachment, inputHistory, t, teams, activeTeam]);
+  }, [goal, attachment, busy, projectDir, clearAttachment, inputHistory, t, teams, activeTeam, syncQueuedView]);
 
   const newTask = useCallback(() => {
     if (!projectDir) return;
@@ -1129,6 +1270,7 @@ export function useWorkzSessionStore({
     setError(null);
     setGoal("");
     clearAttachment();
+    setQueuedView([]);
     setWorktree(null);
     setIsolateState(localStorage.getItem("agentz-workz-isolate") !== "0");
     setCwd(null);
@@ -1179,17 +1321,24 @@ export function useWorkzSessionStore({
           setIsolateState(Boolean(restoredEnvironment));
         }
         // Switching to a different task detaches live streaming from the
-        // previous foreground run (it keeps going in the background). We show
-        // the opened task's persisted history; if it is itself running, its
-        // results refresh on completion.
-        liveRef.current = false;
+        // previous foreground run (it keeps going in the background). A task
+        // whose row is still `running` keeps the input locked and keeps
+        // receiving tool events — the in-memory running set is wiped on
+        // reload, the session row is not.
+        const stillRunning =
+          meta?.status === "running" || runningSessionsRef.current.has(id);
+        if (stillRunning) markRunning(id, true);
+        liveRef.current = stillRunning;
         discardStreamDelta();
-        foregroundTaskKeyRef.current = null;
+        foregroundTaskKeyRef.current = stillRunning
+          ? (taskKeyBySessionRef.current.get(id) ?? null)
+          : null;
         foregroundSessionRef.current = id;
         sessionRef.current = id;
         rememberLastTask(projectDir, id);
-        setBusy(runningSessionsRef.current.has(id));
+        setBusy(stillRunning);
         setSelectedId(id);
+        syncQueuedView(id);
         setSteps(
           history.map((m) => ({
             id: m.id,
@@ -1222,7 +1371,7 @@ export function useWorkzSessionStore({
         setError(String(e));
       }
     },
-    [projectDir, isFree, refreshGitChanges, tasks, applyTaskModeBinding, clearCards, planProject, applyPersistedPlan],
+    [projectDir, isFree, refreshGitChanges, tasks, applyTaskModeBinding, clearCards, planProject, applyPersistedPlan, syncQueuedView],
   );
 
   // After a restart, reopen the task that was active when the app closed.
@@ -1242,11 +1391,93 @@ export function useWorkzSessionStore({
 
   // Cancel the task bound to the active view (foreground run, or a reopened
   // background run we still hold the key for).
+  const sessionKey = () => sessionRef.current;
+
+  const removeQueued = useCallback((index: number) => {
+    const id = sessionKey();
+    if (!id) return;
+    queueBookRef.current.removeAt(id, index);
+    syncQueuedView(id);
+  }, [syncQueuedView]);
+
+  const interruptQueued = useCallback((index: number) => {
+    const id = sessionKey();
+    if (!id) return;
+    const turn = queueBookRef.current.takeAt(id, index);
+    if (!turn) return;
+    queueBookRef.current.enqueueFront(turn);
+    syncQueuedView(id);
+    if (runningSessionsRef.current.has(id)) {
+      void chatCancel(taskKeyBySessionRef.current.get(id) ?? null, id);
+      return;
+    }
+    const next = queueBookRef.current.shiftNext(id);
+    syncQueuedView(id);
+    if (next) void runRef.current(next.text, next.attachment);
+  }, [syncQueuedView]);
+
+  const steerQueued = useCallback((index: number) => {
+    const id = sessionKey();
+    if (!id) return;
+    const turn = queueBookRef.current.takeAt(id, index);
+    if (!turn) return;
+    const guidance = turn.text.trim();
+    if (!guidance) {
+      queueBookRef.current.enqueueFront(turn);
+      syncQueuedView(id);
+      return;
+    }
+    syncQueuedView(id);
+    const restore = () => {
+      queueBookRef.current.enqueueFront(turn);
+      syncQueuedView(id);
+      showToast(t("chat.queueSteerQueued"));
+    };
+    void chatSteer(id, guidance).then((delivered) => {
+      if (!delivered) {
+        restore();
+        return;
+      }
+      if (turn.attachment) {
+        queueBookRef.current.enqueue({ ...turn, text: "", displayText: turn.displayText });
+        syncQueuedView(id);
+      }
+      showToast(t("chat.queueSteerInserted"));
+    }, restore);
+  }, [syncQueuedView, showToast, t]);
+
+  const editQueued = useCallback((index: number) => {
+    const id = sessionKey();
+    if (!id) return;
+    if (queueEditRef.current) {
+      showToast(t("chat.queueEditPending"));
+      return;
+    }
+    if (goal.trim() || attachment) {
+      showToast(t("chat.queueEditComposerBusy"));
+      return;
+    }
+    const queue = [...queueBookRef.current.queueFor(id)];
+    const turn = queue[index];
+    if (!turn) return;
+    queueEditRef.current = {
+      sessionId: id,
+      beforeIds: queue.slice(0, index).map((item) => item.id),
+      afterIds: queue.slice(index + 1).map((item) => item.id),
+      base: turn,
+    };
+    queueBookRef.current.takeAt(id, index);
+    syncQueuedView(id);
+    setGoal(turn.text);
+    if (turn.attachment) setAttachment(turn.attachment);
+    requestAnimationFrame(() => taRef.current?.focus());
+  }, [syncQueuedView, showToast, t, goal, attachment]);
+
   const stopActive = useCallback(() => {
     const sid = sessionRef.current;
     const key =
       foregroundTaskKeyRef.current ?? (sid ? (taskKeyBySessionRef.current.get(sid) ?? null) : null);
-    void chatCancel(key);
+    void chatCancel(key, sid);
   }, []);
 
   const removeTask = useCallback(
@@ -1677,6 +1908,6 @@ export function useWorkzSessionStore({
   }, [agents, t]);
 
   return {
-    t, i18n, panelRef, dragOver, toast, overview, projectDir, tasks, groups, groupErrors, collapsed, selectedId, runningIds, toggleGroup, openSession, newSessionIn, deleteSessionIn, addProject, removeProject, previewPath, isFree, freeTaskWorkspace, isSwarmTeam, swarmMainTab, setSwarmMainTab, activePoolId, scrollRef, steps, busy, sessionRef, pendingCards, permissionRequest, setPermissionRequest, markSubmitted, markActionSent, cards, restoreCard, setGoal, taskBound, setIsolate, taRef, refreshGitChanges, showToast, setError, worktree, setPreviewPath, error, planItems, setPlanItems, taskPanelOpen, setTaskPanelOpen, managedWorkspace, cwdOptions, changeCwd, isolate, startMode, setStartMode, startBase, setStartBase, teams, activeTeam, selectedTeam, teamOptions, handleTeamChange, agents, activeAgentId, agentOptions, handleAgentChange, setBoardOpen, isWorkflowTeam, workflowRunId, setWorkflowRunId, workflowStatus, setWorkflowStatus, setWorkflowOpen, setRunsOpen, setReviewTask, goal, detectAtMention, detectSlash, run, stopActive, canSend, onKeyDown, handlePaste, modelId, modelOptions, setModelId, showModelSelector, showGenericComposerTools, installedSkills, enabledSkills, setEnabledSkills, connectors, enabledConnectors, setEnabledConnectors, mention, mentionMatches, pickMention, slash, slashMatches, pickSlash, slashLabel, composerModeNotice, attachment, attachmentPreview, handleAttach, clearAttachment, boardOpen, workflowOpen, runsOpen, reviewTask, refreshTasks,
+    t, i18n, panelRef, dragOver, toast, overview, projectDir, tasks, groups, groupErrors, collapsed, selectedId, runningIds, toggleGroup, openSession, newSessionIn, deleteSessionIn, addProject, removeProject, previewPath, isFree, freeTaskWorkspace, isSwarmTeam, swarmMainTab, setSwarmMainTab, activePoolId, scrollRef, steps, busy, sessionRef, pendingCards, permissionRequest, setPermissionRequest, markSubmitted, markActionSent, cards, restoreCard, setGoal, taskBound, setIsolate, taRef, refreshGitChanges, showToast, setError, worktree, setPreviewPath, error, planItems, setPlanItems, taskPanelOpen, setTaskPanelOpen, managedWorkspace, cwdOptions, changeCwd, isolate, startMode, setStartMode, startBase, setStartBase, teams, activeTeam, selectedTeam, teamOptions, handleTeamChange, agents, activeAgentId, agentOptions, handleAgentChange, setBoardOpen, isWorkflowTeam, workflowRunId, setWorkflowRunId, workflowStatus, setWorkflowStatus, setWorkflowOpen, setRunsOpen, setReviewTask, goal, detectAtMention, detectSlash, run, stopActive, canSend, queuedView, removeQueued, interruptQueued, steerQueued, editQueued, onKeyDown, handlePaste, modelId, modelOptions, setModelId, showModelSelector, showGenericComposerTools, installedSkills, enabledSkills, setEnabledSkills, connectors, enabledConnectors, setEnabledConnectors, mention, mentionMatches, pickMention, slash, slashMatches, pickSlash, slashLabel, composerModeNotice, attachment, attachmentPreview, handleAttach, clearAttachment, boardOpen, workflowOpen, runsOpen, reviewTask, refreshTasks,
   };
 }

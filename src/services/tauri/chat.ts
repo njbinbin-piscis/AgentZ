@@ -396,9 +396,9 @@ export function deleteSession(sessionId: string, projectDir: string): Promise<vo
   return invoke<void>("chat_delete_session", { sessionId, projectDir });
 }
 
-/** Stop an in-flight agent turn. With `taskKey`, stops just that parallel task. */
-export function chatCancel(taskKey?: string | null): Promise<void> {
-  return invoke<void>("chat_cancel", { taskKey: taskKey ?? null });
+/** Stop an in-flight agent turn. `sessionId` still reaches a WorkZ turn after its task key was lost. */
+export function chatCancel(taskKey?: string | null, sessionId?: string | null): Promise<void> {
+  return invoke<void>("chat_cancel", { taskKey: taskKey ?? null, sessionId: sessionId ?? null });
 }
 
 /** Deliver guidance to the running turn. False when no turn is listening. */

@@ -1479,6 +1479,8 @@ const en = {
     artifactFilteredCount: "{{filtered}} of {{total}}",
     noMatchingArtifacts: "No artifacts match the filter.",
     placeholderBusy: "WorkZ is working…",
+    taskStillRunning: "This task is still running{{held}}. Your message waits behind it. If it is stuck, press Stop and send again.",
+    taskStillRunningHeld: " (about {{minutes}} min)",
     placeholder: "Describe a WorkZ task (Enter run, Shift+Enter newline, ↑↓ recall history)",
     swarmFeed: "Team activity",
     coordinatorChat: "Coordinator",
