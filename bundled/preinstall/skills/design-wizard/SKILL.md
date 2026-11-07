@@ -1,9 +1,9 @@
 ---
 name: "design-wizard"
-description: "Interactive design wizard that guides through a complete frontend design process with discovery, aesthetic selection, and code generation. Use for creating distinctive, production-ready UI."
+description: "Interactive wizard that walks through discovery, aesthetic selection, and code generation for a distinctive, production-ready frontend. Use when starting a new UI design."
+description_zh: "交互式前端设计向导：需求梳理、风格选择到代码生成，产出有辨识度的界面。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "frontend-design-pro"
+source: agentz
 ---
 
 # Design Wizard
@@ -117,7 +117,7 @@ See `references/aesthetics-catalog.md` for full catalog.
 
 ## Step 5: Color & Typography
 
-Invoke specialized skills:
+Use these companion skills (if enabled):
 - `color-curator` - Browse Coolors or select from fallbacks
 - `typography-selector` - Browse Google Fonts or use pairings
 

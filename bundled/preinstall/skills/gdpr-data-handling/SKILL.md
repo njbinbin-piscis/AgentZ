@@ -1,10 +1,9 @@
 ---
 name: "gdpr-data-handling"
-description: "Implement GDPR-compliant data handling with consent management, data subject rights, and privacy by design. Use when building systems that process EU personal data, implementing privacy controls, or conducting GDPR compliance reviews."
-description_zh: "人力资源政策文档、法律合规模板（GDPR/SOC2/HIPAA）、雇佣合同及监管文件"
+description: "Implement GDPR-compliant data handling: consent management, data subject rights, and privacy by design. Use when processing EU personal data or reviewing GDPR compliance."
+description_zh: "实现符合 GDPR 的数据处理：同意管理、数据主体权利与隐私设计。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hr-legal-compliance"
+source: agentz
 ---
 
 # GDPR Data Handling

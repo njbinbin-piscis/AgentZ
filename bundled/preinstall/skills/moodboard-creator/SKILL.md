@@ -1,9 +1,9 @@
 ---
 name: "moodboard-creator"
-description: "Create visual moodboards from collected inspiration with iterative refinement. Use after trend research or website analysis to synthesize design direction before implementation."
+description: "Create and iteratively refine visual moodboards from collected inspiration. Use after trend research or website analysis to settle design direction before implementation."
+description_zh: "根据收集的灵感制作并迭代视觉情绪板，在动手实现前确定设计方向"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "frontend-design-pro"
+source: agentz
 ---
 
 # Moodboard Creator

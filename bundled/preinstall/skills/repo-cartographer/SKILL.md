@@ -1,7 +1,7 @@
 ---
 name: "repo-cartographer"
-description: "Use when exploring unfamiliar modules, tracing cross-language Tauri IPC flows, assessing blast radius before refactoring, or recording source-anchored repository invariants"
-description_zh: "代码图谱测绘与仓库外部记忆维护技能：结合 graph_explore 与 repo_memory 精准定位跨端调用链、评估改动影响面并沉淀源码锚点绑定的架构不变量"
+description: "Map unfamiliar code, trace cross-language Tauri IPC flows, assess refactoring blast radius, and record source-anchored repository invariants. Use when exploring unfamiliar modules."
+description_zh: "梳理陌生代码、追踪跨语言 Tauri IPC 调用链、评估重构影响范围并记录源码锚定的架构不变量"
 version: "1.0.0"
 source: agentz
 ---

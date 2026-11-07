@@ -1,9 +1,9 @@
 ---
 name: "lucide-icons"
-description: ""
+description: "Search, download and customize Lucide SVG icons, with optional React component output. Use when you need icons for a web or app UI."
+description_zh: "搜索、下载并自定义 Lucide SVG 图标，可生成 React 组件，适用于网页和应用界面图标"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "lucide-icons"
+source: agentz
 ---
 
 # Lucide Icons Skill

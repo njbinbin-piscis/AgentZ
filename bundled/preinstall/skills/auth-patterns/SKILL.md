@@ -1,9 +1,9 @@
 ---
 name: "auth-patterns"
-description: "This skill should be used when the user asks about \\\\\\\\\\\\\\\"authentication in Next.js\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"NextAuth\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"Auth.js\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"middleware auth\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"protected routes\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"session management\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"JWT\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"login flow\\\\\\\\\\\\\\\", or needs guidance on implementing authentication and authorization in Next.js applications."
+description: "Authentication and authorization in Next.js: Auth.js/NextAuth, middleware, protected routes, sessions and JWT. Use when implementing login flows or access control in a Next.js app."
+description_zh: "Next.js 认证与授权实践：Auth.js/NextAuth、中间件、受保护路由、会话与 JWT。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "nextjs-expert"
+source: agentz
 ---
 
 # Authentication Patterns in Next.js

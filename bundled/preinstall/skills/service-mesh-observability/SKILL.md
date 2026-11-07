@@ -1,10 +1,9 @@
 ---
 name: "service-mesh-observability"
-description: "Implement comprehensive observability for service meshes including distributed tracing, metrics, and visualization. Use when setting up mesh monitoring, debugging latency issues, or implementing SLOs for service communication."
-description_zh: "云架构设计（AWS/Azure/GCP），Kubernetes 集群配置，Terraform 基础设施即代码，混合云网络，以及多云成本优化"
+description: "Observability for service meshes: distributed tracing, metrics, and dashboards. Use when setting up mesh monitoring, debugging latency, or defining SLOs for service communication."
+description_zh: "服务网格可观测性：分布式追踪、指标与可视化，用于监控和排查延迟问题"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "cloud-infrastructure"
+source: agentz
 ---
 
 # Service Mesh Observability

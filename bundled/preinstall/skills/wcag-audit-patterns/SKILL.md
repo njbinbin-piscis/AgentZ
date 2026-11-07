@@ -1,10 +1,9 @@
 ---
 name: "wcag-audit-patterns"
-description: "Conduct WCAG 2.2 accessibility audits with automated testing, manual verification, and remediation guidance. Use when auditing websites for accessibility, fixing WCAG violations, or implementing accessible design patterns."
-description_zh: "WCAG 无障碍审计、合规性验证、屏幕阅读器 UI 测试、键盘导航和包容性设计"
+description: "Run WCAG 2.2 accessibility audits with automated testing, manual checks and remediation guidance. Use when auditing sites for accessibility or fixing WCAG violations."
+description_zh: "进行 WCAG 2.2 无障碍审计：自动化测试、人工核查和修复建议"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "accessibility-compliance"
+source: agentz
 ---
 
 # WCAG Audit Patterns

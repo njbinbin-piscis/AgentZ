@@ -1,10 +1,9 @@
 ---
 name: "songsee"
-description: "Generate spectrograms and feature-panel visualizations from audio with the songsee CLI."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Generate spectrograms and feature-panel visualizations from audio with the songsee CLI. Use when visualizing audio files."
+description_zh: "使用 songsee 命令行从音频生成频谱图和特征面板可视化"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # songsee

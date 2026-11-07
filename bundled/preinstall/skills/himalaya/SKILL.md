@@ -1,10 +1,9 @@
 ---
 name: "himalaya"
-description: "CLI to manage emails via IMAP/SMTP. Use `himalaya` to list, read, write, reply, forward, search, and organize emails from the terminal. Supports multiple accounts and message composition with MML (MIME Meta Language)."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Manage email from the terminal with the himalaya IMAP/SMTP CLI: list, read, write, reply, forward, search, and organize. Use when working with a mailbox from the shell."
+description_zh: "用 himalaya 命令行通过 IMAP/SMTP 管理邮件：列出、阅读、撰写、回复和搜索。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Himalaya Email CLI

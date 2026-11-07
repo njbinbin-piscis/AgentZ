@@ -1,10 +1,9 @@
 ---
 name: "peekaboo"
-description: "Capture and automate macOS UI with the Peekaboo CLI."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Capture and automate the macOS UI with the Peekaboo CLI: screenshots, element targeting, clicks, typing and window or menu control. Use on macOS only."
+description_zh: "用 Peekaboo 命令行截屏并自动化操作 macOS 界面：点击、输入、窗口与菜单（仅 macOS）"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Peekaboo

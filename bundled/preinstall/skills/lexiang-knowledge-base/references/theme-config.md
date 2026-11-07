@@ -5,10 +5,10 @@
 ## 文件位置
 
 ```
-.AgentZ/themes/yunzhi-{template-name}.json
+themes/yunzhi-{template-name}.json
 ```
 
-默认主题: `skills/yunzhi-doc-writer/themes/default.json`
+默认主题: `assets/themes/default.json`
 
 ---
 

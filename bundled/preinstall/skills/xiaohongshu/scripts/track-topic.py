@@ -28,8 +28,6 @@ def find_feishu_scripts() -> Path:
     # 只允许在已知的 skill 目录中查找
     allowed_roots = [
         SCRIPT_DIR.parent.parent,  # 同级 skill 目录
-        Path.home() / ".openclaw" / "workspace" / "skills",
-        Path.home() / ".claude" / "skills",
     ]
     for root in allowed_roots:
         candidate = (root / "feishu-docs" / "scripts").resolve()

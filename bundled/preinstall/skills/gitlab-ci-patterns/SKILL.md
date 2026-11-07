@@ -1,10 +1,9 @@
 ---
 name: "gitlab-ci-patterns"
-description: "Build GitLab CI/CD pipelines with multi-stage workflows, caching, and distributed runners for scalable automation. Use when implementing GitLab CI/CD, optimizing pipeline performance, or setting up automated testing and deployment."
-description_zh: "CI/CD 流水线配置、GitHub Actions/GitLab CI 工作流设置及自动化部署流水线编排"
+description: "Build GitLab CI/CD pipelines with multi-stage workflows, caching, and distributed runners. Use when implementing or optimizing GitLab CI/CD."
+description_zh: "构建 GitLab CI/CD 流水线：多阶段、缓存和分布式 Runner。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "cicd-automation"
+source: agentz
 ---
 
 # GitLab CI Patterns

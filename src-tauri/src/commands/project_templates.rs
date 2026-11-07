@@ -250,8 +250,8 @@ mod tests {
             .join("../bundled/preinstall/project-templates");
         let list = list_from_dir(&root);
         assert!(
-            list.len() >= 9,
-            "expected at least 9 bundled templates, got {}",
+            list.len() >= 8,
+            "expected at least 8 bundled templates, got {}",
             list.len()
         );
         for tpl in &list {

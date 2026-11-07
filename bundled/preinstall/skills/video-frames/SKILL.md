@@ -1,10 +1,9 @@
 ---
 name: "video-frames"
-description: "Extract frames or short clips from videos using ffmpeg."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Extract single frames or thumbnails from a video with ffmpeg. Use when you need to inspect what happens at a given moment of a video."
+description_zh: "用 ffmpeg 从视频中提取指定时刻的画面或缩略图"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Video Frames (ffmpeg)
@@ -15,12 +14,12 @@ Extract a single frame from a video, or create quick thumbnails for inspection.
 
 First frame:
 ```bash
-{baseDir}/scripts/frame.sh /path/to/video.mp4 --out /tmp/frame.jpg
+scripts/frame.sh /path/to/video.mp4 --out /tmp/frame.jpg
 ```
 
 At a timestamp:
 ```bash
-{baseDir}/scripts/frame.sh /path/to/video.mp4 --time 00:00:10 --out /tmp/frame-10s.jpg
+scripts/frame.sh /path/to/video.mp4 --time 00:00:10 --out /tmp/frame-10s.jpg
 ```
 
 ## Notes

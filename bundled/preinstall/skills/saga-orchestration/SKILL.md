@@ -1,10 +1,9 @@
 ---
 name: "saga-orchestration"
-description: "Implement saga patterns for distributed transactions and cross-aggregate workflows. Use when coordinating multi-step business processes, handling compensating transactions, or managing long-running workflows."
-description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
+description: "Implement saga patterns for distributed transactions and cross-aggregate workflows. Use when coordinating multi-step business processes or handling compensating transactions."
+description_zh: "实现分布式事务与跨聚合工作流的 Saga 模式，处理补偿事务和长流程编排"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "backend-development"
+source: agentz
 ---
 
 # Saga Orchestration

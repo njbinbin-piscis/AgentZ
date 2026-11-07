@@ -1,0 +1,19 @@
+{
+  "id": "release",
+  "slash_id": "release",
+  "name": "Prepare Release Notes",
+  "description": "Update the changelog, version number and README for a new release based on changes since the last release.",
+  "description_zh": "根据上次发布以来的改动更新 CHANGELOG、版本号与 README。",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_search",
+    "file_edit",
+    "file_write",
+    "shell"
+  ],
+  "prompt": "Update CHANGELOG.md with changes since the last version increase. Check our README.md for any necessary changes. Check the scope of changes since the last release and increase our version number as appropriate.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-ci-deployment"
+}

@@ -1,13 +1,10 @@
 ---
-name: "agentmail"
-description: "Email inbox for AI agents. Check messages, send emails, and communicate via your own @agentmail.to address."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+name: "agent-mail"
+description: "Give the agent its own AgentMail inbox: read messages and send email through the AgentMail Python SDK or REST API. Use for signups, verification codes and agent-to-person mail."
+description_zh: "通过 AgentMail 为智能体提供独立收件箱，可收信、发信，适用于注册验证与通知。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
-
-> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 
 # AgentMail - Email for AI Agents 📧
 
@@ -119,18 +116,6 @@ client.inboxes.messages.send(
 )
 ```
 
-### CLI Scripts
-
-This skill includes helper scripts:
-
-```bash
-# Check inbox
-python3 scripts/check_inbox.py
-
-# Send email
-python3 scripts/send_email.py --to "recipient@example.com" --subject "Hello" --body "Message"
-```
-
 ---
 
 ## 🔌 REST API (curl alternative)
@@ -151,11 +136,7 @@ curl -s "https://api.agentmail.to/v0/inboxes/YOUR_EMAIL@agentmail.to/messages" \
 
 ## ⏰ Real-Time Notifications (Optional)
 
-**Option 1: Cron polling**
-```bash
-openclaw cron add --name "email-check" --every 5m \
-  --message "Check email inbox and notify if new messages"
-```
+**Option 1: Poll on request.** Check the inbox when the user asks, or at the start of a task that expects a reply.
 
 **Option 2: Webhooks**
 See https://docs.agentmail.to/webhook-setup for instant notifications.

@@ -1,10 +1,9 @@
 ---
 name: "memory-safety-patterns"
-description: "Implement memory-safe programming with RAII, ownership, smart pointers, and resource management across Rust, C++, and C. Use when writing safe systems code, managing resources, or preventing memory bugs."
-description_zh: "使用 Rust、Go、C 和 C++ 进行系统编程，适用于性能关键和底层开发"
+description: "Write memory-safe code with RAII, ownership, smart pointers and resource management in Rust, C++ and C. Use when writing systems code, managing resources or preventing memory bugs."
+description_zh: "Rust、C++、C 的内存安全实践：RAII、所有权与智能指针，适用于系统编程与防止内存缺陷"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "systems-programming"
+source: agentz
 ---
 
 # Memory Safety Patterns

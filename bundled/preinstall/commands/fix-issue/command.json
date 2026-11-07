@@ -1,0 +1,19 @@
+{
+  "id": "fix-issue",
+  "slash_id": "fix-issue",
+  "name": "Fix Issue",
+  "description": "Fix a specific issue or problem given an identifier or a short description. Use for quick, well-scoped bug fixes.",
+  "description_zh": "根据编号或描述修复指定的问题，适合范围明确的小型缺陷。",
+  "argument_hint": "<issue identifier or description>",
+  "tools": [
+    "file_read",
+    "file_search",
+    "file_edit",
+    "file_write",
+    "shell"
+  ],
+  "prompt": "Fix issue $ARGUMENTS",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-version-control-git"
+}

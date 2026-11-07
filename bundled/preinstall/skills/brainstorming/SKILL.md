@@ -1,10 +1,9 @@
 ---
 name: "brainstorming"
-description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
-description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description: "Explore intent, requirements and design through collaborative dialogue before implementation. Use before building features, adding components or changing behavior."
+description_zh: "动手实现前，通过对话梳理意图、需求与设计方案，适用于新功能、新组件或行为变更之前。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "superpowers"
+source: agentz
 ---
 
 # Brainstorming Ideas Into Designs
@@ -19,7 +18,7 @@ Start by understanding the current project context, then ask questions one at a 
 
 **Understanding the idea:**
 - Check out the current project state first (files, docs, recent commits)
-- Ask questions one at a time to refine the idea
+- Ask questions one at a time to refine the idea (`chat_ui` works well for multiple-choice questions)
 - Prefer multiple choice questions when possible, but open-ended is fine too
 - Only one question per message - if a topic needs more exploration, break it into multiple questions
 - Focus on understanding: purpose, constraints, success criteria
@@ -40,13 +39,13 @@ Start by understanding the current project context, then ask questions one at a 
 
 **Documentation:**
 - Write the validated design to `docs/plans/YYYY-MM-DD-<topic>-design.md`
-- Use elements-of-style:writing-clearly-and-concisely skill if available
-- Commit the design document to git
+- Write clearly and concisely
+- Commit the design document to git only if the user asks
 
 **Implementation (if continuing):**
 - Ask: "Ready to set up for implementation?"
-- Use superpowers:using-git-worktrees to create isolated workspace
-- Use superpowers:writing-plans to create detailed implementation plan
+- Offer to create a git worktree or branch for isolated work
+- Write a detailed implementation plan (`plan_write`) before coding
 
 ## Key Principles
 

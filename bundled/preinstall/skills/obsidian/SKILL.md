@@ -1,10 +1,9 @@
 ---
 name: "obsidian"
-description: "Work with Obsidian vaults (plain Markdown notes) and automate via obsidian-cli."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Work with Obsidian vaults (plain Markdown notes) and automate them with obsidian-cli. Use when searching, creating, moving or editing notes in a vault."
+description_zh: "操作 Obsidian 知识库（纯 Markdown 笔记），可用 obsidian-cli 搜索、创建、移动笔记"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Obsidian

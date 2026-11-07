@@ -1,0 +1,18 @@
+{
+  "id": "code_analysis",
+  "slash_id": "code_analysis",
+  "name": "Code Analysis",
+  "description": "Run a comprehensive code analysis with quality metrics, smells, security and performance findings, and track fixes with plan_todo. Use for a quality audit.",
+  "description_zh": "全面分析代码：质量指标、坏味道、安全与性能问题，并用待办跟踪修复。",
+  "argument_hint": "[file-or-directory-path]",
+  "tools": [
+    "file_read",
+    "codebase_search",
+    "file_list",
+    "plan_todo"
+  ],
+  "prompt": "Perform a comprehensive code analysis on the specified files or directory. If no path is provided, analyze the current working directory.\n\n## Analysis Process:\n\n1. **Parse Arguments**:\n   - Extract the path from $ARGUMENTS (defaults to current directory if not specified)\n   - Determine scope: single file, multiple files, or entire directory\n\n2. **Language Detection**:\n   - Identify programming language(s) based on file extensions\n   - Apply language-specific analysis rules\n\n3. **Code Quality Analysis**:\n   - **Complexity Metrics**: Cyclomatic complexity, nesting depth, function length\n   - **Code Smells**: Long methods, large classes, duplicate code patterns\n   - **Best Practices**: Naming conventions, code organization, documentation\n   - **Security Issues**: Common vulnerabilities, unsafe patterns, input validation\n   - **Performance**: Inefficient algorithms, memory leaks, blocking operations\n   - **Maintainability**: Code coupling, cohesion, test coverage indicators\n\n4. **Generate Report**:\n   - Summary with overall health score\n   - Detailed findings by category\n   - Priority-ranked issues (High/Medium/Low)\n   - Specific file and line references\n   - Actionable recommendations for improvement\n\n5. **Track with plan_todo tool**:\n   - Create todos for high-priority issues found\n   - Organize by fix complexity and impact\n\n## Example Usage:\n- `/code_analysis` - Analyze entire current directory\n- `/code_analysis src/` - Analyze all code in src directory\n- `/code_analysis app.js` - Analyze specific file\n- `/code_analysis \"src/**/*.py\"` - Analyze all Python files in src\n\nTarget path: $ARGUMENTS",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-code-analysis-testing"
+}

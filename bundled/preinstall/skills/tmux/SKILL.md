@@ -1,23 +1,22 @@
 ---
 name: "tmux"
-description: "Remote-control tmux sessions for interactive CLIs by sending keystrokes and scraping pane output."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Remote-control tmux sessions for interactive CLIs by sending keystrokes and reading pane output. Use when a task needs an interactive TTY such as a REPL or debugger."
+description_zh: "通过发送按键和读取窗格输出远程控制 tmux 会话，用于 REPL、调试器等需要交互终端的命令行程序"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # tmux Skill
 
-Use tmux only when you need an interactive TTY. Prefer bash background mode for long-running, non-interactive tasks.
+Use tmux only when you need an interactive TTY. Prefer running long, non-interactive tasks in the background with `shell` / `process_control`.
 
 ## Quickstart (isolated socket)
 
 ```bash
-SOCKET_DIR="${TMPDIR:-/tmp}/AgentZ-tmux-sockets"
+SOCKET_DIR="${TMPDIR:-/tmp}/agent-tmux-sockets"
 mkdir -p "$SOCKET_DIR"
-SOCKET="$SOCKET_DIR/AgentZ.sock"
-SESSION=AgentZ-python
+SOCKET="$SOCKET_DIR/agent.sock"
+SESSION=agent-python
 
 tmux -S "$SOCKET" new -d -s "$SESSION" -n shell
 tmux -S "$SOCKET" send-keys -t "$SESSION":0.0 -- 'PYTHON_BASIC_REPL=1 python3 -q' Enter
@@ -26,8 +25,8 @@ tmux -S "$SOCKET" capture-pane -p -J -t "$SESSION":0.0 -S -200
 
 ## Socket convention
 
-- Default socket dir: `${TMPDIR:-/tmp}/AgentZ-tmux-sockets`
-- Default socket path: `"$SOCKET_DIR/AgentZ.sock"`
+- Default socket dir: `${TMPDIR:-/tmp}/agent-tmux-sockets`
+- Default socket path: `"$SOCKET_DIR/agent.sock"`
 
 ## Targeting panes
 
@@ -36,8 +35,8 @@ tmux -S "$SOCKET" capture-pane -p -J -t "$SESSION":0.0 -S -200
 
 ## Finding sessions
 
-- List sessions: `{baseDir}/scripts/find-sessions.sh -S "$SOCKET"`
-- Scan all sockets: `{baseDir}/scripts/find-sessions.sh --all`
+- List sessions: `scripts/find-sessions.sh -S "$SOCKET"`
+- Scan all sockets: `scripts/find-sessions.sh --all`
 
 ## Sending input safely
 
@@ -47,7 +46,7 @@ tmux -S "$SOCKET" capture-pane -p -J -t "$SESSION":0.0 -S -200
 ## Watching output
 
 - Capture recent: `tmux -S "$SOCKET" capture-pane -p -J -t target -S -200`
-- Wait for prompts: `{baseDir}/scripts/wait-for-text.sh -t session:0.0 -p 'pattern'`
+- Wait for prompts: `scripts/wait-for-text.sh -t session:0.0 -p 'pattern'`
 
 ## Cleanup
 
@@ -57,5 +56,5 @@ tmux -S "$SOCKET" capture-pane -p -J -t "$SESSION":0.0 -S -200
 ## Helper: wait-for-text.sh
 
 ```bash
-{baseDir}/scripts/wait-for-text.sh -t session:0.0 -p 'pattern' [-F] [-T 20] [-i 0.5] [-l 2000]
+scripts/wait-for-text.sh -t session:0.0 -p 'pattern' [-F] [-T 20] [-i 0.5] [-l 2000]
 ```

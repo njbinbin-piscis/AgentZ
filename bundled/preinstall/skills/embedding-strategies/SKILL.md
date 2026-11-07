@@ -1,9 +1,9 @@
 ---
 name: "embedding-strategies"
-description: "Select and optimize embedding models for semantic search and RAG applications. Use when choosing embedding models, implementing chunking strategies, or optimizing embedding quality for specific domains."
+description: "Select and optimize embedding models for semantic search and RAG. Use when choosing embedding models, designing chunking strategies, or tuning embedding quality for a domain."
+description_zh: "为语义搜索和 RAG 选择并优化嵌入模型，设计分块策略。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "llm-application-dev"
+source: agentz
 ---
 
 # Embedding Strategies

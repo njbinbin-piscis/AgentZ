@@ -1,9 +1,9 @@
 ---
 name: "vector-index-tuning"
-description: "Optimize vector index performance for latency, recall, and memory. Use when tuning HNSW parameters, selecting quantization strategies, or scaling vector search infrastructure."
+description: "Tune vector index performance for latency, recall and memory. Use when adjusting HNSW parameters, choosing quantization or scaling vector search."
+description_zh: "优化向量索引的延迟、召回率和内存占用：HNSW 参数调优、量化策略和向量检索扩容"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "llm-application-dev"
+source: agentz
 ---
 
 # Vector Index Tuning

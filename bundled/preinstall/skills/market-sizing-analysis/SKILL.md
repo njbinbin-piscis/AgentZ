@@ -1,10 +1,9 @@
 ---
 name: "market-sizing-analysis"
-description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"calculate TAM\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"determine SAM\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"estimate SOM\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"size the market\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"calculate market opportunity\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"what's the total addressable market\\\\\\\\\\\\\\\", or requests market sizing analysis for a startup or business opportunity."
-description_zh: "面向初创企业的综合业务分析工具，提供市场规模分析（TAM/SAM/SOM）、财务建模、团队规划和战略研究功能"
+description: "Calculate TAM, SAM and SOM with top-down, bottom-up and value-theory methods. Use when sizing a market or estimating the opportunity for a startup or business idea."
+description_zh: "用自上而下、自下而上等方法测算 TAM/SAM/SOM，适用于评估创业或业务的市场机会"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "startup-business-analyst"
+source: agentz
 ---
 
 # Market Sizing Analysis

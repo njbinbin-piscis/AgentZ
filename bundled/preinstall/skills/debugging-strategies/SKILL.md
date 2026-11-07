@@ -1,10 +1,9 @@
 ---
 name: "debugging-strategies"
-description: "Master systematic debugging techniques, profiling tools, and root cause analysis to efficiently track down bugs across any codebase or technology stack. Use when investigating bugs, performance issues, or unexpected behavior."
-description_zh: "包含 Git 工作流、SQL 优化、错误处理、代码审查、端到端测试、身份认证、调试和 Monorepo 管理的核心开发技能集"
+description: "Systematic debugging, profiling and root cause analysis to track down bugs in any codebase. Use when investigating bugs, performance problems or unexpected behavior."
+description_zh: "系统化调试、性能分析与根因分析方法，用于排查缺陷、性能问题和异常行为。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "developer-essentials"
+source: agentz
 ---
 
 # Debugging Strategies

@@ -1,10 +1,9 @@
 ---
 name: "openapi-spec-generation"
-description: "Generate and maintain OpenAPI 3.1 specifications from code, design-first specs, and validation patterns. Use when creating API documentation, generating SDKs, or ensuring API contract compliance."
-description_zh: "OpenAPI规范生成、Mermaid图表创建、教程编写、API参考文档"
+description: "Generate and maintain OpenAPI 3.1 specs from code, design-first workflows and validation. Use when writing API documentation, generating SDKs or checking API contracts."
+description_zh: "生成并维护 OpenAPI 3.1 规范：代码生成、设计优先与校验，适用于 API 文档和 SDK 生成"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "documentation-generation"
+source: agentz
 ---
 
 # OpenAPI Spec Generation

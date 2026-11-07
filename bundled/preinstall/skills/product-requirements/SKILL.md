@@ -1,10 +1,9 @@
 ---
 name: "product-requirements"
-description: "Interactive Product Owner skill for requirements gathering, analysis, and PRD generation. Triggers when users request product requirements, feature specification, PRD creation, or need help understanding and documenting project requirements. Uses quality scoring and iterative dialogue to ensure comprehensive requirements before generating professional PRD documents."
-description_zh: "完整的 OMC (Oh My AgentZ) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
+description: "Interactive product owner workflow for requirements gathering, quality scoring and PRD generation. Use when writing a PRD or specifying a feature."
+description_zh: "交互式需求梳理与质量评分，生成专业 PRD 文档，适用于撰写产品需求和功能规格"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "oh-my-agentz"
+source: agentz
 ---
 
 # Product Requirements Skill

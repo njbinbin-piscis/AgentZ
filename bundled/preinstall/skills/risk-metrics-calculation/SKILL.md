@@ -1,10 +1,9 @@
 ---
 name: "risk-metrics-calculation"
-description: "Calculate portfolio risk metrics including VaR, CVaR, Sharpe, Sortino, and drawdown analysis. Use when measuring portfolio risk, implementing risk limits, or building risk monitoring systems."
-description_zh: "量化分析、算法交易策略、金融建模、投资组合风险管理和回测"
+description: "Calculate portfolio risk metrics including VaR, CVaR, Sharpe, Sortino, and drawdown. Use when measuring portfolio risk, setting risk limits, or building risk monitoring."
+description_zh: "计算 VaR、CVaR、夏普、索提诺和回撤等投资组合风险指标"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "quantitative-trading"
+source: agentz
 ---
 
 # Risk Metrics Calculation

@@ -1,10 +1,9 @@
 ---
 name: "backtesting-frameworks"
-description: "Build robust backtesting systems for trading strategies with proper handling of look-ahead bias, survivorship bias, and transaction costs. Use when developing trading algorithms, validating strategies, or building backtesting infrastructure."
-description_zh: "量化分析、算法交易策略、金融建模、投资组合风险管理和回测"
+description: "Build robust trading strategy backtests that handle look-ahead bias, survivorship bias and transaction costs. Use when developing or validating trading algorithms."
+description_zh: "构建稳健的交易策略回测系统，处理前视偏差、幸存者偏差与交易成本，用于开发和验证交易算法。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "quantitative-trading"
+source: agentz
 ---
 
 # Backtesting Frameworks

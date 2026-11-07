@@ -1,10 +1,9 @@
 ---
 name: "python-testing-patterns"
-description: "Implement comprehensive testing strategies with pytest, fixtures, mocking, and test-driven development. Use when writing Python tests, setting up test suites, or implementing testing best practices."
-description_zh: "现代 Python 开发工具，支持 Python 3.12+、Django、FastAPI、异步编程模式及生产环境最佳实践"
+description: "Implement Python testing strategies with pytest, fixtures, mocking, and TDD. Use when writing Python tests, setting up test suites, or applying testing best practices."
+description_zh: "使用 pytest、fixture、mock 和 TDD 编写 Python 测试并搭建测试套件"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "python-development"
+source: agentz
 ---
 
 # Python Testing Patterns

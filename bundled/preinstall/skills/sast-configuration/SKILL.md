@@ -1,10 +1,9 @@
 ---
 name: "sast-configuration"
-description: "Configure Static Application Security Testing (SAST) tools for automated vulnerability detection in application code. Use when setting up security scanning, implementing DevSecOps practices, or automating code vulnerability detection."
-description_zh: "静态应用程序安全测试（SAST）分析、依赖项漏洞扫描、OWASP Top 10 合规性检查、容器安全扫描以及自动化安全加固"
+description: "Configure Static Application Security Testing (SAST) tools for automated vulnerability detection. Use when setting up security scanning or DevSecOps pipelines."
+description_zh: "配置静态应用安全测试（SAST）工具，实现代码漏洞的自动检测"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "security-scanning"
+source: agentz
 ---
 
 # SAST Configuration

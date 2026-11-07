@@ -1,10 +1,9 @@
 ---
 name: "k8s-manifest-generator"
-description: "Create production-ready Kubernetes manifests for Deployments, Services, ConfigMaps, and Secrets following best practices and security standards. Use when generating Kubernetes YAML manifests, creating K8s resources, or implementing production-grade Kubernetes configurations."
-description_zh: "Kubernetes 清单生成、网络配置、安全策略、可观测性配置、GitOps 工作流和自动扩缩容"
+description: "Create production-ready Kubernetes manifests for Deployments, Services, ConfigMaps, and Secrets following best practices. Use when generating Kubernetes YAML."
+description_zh: "生成符合最佳实践的生产级 Kubernetes 清单：Deployment、Service、ConfigMap、Secret。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "kubernetes-operations"
+source: agentz
 ---
 
 # Kubernetes Manifest Generator

@@ -1,14 +1,14 @@
 ---
 name: "json-canvas"
-description: "Create and edit JSON Canvas files (.canvas) with nodes, edges, groups, and connections. Use when working with .canvas files, creating visual canvases, mind maps, flowcharts, or when the user mentions Canvas files in Obsidian."
+description: "Create and edit JSON Canvas (.canvas) files with nodes, edges, and groups. Use when working with .canvas files, mind maps, flowcharts, or Obsidian canvases."
+description_zh: "创建和编辑 JSON Canvas (.canvas) 文件：节点、连线与分组。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "obsidian-skills"
+source: agentz
 ---
 
 # JSON Canvas
 
-This skill enables AgentZ to create and edit valid JSON Canvas files (`.canvas`) used in Obsidian and other applications.
+This skill covers how to create and edit valid JSON Canvas files (`.canvas`) used in Obsidian and other applications.
 
 ## Overview
 

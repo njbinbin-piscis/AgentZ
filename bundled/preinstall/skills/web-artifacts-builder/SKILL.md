@@ -1,18 +1,18 @@
 ---
 name: "web-artifacts-builder"
-description: "Suite of tools for creating elaborate, multi-component claude.ai HTML artifacts using modern frontend web technologies (React, Tailwind CSS, shadcn/ui). Use for complex artifacts requiring state management, routing, or shadcn/ui components - not for simple single-file HTML/JSX artifacts."
+description: "Build multi-component single-file HTML web apps with React, Tailwind CSS and shadcn/ui, bundled into one HTML file. Use for complex pages needing state, routing or shadcn/ui components."
+description_zh: "用 React、Tailwind CSS 和 shadcn/ui 构建多组件网页应用，并打包为单个 HTML 文件"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "web-artifacts-builder"
+source: agentz
 ---
 
 # Web Artifacts Builder
 
-To build powerful frontend claude.ai artifacts, follow these steps:
+To build a powerful single-file frontend web app, follow these steps:
 1. Initialize the frontend repo using `scripts/init-artifact.sh`
 2. Develop your artifact by editing the generated code
 3. Bundle all code into a single HTML file using `scripts/bundle-artifact.sh`
-4. Display artifact to user
+4. Show the result to the user
 5. (Optional) Test the artifact
 
 **Stack**: React 18 + TypeScript + Vite + Parcel (bundling) + Tailwind CSS + shadcn/ui
@@ -51,7 +51,7 @@ To bundle the React app into a single HTML artifact:
 bash scripts/bundle-artifact.sh
 ```
 
-This creates `bundle.html` - a self-contained artifact with all JavaScript, CSS, and dependencies inlined. This file can be directly shared in Claude conversations as an artifact.
+This creates `bundle.html` - a self-contained artifact with all JavaScript, CSS, and dependencies inlined. This file can be opened directly in a browser or shared as is.
 
 **Requirements**: Your project must have an `index.html` in the root directory.
 
@@ -61,15 +61,15 @@ This creates `bundle.html` - a self-contained artifact with all JavaScript, CSS,
 - Builds with Parcel (no source maps)
 - Inlines all assets into single HTML using html-inline
 
-### Step 4: Share Artifact with User
+### Step 4: Share the Result with the User
 
-Finally, share the bundled HTML file in conversation with the user so they can view it as an artifact.
+Finally, tell the user where the bundled HTML file is so they can open it in a browser.
 
 ### Step 5: Testing/Visualizing the Artifact (Optional)
 
 Note: This is a completely optional step. Only perform if necessary or requested.
 
-To test/visualize the artifact, use available tools (including other Skills or built-in tools like Playwright or Puppeteer). In general, avoid testing the artifact upfront as it adds latency between the request and when the finished artifact can be seen. Test later, after presenting the artifact, if requested or if issues arise.
+To test/visualize the artifact, use available tools (for example the `browser` tool, Playwright or Puppeteer). In general, avoid testing the artifact upfront as it adds latency between the request and when the finished artifact can be seen. Test later, after presenting the artifact, if requested or if issues arise.
 
 ## Reference
 

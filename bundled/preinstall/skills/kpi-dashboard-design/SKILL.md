@@ -1,10 +1,9 @@
 ---
 name: "kpi-dashboard-design"
-description: "Design effective KPI dashboards with metrics selection, visualization best practices, and real-time monitoring patterns. Use when building business dashboards, selecting metrics, or designing data visualization layouts."
-description_zh: "业务指标分析、KPI 跟踪、财务报告和数据驱动的决策制定"
+description: "Design KPI dashboards with metric selection, visualization best practices and real-time monitoring patterns. Use when building business dashboards or choosing metrics and layouts."
+description_zh: "设计 KPI 仪表盘：指标选择、可视化最佳实践与实时监控模式，适用于业务看板搭建"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "business-analytics"
+source: agentz
 ---
 
 # KPI Dashboard Design

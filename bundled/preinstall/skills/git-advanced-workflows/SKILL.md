@@ -1,10 +1,9 @@
 ---
 name: "git-advanced-workflows"
-description: "Master advanced Git workflows including rebasing, cherry-picking, bisect, worktrees, and reflog to maintain clean history and recover from any situation. Use when managing complex Git histories, collaborating on feature branches, or troubleshooting repository issues."
-description_zh: "包含 Git 工作流、SQL 优化、错误处理、代码审查、端到端测试、身份认证、调试和 Monorepo 管理的核心开发技能集"
+description: "Use advanced Git workflows: rebasing, cherry-picking, bisect, worktrees, and reflog. Use when managing complex histories, collaborating on branches, or recovering from mistakes."
+description_zh: "进阶 Git 工作流：变基、cherry-pick、bisect、worktree 与 reflog。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "developer-essentials"
+source: agentz
 ---
 
 # Git Advanced Workflows

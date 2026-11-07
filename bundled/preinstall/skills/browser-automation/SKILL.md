@@ -1,15 +1,14 @@
 ---
-name: "Browser Automation"
-description: "This skill should be used when the user needs to interact with web pages, browse websites, take screenshots, fill forms, click elements, extract web content, or perform any browser automation tasks. Trigger phrases include \\\\\\\\\\\\\\\"open webpage\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"visit website\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"browse\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"screenshot page\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"fill form\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"click button\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"extract from website\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"web scraping\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"automate browser\\\\\\\\\\\\\\\"."
-description_zh: "基于 Vercel agent-browser CLI 的浏览器自动化插件。首次使用时自动安装，让 AgentZ 能够进行网页交互、截图、表单填写等浏览器操作。"
+name: "browser-automation"
+description: "Automate web pages with the agent-browser CLI: open sites, snapshot, click, type, fill forms and take screenshots. Use when a task needs a real browser with JavaScript rendering."
+description_zh: "使用 agent-browser 命令行自动化网页：打开站点、快照、点击、输入、填表与截图，适用于需要真实浏览器的任务。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "agent-browser"
+source: agentz
 ---
 
 # Browser Automation with agent-browser
 
-Use `agent-browser` CLI tool for all browser automation tasks. This is the preferred method for web interactions.
+Use the `agent-browser` CLI (run through `shell`) for browser automation that needs a real browser. For quick page checks the builtin `browser` tool may be enough.
 
 ## Important: Command Sequence
 
@@ -87,7 +86,7 @@ agent-browser close
 
 ## When NOT to Use
 
-- For simple HTTP requests without JavaScript rendering, use `curl` or `WebFetch`
+- For simple HTTP requests without JavaScript rendering, use `web_fetch` or `curl`
 - For API calls, use appropriate HTTP tools
 - agent-browser is for full browser automation with JavaScript support
 

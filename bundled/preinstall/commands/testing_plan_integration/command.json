@@ -1,0 +1,20 @@
+{
+  "id": "testing_plan_integration",
+  "slash_id": "testing_plan_integration",
+  "name": "Integration Test Plan",
+  "description": "Create an integration testing plan and tests for a feature, written inline in Rust style where applicable. Use to plan integration coverage.",
+  "description_zh": "为功能制定集成测试计划并编写测试",
+  "argument_hint": "<feature or code to test>",
+  "tools": [
+    "shell",
+    "file_read",
+    "file_write",
+    "file_edit",
+    "file_search",
+    "file_list"
+  ],
+  "prompt": "I need you to create an integration testing plan for $ARGUMENTS\n\nThese are integration tests and I want them to be inline in rust fashion.\n\nIf the code is difficult to test, you should suggest refactoring to make it easier to test.\n\nThink really hard about the code, the tests, and the refactoring (if applicable).\n\nWill you come up with test cases and let me review before you write the tests?\n\nFeel free to ask clarifying questions.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-code-analysis-testing"
+}

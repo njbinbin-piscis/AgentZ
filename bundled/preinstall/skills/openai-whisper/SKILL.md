@@ -1,10 +1,9 @@
 ---
 name: "openai-whisper"
-description: "Local speech-to-text with the Whisper CLI (no API key)."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Transcribe audio locally with the Whisper CLI, no API key needed. Use when converting speech or recordings to text offline."
+description_zh: "用 Whisper 命令行在本地转写音频，无需 API Key，适用于离线语音转文字"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Whisper (CLI)
@@ -17,5 +16,5 @@ Quick start
 
 Notes
 - Models download to `~/.cache/whisper` on first run.
-- `--model` defaults to `turbo` on this install.
+- `--model` defaults to `turbo` in recent versions.
 - Use smaller models for speed, larger for accuracy.

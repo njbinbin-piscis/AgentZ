@@ -1,10 +1,9 @@
 ---
 name: "github-actions-templates"
-description: "Create production-ready GitHub Actions workflows for automated testing, building, and deploying applications. Use when setting up CI/CD with GitHub Actions, automating development workflows, or creating reusable workflow templates."
-description_zh: "CI/CD 流水线配置、GitHub Actions/GitLab CI 工作流设置及自动化部署流水线编排"
+description: "Create production-ready GitHub Actions workflows for testing, building, and deploying. Use when setting up CI/CD on GitHub or writing reusable workflow templates."
+description_zh: "创建生产级 GitHub Actions 工作流，用于测试、构建和部署。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "cicd-automation"
+source: agentz
 ---
 
 # GitHub Actions Templates

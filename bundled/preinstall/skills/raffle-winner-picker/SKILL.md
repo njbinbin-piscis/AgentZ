@@ -1,9 +1,9 @@
 ---
 name: "raffle-winner-picker"
-description: "Picks random winners from lists, spreadsheets, or Google Sheets for giveaways, raffles, and contests. Ensures fair, unbiased selection with transparency."
+description: "Pick random winners from lists, spreadsheets, or Google Sheets for giveaways and contests, with fair and transparent selection. Use when running a raffle or drawing winners."
+description_zh: "从列表、表格或 Google Sheets 中公平透明地随机抽取中奖者，适用于抽奖和比赛"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "raffle-winner-picker"
+source: agentz
 ---
 
 # Raffle Winner Picker

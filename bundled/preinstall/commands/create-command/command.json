@@ -1,0 +1,19 @@
+{
+  "id": "create-command",
+  "slash_id": "create-command",
+  "name": "Create Command",
+  "description": "Create a new AgentZ slash command (command.json) from a description, following the conventions of the existing commands. Use when you want to automate a repeated task as a /command.",
+  "description_zh": "根据描述创建新的 AgentZ 斜杠命令（command.json），并遵循现有命令的约定。",
+  "argument_hint": "<what the command should do>",
+  "tools": [
+    "file_read",
+    "file_write",
+    "file_list",
+    "file_search",
+    "chat_ui"
+  ],
+  "prompt": "Create a new AgentZ slash command based on this request: $ARGUMENTS\n\n## 1. Study existing commands\nList the commands folder of the AgentZ config directory (and any command.json files in the project the user points to). Read a few to learn naming, tone and structure. Note existing slash_ids so you do not collide with them.\n\n## 2. Clarify\nIf the request is missing the goal, the expected output or what arguments the user will pass, ask with chat_ui. If $ARGUMENTS is empty, ask what the command should do.\n\n## 3. Design command.json\nFields: id (lowercase kebab-case, same as the folder name), slash_id (what the user types after the slash), name (Title Case English), description (English plain text, at most 200 characters, no Markdown), description_zh (natural Chinese, at most 80 characters), argument_hint, tools (builtin tool ids only), prompt (English instructions; $ARGUMENTS is replaced by the user's input), prompt_zh (optional Chinese version), source (\"agentz\").\nValid tool ids: file_read, file_write, file_edit, file_list, file_search, file_diff, codebase_search, symbol_search, shell, process_control, code_run, web_fetch, web_search, plan_todo, plan_write, delegate, chat_ui, browser, pdf, vision_context, email, ssh, repo_memory, memory_store, skill_manage, api_connector, lsp, read_lints, graph_explore, graph_search, impact, devenv, terminal_read, recall_tool_result, plan_mode_ui, pool_org, pool_chat.\n\nWrite the prompt as direct instructions: goal, numbered steps, files or commands to inspect, output format, and behaviour when $ARGUMENTS is empty. Enable only the tools those steps need.\n\n## 4. Save and summarize\nCreate the folder <commands folder>/<id>/ and write command.json there with file_write (valid JSON, UTF-8). Then summarize the command, show an example invocation, and mention that it can be edited later on the Commands page.",
+  "prompt_zh": "根据以下需求创建新的 AgentZ 斜杠命令：$ARGUMENTS\n\n1. 查看 AgentZ 配置目录下 commands 文件夹中已有的命令，了解命名与结构，避免 slash_id 冲突。\n2. 若目标、输出或参数不明确，用 chat_ui 追问；若 $ARGUMENTS 为空，先询问命令要做什么。\n3. 设计 command.json：id、slash_id、name、description（英文，不超过 200 字符）、description_zh（中文，不超过 80 字）、argument_hint、tools（仅限内置工具 id）、prompt（用 $ARGUMENTS 接收用户输入）、prompt_zh、source 为 agentz。\n4. 在 commands/<id>/ 下写入 command.json，然后给出用法示例。",
+  "source": "agentz",
+  "source_plugin": ""
+}

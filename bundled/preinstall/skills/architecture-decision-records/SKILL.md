@@ -1,10 +1,9 @@
 ---
 name: "architecture-decision-records"
-description: "Write and maintain Architecture Decision Records (ADRs) following best practices for technical decision documentation. Use when documenting significant technical decisions, reviewing past architectural choices, or establishing decision processes."
-description_zh: "OpenAPI规范生成、Mermaid图表创建、教程编写、API参考文档"
+description: "Write and maintain Architecture Decision Records (ADRs) for significant technical decisions. Use when documenting architectural choices, reviewing past decisions or setting up a decision process."
+description_zh: "编写并维护架构决策记录（ADR），用于记录重要技术决策、回顾既有架构选择或建立决策流程。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "documentation-generation"
+source: agentz
 ---
 
 # Architecture Decision Records

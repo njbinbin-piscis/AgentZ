@@ -1,8 +1,7 @@
 {
   "id": "tpl-tsmart-template",
-  "name": "tsmart",
-  "name_zh": "tsmart",
+  "name": "Test Engineering",
+  "name_zh": "测试工程",
   "description": "Structured test engineering workflow: test case matrix design, boundary/negative path coverage, and automated unit/integration/E2E test generation.",
-  "description_zh": "结构化测试工程工作流：涵盖测试矩阵设计、边界与异常路径覆盖、以及单元/集成/E2E 自动化测试生成。",
-  "source_plugin": "tsmart"
+  "description_zh": "结构化测试工程工作流：涵盖测试矩阵设计、边界与异常路径覆盖、以及单元/集成/E2E 自动化测试生成。"
 }

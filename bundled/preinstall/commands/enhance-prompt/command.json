@@ -1,0 +1,13 @@
+{
+  "id": "enhance-prompt",
+  "slash_id": "enhance-prompt",
+  "name": "Enhance Prompt",
+  "description": "Rewrite an instruction to be clearer, more specific and unambiguous, and return the improved prompt. Use to polish a request.",
+  "description_zh": "改写指令使其更清晰、具体、无歧义，并返回优化后的提示词。",
+  "argument_hint": "<instruction>",
+  "tools": [],
+  "prompt": "`/enhance-prompt <task info>`\n\nHere is an instruction that I'd like to give you, but it needs to be improved. Rewrite and enhance this instruction to make it clearer, more specific, less ambiguous, and correct any mistakes. Do not use any tools: reply immediately with your answer, even if you're not sure. Consider the context of our conversation history when enhancing the prompt. If there is code in triple backticks (```) consider whether it is a code sample and should remain unchanged.Reply with the following format:\n\n### BEGIN RESPONSE\n\n<enhanced-prompt>enhanced prompt goes here</enhanced-prompt>\n\n### END RESPONSE",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "development-essentials"
+}

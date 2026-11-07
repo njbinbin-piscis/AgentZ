@@ -1,10 +1,9 @@
 ---
 name: "receiving-code-review"
-description: "Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation"
-description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description: "Handle code review feedback with technical rigor and verification instead of blind agreement. Use when receiving review comments, especially unclear or questionable ones, before implementing them."
+description_zh: "以技术严谨和验证的态度处理代码评审反馈，避免盲目附和或照单全收"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "superpowers"
+source: agentz
 ---
 
 # Code Review Reception
@@ -31,7 +30,7 @@ WHEN receiving code review feedback:
 ## Forbidden Responses
 
 **NEVER:**
-- "You're absolutely right!" (explicit CLAUDE.md violation)
+- "You're absolutely right!" (performative agreement, not technical evaluation)
 - "Great point!" / "Excellent feedback!" (performative)
 - "Let me implement that now" (before verification)
 

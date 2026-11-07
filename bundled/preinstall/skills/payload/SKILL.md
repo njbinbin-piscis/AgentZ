@@ -1,10 +1,9 @@
 ---
 name: "payload"
-description: "Use when working with Payload CMS projects (payload.config.ts, collections, fields, hooks, access control, Payload API). Use when debugging validation errors, security issues, relationship queries, transactions, or hook behavior."
-description_zh: "为 Payload 开发提供全面指导的 AgentZ 技能，包含 TypeScript 模式、字段配置、钩子、访问控制和 API 示例。"
+description: "Develop Payload CMS projects: config, collections, fields, hooks, access control and the Payload API. Use when building or debugging Payload apps."
+description_zh: "Payload CMS 开发指南：配置、集合、字段、钩子、访问控制与 API，适用于构建和调试"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "payload"
+source: agentz
 ---
 
 # Payload CMS Application Development

@@ -1,9 +1,9 @@
 ---
 name: "langchain-architecture"
-description: "Design LLM applications using the LangChain framework with agents, memory, and tool integration patterns. Use when building LangChain applications, implementing AI agents, or creating complex LLM workflows."
+description: "Design LLM applications with the LangChain framework: agents, memory and tool integration. Use when building LangChain apps, AI agents or complex LLM workflows."
+description_zh: "使用 LangChain 设计 LLM 应用：智能体、记忆与工具集成，适用于构建复杂 LLM 工作流"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "llm-application-dev"
+source: agentz
 ---
 
 # LangChain Architecture

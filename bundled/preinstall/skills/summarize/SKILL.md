@@ -1,10 +1,9 @@
 ---
 name: "summarize"
-description: "Summarize URLs or files with the summarize CLI (web, PDFs, images, audio, YouTube)."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Summarize URLs or files with the summarize CLI (web pages, PDFs, images, audio, YouTube). Use when asked to summarize a link or document."
+description_zh: "使用 summarize 命令行总结网页、PDF、图片、音频和 YouTube 内容"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Summarize

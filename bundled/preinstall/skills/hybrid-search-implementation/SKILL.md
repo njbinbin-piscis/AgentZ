@@ -1,9 +1,9 @@
 ---
 name: "hybrid-search-implementation"
-description: "Combine vector and keyword search for improved retrieval. Use when implementing RAG systems, building search engines, or when neither approach alone provides sufficient recall."
+description: "Combine vector and keyword search for better retrieval. Use when building RAG or search systems where neither approach alone gives enough recall."
+description_zh: "结合向量检索与关键词检索以提升召回，适用于 RAG 和搜索系统。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "llm-application-dev"
+source: agentz
 ---
 
 # Hybrid Search Implementation

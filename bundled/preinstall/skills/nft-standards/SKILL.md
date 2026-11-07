@@ -1,10 +1,9 @@
 ---
 name: "nft-standards"
-description: "Implement NFT standards (ERC-721, ERC-1155) with proper metadata handling, minting strategies, and marketplace integration. Use when creating NFT contracts, building NFT marketplaces, or implementing digital asset systems."
-description_zh: "使用 Solidity 进行智能合约开发、DeFi 协议实现、NFT 平台和 Web3 应用架构"
+description: "Implement NFT standards (ERC-721, ERC-1155) with metadata handling, minting strategies and marketplace integration. Use when creating NFT contracts or marketplaces."
+description_zh: "实现 ERC-721、ERC-1155 等 NFT 标准：元数据、铸造策略与市场集成"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "blockchain-web3"
+source: agentz
 ---
 
 # NFT Standards

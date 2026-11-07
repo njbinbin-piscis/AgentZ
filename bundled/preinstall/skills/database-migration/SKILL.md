@@ -1,10 +1,9 @@
 ---
 name: "database-migration"
-description: "Execute database migrations across ORMs and platforms with zero-downtime strategies, data transformation, and rollback procedures. Use when migrating databases, changing schemas, performing data transformations, or implementing zero-downtime deployment strategies."
-description_zh: "框架升级、迁移规划与架构转型工作流"
+description: "Run database migrations across ORMs and platforms with zero-downtime strategies, data transformation and rollback plans. Use when migrating databases or changing schemas."
+description_zh: "跨 ORM 与平台执行数据库迁移，涵盖零停机策略、数据转换与回滚方案。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "framework-migration"
+source: agentz
 ---
 
 # Database Migration

@@ -1,20 +1,21 @@
 ---
 name: "openai-whisper-api"
-description: "Transcribe audio via OpenAI Audio Transcriptions API (Whisper)."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Transcribe audio with the OpenAI Audio Transcriptions API (Whisper) using curl. Use when you have an OpenAI API key and need speech-to-text."
+description_zh: "通过 OpenAI 音频转写 API（Whisper）转写音频，适用于已有 OpenAI Key 的语音转文字"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # OpenAI Whisper API (curl)
+
+In the commands below, `<skill-dir>` is this skill's installed directory (`<config>/skills/installed/openai-whisper-api`).
 
 Transcribe an audio file via OpenAI's `/v1/audio/transcriptions` endpoint.
 
 ## Quick start
 
 ```bash
-{baseDir}/scripts/transcribe.sh /path/to/audio.m4a
+<skill-dir>/scripts/transcribe.sh /path/to/audio.m4a
 ```
 
 Defaults:
@@ -24,10 +25,10 @@ Defaults:
 ## Useful flags
 
 ```bash
-{baseDir}/scripts/transcribe.sh /path/to/audio.ogg --model whisper-1 --out /tmp/transcript.txt
-{baseDir}/scripts/transcribe.sh /path/to/audio.m4a --language en
-{baseDir}/scripts/transcribe.sh /path/to/audio.m4a --prompt "Speaker names: Peter, Daniel"
-{baseDir}/scripts/transcribe.sh /path/to/audio.m4a --json --out /tmp/transcript.json
+<skill-dir>/scripts/transcribe.sh /path/to/audio.ogg --model whisper-1 --out /tmp/transcript.txt
+<skill-dir>/scripts/transcribe.sh /path/to/audio.m4a --language en
+<skill-dir>/scripts/transcribe.sh /path/to/audio.m4a --prompt "Speaker names: Peter, Daniel"
+<skill-dir>/scripts/transcribe.sh /path/to/audio.m4a --json --out /tmp/transcript.json
 ```
 
 ## API key

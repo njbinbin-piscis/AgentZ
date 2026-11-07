@@ -1,9 +1,9 @@
 ---
 name: "webapp-testing"
-description: "Toolkit for interacting with and testing local web applications using Playwright. Supports verifying frontend functionality, debugging UI behavior, capturing browser screenshots, and viewing browser logs."
+description: "Test local web applications with Playwright: verify frontend behavior, debug UI, capture screenshots and read browser logs. Use when testing or debugging a running web app."
+description_zh: "用 Playwright 测试本地 Web 应用：验证前端功能、调试界面、截图和查看浏览器日志"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "webapp-testing"
+source: agentz
 ---
 
 # Web Application Testing

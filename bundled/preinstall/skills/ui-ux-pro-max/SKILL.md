@@ -1,12 +1,10 @@
 ---
 name: "ui-ux-pro-max"
-description: "AI-powered UI/UX design intelligence with 57 UI styles, 95+ color palettes, 56 font pairings, 25 chart types, and 100+ industry-specific reasoning rules across 12 tech stacks. Use when designing, building, creating, implementing, reviewing, fixing, or improving UI/UX code for websites, landing pages, dashboards, SaaS, e-commerce, portfolios, and mobile apps."
+description: "UI/UX design intelligence with searchable styles, color palettes, font pairings, chart types and stack guidelines. Use when designing, building or reviewing UI for websites, dashboards and apps."
+description_zh: "UI/UX 设计知识库：可检索的风格、配色、字体搭配、图表类型和技术栈指南，用于设计、开发和评审界面"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "ui-ux-pro-max-skill"
+source: agentz
 ---
-
-> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
 
 # UI/UX Pro Max - Design Intelligence
 
@@ -119,7 +117,7 @@ Extract key information from user request:
 **Always start with `--design-system`** to get comprehensive recommendations with reasoning:
 
 ```bash
-python3 ${AgentZ_PLUGIN_ROOT}/skills/ui-ux-pro-max/scripts/search.py "<product_type> <industry> <keywords>" --design-system [-p "Project Name"]
+python3 scripts/search.py "<product_type> <industry> <keywords>" --design-system [-p "Project Name"]
 ```
 
 This command:
@@ -130,7 +128,7 @@ This command:
 
 **Example:**
 ```bash
-python3 ${AgentZ_PLUGIN_ROOT}/skills/ui-ux-pro-max/scripts/search.py "beauty spa wellness service" --design-system -p "Serenity Spa"
+python3 scripts/search.py "beauty spa wellness service" --design-system -p "Serenity Spa"
 ```
 
 ### Step 3: Supplement with Detailed Searches (as needed)
@@ -138,7 +136,7 @@ python3 ${AgentZ_PLUGIN_ROOT}/skills/ui-ux-pro-max/scripts/search.py "beauty spa
 After getting the design system, use domain searches to get additional details:
 
 ```bash
-python3 ${AgentZ_PLUGIN_ROOT}/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --domain <domain> [-n <max_results>]
+python3 scripts/search.py "<keyword>" --domain <domain> [-n <max_results>]
 ```
 
 **When to use detailed searches:**
@@ -156,7 +154,7 @@ python3 ${AgentZ_PLUGIN_ROOT}/skills/ui-ux-pro-max/scripts/search.py "<keyword>"
 Get implementation-specific best practices. If user doesn't specify a stack, **default to `html-tailwind`**.
 
 ```bash
-python3 ${AgentZ_PLUGIN_ROOT}/skills/ui-ux-pro-max/scripts/search.py "<keyword>" --stack html-tailwind
+python3 scripts/search.py "<keyword>" --stack html-tailwind
 ```
 
 Available stacks: `html-tailwind`, `react`, `nextjs`, `vue`, `nuxtjs`, `nuxt-ui`, `svelte`, `swiftui`, `react-native`, `flutter`, `shadcn`, `jetpack-compose`
@@ -189,10 +187,10 @@ The `--design-system` flag supports two output formats:
 
 ```bash
 # ASCII box (default) - best for terminal display
-python3 ${AgentZ_PLUGIN_ROOT}/skills/ui-ux-pro-max/scripts/search.py "fintech crypto" --design-system
+python3 scripts/search.py "fintech crypto" --design-system
 
 # Markdown - best for documentation
-python3 ${AgentZ_PLUGIN_ROOT}/skills/ui-ux-pro-max/scripts/search.py "fintech crypto" --design-system -f markdown
+python3 scripts/search.py "fintech crypto" --design-system -f markdown
 ```
 
 ---

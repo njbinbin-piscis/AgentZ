@@ -26,6 +26,7 @@ const SEED_SENTINEL: &str = ".layered-seed-v3";
 const PREINSTALL_SENTINEL: &str = ".preinstall-codebuddy-v1";
 const PREINSTALL_COMPAT_SENTINEL: &str = ".preinstall-codebuddy-v2-compat";
 const PREINSTALL_REBRAND_SENTINEL: &str = ".preinstall-agentz-v3-rebrand";
+const PREINSTALL_ALIGN_SENTINEL: &str = ".preinstall-agentz-v4-align";
 
 /// A demonstrable workflow team: coder ⇄ reviewer review loop that exits once
 /// the reviewer's output contains "approved" (capped at 3 iterations).
@@ -580,6 +581,297 @@ pub fn seed_preinstall_rebrand_refresh(app: &AppHandle) {
     }
 }
 
+#[derive(Debug, Deserialize, Default)]
+struct RenameMaps {
+    #[serde(default)]
+    agents: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    commands: std::collections::HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct SuccessorMaps {
+    #[serde(default)]
+    skills: std::collections::HashMap<String, String>,
+}
+
+/// What the AgentZ alignment of the bundled packs retired or renamed
+/// (`bundled/codebuddy/retired.json`).
+#[derive(Debug, Deserialize, Default)]
+struct RetiredManifest {
+    #[serde(default)]
+    skills: Vec<String>,
+    #[serde(default)]
+    agents: Vec<String>,
+    #[serde(default)]
+    commands: Vec<String>,
+    #[serde(default)]
+    renames: RenameMaps,
+    #[serde(default)]
+    successors: SuccessorMaps,
+}
+
+fn source_is_preinstall(value: &str) -> bool {
+    let v = value
+        .trim()
+        .trim_matches(|c| c == '"' || c == '\'')
+        .to_ascii_lowercase();
+    v == "codebuddy" || v == "agentz"
+}
+
+/// True when an installed agent/command manifest was seeded by the preinstall
+/// pack (its `source` is a bundle marker) rather than created by the user.
+fn json_is_preinstall_origin(path: &Path) -> bool {
+    #[derive(Deserialize)]
+    struct Partial {
+        #[serde(default)]
+        source: String,
+    }
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|t| serde_json::from_str::<Partial>(&t).ok())
+        .map(|p| source_is_preinstall(&p.source))
+        .unwrap_or(false)
+}
+
+/// Same check for a skill: the `source:` line of the SKILL.md frontmatter.
+/// A missing SKILL.md counts as a leftover of the pack.
+fn skill_is_preinstall_origin(skill_dir: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(skill_dir.join("SKILL.md")) else {
+        return true;
+    };
+    let mut lines = text.lines();
+    if lines.next().map(str::trim) != Some("---") {
+        return false;
+    }
+    for line in lines {
+        let line = line.trim();
+        if line == "---" {
+            break;
+        }
+        if let Some(rest) = line.strip_prefix("source:") {
+            return source_is_preinstall(rest);
+        }
+    }
+    false
+}
+
+/// Move `path` into `{config}/preinstall-retired/<kind>/` so nothing is
+/// lost. Returns true when `path` no longer exists afterwards.
+fn retire_to_backup(config_dir: &Path, kind: &str, id: &str, path: &Path) -> bool {
+    let base = config_dir.join("preinstall-retired").join(kind);
+    if std::fs::create_dir_all(&base).is_err() {
+        return false;
+    }
+    let clean: String = id
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let mut dest = base.join(&clean);
+    let mut n = 1;
+    while dest.exists() {
+        n += 1;
+        dest = base.join(format!("{clean}-{n}"));
+    }
+    if std::fs::rename(path, &dest).is_ok() {
+        return true;
+    }
+    copy_tree_if_absent(path, &dest);
+    std::fs::remove_dir_all(path).is_ok()
+}
+
+fn read_bytes_eq(a: &Path, b: &Path) -> bool {
+    match (std::fs::read(a), std::fs::read(b)) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => false,
+    }
+}
+
+fn align_json_items(
+    config_dir: &Path,
+    bundle: &Path,
+    kind: &str,
+    file: &str,
+    renames: &std::collections::HashMap<String, String>,
+    retired: &[String],
+) {
+    let installed = config_dir.join(kind);
+    for (old, new) in renames {
+        let old_dir = installed.join(safe_id(old));
+        let manifest = old_dir.join(file);
+        if !manifest.is_file() || !json_is_preinstall_origin(&manifest) {
+            continue;
+        }
+        copy_file_if_absent(
+            &bundle.join(kind).join(new).join(file),
+            &installed.join(safe_id(new)).join(file),
+        );
+        retire_to_backup(config_dir, kind, old, &old_dir);
+    }
+    for old in retired {
+        let old_dir = installed.join(safe_id(old));
+        let manifest = old_dir.join(file);
+        if manifest.is_file() && json_is_preinstall_origin(&manifest) {
+            retire_to_backup(config_dir, kind, old, &old_dir);
+        }
+    }
+}
+
+fn rename_ids_in_value(
+    v: &mut serde_json::Value,
+    map: &std::collections::HashMap<String, String>,
+) -> bool {
+    let mut changed = false;
+    match v {
+        serde_json::Value::Object(obj) => {
+            for (k, val) in obj.iter_mut() {
+                if k == "agent_id" {
+                    if let Some(new) = val.as_str().and_then(|s| map.get(s)) {
+                        *val = serde_json::Value::String(new.clone());
+                        changed = true;
+                        continue;
+                    }
+                }
+                if k == "members" {
+                    if let serde_json::Value::Array(items) = val {
+                        for item in items.iter_mut() {
+                            if let Some(new) = item.as_str().and_then(|s| map.get(s)) {
+                                *item = serde_json::Value::String(new.clone());
+                                changed = true;
+                            }
+                        }
+                        continue;
+                    }
+                }
+                changed |= rename_ids_in_value(val, map);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items.iter_mut() {
+                changed |= rename_ids_in_value(item, map);
+            }
+        }
+        _ => {}
+    }
+    changed
+}
+
+/// Apply the AgentZ alignment of the bundled packs to an existing install:
+/// retire removed items, rename `cb-*` agents/commands, refresh rewritten
+/// skills. Everything replaced or removed is moved to
+/// `{config}/preinstall-retired/`; items the user created are never touched.
+fn apply_preinstall_align(config_dir: &Path, bundle: &Path, retired: &RetiredManifest) {
+    let skills_root = crate::skills::service::skills_root_from_config_dir(config_dir);
+    let skills_installed = crate::skills::provenance::installed_dir(&skills_root);
+
+    for (old, new) in &retired.successors.skills {
+        let old_dir = skills_installed.join(old);
+        if old_dir.is_dir() {
+            copy_tree_if_absent(&bundle.join("skills").join(new), &skills_installed.join(new));
+            if skill_is_preinstall_origin(&old_dir) {
+                retire_to_backup(config_dir, "skills", old, &old_dir);
+            }
+        }
+    }
+    for slug in &retired.skills {
+        let dir = skills_installed.join(slug);
+        if dir.is_dir() && skill_is_preinstall_origin(&dir) {
+            retire_to_backup(config_dir, "skills", slug, &dir);
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(bundle.join("skills")) {
+        for entry in entries.flatten() {
+            if !entry.path().is_dir() {
+                continue;
+            }
+            let slug = entry.file_name().to_string_lossy().to_string();
+            let dest = skills_installed.join(&slug);
+            if !dest.is_dir()
+                || !skill_is_preinstall_origin(&dest)
+                || read_bytes_eq(&entry.path().join("SKILL.md"), &dest.join("SKILL.md"))
+            {
+                continue;
+            }
+            if retire_to_backup(config_dir, "skills", &slug, &dest) {
+                copy_tree_if_absent(&entry.path(), &dest);
+            }
+        }
+    }
+
+    align_json_items(
+        config_dir,
+        bundle,
+        "agents",
+        "agent.json",
+        &retired.renames.agents,
+        &retired.agents,
+    );
+    align_json_items(
+        config_dir,
+        bundle,
+        "commands",
+        "command.json",
+        &retired.renames.commands,
+        &retired.commands,
+    );
+
+    // Teams reference member agents by id: follow the renames.
+    if let Ok(entries) = std::fs::read_dir(config_dir.join("teams")) {
+        for entry in entries.flatten() {
+            let file = entry.path().join("team.json");
+            let Ok(text) = std::fs::read_to_string(&file) else {
+                continue;
+            };
+            let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&text) else {
+                continue;
+            };
+            if rename_ids_in_value(&mut value, &retired.renames.agents) {
+                if let Ok(pretty) = serde_json::to_string_pretty(&value) {
+                    let _ = std::fs::write(&file, pretty);
+                }
+            }
+        }
+    }
+}
+
+/// One-time alignment of already-seeded installs with the AgentZ-ified packs.
+pub fn seed_preinstall_align(app: &AppHandle) {
+    let config_dir = match resolve_global_config_dir(app) {
+        Ok(d) => d,
+        Err(e) => {
+            warn!("seed: align cannot resolve config dir: {}", e);
+            return;
+        }
+    };
+    let sentinel = config_dir.join(PREINSTALL_ALIGN_SENTINEL);
+    if sentinel.exists() {
+        return;
+    }
+    let (Some(bundle), Some(root)) = (bundled_preinstall_root(app), bundled_codebuddy_root(app))
+    else {
+        return;
+    };
+    let retired = std::fs::read_to_string(root.join("retired.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<RetiredManifest>(&t).ok());
+    let Some(retired) = retired else {
+        warn!("seed: retired.json missing or invalid; skipping align");
+        return;
+    };
+    apply_preinstall_align(&config_dir, &bundle, &retired);
+    if let Err(e) = std::fs::write(&sentinel, b"1") {
+        warn!("seed: cannot write align sentinel: {}", e);
+    } else {
+        info!("seed: aligned preinstall packs with AgentZ");
+    }
+}
+
 /// Copy bundled CodeBuddy resources once (skills / agents / commands).
 pub fn seed_preinstall_packs(app: &AppHandle) {
     let config_dir = match resolve_global_config_dir(app) {
@@ -649,6 +941,158 @@ pub fn seed_builtin_packs(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn temp_root(tag: &str) -> PathBuf {
+        let p = std::env::temp_dir().join(format!(
+            "agentz-seed-{tag}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    fn write(path: &Path, text: &str) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+
+    fn retired_fixture() -> RetiredManifest {
+        serde_json::from_str(
+            r#"{
+              "skills": ["gone-skill"],
+              "agents": ["cb-gone-agent"],
+              "commands": ["cb-gone-cmd"],
+              "renames": {
+                "agents": {"cb-foo": "foo"},
+                "commands": {"cb-run": "run"}
+              },
+              "successors": {"skills": {"old-improver": "rules-improver"}}
+            }"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn align_renames_retires_and_never_touches_user_items() {
+        let root = temp_root("align");
+        let cfg = root.join("cfg");
+        let bundle = root.join("bundle");
+        let skills_root = crate::skills::service::skills_root_from_config_dir(&cfg);
+        let installed = crate::skills::provenance::installed_dir(&skills_root);
+
+        // Bundle (new content).
+        write(&bundle.join("agents/foo/agent.json"), r#"{"id":"foo","source":"agentz"}"#);
+        write(&bundle.join("commands/run/command.json"), r#"{"id":"run","source":"agentz"}"#);
+        write(
+            &bundle.join("skills/rules-improver/SKILL.md"),
+            "---\nname: rules-improver\nsource: agentz\n---\nnew",
+        );
+        write(
+            &bundle.join("skills/kept/SKILL.md"),
+            "---\nname: kept\nsource: agentz\n---\nrewritten",
+        );
+
+        // Installed (old content).
+        write(&cfg.join("agents/cb-foo/agent.json"), r#"{"id":"cb-foo","source":"codebuddy"}"#);
+        write(&cfg.join("agents/cb-gone-agent/agent.json"), r#"{"source":"codebuddy"}"#);
+        write(&cfg.join("agents/cb-mine/agent.json"), r#"{"id":"cb-mine","source":"user"}"#);
+        write(&cfg.join("commands/cb-run/command.json"), r#"{"source":"codebuddy"}"#);
+        write(&cfg.join("commands/cb-gone-cmd/command.json"), r#"{"source":"codebuddy"}"#);
+        write(&installed.join("gone-skill/SKILL.md"), "---\nsource: codebuddy\n---\nx");
+        write(&installed.join("old-improver/SKILL.md"), "---\nsource: AgentZ\n---\nx");
+        write(&installed.join("kept/SKILL.md"), "---\nname: kept\nsource: codebuddy\n---\nold");
+        write(&installed.join("mine/SKILL.md"), "---\nname: mine\nsource: user\n---\nmine");
+        write(
+            &cfg.join("teams/t/team.json"),
+            r#"{"id":"t","members":["cb-foo","other"]}"#,
+        );
+
+        apply_preinstall_align(&cfg, &bundle, &retired_fixture());
+
+        assert!(cfg.join("agents/foo/agent.json").is_file());
+        assert!(!cfg.join("agents/cb-foo").exists());
+        assert!(!cfg.join("agents/cb-gone-agent").exists());
+        assert!(cfg.join("agents/cb-mine/agent.json").is_file(), "user agent kept");
+        assert!(cfg.join("commands/run/command.json").is_file());
+        assert!(!cfg.join("commands/cb-run").exists());
+        assert!(!cfg.join("commands/cb-gone-cmd").exists());
+
+        assert!(!installed.join("gone-skill").exists());
+        assert!(!installed.join("old-improver").exists());
+        assert!(installed.join("rules-improver/SKILL.md").is_file(), "successor installed");
+        let kept = std::fs::read_to_string(installed.join("kept/SKILL.md")).unwrap();
+        assert!(kept.contains("rewritten"));
+        assert!(installed.join("mine/SKILL.md").is_file(), "user skill kept");
+        let mine = std::fs::read_to_string(installed.join("mine/SKILL.md")).unwrap();
+        assert!(mine.contains("mine"));
+
+        // Everything replaced is recoverable.
+        let backup = cfg.join("preinstall-retired");
+        assert!(backup.join("agents/cb-foo/agent.json").is_file());
+        assert!(backup.join("agents/cb-gone-agent/agent.json").is_file());
+        assert!(backup.join("skills/gone-skill/SKILL.md").is_file());
+        let old_kept = std::fs::read_to_string(backup.join("skills/kept/SKILL.md")).unwrap();
+        assert!(old_kept.contains("old"));
+
+        let team: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(cfg.join("teams/t/team.json")).unwrap())
+                .unwrap();
+        assert_eq!(team["members"], serde_json::json!(["foo", "other"]));
+
+        // Second run is a no-op.
+        apply_preinstall_align(&cfg, &bundle, &retired_fixture());
+        assert!(cfg.join("agents/foo/agent.json").is_file());
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn shipped_retired_manifest_matches_bundle() {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../bundled");
+        let text = std::fs::read_to_string(base.join("codebuddy/retired.json")).unwrap();
+        let r: RetiredManifest = serde_json::from_str(&text).unwrap();
+        let pre = base.join("preinstall");
+        for (old, new) in &r.renames.agents {
+            assert!(pre.join("agents").join(new).join("agent.json").is_file(), "{old}->{new}");
+        }
+        for (old, new) in &r.renames.commands {
+            assert!(pre.join("commands").join(new).join("command.json").is_file(), "{old}->{new}");
+        }
+        for id in &r.agents {
+            assert!(!pre.join("agents").join(id).exists(), "retired agent still bundled: {id}");
+        }
+        for id in &r.commands {
+            assert!(!pre.join("commands").join(id).exists(), "retired command still bundled: {id}");
+        }
+        for s in &r.skills {
+            assert!(!pre.join("skills").join(s).exists(), "retired skill still bundled: {s}");
+        }
+        for new in r.successors.skills.values() {
+            assert!(pre.join("skills").join(new).join("SKILL.md").is_file(), "successor {new}");
+        }
+    }
+
+    #[test]
+    fn align_leaves_identical_skills_alone() {
+        let root = temp_root("align-same");
+        let cfg = root.join("cfg");
+        let bundle = root.join("bundle");
+        let skills_root = crate::skills::service::skills_root_from_config_dir(&cfg);
+        let installed = crate::skills::provenance::installed_dir(&skills_root);
+        let body = "---\nname: same\nsource: agentz\n---\nbody";
+        write(&bundle.join("skills/same/SKILL.md"), body);
+        write(&installed.join("same/SKILL.md"), body);
+
+        apply_preinstall_align(&cfg, &bundle, &RetiredManifest::default());
+
+        assert!(installed.join("same/SKILL.md").is_file());
+        assert!(!cfg.join("preinstall-retired").exists(), "no needless backup");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn builtin_workflow_team_is_valid() {

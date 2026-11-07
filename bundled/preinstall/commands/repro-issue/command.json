@@ -1,0 +1,20 @@
+{
+  "id": "repro-issue",
+  "slash_id": "repro-issue",
+  "name": "Repro Issue",
+  "description": "Reproduce a reported issue by writing a failing test case. Use when you have a bug report and want a minimal automated reproduction before fixing it.",
+  "description_zh": "为问题报告编写失败的测试用例，在修复前先稳定复现",
+  "argument_hint": "<issue description>",
+  "tools": [
+    "shell",
+    "file_read",
+    "file_write",
+    "file_edit",
+    "file_search",
+    "file_list"
+  ],
+  "prompt": "Repro issue $ARGUMENTS in a failing test",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-code-analysis-testing"
+}

@@ -1,10 +1,9 @@
 ---
 name: "billing-automation"
-description: "Build automated billing systems for recurring payments, invoicing, subscription lifecycle, and dunning management. Use when implementing subscription billing, automating invoicing, or managing recurring payment systems."
-description_zh: "支付网关集成,包含 Stripe 和 PayPal,实现结账流程、订阅计费和 PCI 合规性"
+description: "Build automated billing for recurring payments, invoicing, subscription lifecycle and dunning. Use when implementing subscription billing or automating invoicing."
+description_zh: "构建自动化计费系统，涵盖周期扣款、开票、订阅生命周期与催缴管理。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "payment-processing"
+source: agentz
 ---
 
 # Billing Automation

@@ -1,0 +1,15 @@
+{
+  "id": "context-prime",
+  "slash_id": "context-prime",
+  "name": "Context Prime",
+  "description": "Load project context by reading README.md and listing tracked files. Use at the start of a session to get oriented.",
+  "description_zh": "读取 README.md 并列出受版本管理的文件，在会话开始时快速熟悉项目。",
+  "argument_hint": "",
+  "tools": [
+    "file_read"
+  ],
+  "prompt": "Read README.md, then run `git ls-files` (with `shell`) to list the tracked files and understand the context of the project. Skip build output, vendored and generated directories.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-context-loading-priming"
+}

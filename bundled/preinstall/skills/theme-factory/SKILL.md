@@ -1,9 +1,9 @@
 ---
 name: "theme-factory"
-description: "Toolkit for styling artifacts with a theme. These artifacts can be slides, docs, reportings, HTML landing pages, etc. There are 10 pre-set themes with colors/fonts that you can apply to any artifact that has been creating, or can generate a new theme on-the-fly."
+description: "Apply one of 10 preset color and font themes, or a generated custom theme, to slides, docs, reports or HTML landing pages. Use when an artifact needs consistent professional styling."
+description_zh: "为幻灯片、文档、报告或落地页应用 10 套预设配色字体主题，或生成自定义主题"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "theme-factory"
+source: agentz
 ---
 
 # Theme Factory Skill

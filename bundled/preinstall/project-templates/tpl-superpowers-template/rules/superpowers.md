@@ -1,6 +1,6 @@
-# Superpowers Engineering Discipline
+# Engineering Discipline
 
-This project uses the **Superpowers** engineering workflow. Follow these mandatory rules on every coding, debugging, or planning task:
+Follow these mandatory rules on every coding, debugging, or planning task:
 
 ## 1. Skill-First & Design-First (`brainstorming` / `writing-plans`)
 - Before writing or modifying code on any non-trivial task, check the **Available skills** section in your system prompt (especially `brainstorming`, `writing-plans`, `executing-plans`, `test-driven-development`, `systematic-debugging`, `verification-before-completion`, and `subagent-driven-development`).

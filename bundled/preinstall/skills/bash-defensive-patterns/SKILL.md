@@ -1,10 +1,9 @@
 ---
 name: "bash-defensive-patterns"
-description: "Master defensive Bash programming techniques for production-grade scripts. Use when writing robust shell scripts, CI/CD pipelines, or system utilities requiring fault tolerance and safety."
-description_zh: "生产级 Bash 脚本编写，包含防御性编程、POSIX 合规性和全面测试"
+description: "Defensive Bash programming techniques for production-grade scripts. Use when writing robust shell scripts, CI/CD pipelines or system utilities that need fault tolerance."
+description_zh: "面向生产环境的 Bash 防御式编程技巧，用于编写健壮的 shell 脚本、CI/CD 流水线与系统工具。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "shell-scripting"
+source: agentz
 ---
 
 # Bash Defensive Patterns

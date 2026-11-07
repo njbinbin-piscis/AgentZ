@@ -1,10 +1,9 @@
 ---
 name: "python-performance-optimization"
-description: "Profile and optimize Python code using cProfile, memory profilers, and performance best practices. Use when debugging slow Python code, optimizing bottlenecks, or improving application performance."
-description_zh: "现代 Python 开发工具，支持 Python 3.12+、Django、FastAPI、异步编程模式及生产环境最佳实践"
+description: "Profile and optimize Python code with cProfile, memory profilers, and performance best practices. Use when debugging slow Python code or optimizing bottlenecks."
+description_zh: "使用 cProfile 和内存分析器分析并优化 Python 代码性能，定位瓶颈"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "python-development"
+source: agentz
 ---
 
 # Python Performance Optimization

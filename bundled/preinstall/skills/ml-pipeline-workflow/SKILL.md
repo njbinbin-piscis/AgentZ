@@ -1,9 +1,9 @@
 ---
 name: "ml-pipeline-workflow"
-description: "Build end-to-end MLOps pipelines from data preparation through model training, validation, and production deployment. Use when creating ML pipelines, implementing MLOps practices, or automating model training and deployment workflows."
+description: "Build end-to-end MLOps pipelines from data preparation to training, validation and production deployment. Use when creating ML pipelines or automating model training and deployment."
+description_zh: "构建端到端 MLOps 流水线：数据准备、训练、验证到上线部署，适用于自动化模型训练与发布"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "machine-learning-ops"
+source: agentz
 ---
 
 # ML Pipeline Workflow

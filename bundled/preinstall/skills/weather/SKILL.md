@@ -1,10 +1,9 @@
 ---
 name: "weather"
-description: "Get current weather and forecasts (no API key required)."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Get current weather and forecasts from wttr.in and Open-Meteo, no API key needed. Use when the user asks about the weather."
+description_zh: "通过 wttr.in 和 Open-Meteo 查询当前天气和预报，无需 API 密钥"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Weather

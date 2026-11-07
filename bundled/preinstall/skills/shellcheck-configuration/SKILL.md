@@ -1,10 +1,9 @@
 ---
 name: "shellcheck-configuration"
-description: "Master ShellCheck static analysis configuration and usage for shell script quality. Use when setting up linting infrastructure, fixing code issues, or ensuring script portability."
-description_zh: "生产级 Bash 脚本编写，包含防御性编程、POSIX 合规性和全面测试"
+description: "Configure and use ShellCheck static analysis for shell script quality and portability. Use when setting up linting, fixing script issues, or ensuring portable shell scripts."
+description_zh: "配置并使用 ShellCheck 对 Shell 脚本做静态分析，提升质量与可移植性"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "shell-scripting"
+source: agentz
 ---
 
 # ShellCheck Configuration and Static Analysis

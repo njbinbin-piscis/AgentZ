@@ -1,10 +1,9 @@
 ---
 name: "startup-metrics-framework"
-description: "This skill should be used when the user asks about \\\\\\\\\\\\\\\"key startup metrics\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"SaaS metrics\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"CAC and LTV\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"unit economics\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"burn multiple\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"rule of 40\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"marketplace metrics\\\\\\\\\\\\\\\", or requests guidance on tracking and optimizing business performance metrics."
-description_zh: "面向初创企业的综合业务分析工具，提供市场规模分析（TAM/SAM/SOM）、财务建模、团队规划和战略研究功能"
+description: "Startup and SaaS metrics framework: CAC, LTV, unit economics, burn multiple, rule of 40, and marketplace metrics. Use when tracking or optimizing business performance."
+description_zh: "创业与 SaaS 指标体系：CAC、LTV、单位经济、烧钱倍数、40 法则等"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "startup-business-analyst"
+source: agentz
 ---
 
 # Startup Metrics Framework

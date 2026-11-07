@@ -1,10 +1,9 @@
 ---
 name: "verification-before-completion"
-description: "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always"
-description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description: "Require running verification commands and confirming their output before claiming work is done, fixed or passing. Use before reporting completion, committing or creating a PR."
+description_zh: "完成前先验证：在宣称完成、修复或通过之前，必须运行验证命令并确认输出"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "superpowers"
+source: agentz
 ---
 
 # Verification Before Completion
@@ -112,7 +111,7 @@ Skip any step = lying, not verifying
 ## Why This Matters
 
 From 24 failure memories:
-- your human partner said "I don't believe you" - trust broken
+- the user said "I don't believe you" - trust broken
 - Undefined functions shipped - would crash
 - Missing requirements shipped - incomplete features
 - Time wasted on false completion → redirect → rework

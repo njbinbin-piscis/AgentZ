@@ -1,10 +1,9 @@
 ---
 name: "github"
-description: "Interact with GitHub using the `gh` CLI. Use `gh issue`, `gh pr`, `gh run`, and `gh api` for issues, PRs, CI runs, and advanced queries."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Work with GitHub through the gh CLI for issues, pull requests, CI runs, and API queries. Use when you need to read or manage GitHub resources from the shell."
+description_zh: "通过 gh 命令行处理 GitHub 的 issue、PR、CI 运行和 API 查询。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # GitHub Skill

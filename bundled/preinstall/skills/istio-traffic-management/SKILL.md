@@ -1,10 +1,9 @@
 ---
 name: "istio-traffic-management"
-description: "Configure Istio traffic management including routing, load balancing, circuit breakers, and canary deployments. Use when implementing service mesh traffic policies, progressive delivery, or resilience patterns."
-description_zh: "云架构设计（AWS/Azure/GCP），Kubernetes 集群配置，Terraform 基础设施即代码，混合云网络，以及多云成本优化"
+description: "Configure Istio traffic management: routing, load balancing, circuit breakers, and canary deployments. Use when implementing service mesh traffic policies or progressive delivery."
+description_zh: "配置 Istio 流量管理：路由、负载均衡、熔断和金丝雀发布。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "cloud-infrastructure"
+source: agentz
 ---
 
 # Istio Traffic Management

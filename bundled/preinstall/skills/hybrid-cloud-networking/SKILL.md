@@ -1,10 +1,9 @@
 ---
 name: "hybrid-cloud-networking"
-description: "Configure secure, high-performance connectivity between on-premises infrastructure and cloud platforms using VPN and dedicated connections. Use when building hybrid cloud architectures, connecting data centers to cloud, or implementing secure cross-premises networking."
-description_zh: "云架构设计（AWS/Azure/GCP），Kubernetes 集群配置，Terraform 基础设施即代码，混合云网络，以及多云成本优化"
+description: "Set up secure, high-performance connectivity between on-premises infrastructure and clouds using VPN and dedicated links. Use when designing hybrid cloud networks."
+description_zh: "配置本地数据中心与云之间安全高性能的 VPN 与专线连接。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "cloud-infrastructure"
+source: agentz
 ---
 
 # Hybrid Cloud Networking

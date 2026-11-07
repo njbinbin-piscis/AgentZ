@@ -1,10 +1,9 @@
 ---
 name: "context-driven-development"
-description: "Use this skill when working with Conductor's context-driven development methodology, managing project context artifacts, or understanding the relationship between product.md, tech-stack.md, and workflow.md files."
-description_zh: "上下文驱动开发插件，将 AgentZ 转变为项目管理工具，采用结构化工作流：上下文 → 规格与计划 → 实施"
+description: "Maintain project context artifacts (product.md, tech-stack.md, workflow.md) alongside code for consistent AI-assisted work. Use when setting up or updating project context."
+description_zh: "把项目上下文文档（product.md、tech-stack.md、workflow.md）与代码一同维护，保证 AI 协作的一致性。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "conductor"
+source: agentz
 ---
 
 # Context-Driven Development
@@ -13,10 +12,10 @@ Guide for implementing and maintaining context as a managed artifact alongside c
 
 ## When to Use This Skill
 
-- Setting up new projects with Conductor
+- Setting up new projects with this methodology
 - Understanding the relationship between context artifacts
 - Maintaining consistency across AI-assisted development sessions
-- Onboarding team members to an existing Conductor project
+- Onboarding team members to an existing project
 - Deciding when to update context documents
 - Managing greenfield vs brownfield project contexts
 
@@ -178,7 +177,7 @@ Before starting any track:
 
 For new projects:
 
-1. Run `/conductor:setup` to create all artifacts interactively
+1. Ask the agent to create all context artifacts interactively
 2. Answer questions about product vision, tech preferences, and workflow
 3. Generate initial style guides for chosen languages
 4. Create empty tracks registry
@@ -193,7 +192,7 @@ Characteristics:
 
 For existing codebases:
 
-1. Run `/conductor:setup` with existing codebase detection
+1. Ask the agent to create the context artifacts, starting from the existing codebase
 2. System analyzes existing code, configs, and documentation
 3. Pre-populate artifacts based on discovered patterns
 4. Review and refine generated context
@@ -256,7 +255,7 @@ conductor/
 
 ## Context Lifecycle
 
-1. **Creation**: Initial setup via `/conductor:setup`
+1. **Creation**: Initial setup, created interactively with the agent
 2. **Validation**: Verify before each track
 3. **Evolution**: Update as project grows
 4. **Synchronization**: Keep artifacts aligned

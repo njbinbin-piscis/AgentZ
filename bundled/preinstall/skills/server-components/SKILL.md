@@ -1,9 +1,9 @@
 ---
 name: "server-components"
-description: "This skill should be used when the user asks about \\\\\\\\\\\\\\\"Server Components\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"Client Components\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"'use client' directive\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"when to use server vs client\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"RSC patterns\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"component composition\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"data fetching in components\\\\\\\\\\\\\\\", or needs guidance on React Server Components architecture in Next.js."
+description: "React Server Components in Next.js: server vs client components, the use client directive, composition, and data fetching. Use when designing App Router component architecture."
+description_zh: "Next.js 中的 React Server Components：服务端与客户端组件划分、组合与数据获取"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "nextjs-expert"
+source: agentz
 ---
 
 # React Server Components in Next.js

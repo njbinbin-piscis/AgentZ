@@ -1,10 +1,9 @@
 ---
 name: "changelog-automation"
-description: "Automate changelog generation from commits, PRs, and releases following Keep a Changelog format. Use when setting up release workflows, generating release notes, or standardizing commit conventions."
-description_zh: "OpenAPI规范生成、Mermaid图表创建、教程编写、API参考文档"
+description: "Automate changelog generation from commits, PRs and releases using the Keep a Changelog format. Use when setting up release workflows, writing release notes or standardizing commit conventions."
+description_zh: "基于 Keep a Changelog 格式，从提交、PR 与发布中自动生成变更日志，并规范提交约定。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "documentation-generation"
+source: agentz
 ---
 
 # Changelog Automation

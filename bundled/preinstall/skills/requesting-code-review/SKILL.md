@@ -1,22 +1,21 @@
 ---
 name: "requesting-code-review"
-description: "Use when completing tasks, implementing major features, or before merging to verify work meets requirements"
-description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description: "Request a structured code review of finished work before merging. Use when completing tasks or major features to verify the work meets requirements."
+description_zh: "在合并前对已完成的工作发起结构化代码评审，确认满足需求"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "superpowers"
+source: agentz
 ---
 
 # Requesting Code Review
 
-Dispatch superpowers:code-reviewer subagent to catch issues before they cascade.
+Use the `delegate` tool to run a read-only code-reviewer sub-agent and catch issues before they cascade.
 
 **Core principle:** Review early, review often.
 
 ## When to Request Review
 
 **Mandatory:**
-- After each task in subagent-driven development
+- After each task in sub-agent-driven development
 - After completing major feature
 - Before merge to main
 
@@ -33,9 +32,9 @@ BASE_SHA=$(git rev-parse HEAD~1)  # or origin/main
 HEAD_SHA=$(git rev-parse HEAD)
 ```
 
-**2. Dispatch code-reviewer subagent:**
+**2. Dispatch a code-reviewer sub-agent:**
 
-Use Task tool with superpowers:code-reviewer type, fill template at `code-reviewer.md`
+Use the `delegate` tool with a prompt built from the template in `code-reviewer.md` (the sub-agent is read-only, so include the diff range and requirements in the prompt).
 
 **Placeholders:**
 - `{WHAT_WAS_IMPLEMENTED}` - What you just built
@@ -60,14 +59,14 @@ You: Let me request code review before proceeding.
 BASE_SHA=$(git log --oneline | grep "Task 1" | head -1 | awk '{print $1}')
 HEAD_SHA=$(git rev-parse HEAD)
 
-[Dispatch superpowers:code-reviewer subagent]
+[Dispatch code-reviewer sub-agent via delegate]
   WHAT_WAS_IMPLEMENTED: Verification and repair functions for conversation index
   PLAN_OR_REQUIREMENTS: Task 2 from docs/plans/deployment-plan.md
   BASE_SHA: a7981ec
   HEAD_SHA: 3df7661
   DESCRIPTION: Added verifyIndex() and repairIndex() with 4 issue types
 
-[Subagent returns]:
+[Sub-agent returns]:
   Strengths: Clean architecture, real tests
   Issues:
     Important: Missing progress indicators
@@ -80,7 +79,7 @@ You: [Fix progress indicators]
 
 ## Integration with Workflows
 
-**Subagent-Driven Development:**
+**Sub-Agent-Driven Development:**
 - Review after EACH task
 - Catch issues before they compound
 - Fix before moving to next task

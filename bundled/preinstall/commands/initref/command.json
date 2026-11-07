@@ -1,0 +1,19 @@
+{
+  "id": "initref",
+  "slash_id": "initref",
+  "name": "Build Reference Docs",
+  "description": "Create reference markdown files in a ref directory and add pointers to them in the project rules. Use to capture important documentation for later sessions.",
+  "description_zh": "在 ref 目录生成参考文档，并在项目规则中添加指引。",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_search",
+    "file_edit",
+    "file_write",
+    "shell"
+  ],
+  "prompt": "Build reference documentation for this project.\n\nArguments: $ARGUMENTS\n\n1. Identify the important modules, APIs and configuration files. Prefer summarizing with `file_search` and targeted `file_read` calls; do not read every file in full.\n2. Create reference markdown files in a `ref/` directory, one per topic.\n3. Add a rule file `.agentz/rules/references.md` that points to those documents and says when to read each one.\n4. Finish with a short list of the files you created.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-context-loading-priming"
+}

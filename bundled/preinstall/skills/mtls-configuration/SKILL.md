@@ -1,10 +1,9 @@
 ---
 name: "mtls-configuration"
-description: "Configure mutual TLS (mTLS) for zero-trust service-to-service communication. Use when implementing zero-trust networking, certificate management, or securing internal service communication."
-description_zh: "云架构设计（AWS/Azure/GCP），Kubernetes 集群配置，Terraform 基础设施即代码，混合云网络，以及多云成本优化"
+description: "Configure mutual TLS (mTLS) for zero-trust service-to-service communication. Use when implementing zero-trust networking, certificate management or securing internal services."
+description_zh: "配置双向 TLS（mTLS）实现零信任服务间通信，适用于证书管理与内部服务加固"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "cloud-infrastructure"
+source: agentz
 ---
 
 # mTLS Configuration

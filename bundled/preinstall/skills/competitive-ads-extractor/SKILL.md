@@ -1,9 +1,9 @@
 ---
 name: "competitive-ads-extractor"
-description: "Extracts and analyzes competitors' ads from ad libraries (Facebook, LinkedIn, etc.) to understand what messaging, problems, and creative approaches are working. Helps inspire and improve your own ad campaigns."
+description: "Extract and analyze competitors' ads from ad libraries such as Facebook and LinkedIn to see which messaging and creative approaches work. Use when researching ad strategy."
+description_zh: "从 Facebook、LinkedIn 等广告库提取并分析竞品广告，了解有效的文案与创意思路，用于广告策略研究。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "competitive-ads-extractor"
+source: agentz
 ---
 
 # Competitive Ads Extractor

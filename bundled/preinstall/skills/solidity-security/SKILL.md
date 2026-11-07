@@ -1,10 +1,9 @@
 ---
 name: "solidity-security"
-description: "Master smart contract security best practices to prevent common vulnerabilities and implement secure Solidity patterns. Use when writing smart contracts, auditing existing contracts, or implementing security measures for blockchain applications."
-description_zh: "使用 Solidity 进行智能合约开发、DeFi 协议实现、NFT 平台和 Web3 应用架构"
+description: "Smart contract security best practices and secure Solidity patterns. Use when writing or auditing smart contracts and hardening blockchain applications."
+description_zh: "智能合约安全最佳实践与安全的 Solidity 模式，用于编写和审计合约"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "blockchain-web3"
+source: agentz
 ---
 
 # Solidity Security

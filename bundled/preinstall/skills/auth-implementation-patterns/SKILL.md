@@ -1,10 +1,9 @@
 ---
 name: "auth-implementation-patterns"
-description: "Master authentication and authorization patterns including JWT, OAuth2, session management, and RBAC to build secure, scalable access control systems. Use when implementing auth systems, securing APIs, or debugging security issues."
-description_zh: "包含 Git 工作流、SQL 优化、错误处理、代码审查、端到端测试、身份认证、调试和 Monorepo 管理的核心开发技能集"
+description: "Authentication and authorization patterns including JWT, OAuth2, sessions and RBAC. Use when implementing auth systems, securing APIs or debugging security issues."
+description_zh: "涵盖 JWT、OAuth2、会话管理与 RBAC 的认证授权模式，用于实现登录鉴权、保护 API 或排查安全问题。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "developer-essentials"
+source: agentz
 ---
 
 # Authentication & Authorization Implementation Patterns

@@ -1,10 +1,9 @@
 ---
 name: "on-call-handoff-patterns"
-description: "Master on-call shift handoffs with context transfer, escalation procedures, and documentation. Use when transitioning on-call responsibilities, documenting shift summaries, or improving on-call processes."
-description_zh: "生产事故管理、分级处理工作流和自动化事故解决方案"
+description: "Run on-call shift handoffs with context transfer, escalation procedures and documentation. Use when handing over on-call duty or improving on-call processes."
+description_zh: "规范值班交接：上下文传递、升级流程与文档记录，适用于交接班和改进值班流程"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "incident-response"
+source: agentz
 ---
 
 # On-Call Handoff Patterns

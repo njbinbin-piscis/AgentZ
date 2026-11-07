@@ -1,10 +1,9 @@
 ---
 name: "uv-package-manager"
-description: "Master the uv package manager for fast Python dependency management, virtual environments, and modern Python project workflows. Use when setting up Python projects, managing dependencies, or optimizing Python development workflows with uv."
-description_zh: "现代 Python 开发工具，支持 Python 3.12+、Django、FastAPI、异步编程模式及生产环境最佳实践"
+description: "Use the uv package manager for fast Python dependency management, virtual environments and project workflows. Use when setting up Python projects or managing dependencies with uv."
+description_zh: "使用 uv 快速管理 Python 依赖、虚拟环境和项目工作流"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "python-development"
+source: agentz
 ---
 
 # UV Package Manager

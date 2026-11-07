@@ -1,10 +1,9 @@
 ---
 name: "nodejs-backend-patterns"
-description: "Build production-ready Node.js backend services with Express/Fastify, implementing middleware patterns, error handling, authentication, database integration, and API design best practices. Use when creating Node.js servers, REST APIs, GraphQL backends, or microservices architectures."
-description_zh: "JavaScript 和 TypeScript 开发，支持 ES6+、Node.js、React 及现代 Web 框架"
+description: "Build production-ready Node.js backends with Express or Fastify: middleware, error handling, auth, database integration and API design. Use when creating Node.js servers or REST APIs."
+description_zh: "用 Express/Fastify 构建生产级 Node.js 后端：中间件、错误处理、认证与数据库集成"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "javascript-typescript"
+source: agentz
 ---
 
 # Node.js Backend Patterns

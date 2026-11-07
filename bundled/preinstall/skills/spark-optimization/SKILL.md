@@ -1,10 +1,9 @@
 ---
 name: "spark-optimization"
-description: "Optimize Apache Spark jobs with partitioning, caching, shuffle optimization, and memory tuning. Use when improving Spark performance, debugging slow jobs, or scaling data processing pipelines."
-description_zh: "ETL管道构建、数据仓库设计、批处理工作流和数据驱动的功能开发"
+description: "Optimize Apache Spark jobs with partitioning, caching, shuffle tuning, and memory tuning. Use when improving Spark performance or debugging slow jobs."
+description_zh: "通过分区、缓存、Shuffle 与内存调优优化 Apache Spark 作业"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "data-engineering"
+source: agentz
 ---
 
 # Apache Spark Optimization

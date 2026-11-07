@@ -1,10 +1,9 @@
 ---
 name: "k8s-security-policies"
-description: "Implement Kubernetes security policies including NetworkPolicy, PodSecurityPolicy, and RBAC for production-grade security. Use when securing Kubernetes clusters, implementing network isolation, or enforcing pod security standards."
-description_zh: "Kubernetes 清单生成、网络配置、安全策略、可观测性配置、GitOps 工作流和自动扩缩容"
+description: "Implement Kubernetes security policies: NetworkPolicy, Pod Security, and RBAC. Use when securing clusters, isolating networks, or enforcing pod security standards."
+description_zh: "实现 Kubernetes 安全策略：NetworkPolicy、Pod 安全与 RBAC。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "kubernetes-operations"
+source: agentz
 ---
 
 # Kubernetes Security Policies

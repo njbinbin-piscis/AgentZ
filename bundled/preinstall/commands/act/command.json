@@ -1,0 +1,13 @@
+{
+  "id": "act",
+  "slash_id": "act",
+  "name": "Act (TDD Cycle)",
+  "description": "Work through todo.md items using the RED-GREEN-REFACTOR cycle on a new branch. Use to implement checklist items test-first.",
+  "description_zh": "按红-绿-重构循环，依据 todo.md 中的待办项逐项实现。",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "Follow the RED-GREEN-REFACTOR cycle for the items in todo.md:\n1. Open todo.md and select the first unchecked items to work on.\n2. Plan each item carefully, then share your plan.\n3. Create a new branch and implement the plan test-first: write a failing test (RED), make it pass (GREEN), then refactor.\n4. Check off the finished items in todo.md.\n5. Commit your changes.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-automation-workflow"
+}

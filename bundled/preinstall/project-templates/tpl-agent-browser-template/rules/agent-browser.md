@@ -1,5 +1,4 @@
-# Browser Automation & Web Verification Rules (`agent-browser`)
-
+# Browser Automation & Web Verification Rules
 When inspecting web pages, debugging frontend UI, or automating browser workflows in this project:
 
 1. **Choose the Right Tool**:

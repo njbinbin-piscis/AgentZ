@@ -1,0 +1,20 @@
+{
+  "id": "big-features-interview",
+  "slash_id": "big-features-interview",
+  "name": "Big Features Interview",
+  "description": "Interview you in depth about a plan or spec using interactive questions, then write the refined spec back to the file. Use to flesh out large features.",
+  "description_zh": "围绕计划或规格文档深入提问，并把完善后的规格写回文件，适合大型功能。",
+  "argument_hint": "<plan-file>",
+  "tools": [
+    "chat_ui",
+    "file_read",
+    "file_list",
+    "codebase_search",
+    "file_write",
+    "file_edit"
+  ],
+  "prompt": "Here is the current plan:\n\n@$ARGUMENTS\n\nInterview me in detail using the `chat_ui` tool about literally anything: technical implementation, UI and UX, concerns, tradeoffs and so on, but make sure the questions are not obvious.\n\nBe very in-depth and keep interviewing me until the plan is complete, then write the spec back to `$ARGUMENTS`.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "interview"
+}

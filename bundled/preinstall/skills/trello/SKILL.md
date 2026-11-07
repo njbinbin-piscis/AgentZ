@@ -1,10 +1,9 @@
 ---
 name: "trello"
-description: "Manage Trello boards, lists, and cards via the Trello REST API."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Manage Trello boards, lists and cards through the Trello REST API with curl. Use when the user wants to list boards, create cards or move cards in Trello."
+description_zh: "通过 Trello REST API 管理看板、列表和卡片：查看看板、创建和移动卡片"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Trello Skill

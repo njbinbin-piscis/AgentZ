@@ -1,10 +1,9 @@
 ---
 name: "competitive-landscape"
-description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"analyze competitors\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"assess competitive landscape\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"identify differentiation\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"evaluate market positioning\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"apply Porter's Five Forces\\\\\\\\\\\\\\\", or requests competitive strategy analysis."
-description_zh: "面向初创企业的综合业务分析工具，提供市场规模分析（TAM/SAM/SOM）、财务建模、团队规划和战略研究功能"
+description: "Analyze competitors, market positioning and differentiation using frameworks such as Porter's Five Forces. Use when assessing the competitive landscape or building competitive strategy."
+description_zh: "运用波特五力等框架分析竞品、市场定位与差异化，用于评估竞争格局和制定竞争策略。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "startup-business-analyst"
+source: agentz
 ---
 
 # Competitive Landscape Analysis

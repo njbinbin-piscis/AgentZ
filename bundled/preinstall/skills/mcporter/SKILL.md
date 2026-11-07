@@ -1,10 +1,9 @@
 ---
 name: "mcporter"
-description: "Use the mcporter CLI to list, configure, auth, and call MCP servers/tools directly (HTTP or stdio), including ad-hoc servers, config edits, and CLI/type generation."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "List, configure, authenticate and call MCP servers and tools with the mcporter CLI (HTTP or stdio), incl. config edits and CLI or TS generation. Use to test MCP servers from the shell."
+description_zh: "通过 mcporter 命令行查看、配置、认证并调用 MCP 服务器与工具，可生成 CLI 和 TS 类型"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # mcporter

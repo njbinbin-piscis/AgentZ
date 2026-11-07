@@ -1,9 +1,9 @@
 ---
 name: "app-router"
-description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"create a Next.js route\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"add a page\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"set up layouts\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"implement loading states\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"add error boundaries\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"organize routes\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"create dynamic routes\\\\\\\\\\\\\\\", or needs guidance on Next.js App Router file conventions and routing patterns."
+description: "Guide for Next.js App Router file conventions and routing: pages, layouts, loading and error states, dynamic and parallel routes. Use when creating or organizing Next.js routes."
+description_zh: "Next.js App Router 文件约定与路由指南：页面、布局、加载与错误状态、动态路由和并行路由。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "nextjs-expert"
+source: agentz
 ---
 
 # Next.js App Router Patterns

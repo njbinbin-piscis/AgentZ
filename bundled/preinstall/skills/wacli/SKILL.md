@@ -1,10 +1,9 @@
 ---
 name: "wacli"
-description: "Send WhatsApp messages to other people or search/sync WhatsApp history via the wacli CLI (not for normal user chats)."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Send WhatsApp messages or search and sync WhatsApp history with the wacli CLI. Use only when the user explicitly asks to message someone or search WhatsApp history."
+description_zh: "通过 wacli 命令行发送 WhatsApp 消息或搜索、同步聊天记录，仅在用户明确要求时使用"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # wacli

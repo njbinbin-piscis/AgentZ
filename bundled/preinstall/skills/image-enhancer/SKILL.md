@@ -1,9 +1,9 @@
 ---
 name: "image-enhancer"
-description: "Improves the quality of images, especially screenshots, by enhancing resolution, sharpness, and clarity. Perfect for preparing images for presentations, documentation, or social media posts."
+description: "Improve image quality, especially screenshots, by raising resolution, sharpness, and clarity. Use when preparing images for presentations, docs, or social posts."
+description_zh: "提升图片（尤其是截图）的分辨率、清晰度和锐度。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "image-enhancer"
+source: agentz
 ---
 
 # Image Enhancer

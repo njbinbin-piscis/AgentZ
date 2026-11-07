@@ -1,10 +1,9 @@
 ---
 name: "attack-tree-construction"
-description: "Build comprehensive attack trees to visualize threat paths. Use when mapping attack scenarios, identifying defense gaps, or communicating security risks to stakeholders."
-description_zh: "静态应用程序安全测试（SAST）分析、依赖项漏洞扫描、OWASP Top 10 合规性检查、容器安全扫描以及自动化安全加固"
+description: "Build attack trees to visualize threat paths. Use when mapping attack scenarios, finding defense gaps or communicating security risks to stakeholders."
+description_zh: "构建攻击树以可视化威胁路径，用于梳理攻击场景、发现防御缺口并向相关方说明安全风险。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "security-scanning"
+source: agentz
 ---
 
 # Attack Tree Construction

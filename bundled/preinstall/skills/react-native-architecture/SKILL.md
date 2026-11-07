@@ -1,10 +1,9 @@
 ---
 name: "react-native-architecture"
-description: "Build production React Native apps with Expo, navigation, native modules, offline sync, and cross-platform patterns. Use when developing mobile apps, implementing native integrations, or architecting React Native projects."
-description_zh: "跨平台前端 UI 开发和移动应用实现"
+description: "Build production React Native apps with Expo, navigation, native modules, offline sync, and cross-platform patterns. Use when developing or architecting React Native projects."
+description_zh: "使用 Expo、导航、原生模块和离线同步构建生产级 React Native 应用"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "frontend-mobile-development"
+source: agentz
 ---
 
 # React Native Architecture

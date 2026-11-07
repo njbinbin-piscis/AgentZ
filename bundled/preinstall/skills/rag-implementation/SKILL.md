@@ -1,9 +1,9 @@
 ---
 name: "rag-implementation"
-description: "Build Retrieval-Augmented Generation (RAG) systems for LLM applications with vector databases and semantic search. Use when implementing knowledge-grounded AI, building document Q&A systems, or integrating LLMs with external knowledge bases."
+description: "Build Retrieval-Augmented Generation (RAG) systems with vector databases and semantic search. Use when implementing knowledge-grounded AI or document Q&A."
+description_zh: "用向量数据库和语义检索构建 RAG 系统，适用于知识增强问答和文档问答"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "llm-application-dev"
+source: agentz
 ---
 
 # RAG Implementation

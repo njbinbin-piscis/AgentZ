@@ -1,10 +1,9 @@
 ---
 name: "oracle"
-description: "Use the @steipete/oracle CLI to bundle a prompt plus the right files and get a second-model review (API or browser) for debugging, refactors, design checks, or cross-validation."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Bundle a prompt with the right files and get a second-model review through the oracle CLI. Use for debugging, refactors, design checks or cross-validation."
+description_zh: "用 oracle 命令行打包提示词与文件，交给另一个模型做二次评审，适用于排错、重构与设计校验"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Oracle (CLI)

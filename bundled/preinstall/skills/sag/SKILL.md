@@ -1,10 +1,9 @@
 ---
 name: "sag"
-description: "ElevenLabs text-to-speech with mac-style say UX."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "ElevenLabs text-to-speech from the command line with a say-style interface. Use when generating spoken audio from text."
+description_zh: "通过命令行调用 ElevenLabs 文字转语音，用法类似 say 命令"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # sag

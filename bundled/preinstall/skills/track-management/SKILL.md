@@ -1,10 +1,9 @@
 ---
 name: "track-management"
-description: "Use this skill when creating, managing, or working with Conductor tracks - the logical work units for features, bugs, and refactors. Applies to spec.md, plan.md, and track lifecycle operations."
-description_zh: "上下文驱动开发插件，将 AgentZ 转变为项目管理工具，采用结构化工作流：上下文 → 规格与计划 → 实施"
+description: "Create and manage Conductor tracks, the logical work units for features, bugs and refactors, with spec.md and plan.md. Use when starting, updating or completing a track."
+description_zh: "创建和管理 Conductor 轨道（功能、缺陷、重构的工作单元），含 spec.md 与 plan.md 的编写和生命周期管理"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "conductor"
+source: agentz
 ---
 
 # Track Management
@@ -377,11 +376,11 @@ Example:
 
 ### Creating a Track
 
-1. Run `/conductor:new-track`
-2. Answer interactive questions
-3. Review generated spec.md
-4. Review generated plan.md
-5. Confirm track creation
+1. Ask the user the key questions (type, scope, acceptance criteria) with `chat_ui`
+2. Draft spec.md
+3. Draft plan.md
+4. Register the track in tracks.md and create metadata.json
+5. Confirm track creation with the user
 
 ### Starting Implementation
 
@@ -408,10 +407,10 @@ Example:
 
 ### Reverting a Track
 
-1. Run `/conductor:revert`
-2. Select track to revert
-3. Choose granularity (track/phase/task)
-4. Confirm revert operation
+1. Ask which track to revert
+2. Choose granularity (track/phase/task)
+3. Find the matching commits with `git log` and confirm the revert with the user
+4. Revert them with `git revert`
 5. Update status markers
 
 ## Handling Track Dependencies

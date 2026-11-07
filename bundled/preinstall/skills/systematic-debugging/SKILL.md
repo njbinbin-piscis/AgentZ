@@ -1,10 +1,9 @@
 ---
 name: "systematic-debugging"
-description: "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes"
-description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description: "Systematic root-cause debugging process. Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes."
+description_zh: "系统化的根因调试流程，遇到 Bug、测试失败或异常行为时先定位原因再修复"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "superpowers"
+source: agentz
 ---
 
 # Systematic Debugging
@@ -180,7 +179,7 @@ You MUST complete each phase before proceeding to the next.
    - Automated test if possible
    - One-off test script if no framework
    - MUST have before fixing
-   - Use the `superpowers:test-driven-development` skill for writing proper failing tests
+   - Use a test-driven-development skill (if enabled) for writing proper failing tests
 
 2. **Implement Single Fix**
    - Address the root cause identified
@@ -288,8 +287,8 @@ These techniques are part of systematic debugging and available in this director
 - **`condition-based-waiting.md`** - Replace arbitrary timeouts with condition polling
 
 **Related skills:**
-- **superpowers:test-driven-development** - For creating failing test case (Phase 4, Step 1)
-- **superpowers:verification-before-completion** - Verify fix worked before claiming success
+- **test-driven-development** (if enabled) - For creating failing test case (Phase 4, Step 1)
+- **verification-before-completion** (if enabled) - Verify fix worked before claiming success
 
 ## Real-World Impact
 

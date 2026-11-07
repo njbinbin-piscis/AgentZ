@@ -1,10 +1,9 @@
 ---
 name: "temporal-python-testing"
-description: "Test Temporal workflows with pytest, time-skipping, and mocking strategies. Covers unit testing, integration testing, replay testing, and local development setup. Use when implementing Temporal workflow tests or debugging test failures."
-description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
+description: "Test Temporal workflows in Python with pytest, time-skipping and mocking: unit, integration and replay tests. Use when writing Temporal workflow tests or debugging test failures."
+description_zh: "使用 pytest、时间跳过和 mock 测试 Python 的 Temporal 工作流，含单元、集成和回放测试"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "backend-development"
+source: agentz
 ---
 
 # Temporal Python Testing Strategies

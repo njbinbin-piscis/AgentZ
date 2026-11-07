@@ -1,387 +1,312 @@
 ---
-name: "PPT视觉设计"
-description: "当用户需要优化PPT视觉效果、调整配色方案、改进排版布局或寻求设计建议时自动激活"
-description_zh: "AI驱动的PPT创作助手，支持智能内容生成、多格式导出和专业模板"
+name: "ppt-design"
+description: "Improve presentation visuals: color schemes, typography, layout, chart choice and hierarchy. Use when polishing slides or asking for slide design advice."
+description_zh: "优化演示文稿视觉：配色、字体、排版、图表选择与层次，适用于美化幻灯片和设计建议"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "ppt-writer"
+source: agentz
 ---
 
-# PPT视觉设计技能
+# PPT Visual Design
 
-自动为PPT演示提供专业的视觉设计建议和优化方案。
+Professional visual design advice and optimization for presentation decks: color schemes, typography, layout, chart choice and visual hierarchy.
 
-## 激活场景
+## When to Use
 
-此技能在以下情况自动激活：
+- The user mentions slide colors, fonts, layout or other visual topics
+- The user asks to polish or beautify an existing deck
+- The user asks about presentation design rules and best practices
+- The user needs to pick a chart type
+- The user wants visual style suggestions
 
-1. 用户提到PPT配色、字体、布局等视觉相关词汇
-2. 用户要求优化或美化现有PPT
-3. 用户询问PPT设计规范和最佳实践
-4. 用户需要选择合适的图表类型
-5. 用户寻求视觉风格建议
+## Core Capabilities
 
-## 核心能力
+### 1. Color schemes
 
-### 1. 配色方案设计
-
-为不同场景提供专业配色：
-
-**商务场景**：
+**Business**
 ```
-主色：海军蓝 #0A2463
-辅色：金色 #D4AF37, 浅灰 #E8E8E8
-强调：深红 #C1292E
-背景：白色 #FFFFFF
+Primary: navy #0A2463
+Secondary: gold #D4AF37, light gray #E8E8E8
+Accent: deep red #C1292E
+Background: white #FFFFFF
 ```
 
-**科技场景**：
+**Technology**
 ```
-主色：科技蓝 #1E90FF
-辅色：深灰 #2C3E50, 荧光绿 #00FF7F
-强调：紫色 #8B00FF
-背景：深色 #1A1A1A 或白色 #FFFFFF
-```
-
-**教育场景**：
-```
-主色：暖橙 #FF6B35
-辅色：天蓝 #4ECDC4, 柠檬黄 #FFE66D
-强调：深蓝 #293241
-背景：米白 #F7FFF7
+Primary: tech blue #1E90FF
+Secondary: dark gray #2C3E50, neon green #00FF7F
+Accent: purple #8B00FF
+Background: dark #1A1A1A or white #FFFFFF
 ```
 
-**极简场景**：
+**Education**
 ```
-主色：黑色 #000000
-辅色：白色 #FFFFFF
-强调：单一品牌色
-背景：白色或浅灰
-```
-
-### 2. 字体搭配建议
-
-#### 标题字体（推荐）
-- **Montserrat**：现代、几何、适合商务
-- **Roboto**：清晰、中性、适合技术
-- **Poppins**：友好、圆润、适合教育
-- **Helvetica**：经典、简洁、适合极简
-
-#### 正文字体（推荐）
-- **Open Sans**：易读、专业
-- **Lato**：优雅、现代
-- **Nunito**：友好、平易
-- **Source Sans Pro**：技术、清晰
-
-#### 字体使用规则
-```
-标题：28-48号，粗体
-副标题：20-28号，中等
-正文：18-24号，常规
-注释：14-16号，细体
-
-最小字体：不小于14号（确保投影可读）
-字体数量：最多2-3种字体
-对比度：确保文字与背景对比度 ≥ 4.5:1
+Primary: warm orange #FF6B35
+Secondary: sky teal #4ECDC4, lemon yellow #FFE66D
+Accent: dark blue #293241
+Background: off-white #F7FFF7
 ```
 
-### 3. 布局网格系统
+**Minimal**
+```
+Primary: black #000000
+Secondary: white #FFFFFF
+Accent: a single brand color
+Background: white or light gray
+```
 
-#### 标准布局模板
+### 2. Font pairing
 
-**标题页**：
+Heading fonts:
+- **Montserrat**: modern, geometric, good for business
+- **Roboto**: clear, neutral, good for technical topics
+- **Poppins**: friendly, rounded, good for education
+- **Helvetica**: classic, clean, good for minimal designs
+
+Body fonts:
+- **Open Sans**: readable, professional
+- **Lato**: elegant, modern
+- **Nunito**: friendly, approachable
+- **Source Sans Pro**: technical, clear
+
+Usage rules:
+```
+Title: 28-48 pt, bold
+Subtitle: 20-28 pt, medium
+Body: 18-24 pt, regular
+Notes: 14-16 pt, light
+
+Minimum size: 14 pt (must stay readable when projected)
+Number of fonts: 2-3 at most
+Contrast: text to background contrast ratio >= 4.5:1
+```
+
+### 3. Layout grid
+
+**Title slide**
 ```
 ┌─────────────────────────────┐
 │                             │
-│         [大标题]            │
-│         [副标题]            │
+│         [Big title]         │
+│         [Subtitle]          │
 │                             │
-│        [作者/日期]          │
+│       [Author / date]       │
 │                             │
 └─────────────────────────────┘
 ```
 
-**单栏内容**：
+**Single column**
 ```
 ┌─────────────────────────────┐
-│ [标题]                      │
+│ [Title]                     │
 │ ─────────────────────────── │
-│ • 要点1                     │
-│ • 要点2                     │
-│ • 要点3                     │
+│ • Point 1                   │
+│ • Point 2                   │
+│ • Point 3                   │
 │                             │
-│        [图表/图片]          │
+│       [Chart / image]       │
 └─────────────────────────────┘
 ```
 
-**双栏内容**：
+**Two columns**
 ```
 ┌─────────────────────────────┐
-│ [标题]                      │
+│ [Title]                     │
 │ ─────────────────────────── │
-│ • 要点1      │  [图片]      │
-│ • 要点2      │   或         │
-│ • 要点3      │  [图表]      │
+│ • Point 1    │  [Image]     │
+│ • Point 2    │   or         │
+│ • Point 3    │  [Chart]     │
 │              │              │
 └─────────────────────────────┘
 ```
 
-**图表页**：
+**Chart slide**
 ```
 ┌─────────────────────────────┐
-│ [标题]                      │
+│ [Title]                     │
 │ ─────────────────────────── │
 │                             │
-│      [大型图表/图片]        │
+│     [Large chart / image]   │
 │                             │
-│    [数据说明或要点]         │
+│   [Data notes or takeaways] │
 └─────────────────────────────┘
 ```
 
-#### 留白原则
-- 页边距：至少10%（左右各5%，上下各5%）
-- 元素间距：标题下方留20-30px
-- 行间距：1.2-1.5倍
-- 避免填满整个页面
+White space rules:
+- Margins: at least 10% (5% left/right, 5% top/bottom)
+- Spacing: leave 20-30 px below the title
+- Line spacing: 1.2-1.5x
+- Never fill the whole slide
 
-### 4. 图表类型选择
+### 4. Choosing a chart type
 
-根据数据类型选择合适的图表：
+- **Comparison**: column chart (categories), bar chart (many items), radar chart (multiple dimensions)
+- **Trend**: line chart (change over time), area chart (magnitude of change), waterfall chart (increases and decreases)
+- **Proportion**: pie chart (whole share, at most 5 categories), donut chart (highlight a share), treemap (hierarchical share)
+- **Relationship**: scatter plot (correlation), bubble chart (three variables), heat map (matrix relations)
+- **Process**: flowchart (steps and decisions), timeline (event order), swimlane diagram (cross-team processes)
+- **Hierarchy**: org chart (reporting lines), pyramid (layers), mind map (knowledge structure)
 
-**比较数据**：
-- 柱状图：比较不同类别的数值
-- 条形图：比较项目较多时使用
-- 雷达图：多维度比较
+### 5. Visual hierarchy
 
-**趋势数据**：
-- 折线图：显示随时间变化趋势
-- 面积图：强调变化幅度
-- 瀑布图：显示增减变化
-
-**占比数据**：
-- 饼图：显示整体占比（≤5个分类）
-- 环形图：突出重点占比
-- 树状图：层级占比关系
-
-**关系数据**：
-- 散点图：显示相关性
-- 气泡图：三维关系展示
-- 热力图：矩阵关系
-
-**流程数据**：
-- 流程图：步骤和决策
-- 时间轴：事件顺序
-- 泳道图：跨部门流程
-
-**层级数据**：
-- 组织架构图：层级关系
-- 金字塔图：层次结构
-- 思维导图：知识体系
-
-### 5. 视觉层次优化
-
-#### 建立清晰层次的方法
-
-**大小对比**：
+**Size contrast**
 ```
-标题：48号
-副标题：28号
-正文：20号
-注释：14号
+Title: 48 pt
+Subtitle: 28 pt
+Body: 20 pt
+Notes: 14 pt
 ```
 
-**粗细对比**：
+**Weight contrast**
 ```
-标题：Bold (700)
-副标题：SemiBold (600)
-正文：Regular (400)
-注释：Light (300)
-```
-
-**颜色对比**：
-```
-主要信息：深色（黑色/深蓝）
-次要信息：中灰色
-辅助信息：浅灰色
-强调信息：品牌色/强调色
+Title: Bold (700)
+Subtitle: SemiBold (600)
+Body: Regular (400)
+Notes: Light (300)
 ```
 
-**位置层次**：
+**Color contrast**
 ```
-重要信息：页面上部、中心位置
-次要信息：页面下部、边缘位置
+Primary information: dark (black / dark blue)
+Secondary information: mid gray
+Supporting information: light gray
+Emphasis: brand or accent color
 ```
 
-### 6. 图标和图片使用
+**Position**
+```
+Important information: upper area, center
+Secondary information: lower area, edges
+```
 
-#### 图标选择
-- **风格统一**：使用同一套图标库
-- **大小一致**：相同层级图标大小相同
-- **颜色协调**：与配色方案匹配
-- **语义明确**：图标含义清晰
+### 6. Icons and images
 
-推荐图标库：
-- Lucide Icons（开源、现代）
-- Heroicons（简洁、清晰）
-- Font Awesome（丰富、经典）
-- Material Icons（标准、通用）
+Icons:
+- Keep one consistent style from a single icon set
+- Same size for the same level of hierarchy
+- Colors match the palette
+- Meaning must be unambiguous
 
-#### 图片使用
-- **高质量**：分辨率 ≥ 1920x1080
-- **相关性**：与内容直接相关
-- **一致性**：风格和色调统一
-- **版权**：使用正版或免费商用图片
+Recommended icon sets: Lucide Icons (open source, modern), Heroicons (clean), Font Awesome (rich, classic), Material Icons (standard).
 
-推荐图片来源：
-- Unsplash（高质量免费图片）
-- Pexels（商用免费视频图片）
-- Pixabay（多语言免费素材）
+Images:
+- High quality, resolution >= 1920x1080
+- Directly relevant to the content
+- Consistent style and tone
+- Licensed or free for commercial use
 
-## 设计检查清单
+Image sources: Unsplash, Pexels, Pixabay.
 
-在完成PPT设计后，使用此清单检查：
+## Design Checklist
 
-### 整体风格
-- [ ] 配色方案不超过3种主色
-- [ ] 字体种类不超过2-3种
-- [ ] 视觉风格统一一致
-- [ ] 品牌元素正确应用
+Overall style
+- [ ] No more than 3 main colors
+- [ ] No more than 2-3 fonts
+- [ ] Consistent visual style
+- [ ] Brand elements applied correctly
 
-### 可读性
-- [ ] 最小字号 ≥ 14号
-- [ ] 文字与背景对比度充足
-- [ ] 每页文字量适中（≤5个要点）
-- [ ] 行间距舒适（1.2-1.5倍）
+Readability
+- [ ] Minimum font size >= 14 pt
+- [ ] Sufficient text/background contrast
+- [ ] Moderate amount of text per slide (at most 5 points)
+- [ ] Comfortable line spacing (1.2-1.5x)
 
-### 布局和排版
-- [ ] 页面留白充足
-- [ ] 元素对齐整齐
-- [ ] 视觉层次清晰
-- [ ] 信息密度合理
+Layout and typography
+- [ ] Enough white space
+- [ ] Elements aligned
+- [ ] Clear visual hierarchy
+- [ ] Reasonable information density
 
-### 图表和图片
-- [ ] 图表类型选择恰当
-- [ ] 数据标注清晰
-- [ ] 图片质量高清
-- [ ] 图标风格统一
+Charts and images
+- [ ] Suitable chart type
+- [ ] Clear data labels
+- [ ] High-resolution images
+- [ ] Consistent icon style
 
-### 专业性
-- [ ] 无拼写和语法错误
-- [ ] 数据准确可信
-- [ ] 引用来源标注
-- [ ] 联系方式完整
+Professionalism
+- [ ] No spelling or grammar errors
+- [ ] Accurate, credible data
+- [ ] Sources cited
+- [ ] Complete contact details
 
-## 设计优化建议模板
+## Feedback Template
 
-当分析现有PPT时，使用此模板提供建议：
+When reviewing an existing deck, give suggestions in this structure:
 
 ```markdown
-# PPT设计优化建议
+# Deck Design Review
 
-## 1. 配色优化
-**当前问题**：[描述配色问题]
-**优化方案**：[提供新配色方案]
-**理由**：[解释为什么这样调整]
+## 1. Color
+**Current issue**: [describe]
+**Proposal**: [new color scheme]
+**Reason**: [why]
 
-## 2. 字体优化
-**当前问题**：[描述字体问题]
-**优化方案**：[推荐字体搭配]
-**理由**：[说明优化依据]
+## 2. Typography
+**Current issue**: [describe]
+**Proposal**: [recommended font pairing]
+**Reason**: [why]
 
-## 3. 布局优化
-**当前问题**：[描述布局问题]
-**优化方案**：[提供新布局方案]
-**理由**：[解释布局原则]
+## 3. Layout
+**Current issue**: [describe]
+**Proposal**: [new layout]
+**Reason**: [layout principle]
 
-## 4. 图表优化
-**当前问题**：[描述图表问题]
-**优化方案**：[推荐图表类型和样式]
-**理由**：[说明数据可视化原则]
+## 4. Charts
+**Current issue**: [describe]
+**Proposal**: [chart type and style]
+**Reason**: [data visualization principle]
 
-## 5. 整体改进
-- [改进建议1]
-- [改进建议2]
-- [改进建议3]
+## 5. Overall improvements
+- [Improvement 1]
+- [Improvement 2]
+- [Improvement 3]
 ```
 
-## 常见设计问题和解决方案
+## Common Problems and Fixes
 
-### 问题1：信息过载
-**表现**：每页文字太多，密密麻麻
-**解决**：
-- 提炼核心观点，删减冗余信息
-- 拆分成多页，一页一个重点
-- 使用图表替代大段文字
-- 增加留白空间
+### Information overload
+Symptom: too much text per slide.
+Fix: distill the key message, cut redundancy, split into multiple slides with one point each, replace paragraphs with charts, add white space.
 
-### 问题2：配色混乱
-**表现**：颜色太多，缺乏主次
-**解决**：
-- 确定1-2个主色
-- 使用同色系深浅变化
-- 强调色仅用于重点内容
-- 参考成熟的配色方案
+### Chaotic colors
+Symptom: too many colors, no primary/secondary distinction.
+Fix: pick 1-2 main colors, use tints and shades of the same hue, reserve the accent color for key content, start from a proven palette.
 
-### 问题3：字体杂乱
-**表现**：多种字体混用，风格不统一
-**解决**：
-- 限制字体种类（最多3种）
-- 标题用一种，正文用一种
-- 通过大小和粗细建立层次
-- 避免使用艺术字体
+### Messy fonts
+Symptom: many fonts mixed, inconsistent style.
+Fix: limit to at most 3 fonts, one for headings and one for body, build hierarchy with size and weight, avoid decorative fonts.
 
-### 问题4：排版拥挤
-**表现**：元素贴边，缺少呼吸感
-**解决**：
-- 设置合理的页边距
-- 增加元素之间的间距
-- 减少单页内容量
-- 使用网格系统对齐
+### Crowded layout
+Symptom: elements touch the edges, no breathing room.
+Fix: set sensible margins, increase spacing between elements, reduce content per slide, align to a grid.
 
-### 问题5：图表不清晰
-**表现**：图表复杂，难以理解
-**解决**：
-- 简化数据，只展示关键信息
-- 选择更直观的图表类型
-- 添加清晰的标注和说明
-- 使用对比色突出重点
+### Unclear charts
+Symptom: complex charts that are hard to read.
+Fix: simplify the data to the essentials, choose a more intuitive chart type, add clear labels and captions, use contrasting colors to highlight the point.
 
-## 快速设计技巧
+## Quick Tips
 
-### 5分钟快速美化
-1. 统一字体（选1个标题字体+1个正文字体）
-2. 应用配色方案（选1个主色+1个辅色）
-3. 对齐所有元素（使用对齐工具）
-4. 增加留白（调整页边距和间距）
-5. 统一图标风格（替换为同一套图标）
+### Five-minute polish
+1. Unify fonts (one heading font plus one body font)
+2. Apply a color scheme (one primary plus one secondary)
+3. Align all elements (use alignment tools)
+4. Add white space (adjust margins and spacing)
+5. Unify icon style (replace with a single icon set)
 
-### 配色快速选择
-- 蓝色系：专业、可信、科技
-- 绿色系：健康、环保、成长
-- 橙色系：活力、创意、温暖
-- 紫色系：高端、创新、神秘
-- 灰色系：简约、现代、中性
+### Quick color picks
+- Blue: professional, trustworthy, technical
+- Green: health, environment, growth
+- Orange: energetic, creative, warm
+- Purple: premium, innovative, mysterious
+- Gray: simple, modern, neutral
 
-### 应急设计方案
-当时间紧迫时：
-1. 使用纯色背景+白色文字（或反之）
-2. 只用一种字体，通过大小区分层次
-3. 使用简单的柱状图/折线图
-4. 最小化装饰，聚焦内容
-5. 确保对比度和可读性
+### When time is short
+1. Solid background with white text (or the reverse)
+2. A single font, with hierarchy from size alone
+3. Simple column or line charts
+4. Minimal decoration, focus on content
+5. Make sure contrast and readability hold up
 
-## 学习资源
+## Resources
 
-### 设计灵感
-- Behance（设计案例）
-- Dribbble（UI设计）
-- SlideShare（PPT案例）
-- Pinterest（视觉素材）
-
-### 工具推荐
-- Canva（在线设计）
-- Figma（原型设计）
-- Coolors（配色生成）
-- ColorHunt（配色灵感）
-
-通过持续应用这些设计原则和技巧，帮助用户创建专业、美观、高效的PPT演示文稿。
+Inspiration: Behance, Dribbble, SlideShare, Pinterest.
+Tools: Canva (online design), Figma (prototyping), Coolors (palette generator), ColorHunt (palette inspiration).

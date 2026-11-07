@@ -1,9 +1,9 @@
 ---
 name: "trend-researcher"
-description: "Research latest UI/UX trends from Dribbble and design communities. Use when starting a design project to understand current visual trends, color palettes, and layout patterns."
+description: "Research current UI/UX trends on Dribbble and design communities. Use at the start of a design project to learn visual trends, color palettes and layout patterns."
+description_zh: "调研 Dribbble 等设计社区的最新 UI/UX 趋势，了解流行的视觉风格、配色和布局"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "frontend-design-pro"
+source: agentz
 ---
 
 # Trend Researcher

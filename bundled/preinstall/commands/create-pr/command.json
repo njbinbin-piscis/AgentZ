@@ -1,0 +1,13 @@
+{
+  "id": "create-pr",
+  "slash_id": "create-pr",
+  "name": "Create PR",
+  "description": "Create a branch, split changes into logical commits and open a pull request with summary and test plan. Use to submit work.",
+  "description_zh": "创建分支、按逻辑拆分提交并创建带摘要和测试计划的拉取请求。",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# Create Pull Request Command\n\nCreate a new branch, commit changes, and submit a pull request.\n\n## Behavior\n- Creates a new branch based on current changes\n- Formats modified files using Biome\n- Analyzes changes and automatically splits into logical commits when appropriate\n- Each commit focuses on a single logical change or feature\n- Creates descriptive commit messages for each logical unit\n- Pushes branch to remote\n- Creates pull request with proper summary and test plan\n\n## Guidelines for Automatic Commit Splitting\n- Split commits by feature, component, or concern\n- Keep related file changes together in the same commit\n- Separate refactoring from feature additions\n- Ensure each commit can be understood independently\n- Multiple unrelated changes should be split into separate commits",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-version-control-git"
+}

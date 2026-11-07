@@ -1,0 +1,18 @@
+{
+  "id": "optimize",
+  "slash_id": "optimize",
+  "name": "Optimize Code",
+  "description": "Analyze the performance of the given code and propose three specific optimizations. Use for a quick performance review.",
+  "description_zh": "分析代码性能并给出三条具体优化建议。",
+  "argument_hint": "<file or function>",
+  "tools": [
+    "file_read",
+    "file_search",
+    "codebase_search",
+    "shell"
+  ],
+  "prompt": "Analyze the performance of this code and propose three specific optimizations.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-code-analysis-testing"
+}

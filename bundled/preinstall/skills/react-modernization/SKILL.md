@@ -1,10 +1,9 @@
 ---
 name: "react-modernization"
-description: "Upgrade React applications to latest versions, migrate from class components to hooks, and adopt concurrent features. Use when modernizing React codebases, migrating to React Hooks, or upgrading to latest React versions."
-description_zh: "框架升级、迁移规划与架构转型工作流"
+description: "Upgrade React apps to current versions, migrate class components to hooks, and adopt concurrent features. Use when modernizing React codebases or upgrading React."
+description_zh: "升级 React 应用、将类组件迁移到 Hooks 并采用并发特性"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "framework-migration"
+source: agentz
 ---
 
 # React Modernization

@@ -1,10 +1,9 @@
 ---
 name: "team-composition-analysis"
-description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"plan team structure\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"determine hiring needs\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"design org chart\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"calculate compensation\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"plan equity allocation\\\\\\\\\\\\\\\", or requests organizational design and headcount planning for a startup."
-description_zh: "面向初创企业的综合业务分析工具，提供市场规模分析（TAM/SAM/SOM）、财务建模、团队规划和战略研究功能"
+description: "Design startup team structure, hiring plans, compensation and equity allocation from pre-seed to Series A. Use when planning org design, headcount, pay or equity for an early-stage startup."
+description_zh: "为初创公司设计团队结构、招聘计划、薪酬与股权分配，覆盖种子前到 A 轮"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "startup-business-analyst"
+source: agentz
 ---
 
 # Team Composition Analysis

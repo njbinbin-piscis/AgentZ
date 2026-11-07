@@ -1,10 +1,9 @@
 ---
 name: "writing-plans"
-description: "Use when you have a spec or requirements for a multi-step task, before touching code"
-description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description: "Write detailed step-by-step implementation plans with exact files, code and test commands. Use when you have a spec or requirements for a multi-step task, before touching code."
+description_zh: "编写详细的分步实施计划，包含确切的文件、代码和测试命令，适用于动手写代码之前"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "superpowers"
+source: agentz
 ---
 
 # Writing Plans
@@ -15,11 +14,9 @@ Write comprehensive implementation plans assuming the engineer has zero context 
 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
-**Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
+**Context:** Ideally run this in a dedicated git worktree (see the using-git-worktrees skill).
 
-**Context:** This should be run in a dedicated worktree (created by brainstorming skill).
-
-**Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
+**Save plans to:** `.agentz/plans/YYYY-MM-DD-<feature-name>.md` (use the `plan_write` tool, or `file_write`).
 
 ## Bite-Sized Task Granularity
 
@@ -37,7 +34,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For the implementing agent:** implement this plan task-by-task, running each verification step before moving on.
 
 **Goal:** [One sentence describing what this builds]
 
@@ -95,26 +92,20 @@ git commit -m "feat: add specific feature"
 - Exact file paths always
 - Complete code in plan (not "add validation")
 - Exact commands with expected output
-- Reference relevant skills with @ syntax
+- Name any relevant skills the implementer should enable
 - DRY, YAGNI, TDD, frequent commits
 
 ## Execution Handoff
 
-After saving the plan, offer execution choice:
+After saving the plan, tell the user where it is and offer execution choices:
 
-**"Plan complete and saved to `docs/plans/<filename>.md`. Two execution options:**
+"Plan complete and saved to `.agentz/plans/<filename>.md`. Two execution options:
 
-**1. Subagent-Driven (this session)** - I dispatch fresh subagent per task, review between tasks, fast iteration
+1. **Step-by-step in this conversation** - I implement one task at a time and review the result between tasks. Fast iteration.
+2. **Separate session** - open a new conversation (ideally in a worktree) and implement the plan in batches with checkpoints.
 
-**2. Parallel Session (separate)** - Open new session with executing-plans, batch execution with checkpoints
+Which approach?"
 
-**Which approach?"**
+If step-by-step is chosen: stay in this conversation, implement each task, and review the diff after each one (`file_diff`, `read_lints`, tests).
 
-**If Subagent-Driven chosen:**
-- **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development
-- Stay in this session
-- Fresh subagent per task + code review
-
-**If Parallel Session chosen:**
-- Guide them to open new session in worktree
-- **REQUIRED SUB-SKILL:** New session uses superpowers:executing-plans
+If a separate session is chosen: guide the user to open a new conversation in the worktree and point it at the plan file.

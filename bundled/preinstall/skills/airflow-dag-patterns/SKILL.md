@@ -1,10 +1,9 @@
 ---
 name: "airflow-dag-patterns"
-description: "Build production Apache Airflow DAGs with best practices for operators, sensors, testing, and deployment. Use when creating data pipelines, orchestrating workflows, or scheduling batch jobs."
-description_zh: "ETL管道构建、数据仓库设计、批处理工作流和数据驱动的功能开发"
+description: "Build production Apache Airflow DAGs with sound patterns for operators, sensors, testing and deployment. Use when creating data pipelines, orchestrating workflows or scheduling batch jobs."
+description_zh: "构建生产级 Apache Airflow DAG，涵盖算子、传感器、测试与部署最佳实践，适用于数据管道编排与批处理调度。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "data-engineering"
+source: agentz
 ---
 
 # Apache Airflow DAG Patterns

@@ -1,9 +1,9 @@
 ---
 name: "content-research-writer"
-description: "Assists in writing high-quality content by conducting research, adding citations, improving hooks, iterating on outlines, and providing real-time feedback on each section. Transforms your writing process from solo effort to collaborative partnership."
+description: "Write high-quality content with research, citations, stronger hooks, outline iteration and section-by-section feedback. Use when drafting articles, posts or reports."
+description_zh: "辅助撰写高质量内容：调研、引用、优化开头、迭代大纲并逐段反馈，适用于文章、帖子与报告写作。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "content-research-writer"
+source: agentz
 ---
 
 # Content Research Writer
@@ -46,7 +46,7 @@ Create your draft file:
 touch article-draft.md
 ```
 
-Open AgentZ from this directory and start writing.
+Open this folder as your AgentZ project and start writing.
 
 ### Basic Workflow
 
@@ -484,7 +484,7 @@ Ready for the next section!
 
 ## Pro Tips
 
-1. **Work in VS Code**: Better than web Claude for long-form writing
+1. **Work in a project folder**: Keeping drafts and research as files works better than a chat window for long-form writing
 2. **One section at a time**: Get feedback incrementally
 3. **Save research separately**: Keep a research.md file
 4. **Version your drafts**: article-v1.md, article-v2.md, etc.

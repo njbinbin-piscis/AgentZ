@@ -1,15 +1,14 @@
 ---
 name: "openai-image-gen"
-description: "Batch-generate images via OpenAI Images API. Random prompt sampler + `index.html` gallery."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Batch-generate images through the OpenAI Images API with a random prompt sampler and an HTML thumbnail gallery. Use when you need many image variations."
+description_zh: "通过 OpenAI Images API 批量生成图片，带随机提示词采样和 HTML 缩略图画廊"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
-> **AgentZ note:** Bundled scripts are optional reference only. Prefer `shell`, `file_read`, and `file_write`.
-
 # OpenAI Image Gen
+
+In the commands below, `<skill-dir>` is this skill's installed directory (`<config>/skills/installed/openai-image-gen`).
 
 Generate a handful of "random but structured" prompts and render them via OpenAI Images API.
 
@@ -20,14 +19,14 @@ Generate a handful of "random but structured" prompts and render them via OpenAI
 ## Run
 
 ```bash
-python3 {baseDir}/scripts/gen.py
+python3 <skill-dir>/scripts/gen.py
 ```
 
 Useful flags:
 ```bash
-python3 {baseDir}/scripts/gen.py --count 16 --model gpt-image-1.5
-python3 {baseDir}/scripts/gen.py --prompt "ultra-detailed studio photo of a lobster astronaut" --count 4
-python3 {baseDir}/scripts/gen.py --size 1536x1024 --quality high --out-dir ./out/images
+python3 <skill-dir>/scripts/gen.py --count 16 --model gpt-image-1.5
+python3 <skill-dir>/scripts/gen.py --prompt "ultra-detailed studio photo of a lobster astronaut" --count 4
+python3 <skill-dir>/scripts/gen.py --size 1536x1024 --quality high --out-dir ./out/images
 ```
 
 ## Output

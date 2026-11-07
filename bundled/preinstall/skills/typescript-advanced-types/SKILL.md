@@ -1,10 +1,9 @@
 ---
 name: "typescript-advanced-types"
-description: "Master TypeScript's advanced type system including generics, conditional types, mapped types, template literals, and utility types for building type-safe applications. Use when implementing complex type logic, creating reusable type utilities, or ensuring compile-time type safety in TypeScript projects."
-description_zh: "JavaScript 和 TypeScript 开发，支持 ES6+、Node.js、React 及现代 Web 框架"
+description: "Use TypeScript's advanced type system: generics, conditional and mapped types, template literal types and utility types. Use for complex type logic and reusable type utilities."
+description_zh: "掌握 TypeScript 高级类型系统：泛型、条件类型、映射类型、模板字面量类型和工具类型"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "javascript-typescript"
+source: agentz
 ---
 
 # TypeScript Advanced Types

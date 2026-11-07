@@ -1,10 +1,9 @@
 ---
 name: "slo-implementation"
-description: "Define and implement Service Level Indicators (SLIs) and Service Level Objectives (SLOs) with error budgets and alerting. Use when establishing reliability targets, implementing SRE practices, or measuring service performance."
-description_zh: "指标收集、日志基础设施、分布式追踪、SLO 实施和监控仪表板"
+description: "Define and implement SLIs and SLOs with error budgets and alerting. Use when establishing reliability targets, applying SRE practices, or measuring service performance."
+description_zh: "定义并落地 SLI/SLO、错误预算和告警，用于建立可靠性目标"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "observability-monitoring"
+source: agentz
 ---
 
 # SLO Implementation

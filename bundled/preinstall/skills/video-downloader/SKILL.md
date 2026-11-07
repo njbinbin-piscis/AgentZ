@@ -1,9 +1,9 @@
 ---
-name: "youtube-downloader"
-description: "Download YouTube videos with customizable quality and format options. Use this skill when the user asks to download, save, or grab YouTube videos. Supports various quality settings (best, 1080p, 720p, 480p, 360p), multiple formats (mp4, webm, mkv), and audio-only downloads as MP3."
+name: "video-downloader"
+description: "Download YouTube videos with yt-dlp in chosen quality and format, or extract audio as MP3. Use when the user asks to download or save a YouTube video."
+description_zh: "用 yt-dlp 下载 YouTube 视频，可选画质和格式，或仅提取 MP3 音频"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "video-downloader"
+source: agentz
 ---
 
 # YouTube Video Downloader
@@ -18,7 +18,7 @@ The simplest way to download a video:
 python scripts/download_video.py "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-This downloads the video in best available quality as MP4 to `/mnt/user-data/outputs/`.
+This downloads the video in best available quality as MP4 to `~/Downloads/`.
 
 ## Options
 
@@ -95,7 +95,7 @@ The skill uses `yt-dlp`, a robust YouTube downloader that:
 
 ## Important Notes
 
-- Downloads are saved to `/mnt/user-data/outputs/` by default
+- Downloads are saved to `~/Downloads/` by default
 - Video filename is automatically generated from the video title
 - The script handles installation of yt-dlp automatically
 - Only single videos are downloaded (playlists are skipped by default)

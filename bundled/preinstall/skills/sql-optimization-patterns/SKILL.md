@@ -1,10 +1,9 @@
 ---
 name: "sql-optimization-patterns"
-description: "Master SQL query optimization, indexing strategies, and EXPLAIN analysis to dramatically improve database performance and eliminate slow queries. Use when debugging slow queries, designing database schemas, or optimizing application performance."
-description_zh: "包含 Git 工作流、SQL 优化、错误处理、代码审查、端到端测试、身份认证、调试和 Monorepo 管理的核心开发技能集"
+description: "SQL query optimization, indexing strategies, and EXPLAIN analysis to speed up databases. Use when debugging slow queries, designing schemas, or tuning database performance."
+description_zh: "SQL 查询优化、索引策略与 EXPLAIN 分析，用于排查慢查询和提升数据库性能"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "developer-essentials"
+source: agentz
 ---
 
 # SQL Optimization Patterns

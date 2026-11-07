@@ -1,10 +1,9 @@
 ---
 name: "screen-reader-testing"
-description: "Test web applications with screen readers including VoiceOver, NVDA, and JAWS. Use when validating screen reader compatibility, debugging accessibility issues, or ensuring assistive technology support."
-description_zh: "WCAG 无障碍审计、合规性验证、屏幕阅读器 UI 测试、键盘导航和包容性设计"
+description: "Test web apps with screen readers including VoiceOver, NVDA, and JAWS. Use when validating screen reader compatibility or debugging accessibility issues."
+description_zh: "使用 VoiceOver、NVDA、JAWS 等屏幕阅读器测试网页无障碍性"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "accessibility-compliance"
+source: agentz
 ---
 
 # Screen Reader Testing

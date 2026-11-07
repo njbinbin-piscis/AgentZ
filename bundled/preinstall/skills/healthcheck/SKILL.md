@@ -1,10 +1,9 @@
 ---
 name: "healthcheck"
-description: "Track water and sleep with JSON file storage"
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Track water intake and sleep in a local JSON file with small Node.js commands. Use when the user logs drinking water, going to sleep, or waking up, or asks for stats."
+description_zh: "用本地 JSON 文件记录饮水和睡眠，并查看统计。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Health Tracker
@@ -13,7 +12,7 @@ Simple tracking for water intake and sleep using JSON file.
 
 ## Data Format
 
-File: `{baseDir}/health-data.json`
+File: `health-data.json` in the current working directory (run the commands from there).
 
 ```json
 {
@@ -27,7 +26,7 @@ File: `{baseDir}/health-data.json`
 When user says "drink X cups" or similar:
 
 ```bash
-node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d={water:[],sleep:[]};try{d=JSON.parse(fs.readFileSync(f))}catch(e){}d.water.push({time:new Date().toISOString(),cups:CUPS});fs.writeFileSync(f,JSON.stringify(d));console.log('Recorded: '+CUPS+' cups')"
+node -e "const fs=require('fs');const f='./health-data.json';let d={water:[],sleep:[]};try{d=JSON.parse(fs.readFileSync(f))}catch(e){}d.water.push({time:new Date().toISOString(),cups:CUPS});fs.writeFileSync(f,JSON.stringify(d));console.log('Recorded: '+CUPS+' cups')"
 ```
 
 Replace `CUPS` with number from user input.
@@ -37,7 +36,7 @@ Replace `CUPS` with number from user input.
 When user says "going to sleep":
 
 ```bash
-node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d={water:[],sleep:[]};try{d=JSON.parse(fs.readFileSync(f))}catch(e){}d.sleep.push({time:new Date().toISOString(),action:'sleep'});fs.writeFileSync(f,JSON.stringify(d));console.log('Recorded: sleep')"
+node -e "const fs=require('fs');const f='./health-data.json';let d={water:[],sleep:[]};try{d=JSON.parse(fs.readFileSync(f))}catch(e){}d.sleep.push({time:new Date().toISOString(),action:'sleep'});fs.writeFileSync(f,JSON.stringify(d));console.log('Recorded: sleep')"
 ```
 
 ## Add Wake Record
@@ -45,7 +44,7 @@ node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d={wate
 When user says "woke up":
 
 ```bash
-node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d={water:[],sleep:[]};try{d=JSON.parse(fs.readFileSync(f))}catch(e){}const last=d.sleep.filter(s=>s.action==='sleep').pop();d.sleep.push({time:new Date().toISOString(),action:'wake'});fs.writeFileSync(f,JSON.stringify(d));if(last){const h=((new Date()-new Date(last.time))/3600000).toFixed(1);console.log('Slept: '+h+' hours')}else{console.log('Recorded: wake')}"
+node -e "const fs=require('fs');const f='./health-data.json';let d={water:[],sleep:[]};try{d=JSON.parse(fs.readFileSync(f))}catch(e){}const last=d.sleep.filter(s=>s.action==='sleep').pop();d.sleep.push({time:new Date().toISOString(),action:'wake'});fs.writeFileSync(f,JSON.stringify(d));if(last){const h=((new Date()-new Date(last.time))/3600000).toFixed(1);console.log('Slept: '+h+' hours')}else{console.log('Recorded: wake')}"
 ```
 
 ## View Stats
@@ -53,7 +52,7 @@ node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d={wate
 When user asks for stats:
 
 ```bash
-node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d={water:[],sleep:[]};try{d=JSON.parse(fs.readFileSync(f))}catch(e){}console.log('Water:',d.water.length,'records');console.log('Sleep:',d.sleep.length,'records');const today=d.water.filter(w=>new Date(w.time).toDateString()===new Date().toDateString());console.log('Today:',today.reduce((s,w)=>s+w.cups,0),'cups')"
+node -e "const fs=require('fs');const f='./health-data.json';let d={water:[],sleep:[]};try{d=JSON.parse(fs.readFileSync(f))}catch(e){}console.log('Water:',d.water.length,'records');console.log('Sleep:',d.sleep.length,'records');const today=d.water.filter(w=>new Date(w.time).toDateString()===new Date().toDateString());console.log('Today:',today.reduce((s,w)=>s+w.cups,0),'cups')"
 ```
 
 ## Update Record
@@ -61,7 +60,7 @@ node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d={wate
 To update last water entry:
 
 ```bash
-node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d=JSON.parse(fs.readFileSync(f));d.water[d.water.length-1].cups=NEW_CUPS;fs.writeFileSync(f,JSON.stringify(d));console.log('Updated')"
+node -e "const fs=require('fs');const f='./health-data.json';let d=JSON.parse(fs.readFileSync(f));d.water[d.water.length-1].cups=NEW_CUPS;fs.writeFileSync(f,JSON.stringify(d));console.log('Updated')"
 ```
 
 ## Delete Record
@@ -69,7 +68,7 @@ node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d=JSON.
 To delete last water entry:
 
 ```bash
-node -e "const fs=require('fs');const f='{baseDir}/health-data.json';let d=JSON.parse(fs.readFileSync(f));d.water.pop();fs.writeFileSync(f,JSON.stringify(d));console.log('Deleted')"
+node -e "const fs=require('fs');const f='./health-data.json';let d=JSON.parse(fs.readFileSync(f));d.water.pop();fs.writeFileSync(f,JSON.stringify(d));console.log('Deleted')"
 ```
 
 ## Notes

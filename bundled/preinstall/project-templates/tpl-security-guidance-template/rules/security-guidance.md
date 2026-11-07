@@ -1,5 +1,4 @@
-# Secure Coding Guardrails (`security-guidance`)
-
+# Secure Coding Guardrails
 Apply these security checks before every `file_write` or `file_edit` in this project:
 
 1. **No Command or Code Injection**:

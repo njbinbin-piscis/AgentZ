@@ -1,0 +1,13 @@
+{
+  "id": "all-tools",
+  "slash_id": "all-tools",
+  "name": "All Tools",
+  "description": "List every tool available in the current AgentZ session with its signature and purpose. Use to see what the agent can do.",
+  "description_zh": "列出当前 AgentZ 会话中所有可用工具及其用途，便于了解智能体能力。",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# Display All Available Tools\n\nList every tool available in this AgentZ session.\n\n## Instructions\n\n1. List each tool with its name and parameters.\n2. Add a short purpose for each tool.\n3. Use a blank line between tools for readability.\n4. Format the result as bullet points.\n\nThe output should help the user understand:\n- Which tools are available in the current session\n- The exact parameters each tool takes\n- The primary purpose of each tool\n\nExample format:\n\n- `tool_name(param: type)` - Purpose of the tool\n\n- `another_tool(param: type)` - What this tool does\n",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-utilities-debugging"
+}

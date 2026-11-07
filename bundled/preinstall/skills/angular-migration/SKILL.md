@@ -1,10 +1,9 @@
 ---
 name: "angular-migration"
-description: "Migrate from AngularJS to Angular using hybrid mode, incremental component rewriting, and dependency injection updates. Use when upgrading AngularJS applications, planning framework migrations, or modernizing legacy Angular code."
-description_zh: "框架升级、迁移规划与架构转型工作流"
+description: "Migrate AngularJS apps to modern Angular using hybrid mode, incremental component rewrites and dependency injection updates. Use when upgrading legacy Angular or planning a framework migration."
+description_zh: "借助混合模式、渐进式组件重写与依赖注入更新，将 AngularJS 应用迁移到现代 Angular。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "framework-migration"
+source: agentz
 ---
 
 # Angular Migration

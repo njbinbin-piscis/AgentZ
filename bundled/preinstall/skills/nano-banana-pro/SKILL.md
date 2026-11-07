@@ -1,13 +1,14 @@
 ---
 name: "nano-banana-pro"
-description: "Generate/edit images with Nano Banana Pro (Gemini 3 Pro Image). Use for image create/modify requests incl. edits. Supports text-to-image + image-to-image; 1K/2K/4K; use --input-image."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Generate or edit images with Nano Banana Pro (Gemini 3 Pro Image), text-to-image or image-to-image, at 1K, 2K or 4K. Use for image creation and editing requests."
+description_zh: "使用 Nano Banana Pro（Gemini 3 Pro Image）生成或编辑图片，支持文生图、图生图与多种分辨率"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Nano Banana Pro Image Generation & Editing
+
+In the commands below, `<skill-dir>` is this skill's installed directory (`<config>/skills/installed/nano-banana-pro`).
 
 Generate new images or edit existing ones using Google's Nano Banana Pro API (Gemini 3 Pro Image).
 
@@ -17,12 +18,12 @@ Run the script using absolute path (do NOT cd to skill directory first):
 
 **Generate new image:**
 ```bash
-uv run {baseDir}/scripts/generate_image.py --prompt "your image description" --filename "output-name.png" [--resolution 1K|2K|4K] [--api-key KEY]
+uv run <skill-dir>/scripts/generate_image.py --prompt "your image description" --filename "output-name.png" [--resolution 1K|2K|4K] [--api-key KEY]
 ```
 
 **Edit existing image:**
 ```bash
-uv run {baseDir}/scripts/generate_image.py --prompt "editing instructions" --filename "output-name.png" --input-image "path/to/input.png" [--resolution 1K|2K|4K] [--api-key KEY]
+uv run <skill-dir>/scripts/generate_image.py --prompt "editing instructions" --filename "output-name.png" --input-image "path/to/input.png" [--resolution 1K|2K|4K] [--api-key KEY]
 ```
 
 **Important:** Always run from the user's current working directory so images are saved where the user is working.

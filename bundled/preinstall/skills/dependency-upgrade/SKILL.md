@@ -1,10 +1,9 @@
 ---
 name: "dependency-upgrade"
-description: "Manage major dependency version upgrades with compatibility analysis, staged rollout, and comprehensive testing. Use when upgrading framework versions, updating major dependencies, or managing breaking changes in libraries."
-description_zh: "框架升级、迁移规划与架构转型工作流"
+description: "Manage major dependency upgrades with compatibility analysis, staged rollout and thorough testing. Use when upgrading frameworks or handling breaking changes in libraries."
+description_zh: "管理依赖大版本升级：兼容性分析、分阶段推进与充分测试，用于升级框架或处理破坏性变更。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "framework-migration"
+source: agentz
 ---
 
 # Dependency Upgrade

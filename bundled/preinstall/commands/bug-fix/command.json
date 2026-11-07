@@ -1,0 +1,13 @@
+{
+  "id": "bug-fix",
+  "slash_id": "bug-fix",
+  "name": "Bug Fix",
+  "description": "Fix a bug with a clean Git workflow: create an issue and branch, fix, commit, push and open a PR. Use for tracked bug fixes on GitHub.",
+  "description_zh": "用规范的 Git 流程修复缺陷：建议与分支、修复、提交、推送并创建 PR。",
+  "argument_hint": "<bug description>",
+  "tools": [],
+  "prompt": "Understand the bug: $ARGUMENTS\n\nBefore Starting:\n- GITHUB: create an issue with a short descriptive title.\n- GIT: checkout a branch and switch to it.\n\nFix the Bug\n\nOn Completion:\n- GIT: commit with a descriptive message.\n- GIT: push the branch to the remote repository.\n- GITHUB: create a PR and link the issue.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-version-control-git"
+}

@@ -1,9 +1,9 @@
 ---
 name: "invoice-organizer"
-description: "Automatically organizes invoices and receipts for tax preparation by reading messy files, extracting key information, renaming them consistently, and sorting them into logical folders. Turns hours of manual bookkeeping into minutes of automated organization."
+description: "Organize invoices and receipts for tax prep by reading files, extracting key data, renaming them consistently, and sorting into folders. Use when cleaning up messy financial documents."
+description_zh: "整理发票和收据以备报税：读取文件、提取信息、统一命名并分类归档。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "invoice-organizer"
+source: agentz
 ---
 
 # Invoice Organizer
@@ -58,7 +58,7 @@ Navigate to your messy invoice folder:
 cd ~/Desktop/receipts-to-sort
 ```
 
-Then ask AgentZ:
+Then ask the agent:
 ```
 Organize these invoices for taxes
 ```

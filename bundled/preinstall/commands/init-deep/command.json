@@ -1,0 +1,19 @@
+{
+  "id": "init-deep",
+  "slash_id": "init-deep",
+  "name": "Init Project Rules",
+  "description": "Analyze the repository and generate hierarchical project rule files under .agentz/rules/ describing structure, conventions and commands. Use to bootstrap or refresh project guidance.",
+  "description_zh": "分析仓库并在 .agentz/rules/ 下生成分层的项目规则文件，说明结构、约定与常用命令。",
+  "argument_hint": "[--create-new] [--max-depth=N]",
+  "tools": [
+    "file_read",
+    "file_search",
+    "file_edit",
+    "file_write",
+    "shell"
+  ],
+  "prompt": "# Init Project Rules\n\nAnalyze this repository and generate project rule files under `.agentz/rules/` so future sessions understand the codebase. Arguments: $ARGUMENTS\n\n## Options\n- `--create-new`: read existing rule files, then regenerate them from scratch.\n- `--max-depth=N`: limit directory depth when looking for areas that deserve their own file (default 3).\n- No option: update mode. Modify existing files and add new ones where warranted.\n\n## Workflow\n1. **Discover**\n   - Map the structure with `file_list` and `shell` (for example `git ls-files`).\n   - Read README, manifests (package.json, Cargo.toml, pyproject.toml, go.mod), CI config and lint/format config.\n   - Read existing files in `.agentz/rules/` first.\n   - Use `symbol_search`, `codebase_search` or `delegate` for read-only research on large areas.\n2. **Score areas**\n   - Give each directory a score from file count, code share, module boundaries, distinct conventions and entry points.\n   - Write a dedicated rule file only for areas that score high; the root overview covers the rest.\n3. **Generate**\n   - `.agentz/rules/project-overview.md`: purpose, tech stack, directory map, how to build, test, lint and run, and key conventions.\n   - `.agentz/rules/<area>.md` for each complex area: responsibilities, entry points, local conventions, anti-patterns and gotchas.\n   - Keep every file short and specific. Do not repeat parent content or state generic advice. Prefer concrete commands and file paths.\n4. **Review**\n   - Check that every command and path you wrote exists, remove duplicates and generic filler.\n\n## Rules\n- Only document what you verified in the code.\n- Never edit source code during this command.\n- Finish with a short list of the files created or updated.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": ""
+}

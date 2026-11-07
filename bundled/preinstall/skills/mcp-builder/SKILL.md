@@ -1,9 +1,9 @@
 ---
 name: "mcp-builder"
-description: "Guide for creating high-quality MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools. Use when building MCP servers to integrate external APIs or services, whether in Python (FastMCP) or Node/TypeScript (MCP SDK)."
+description: "Build high-quality MCP servers in Python (FastMCP) or TypeScript that let agents use external APIs through well-designed tools. Use when creating an MCP server and registering it in AgentZ."
+description_zh: "用 Python 或 TypeScript 构建高质量 MCP 服务器，并在 AgentZ 设置中注册使用。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "mcp-builder"
+source: agentz
 ---
 
 # MCP Server Development Guide
@@ -16,7 +16,7 @@ Create MCP (Model Context Protocol) servers that enable LLMs to interact with ex
 
 # Process
 
-## 🚀 High-Level Workflow
+## High-Level Workflow
 
 Creating a high-quality MCP server involves four main phases:
 
@@ -57,20 +57,20 @@ Key pages to review:
 
 **Load framework documentation:**
 
-- **MCP Best Practices**: [📋 View Best Practices](./reference/mcp_best_practices.md) - Core guidelines
+- **MCP Best Practices**: [View Best Practices](./reference/mcp_best_practices.md) - Core guidelines
 
 **For TypeScript (recommended):**
-- **TypeScript SDK**: Use WebFetch to load `https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/main/README.md`
-- [⚡ TypeScript Guide](./reference/node_mcp_server.md) - TypeScript patterns and examples
+- **TypeScript SDK**: Use `web_fetch` to load `https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/main/README.md`
+- [TypeScript Guide](./reference/node_mcp_server.md) - TypeScript patterns and examples
 
 **For Python:**
-- **Python SDK**: Use WebFetch to load `https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/main/README.md`
-- [🐍 Python Guide](./reference/python_mcp_server.md) - Python patterns and examples
+- **Python SDK**: Use `web_fetch` to load `https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/main/README.md`
+- [Python Guide](./reference/python_mcp_server.md) - Python patterns and examples
 
 #### 1.4 Plan Your Implementation
 
 **Understand the API:**
-Review the service's API documentation to identify key endpoints, authentication requirements, and data models. Use web search and WebFetch as needed.
+Review the service's API documentation to identify key endpoints, authentication requirements, and data models. Use `web_search` and `web_fetch` as needed.
 
 **Tool Selection:**
 Prioritize comprehensive API coverage. List endpoints to implement, starting with the most common operations.
@@ -82,8 +82,8 @@ Prioritize comprehensive API coverage. List endpoints to implement, starting wit
 #### 2.1 Set Up Project Structure
 
 See language-specific guides for project setup:
-- [⚡ TypeScript Guide](./reference/node_mcp_server.md) - Project structure, package.json, tsconfig.json
-- [🐍 Python Guide](./reference/python_mcp_server.md) - Module organization, dependencies
+- [TypeScript Guide](./reference/node_mcp_server.md) - Project structure, package.json, tsconfig.json
+- [Python Guide](./reference/python_mcp_server.md) - Module organization, dependencies
 
 #### 2.2 Implement Core Infrastructure
 
@@ -140,7 +140,7 @@ Review for:
 
 **TypeScript:**
 - Run `npm run build` to verify compilation
-- Test with MCP Inspector: `npx @modelcontextprotocol/inspector`
+- Test with MCP Inspector (`npx @modelcontextprotocol/inspector`, run through `shell`)
 
 **Python:**
 - Verify syntax: `python -m py_compile your_server.py`
@@ -150,89 +150,34 @@ See language-specific guides for detailed testing approaches and quality checkli
 
 ---
 
-### Phase 4: Create Evaluations
+### Phase 4: Register and Evaluate
 
-After implementing your MCP server, create comprehensive evaluations to test its effectiveness.
+#### 4.1 Register the server in AgentZ
 
-**Load [✅ Evaluation Guide](./reference/evaluation.md) for complete evaluation guidelines.**
+Add the server in **Settings, MCP Servers**: use `stdio` with `command` and `args` for a local server (put keys in `env`), or `http` with `url` and `headers` for a remote one. Enable it and confirm it connects. To give it only to a specific agent, keep it disabled globally and list its name in that agent's `mcp_servers`. The mcp-integration skill covers the details.
 
-#### 4.1 Understand Evaluation Purpose
+#### 4.2 Write evaluation questions
 
-Use evaluations to test whether LLMs can effectively use your MCP server to answer realistic, complex questions.
+Test whether an agent can answer realistic questions with your server. Write about 10 questions and solve each yourself first.
 
-#### 4.2 Create 10 Evaluation Questions
+Each question must be:
+- **Independent**: not dependent on other questions
+- **Read-only**: answerable with non-destructive tool calls
+- **Complex**: needs several tool calls and real exploration
+- **Realistic**: something a person would actually ask
+- **Verifiable**: one clear answer that can be checked by string comparison
+- **Stable**: the answer will not change over time
 
-To create effective evaluations, follow the process outlined in the evaluation guide:
-
-1. **Tool Inspection**: List available tools and understand their capabilities
-2. **Content Exploration**: Use READ-ONLY operations to explore available data
-3. **Question Generation**: Create 10 complex, realistic questions
-4. **Answer Verification**: Solve each question yourself to verify answers
-
-#### 4.3 Evaluation Requirements
-
-Ensure each question is:
-- **Independent**: Not dependent on other questions
-- **Read-only**: Only non-destructive operations required
-- **Complex**: Requiring multiple tool calls and deep exploration
-- **Realistic**: Based on real use cases humans would care about
-- **Verifiable**: Single, clear answer that can be verified by string comparison
-- **Stable**: Answer won't change over time
-
-#### 4.4 Output Format
-
-Create an XML file with this structure:
-
-```xml
-<evaluation>
-  <qa_pair>
-    <question>Find discussions about AI model launches with animal codenames. One model needed a specific safety designation that uses the format ASL-X. What number X was being determined for the model named after a spotted wild cat?</question>
-    <answer>3</answer>
-  </qa_pair>
-<!-- More qa_pairs... -->
-</evaluation>
-```
+Keep them as simple question and answer pairs in a Markdown file next to the server. Run them in a fresh chat with the server enabled, compare answers, and look at which tool calls failed or were wasted. Fix unclear tool names, descriptions, missing filters and unhelpful error messages, then rerun.
 
 ---
 
 # Reference Files
 
-## 📚 Documentation Library
-
 Load these resources as needed during development:
 
-### Core MCP Documentation (Load First)
-- **MCP Protocol**: Start with sitemap at `https://modelcontextprotocol.io/sitemap.xml`, then fetch specific pages with `.md` suffix
-- [📋 MCP Best Practices](./reference/mcp_best_practices.md) - Universal MCP guidelines including:
-  - Server and tool naming conventions
-  - Response format guidelines (JSON vs Markdown)
-  - Pagination best practices
-  - Transport selection (streamable HTTP vs stdio)
-  - Security and error handling standards
-
-### SDK Documentation (Load During Phase 1/2)
-- **Python SDK**: Fetch from `https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/main/README.md`
-- **TypeScript SDK**: Fetch from `https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/main/README.md`
-
-### Language-Specific Implementation Guides (Load During Phase 2)
-- [🐍 Python Implementation Guide](./reference/python_mcp_server.md) - Complete Python/FastMCP guide with:
-  - Server initialization patterns
-  - Pydantic model examples
-  - Tool registration with `@mcp.tool`
-  - Complete working examples
-  - Quality checklist
-
-- [⚡ TypeScript Implementation Guide](./reference/node_mcp_server.md) - Complete TypeScript guide with:
-  - Project structure
-  - Zod schema patterns
-  - Tool registration with `server.registerTool`
-  - Complete working examples
-  - Quality checklist
-
-### Evaluation Guide (Load During Phase 4)
-- [✅ Evaluation Guide](./reference/evaluation.md) - Complete evaluation creation guide with:
-  - Question creation guidelines
-  - Answer verification strategies
-  - XML format specifications
-  - Example questions and answers
-  - Running an evaluation with the provided scripts
+- [MCP Best Practices](./reference/mcp_best_practices.md): naming, response formats, pagination, transport selection, security and error handling.
+- [Python Implementation Guide](./reference/python_mcp_server.md): FastMCP initialization, Pydantic models, `@mcp.tool` registration, working examples and a quality checklist.
+- [TypeScript Implementation Guide](./reference/node_mcp_server.md): project structure, Zod schemas, `server.registerTool`, working examples and a quality checklist.
+- MCP protocol: start with `https://modelcontextprotocol.io/sitemap.xml` and fetch pages with a `.md` suffix using `web_fetch`.
+- SDK READMEs: `https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/main/README.md` and `https://raw.githubusercontent.com/modelcontextprotocol/typescript-sdk/main/README.md`.

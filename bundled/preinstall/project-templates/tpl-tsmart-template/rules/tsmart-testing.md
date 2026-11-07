@@ -1,5 +1,4 @@
-# Structured Test Engineering Rules (`tsmart`)
-
+# Structured Test Engineering Rules
 When designing tests or adding features/fixes in this project:
 
 1. **Test Matrix Coverage**:

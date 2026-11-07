@@ -1,9 +1,9 @@
 ---
 name: "llm-evaluation"
-description: "Implement comprehensive evaluation strategies for LLM applications using automated metrics, human feedback, and benchmarking. Use when testing LLM performance, measuring AI application quality, or establishing evaluation frameworks."
+description: "Evaluate LLM applications with automated metrics, human feedback and benchmarks. Use when testing LLM performance, measuring AI application quality or building evaluation frameworks."
+description_zh: "用自动指标、人工反馈和基准测试评估 LLM 应用，适用于搭建评估体系与衡量应用质量"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "llm-application-dev"
+source: agentz
 ---
 
 # LLM Evaluation

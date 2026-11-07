@@ -1,10 +1,9 @@
 ---
 name: "bats-testing-patterns"
-description: "Master Bash Automated Testing System (Bats) for comprehensive shell script testing. Use when writing tests for shell scripts, CI/CD pipelines, or requiring test-driven development of shell utilities."
-description_zh: "生产级 Bash 脚本编写，包含防御性编程、POSIX 合规性和全面测试"
+description: "Test shell scripts with the Bash Automated Testing System (Bats). Use when writing tests for shell scripts, CI/CD pipelines or doing test-driven development of shell utilities."
+description_zh: "使用 Bats（Bash 自动化测试系统）测试 shell 脚本，适用于脚本、CI/CD 流水线和 shell 工具的测试驱动开发。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "shell-scripting"
+source: agentz
 ---
 
 # Bats Testing Patterns

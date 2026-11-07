@@ -1,5 +1,4 @@
-# Full-Stack Cloud Application Rules (`cloudbase`)
-
+# Full-Stack Cloud Application Rules
 When developing frontend, backend/serverless functions, and database layers in this project:
 
 1. **End-to-End Contract Alignment**:

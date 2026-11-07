@@ -1,10 +1,9 @@
 ---
 name: "bazel-build-optimization"
-description: "Optimize Bazel builds for large-scale monorepos. Use when configuring Bazel, implementing remote execution, or optimizing build performance for enterprise codebases."
-description_zh: "包含 Git 工作流、SQL 优化、错误处理、代码审查、端到端测试、身份认证、调试和 Monorepo 管理的核心开发技能集"
+description: "Optimize Bazel builds for large monorepos. Use when configuring Bazel, setting up remote execution or improving build performance in enterprise codebases."
+description_zh: "优化大型 monorepo 的 Bazel 构建，用于配置 Bazel、远程执行与提升构建性能。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "developer-essentials"
+source: agentz
 ---
 
 # Bazel Build Optimization

@@ -1,10 +1,9 @@
 ---
 name: "error-handling-patterns"
-description: "Master error handling patterns across languages including exceptions, Result types, error propagation, and graceful degradation to build resilient applications. Use when implementing error handling, designing APIs, or improving application reliability."
-description_zh: "包含 Git 工作流、SQL 优化、错误处理、代码审查、端到端测试、身份认证、调试和 Monorepo 管理的核心开发技能集"
+description: "Apply error handling patterns across languages: exceptions, Result types, propagation, and graceful degradation. Use when implementing error handling or improving reliability."
+description_zh: "跨语言的错误处理模式：异常、Result 类型、错误传播与优雅降级。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "developer-essentials"
+source: agentz
 ---
 
 # Error Handling Patterns

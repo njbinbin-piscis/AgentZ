@@ -1,10 +1,9 @@
 ---
 name: "imsg"
-description: "iMessage/SMS CLI for listing chats, history, watch, and sending."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "iMessage and SMS CLI for macOS to list chats, read history, watch for messages, and send. Use when reading or sending Messages.app conversations from the shell."
+description_zh: "macOS 上的 iMessage/SMS 命令行：查看会话、历史、监听和发送消息。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # imsg

@@ -1,22 +1,22 @@
 ---
 name: "browser"
-description: "This skill should be used for browser automation tasks using Chrome DevTools Protocol (CDP). Triggers when users need to launch Chrome with remote debugging, navigate pages, execute JavaScript in browser context, capture screenshots, or interactively select DOM elements. No MCP server required."
-description_zh: "完整的 OMC (Oh My AgentZ) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
+description: "Browser automation with Chrome DevTools Protocol scripts: launch Chrome, navigate, run JavaScript, take screenshots and pick DOM elements. Use for scripted browser tasks via the shell."
+description_zh: "通过 Chrome DevTools Protocol 脚本自动化浏览器：启动 Chrome、导航、执行 JS、截图和拾取 DOM 元素。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "oh-my-agentz"
+source: agentz
 ---
 
 # Browser Automation
 
-Minimal Chrome DevTools Protocol (CDP) helpers for browser automation without MCP server setup.
+Minimal Chrome DevTools Protocol (CDP) helper scripts for browser automation from `shell`, with no MCP server setup. For simple page checks prefer the builtin `browser` tool.
 
 ## Setup
 
-Install dependencies before first use:
+Install dependencies before first use (run with `shell`):
 
 ```bash
-npm install --prefix ~/.AgentZ/skills/browser/browser ws
+# run inside this skill's scripts/ directory
+npm install ws
 ```
 
 ## Scripts

@@ -1,0 +1,21 @@
+{
+  "id": "review-pr",
+  "slash_id": "review-pr",
+  "name": "Review PR",
+  "description": "Run a multi-aspect pull request review (code quality, tests, error handling, comments, types, simplification) on the current changes. Use before merging or opening a PR.",
+  "description_zh": "多维度评审当前改动或 PR：代码质量、测试、错误处理、注释、类型与简化",
+  "argument_hint": "[aspects: code tests errors comments types simplify all]",
+  "tools": [
+    "shell",
+    "file_read",
+    "file_write",
+    "file_edit",
+    "file_search",
+    "file_list",
+    "delegate"
+  ],
+  "prompt": "# Comprehensive PR Review\n\nReview the current pull request or local changes across several aspects of code quality.\n\n**Review aspects (optional):** \"$ARGUMENTS\"\n\n## Review Workflow\n\n1. **Determine review scope**\n   - Run `git status` and `git diff --name-only` to identify changed files (use `gh pr view` if a PR exists)\n   - Parse the arguments to see if the user asked for specific aspects\n   - Default: run all applicable reviews\n\n2. **Available review aspects**\n   - **comments**: comment accuracy, comment rot, documentation completeness\n   - **tests**: behavioral test coverage, critical gaps, test quality\n   - **errors**: silent failures, swallowed exceptions, missing error logging\n   - **types**: type encapsulation and invariants (when types were added or changed)\n   - **code**: bugs, general quality, and compliance with the project guidelines in `.agentz/rules/`\n   - **simplify**: simplify complex code for clarity while preserving behavior\n   - **all**: run all applicable reviews (default)\n\n3. **Pick applicable reviews from the changes**\n   - Always: code review\n   - If test files changed: tests\n   - If comments or docs were added: comments\n   - If error handling changed: errors\n   - If types were added or modified: types\n   - After the review passes: simplify\n\n4. **Run the reviews** one at a time, completing each report before the next. For a large diff, read-only research can be split out with `delegate`.\n\n5. **Aggregate results** and present them as:\n\n   ```markdown\n   # PR Review Summary\n\n   ## Critical Issues (X found)\n   - [aspect]: Issue description [file:line]\n\n   ## Important Issues (X found)\n   - [aspect]: Issue description [file:line]\n\n   ## Suggestions (X found)\n   - [aspect]: Suggestion [file:line]\n\n   ## Strengths\n   - What is well done in this PR\n\n   ## Recommended Action\n   1. Fix critical issues first\n   2. Address important issues\n   3. Consider suggestions\n   4. Re-run the review after fixes\n   ```\n\n## Usage Examples\n\n- `/review-pr`: full review\n- `/review-pr tests errors`: only test coverage and error handling\n- `/review-pr simplify`: simplify code after the review passes\n\n## Tips\n\n- Run early, before creating the PR\n- Focus on the diff; do not review untouched code\n- Fix critical issues first and re-run after fixes\n- Give every finding a specific file:line reference\n",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "pr-review-toolkit"
+}

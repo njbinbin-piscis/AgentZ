@@ -1,9 +1,9 @@
 ---
 name: "meeting-insights-analyzer"
-description: "Analyzes meeting transcripts and recordings to uncover behavioral patterns, communication insights, and actionable feedback. Identifies when you avoid conflict, use filler words, dominate conversations, or miss opportunities to listen. Perfect for professionals seeking to improve their communication and leadership skills."
+description: "Analyze meeting transcripts to reveal communication patterns such as filler words, conflict avoidance and talk time, with actionable feedback. Use to improve communication and leadership."
+description_zh: "分析会议记录，发现口头禅、回避冲突、发言占比等沟通模式并给出改进建议"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "meeting-insights-analyzer"
+source: agentz
 ---
 
 # Meeting Insights Analyzer

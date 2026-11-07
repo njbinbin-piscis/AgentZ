@@ -1,10 +1,9 @@
 ---
 name: "executing-plans"
-description: "Use when you have a written implementation plan to execute in a separate session with review checkpoints"
-description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description: "Execute a written implementation plan in batches with review checkpoints. Use when you have a plan file to carry out step by step."
+description_zh: "按批次执行已写好的实施计划，并在批次之间设置评审检查点。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "superpowers"
+source: agentz
 ---
 
 # Executing Plans
@@ -22,8 +21,8 @@ Load plan, review critically, execute tasks in batches, report for review betwee
 ### Step 1: Load and Review Plan
 1. Read plan file
 2. Review critically - identify any questions or concerns about the plan
-3. If concerns: Raise them with your human partner before starting
-4. If no concerns: Create plan_todo tool and proceed
+3. If concerns: Raise them with the user before starting
+4. If no concerns: Create a task list with `plan_todo` and proceed
 
 ### Step 2: Execute Batch
 **Default: First 3 tasks**
@@ -50,8 +49,7 @@ Based on feedback:
 
 After all tasks complete and verified:
 - Announce: "I'm using the finishing-a-development-branch skill to complete this work."
-- **REQUIRED SUB-SKILL:** Use superpowers:finishing-a-development-branch
-- Follow that skill to verify tests, present options, execute choice
+- Follow the finishing-a-development-branch skill (if enabled) to verify tests, present options, and execute the choice
 
 ## When to Stop and Ask for Help
 
@@ -66,7 +64,7 @@ After all tasks complete and verified:
 ## When to Revisit Earlier Steps
 
 **Return to Review (Step 1) when:**
-- Partner updates the plan based on your feedback
+- User updates the plan based on your feedback
 - Fundamental approach needs rethinking
 
 **Don't force through blockers** - stop and ask.
@@ -75,6 +73,6 @@ After all tasks complete and verified:
 - Review plan critically first
 - Follow plan steps exactly
 - Don't skip verifications
-- Reference skills when plan says to
+- Use the skills the plan references, if enabled
 - Between batches: just report and wait
 - Stop when blocked, don't guess

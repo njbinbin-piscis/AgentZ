@@ -1,0 +1,13 @@
+{
+  "id": "commit-fast",
+  "slash_id": "commit-fast",
+  "name": "Commit Fast",
+  "description": "Create a git commit immediately using the first suggested commit message, without asking for confirmation. Use for quick commits.",
+  "description_zh": "直接采用第一条建议的提交信息完成 git 提交，无需确认。",
+  "argument_hint": "",
+  "tools": [],
+  "prompt": "# Create a fast commit\n\nThis command follows the same logic as the `commit` command, but automatically selects the first suggested commit message without asking for confirmation.\n\n- Generate 3 commit message suggestions in the same format as the `commit` command\n- Automatically use the first suggestion without asking the user\n- Immediately run `git commit -m` with the first message\n- All other behavior stays the same as the `commit` command (format, package names, staged files only)\n- Do NOT add any co-author footer to commits",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-version-control-git"
+}

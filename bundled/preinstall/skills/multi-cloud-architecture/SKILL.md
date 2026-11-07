@@ -1,10 +1,9 @@
 ---
 name: "multi-cloud-architecture"
-description: "Design multi-cloud architectures using a decision framework to select and integrate services across AWS, Azure, and GCP. Use when building multi-cloud systems, avoiding vendor lock-in, or leveraging best-of-breed services from multiple providers."
-description_zh: "云架构设计（AWS/Azure/GCP），Kubernetes 集群配置，Terraform 基础设施即代码，混合云网络，以及多云成本优化"
+description: "Design multi-cloud architectures with a decision framework for choosing and integrating services across AWS, Azure and GCP. Use to avoid vendor lock-in or pick best-of-breed services."
+description_zh: "设计跨 AWS、Azure、GCP 的多云架构，用决策框架选型与集成，避免厂商锁定"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "cloud-infrastructure"
+source: agentz
 ---
 
 # Multi-Cloud Architecture

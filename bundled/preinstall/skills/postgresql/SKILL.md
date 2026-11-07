@@ -1,10 +1,9 @@
 ---
-name: "postgresql-table-design"
-description: "Design a PostgreSQL-specific schema. Covers best-practices, data types, indexing, constraints, performance patterns, and advanced features"
-description_zh: "生产系统的数据库架构设计、模式设计和 SQL 优化"
+name: "postgresql"
+description: "Design PostgreSQL schemas: data types, indexing, constraints, performance patterns and advanced features. Use when creating or reviewing PostgreSQL tables."
+description_zh: "设计 PostgreSQL 表结构：数据类型、索引、约束与性能优化，适用于建表和评审"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "database-design"
+source: agentz
 ---
 
 # PostgreSQL Table Design 

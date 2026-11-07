@@ -1,0 +1,19 @@
+{
+  "id": "improve-agent",
+  "slash_id": "improve-agent",
+  "name": "Improve Agent",
+  "description": "Analyze an existing AgentZ agent and improve its system prompt, tools, skills and permissions through failure analysis and a before/after test plan. Use when an agent underperforms.",
+  "description_zh": "分析现有 AgentZ 智能体的表现，改进其提示词、工具、技能与权限，并给出前后对比测试方案。",
+  "argument_hint": "<agent id or name>",
+  "tools": [
+    "file_read",
+    "file_edit",
+    "file_list",
+    "file_search",
+    "chat_ui"
+  ],
+  "prompt": "Improve the AgentZ agent: $ARGUMENTS\n\nIf $ARGUMENTS is empty, list the agents in the agents folder of the AgentZ config directory and ask which one to improve with chat_ui.\n\n## 1. Read the current definition\nOpen <agents folder>/<id>/agent.json with file_read. Note description, system_prompt, skills, tools, tool_allowlist, permission_mode, delegable, mcp_servers, connectors, max_iterations and task_timeout_secs.\n\n## 2. Collect evidence of problems\nAsk the user (chat_ui) for two to five concrete examples where the agent failed or was mediocre: the request, what it did, and what was expected. If they have none, review the prompt itself. Classify each failure:\n- Instruction failures: ignored or misread requirements, wrong format, scope creep.\n- Tool failures: missing tool, wrong tool, too many tools, unsafe write access.\n- Knowledge failures: missing domain context that a skill or a reference file should supply.\n- Reliability failures: stops early, loops, hits max_iterations or the timeout.\n\n## 3. Propose targeted changes\nFor each failure give the root cause and one change:\n- Prompt: clearer role, numbered procedure, explicit output format, a few short examples, explicit boundaries and when to ask the user. Prefer concrete rules to long generic text; remove contradictions. Keep the prompt in English and put any Chinese into system_prompt_zh.\n- Tools: use only builtin tool ids (file_read, file_write, file_edit, file_list, file_search, file_diff, codebase_search, symbol_search, shell, process_control, code_run, web_fetch, web_search, plan_todo, plan_write, delegate, chat_ui, browser, pdf, vision_context, email, ssh, repo_memory, memory_store, skill_manage, api_connector, lsp, read_lints, graph_explore, graph_search, impact, devenv, terminal_read, recall_tool_result, plan_mode_ui, pool_org, pool_chat); remove tools the job does not need; add write tools only when required.\n- Skills: add existing skill slugs that carry the missing knowledge; remove skills that bloat the context.\n- Permissions: narrow tool_allowlist and permission_mode if the agent is delegable.\n- Limits: adjust max_iterations or task_timeout_secs if runs end prematurely.\nKeep changes minimal and reversible, and keep everything that already works.\n\n## 4. Test plan\nWrite a small before/after test set (five to ten requests covering normal, edge and adversarial cases) with a pass criterion for each. Ask the user to run it against the old and new versions and report back.\n\n## 5. Apply\nShow the revised fields as a fenced json block with a rationale for each change. Only after the user agrees, apply them with file_edit, keeping valid JSON, and tell the user to start a new conversation to pick up the updated agent.",
+  "prompt_zh": "改进以下 AgentZ 智能体：$ARGUMENTS\n\n1. 读取 agents/<id>/agent.json，记录提示词、技能、工具、权限与限制。\n2. 请用户提供 2 到 5 个失败或表现不佳的例子，并按指令、工具、知识、稳定性分类。\n3. 针对每类问题给出根因与最小改动：优化提示词、精简工具（仅内置工具 id）、补充已有技能、收紧权限、调整迭代与超时。\n4. 编写 5 到 10 条前后对比测试用例。\n5. 展示修改后的字段，用户同意后再用 file_edit 应用。",
+  "source": "agentz",
+  "source_plugin": ""
+}

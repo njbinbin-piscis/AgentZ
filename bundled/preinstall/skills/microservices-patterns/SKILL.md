@@ -1,10 +1,9 @@
 ---
 name: "microservices-patterns"
-description: "Design microservices architectures with service boundaries, event-driven communication, and resilience patterns. Use when building distributed systems, decomposing monoliths, or implementing microservices."
-description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
+description: "Design microservice architectures with service boundaries, event-driven communication and resilience patterns. Use when building distributed systems or decomposing a monolith."
+description_zh: "设计微服务架构：服务边界、事件驱动通信与容错模式，适用于分布式系统和单体拆分"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "backend-development"
+source: agentz
 ---
 
 # Microservices Patterns

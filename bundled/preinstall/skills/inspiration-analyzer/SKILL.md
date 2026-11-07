@@ -1,9 +1,9 @@
 ---
 name: "inspiration-analyzer"
-description: "Analyze websites for design inspiration, extracting colors, typography, layouts, and patterns. Use when you have specific URLs to analyze for a design project."
+description: "Analyze websites for design inspiration by extracting colors, typography, layouts, and patterns. Use when you have specific URLs to study for a design project."
+description_zh: "分析网站的设计灵感：提取配色、字体、布局和设计模式。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "frontend-design-pro"
+source: agentz
 ---
 
 # Inspiration Analyzer
@@ -13,7 +13,7 @@ Analyze websites to extract design inspiration including colors, typography, lay
 ## Purpose
 
 When a user provides inspiration URLs, this skill:
-- Visits each site using browser tools
+- Visits each site with the `browser` tool
 - Takes screenshots for visual analysis
 - Extracts specific design elements
 - Creates structured inspiration report
@@ -21,41 +21,24 @@ When a user provides inspiration URLs, this skill:
 
 ## Workflow
 
-### Step 1: Get Browser Context
+### Step 1: Open the Site
 
-```javascript
-// Get or create browser tab
-tabs_context_mcp({ createIfEmpty: true })
-tabs_create_mcp()
-```
+Use the `browser` tool to open the URL. If the `browser` tool is unavailable, fall back to `web_fetch` for the HTML/CSS source (see Fallback Mode).
 
-### Step 2: Navigate to URL
-
-```javascript
-navigate({ url: "https://example.com", tabId: tabId })
-```
-
-### Step 3: Capture Screenshots
+### Step 2: Capture Screenshots
 
 Take multiple screenshots to capture the full experience:
 
 1. **Hero/Above-fold**: Initial viewport
-2. **Scrolled sections**: Scroll and capture
+2. **Scrolled sections**: Scroll down and capture each section
 3. **Interactive states**: Hover on navigation, buttons
-4. **Mobile view**: Resize to mobile width
+4. **Mobile view**: Resize the viewport to a mobile width (about 375x812)
 
-```javascript
-// Full page screenshot
-computer({ action: "screenshot", tabId: tabId })
+Use `vision_context` (when available) to analyze the screenshots visually.
 
-// Scroll and capture more
-computer({ action: "scroll", scroll_direction: "down", tabId: tabId })
-computer({ action: "screenshot", tabId: tabId })
+### Step 3: Read the Page Source
 
-// Mobile view
-resize_window({ width: 375, height: 812, tabId: tabId })
-computer({ action: "screenshot", tabId: tabId })
-```
+Use `web_fetch` or the `browser` tool to read the page HTML and CSS for color variables, font-family declarations, and breakpoints.
 
 ### Step 4: Analyze Elements
 
@@ -149,7 +132,7 @@ When analyzing multiple URLs:
 
 ## Fallback Mode
 
-If browser tools are unavailable:
+If the `browser` tool is unavailable:
 
 1. Inform user that live analysis requires browser access
 2. Ask user to:

@@ -23,7 +23,7 @@ const agents = countDirs(join(root, "agents"));
 const commands = countDirs(join(root, "commands"));
 const templates = countDirs(join(root, "project-templates"));
 
-const mins = { skills: 240, agents: 220, commands: 300, templates: 5 };
+const mins = { skills: 200, agents: 200, commands: 200, templates: 5 };
 let ok = true;
 
 for (const [key, min] of Object.entries(mins)) {
@@ -36,6 +36,12 @@ for (const [key, min] of Object.entries(mins)) {
 
 if (!existsSync(manifestPath)) {
   console.error(`verify-preinstall: missing ${manifestPath}`);
+  ok = false;
+}
+
+const retiredPath = join(ROOT, "bundled", "codebuddy", "retired.json");
+if (!existsSync(retiredPath)) {
+  console.error(`verify-preinstall: missing ${retiredPath}`);
   ok = false;
 }
 

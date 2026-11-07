@@ -1,10 +1,9 @@
 ---
 name: "test-cases"
-description: "This skill should be used when generating comprehensive test cases from PRD documents or user requirements. Triggers when users request test case generation, QA planning, test scenario creation, or need structured test documentation. Produces detailed test cases covering functional, edge case, error handling, and state transition scenarios."
-description_zh: "完整的 OMC (Oh My AgentZ) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
+description: "Generate structured test cases from a PRD or requirements, covering functional, edge-case, error-handling and state-transition scenarios. Use for test case generation or QA planning."
+description_zh: "根据 PRD 或需求生成结构化测试用例，覆盖功能、边界、异常和状态流转场景"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "oh-my-agentz"
+source: agentz
 ---
 
 # Test Cases Generator
@@ -42,9 +41,9 @@ Follow these principles when generating test cases:
 
 First, identify the source of requirements:
 
-1. If user provides a file path to a PRD, read it using the Read tool
+1. If user provides a file path to a PRD, read it with `file_read`
 2. If user describes requirements verbally, capture them
-3. If requirements are unclear or incomplete, use chat_ui tool to clarify:
+3. If requirements are unclear or incomplete, use the `chat_ui` tool to clarify:
    - What are the core user flows?
    - What are the acceptance criteria?
    - What are the edge cases or error scenarios to consider?
@@ -159,11 +158,11 @@ Write the test cases to `tests/<name>-test-cases.md` where `<name>` is derived f
 - The user's specified name
 - A sanitized version of the requirement title
 
-Use the Write tool to create the file with the structured test cases.
+Use `file_write` to create the file with the structured test cases.
 
 ### Step 7: Summary
 
-After generating test cases, provide a brief summary in Chinese:
+After generating test cases, provide a brief summary in the user's language:
 - Total number of test cases generated
 - Coverage breakdown (functional, edge, error, state)
 - Any assumptions made or areas needing clarification
@@ -194,7 +193,7 @@ Before finalizing test cases, verify:
 3. Identify scenarios: successful login, invalid credentials, expired session, etc.
 4. Generate test cases covering all scenarios
 5. Write to tests/auth-test-cases.md
-6. Summarize coverage in Chinese
+6. Summarize coverage in the user's language
 
 ## References
 

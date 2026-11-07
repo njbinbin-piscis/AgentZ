@@ -1,9 +1,9 @@
 ---
 name: "slack-gif-creator"
-description: "Knowledge and utilities for creating animated GIFs optimized for Slack. Provides constraints, validation tools, and animation concepts. Use when users request animated GIFs for Slack like \\\\\\\\\\\\\\\"make me a GIF of X doing Y for Slack."
+description: "Create animated GIFs optimized for Slack, with size constraints, validation tools, and animation concepts. Use when asked for a GIF to post in Slack."
+description_zh: "制作适合 Slack 的动画 GIF，包含尺寸限制、校验工具和动画技巧"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "slack-gif-creator"
+source: agentz
 ---
 
 # Slack GIF Creator

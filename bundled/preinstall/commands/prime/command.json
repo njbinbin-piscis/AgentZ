@@ -1,0 +1,17 @@
+{
+  "id": "prime",
+  "slash_id": "prime",
+  "name": "Prime Context",
+  "description": "Load project context by reading the file tree and key documentation. Use at the start of a session.",
+  "description_zh": "读取目录结构与关键文档以加载项目上下文，适合会话开头使用。",
+  "argument_hint": "",
+  "tools": [
+    "shell",
+    "file_read",
+    "file_list"
+  ],
+  "prompt": "# Context Prime\n\nLoad the context of this project.\n\n1. Show the project tree with `shell`, for example `git ls-files` (skip ignored and generated files).\n2. Read `README.md` and any files in `.agentz/rules/` and `docs/` that describe architecture or conventions. Read only those and nothing else.\n3. Summarize: what the project is, the main directories, how to build and test, and key conventions.\n\nExtra focus from the user: $ARGUMENTS",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-context-loading-priming"
+}

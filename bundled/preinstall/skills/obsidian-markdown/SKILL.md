@@ -1,9 +1,9 @@
 ---
 name: "obsidian-markdown"
-description: "Create and edit Obsidian Flavored Markdown with wikilinks, embeds, callouts, properties, and other Obsidian-specific syntax. Use when working with .md files in Obsidian, or when the user mentions wikilinks, callouts, frontmatter, tags, embeds, or Obsidian notes."
+description: "Write Obsidian Flavored Markdown with wikilinks, embeds, callouts, properties and tags. Use when creating or editing notes for an Obsidian vault."
+description_zh: "编写 Obsidian 风格 Markdown：双链、嵌入、提示块、属性与标签，适用于创建和编辑笔记"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "obsidian-skills"
+source: agentz
 ---
 
 # Obsidian Flavored Markdown

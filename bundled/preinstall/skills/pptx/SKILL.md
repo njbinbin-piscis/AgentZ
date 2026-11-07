@@ -1,9 +1,9 @@
 ---
 name: "pptx"
-description: "Use this skill any time a .pptx file is involved in any way — as input, output, or both. This includes: creating slide decks, pitch decks, or presentations; reading, parsing, or extracting text from any .pptx file (even if the extracted content will be used elsewhere, like in an email or summary); editing, modifying, or updating existing presentations; combining or splitting slide files; working with templates, layouts, speaker notes, or comments. Trigger whenever the user mentions \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"deck,\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"slides,\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"presentation,\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\" or references a .pptx filename, regardless of what they plan to do with the content afterward. If a .pptx file needs to be opened, created, or touched, use this skill."
+description: "Create, read, edit and analyze .pptx presentations: slide decks, templates, layouts, speaker notes and comments. Use whenever a .pptx file is involved."
+description_zh: "创建、读取、编辑和分析 .pptx 演示文稿：模板、版式、备注与批注"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "pptx"
+source: agentz
 ---
 
 # PPTX Skill

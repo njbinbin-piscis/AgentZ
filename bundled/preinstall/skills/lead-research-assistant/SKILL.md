@@ -1,9 +1,9 @@
 ---
 name: "lead-research-assistant"
-description: "Identifies high-quality leads for your product or service by analyzing your business, searching for target companies, and providing actionable contact strategies. Perfect for sales, business development, and marketing professionals."
+description: "Find and qualify high-quality sales leads by analyzing your business, researching target companies and drafting outreach strategies. Use for sales, business development and marketing."
+description_zh: "分析业务并调研目标公司，筛选高质量销售线索并给出触达策略，适用于销售与市场拓展"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "lead-research-assistant"
+source: agentz
 ---
 
 # Lead Research Assistant
@@ -168,7 +168,7 @@ When a user requests lead research:
 **User**: "I'm building a tool that masks sensitive data in AI coding assistant queries. Find potential leads."
 
 **Output**: Creates a prioritized list of companies that:
-- Use AI coding assistants (Copilot, Cursor, etc.)
+- Use AI coding assistants (AI pair-programming tools)
 - Handle sensitive data (fintech, healthcare, legal)
 - Have evidence in their GitHub repos of using coding agents
 - May have accidentally exposed sensitive data in code

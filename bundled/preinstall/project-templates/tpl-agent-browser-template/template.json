@@ -1,8 +1,7 @@
 {
   "id": "tpl-agent-browser-template",
-  "name": "agent-browser",
-  "name_zh": "agent-browser",
+  "name": "Browser Automation",
+  "name_zh": "浏览器自动化",
   "description": "Browser automation and web verification workflow: structured page navigation, DOM snapshot inspection, form interaction, and visual screenshot evidence.",
-  "description_zh": "浏览器自动化与 Web 验证工作流：规范网页导航、DOM 快照检查、交互操作与截图验收取证。",
-  "source_plugin": "agent-browser"
+  "description_zh": "浏览器自动化与 Web 验证工作流：规范网页导航、DOM 快照检查、交互操作与截图验收取证。"
 }

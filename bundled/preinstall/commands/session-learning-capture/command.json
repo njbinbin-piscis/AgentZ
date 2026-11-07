@@ -1,0 +1,20 @@
+{
+  "id": "session-learning-capture",
+  "slash_id": "session-learning-capture",
+  "name": "Session Learning Capture",
+  "description": "Review the session for project knowledge worth keeping and save it as rules in .agentz/rules. Use at the end of a session after corrections or discoveries.",
+  "description_zh": "回顾本次会话，把值得保留的项目知识写入 .agentz/rules 规则文件",
+  "argument_hint": "",
+  "tools": [
+    "shell",
+    "file_read",
+    "file_write",
+    "file_edit",
+    "file_search",
+    "file_list"
+  ],
+  "prompt": "# Session Learning Capture\n\nCapture and document session learnings in the project's rules.\n\n## Instructions\n\n1. **Identify session learnings**\n   - Review whether, during this session:\n     - You learned something new about the project\n     - The user corrected you on an implementation detail\n     - The user corrected source code you generated\n     - You struggled to find information and had to infer details about the project\n     - You lost track of the project structure and had to look up information in the source\n\n2. **Choose the right place**\n   - Project guidance lives in `.agentz/rules/*.md` in the project root (one focused file per topic, for example `architecture.md`, `testing.md`, `conventions.md`)\n   - Shared guidance can be committed to version control; keep private, developer-specific notes out of the repository (for example in a file that is git-ignored)\n   - Create a new rule file for a new topic instead of making one file grow without bound\n\n3. **Update the rules**\n   - Add relevant, non-obvious information that should be persisted\n   - Check the existing files in `.agentz/rules/` first and update them instead of duplicating content\n   - Keep entries short, concrete and verifiable (paths, commands, conventions)\n   - Place component-specific knowledge in a rule file named for that component (UI, API, infrastructure)\n\n4. **Report** what you saved and where, so the user can review it.\n",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-team-collaboration"
+}

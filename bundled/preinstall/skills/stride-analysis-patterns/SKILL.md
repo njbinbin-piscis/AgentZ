@@ -1,10 +1,9 @@
 ---
 name: "stride-analysis-patterns"
-description: "Apply STRIDE methodology to systematically identify threats. Use when analyzing system security, conducting threat modeling sessions, or creating security documentation."
-description_zh: "静态应用程序安全测试（SAST）分析、依赖项漏洞扫描、OWASP Top 10 合规性检查、容器安全扫描以及自动化安全加固"
+description: "Apply the STRIDE methodology to systematically identify threats. Use when analyzing system security, running threat modeling sessions, or writing security documentation."
+description_zh: "运用 STRIDE 方法系统化识别威胁，用于系统安全分析和威胁建模"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "security-scanning"
+source: agentz
 ---
 
 # STRIDE Analysis Patterns

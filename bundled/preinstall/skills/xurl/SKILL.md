@@ -1,10 +1,9 @@
 ---
 name: "xurl"
-description: "A Twitter research and content intelligence skill focused on attracting WordPress and Shopify clients. Use to analyze Twitter profiles, threads, and conversations for identifying pain points, extracting content angles, and converting Twitter intelligence into business leverage."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Analyze Twitter/X profiles, threads and replies that you provide to find pain points, content angles and leads for WordPress and Shopify work. Use for Twitter-based content research."
+description_zh: "分析你提供的 Twitter/X 主页、帖子串和回复，挖掘痛点、内容选题和潜在客户线索"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # xurl: Twitter Content Intelligence for WordPress & Shopify

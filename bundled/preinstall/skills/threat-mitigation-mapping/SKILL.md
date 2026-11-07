@@ -1,10 +1,9 @@
 ---
 name: "threat-mitigation-mapping"
-description: "Map identified threats to appropriate security controls and mitigations. Use when prioritizing security investments, creating remediation plans, or validating control effectiveness."
-description_zh: "静态应用程序安全测试（SAST）分析、依赖项漏洞扫描、OWASP Top 10 合规性检查、容器安全扫描以及自动化安全加固"
+description: "Map identified threats to security controls and mitigations. Use when prioritizing security investments, building remediation plans, or validating control effectiveness."
+description_zh: "把已识别的威胁映射到安全控制与缓解措施，用于确定投入优先级、制定整改计划和验证控制有效性"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "security-scanning"
+source: agentz
 ---
 
 # Threat Mitigation Mapping

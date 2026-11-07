@@ -1,10 +1,9 @@
 ---
 name: "projection-patterns"
-description: "Build read models and projections from event streams. Use when implementing CQRS read sides, building materialized views, or optimizing query performance in event-sourced systems."
-description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
+description: "Build read models and projections from event streams. Use when implementing CQRS read sides, building materialized views, or optimizing queries in event-sourced systems."
+description_zh: "基于事件流构建读模型与投影，适用于 CQRS 读侧、物化视图和事件溯源查询优化"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "backend-development"
+source: agentz
 ---
 
 # Projection Patterns

@@ -1,10 +1,9 @@
 ---
 name: "architecture-patterns"
-description: "Implement proven backend architecture patterns including Clean Architecture, Hexagonal Architecture, and Domain-Driven Design. Use when architecting complex backend systems or refactoring existing applications for better maintainability."
-description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
+description: "Implement proven backend architecture patterns such as Clean Architecture, Hexagonal Architecture and Domain-Driven Design. Use when architecting complex backends or refactoring for maintainability."
+description_zh: "落地整洁架构、六边形架构与领域驱动设计等后端架构模式，用于复杂后端设计或可维护性重构。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "backend-development"
+source: agentz
 ---
 
 # Architecture Patterns

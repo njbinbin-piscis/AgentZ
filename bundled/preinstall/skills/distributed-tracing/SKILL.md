@@ -1,10 +1,9 @@
 ---
 name: "distributed-tracing"
-description: "Implement distributed tracing with Jaeger and Tempo to track requests across microservices and identify performance bottlenecks. Use when debugging microservices, analyzing request flows, or implementing observability for distributed systems."
-description_zh: "指标收集、日志基础设施、分布式追踪、SLO 实施和监控仪表板"
+description: "Implement distributed tracing with Jaeger and Tempo to follow requests across microservices and find bottlenecks. Use when debugging microservices or adding observability."
+description_zh: "用 Jaeger 和 Tempo 实现分布式追踪，跨微服务跟踪请求并定位性能瓶颈。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "observability-monitoring"
+source: agentz
 ---
 
 # Distributed Tracing

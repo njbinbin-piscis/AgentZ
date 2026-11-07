@@ -1,9 +1,9 @@
 ---
 name: "route-handlers"
-description: "This skill should be used when the user asks to \\\\\\\\\\\\\\\"create an API route\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"add an endpoint\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"build a REST API\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"handle POST requests\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"create route handlers\\\\\\\\\\\\\\\", \\\\\\\\\\\\\\\"stream responses\\\\\\\\\\\\\\\", or needs guidance on Next.js API development in the App Router."
+description: "Next.js App Router route handlers: creating API routes, REST endpoints, handling POST requests, and streaming responses. Use when building API endpoints in the App Router."
+description_zh: "Next.js App Router 路由处理器：创建 API 路由、REST 接口、处理 POST 请求与流式响应"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "nextjs-expert"
+source: agentz
 ---
 
 # Next.js Route Handlers

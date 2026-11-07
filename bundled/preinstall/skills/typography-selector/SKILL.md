@@ -1,9 +1,9 @@
 ---
 name: "typography-selector"
-description: "Browse and select fonts from Google Fonts or curated pairings. Use to find the perfect typography for a design project."
+description: "Browse and pick fonts from Google Fonts or curated pairings and generate imports and Tailwind config. Use to choose typography for a design project."
+description_zh: "从 Google Fonts 或精选搭配中选择字体，并生成字体引入代码和 Tailwind 配置"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "frontend-design-pro"
+source: agentz
 ---
 
 # Typography Selector

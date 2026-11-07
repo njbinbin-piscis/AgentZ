@@ -1,10 +1,9 @@
 ---
 name: "terraform-module-library"
-description: "Build reusable Terraform modules for AWS, Azure, and GCP infrastructure following infrastructure-as-code best practices. Use when creating infrastructure modules, standardizing cloud provisioning, or implementing reusable IaC components."
-description_zh: "云架构设计（AWS/Azure/GCP），Kubernetes 集群配置，Terraform 基础设施即代码，混合云网络，以及多云成本优化"
+description: "Build reusable Terraform modules for AWS, Azure and GCP following infrastructure-as-code best practices. Use when creating infrastructure modules or standardizing cloud provisioning."
+description_zh: "按基础设施即代码最佳实践构建可复用的 AWS、Azure、GCP Terraform 模块"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "cloud-infrastructure"
+source: agentz
 ---
 
 # Terraform Module Library

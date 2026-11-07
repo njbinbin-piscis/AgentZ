@@ -12,7 +12,7 @@ clawdhub install humanizer
 
 ## Usage
 
-Ask your agent to humanize text:
+Ask the agent to humanize text:
 
 ```
 Please humanize this text: [your text]

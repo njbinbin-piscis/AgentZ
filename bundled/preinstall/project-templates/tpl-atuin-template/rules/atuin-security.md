@@ -1,5 +1,4 @@
-# Security Auditing & Vulnerability Investigation Rules (`atuin`)
-
+# Security Auditing & Vulnerability Investigation Rules
 When auditing code, investigating security issues, or hardening components in this project:
 
 1. **Attack Surface Mapping**:

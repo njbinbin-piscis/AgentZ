@@ -1,10 +1,9 @@
 ---
 name: "gitops-workflow"
-description: "Implement GitOps workflows with ArgoCD and Flux for automated, declarative Kubernetes deployments with continuous reconciliation. Use when implementing GitOps practices, automating Kubernetes deployments, or setting up declarative infrastructure management."
-description_zh: "Kubernetes 清单生成、网络配置、安全策略、可观测性配置、GitOps 工作流和自动扩缩容"
+description: "Implement GitOps with ArgoCD and Flux for declarative Kubernetes deployments with continuous reconciliation. Use when setting up GitOps or automating Kubernetes delivery."
+description_zh: "用 ArgoCD 和 Flux 实现 GitOps，进行声明式 Kubernetes 部署与持续对账。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "kubernetes-operations"
+source: agentz
 ---
 
 # GitOps Workflow

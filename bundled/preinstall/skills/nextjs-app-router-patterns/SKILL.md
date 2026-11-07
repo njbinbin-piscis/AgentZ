@@ -1,10 +1,9 @@
 ---
 name: "nextjs-app-router-patterns"
-description: "Master Next.js 14+ App Router with Server Components, streaming, parallel routes, and advanced data fetching. Use when building Next.js applications, implementing SSR/SSG, or optimizing React Server Components."
-description_zh: "跨平台前端 UI 开发和移动应用实现"
+description: "Build with the Next.js 14+ App Router: Server Components, streaming, parallel routes and advanced data fetching. Use when building Next.js apps, SSR/SSG or optimizing Server Components."
+description_zh: "Next.js 14+ App Router 实践：服务端组件、流式渲染、并行路由与数据获取"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "frontend-mobile-development"
+source: agentz
 ---
 
 # Next.js App Router Patterns

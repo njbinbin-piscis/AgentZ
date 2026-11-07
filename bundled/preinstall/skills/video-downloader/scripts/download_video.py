@@ -5,6 +5,7 @@ Downloads videos from YouTube with customizable quality and format options.
 """
 
 import argparse
+import os
 import sys
 import subprocess
 import json
@@ -30,7 +31,7 @@ def get_video_info(url):
     return json.loads(result.stdout)
 
 
-def download_video(url, output_path="/mnt/user-data/outputs", quality="best", format_type="mp4", audio_only=False):
+def download_video(url, output_path=os.path.join(os.path.expanduser("~"), "Downloads"), quality="best", format_type="mp4", audio_only=False):
     """
     Download a YouTube video.
     
@@ -107,8 +108,8 @@ def main():
     parser.add_argument("url", help="YouTube video URL")
     parser.add_argument(
         "-o", "--output",
-        default="/mnt/user-data/outputs",
-        help="Output directory (default: /mnt/user-data/outputs)"
+        default=os.path.join(os.path.expanduser("~"), "Downloads"),
+        help="Output directory (default: ~/Downloads)"
     )
     parser.add_argument(
         "-q", "--quality",

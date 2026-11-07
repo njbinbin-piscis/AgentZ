@@ -1,10 +1,9 @@
 ---
 name: "finishing-a-development-branch"
-description: "Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup"
-description_zh: "AgentZ 核心技能库：包含测试驱动开发、系统化调试、协作模式和经过验证的技术方法"
+description: "Finish a development branch once work is complete and tests pass, by offering structured options to merge, open a PR, or clean up. Use when implementation is done."
+description_zh: "开发完成且测试通过后收尾分支：提供合并、提 PR 或清理等选项。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "superpowers"
+source: agentz
 ---
 
 # Finishing a Development Branch

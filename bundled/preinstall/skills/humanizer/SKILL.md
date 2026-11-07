@@ -1,10 +1,9 @@
 ---
 name: "humanizer"
-description: "|"
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Remove signs of AI-generated writing from text so it sounds natural and human. Use when editing or rewriting drafts that read as robotic or formulaic."
+description_zh: "去除文本中的 AI 写作痕迹，让文字更自然、更像真人。"
 version: "2.1.1"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Humanizer: Remove AI Writing Patterns

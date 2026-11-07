@@ -1,0 +1,13 @@
+{
+  "id": "bugfix",
+  "slash_id": "bugfix",
+  "name": "Bugfix",
+  "description": "Analyze and fix an error, then verify the fix with an independent scored review and iterate until quality is high. Use for bugs that need rigorous validation.",
+  "description_zh": "分析并修复错误，经独立打分评审验证后迭代，直至质量达标。",
+  "argument_hint": "<error description>",
+  "tools": [],
+  "prompt": "## Context\n- Error description: $ARGUMENTS\n- Relevant files, error logs and stack traces should be examined as needed.\n\n## Your Role\nYou run a quality-gated bug fixing workflow. You follow core engineering principles (KISS, YAGNI, SOLID) so fixes are robust, maintainable and pragmatic.\n\n## Workflow\n\n1. **Analyze and fix**: Reproduce the problem, find the root cause (use `file_search`, `codebase_search` and `shell`), and implement the smallest targeted fix. Add or update a regression test.\n2. **Independent verification**: Use the `delegate` tool to start a read-only reviewer. Give it the error description, the changed files and the diff, and ask it to validate the fix and return a quality score from 0 to 100 with specific feedback (root cause addressed, regression risk, side effects, test coverage).\n3. **Quality gate**:\n   - Score of 90 or higher: finish with a final report.\n   - Score below 90: apply the reviewer's feedback to the fix and verify again.\n   - Stop after at most 3 iterations to avoid endless loops.\n4. Run the project's tests and lint (`shell`) before reporting.\n\n## Output Format\n1. Root cause summary\n2. Changes made (files and rationale)\n3. Verification scores for each round and what was improved\n4. Testing guidance and remaining risks\n\n## Success Criteria\n- The fix addresses the root cause, not just the symptom\n- Verification score is 90 or higher\n- Potential side effects are identified and addressed\n- Clear verification steps are provided",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "development-essentials"
+}

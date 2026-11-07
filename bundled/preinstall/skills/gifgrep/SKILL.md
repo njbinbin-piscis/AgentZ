@@ -1,10 +1,9 @@
 ---
 name: "gifgrep"
-description: "Search GIF providers with CLI/TUI, download results, and extract stills/sheets."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Search GIF providers from the CLI or TUI, download results, and extract stills or contact sheets. Use when you need to find or process GIFs."
+description_zh: "通过命令行搜索 GIF 来源、下载结果，并提取静帧或拼图。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # gifgrep

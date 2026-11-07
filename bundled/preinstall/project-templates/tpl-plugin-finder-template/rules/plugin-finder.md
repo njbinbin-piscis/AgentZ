@@ -1,5 +1,4 @@
-# Skill & Tool Orchestration Rules (`plugin-finder`)
-
+# Skill & Tool Orchestration Rules
 When selecting and combining tools, skills, sub-agents, and connectors in this project:
 
 1. **Capability Discovery**:

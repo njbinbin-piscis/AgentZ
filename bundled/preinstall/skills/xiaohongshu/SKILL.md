@@ -1,190 +1,191 @@
 ---
 name: "xiaohongshu"
-description: "|"
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Search, read, comment on, track topics and publish to Xiaohongshu (RED) through the local xiaohongshu-mcp service and helper shell scripts. Use when the user works with Xiaohongshu notes."
+description_zh: "通过本地 xiaohongshu-mcp 服务和脚本搜索、阅读、评论、发布小红书笔记并做热点跟踪"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
-# 小红书 MCP Skill
+# Xiaohongshu MCP Skill
 
-基于 [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) 封装的 shell 脚本工具集。
+A set of shell scripts wrapping [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp). Run them with the `shell` tool.
 
-## 前置条件
+## Prerequisites
 
 ```bash
 cd scripts/
-./install-check.sh    # 检查依赖（xiaohongshu-mcp、jq、python3）
-./start-mcp.sh        # 启动 MCP 服务（默认端口 18060）
-./status.sh           # 确认已登录
+./install-check.sh    # check dependencies (xiaohongshu-mcp, jq, python3)
+./start-mcp.sh        # start the MCP service (default port 18060)
+./status.sh           # confirm you are logged in
 ```
 
-未登录时需扫码：`mcp-call.sh get_login_qrcode` 获取二维码，用小红书 App 扫码。
+If not logged in, scan a QR code: run `mcp-call.sh get_login_qrcode` and scan the code with the Xiaohongshu app.
 
-服务端口可通过 `MCP_URL` 环境变量覆盖（默认 `http://localhost:18060/mcp`）。
+The service URL can be overridden with the `MCP_URL` environment variable (default `http://localhost:18060/mcp`).
 
-## 核心数据流
+## Core data flow
 
-**重要：** 大多数操作需要 `feed_id` + `xsec_token` 配对。这两个值从搜索/推荐/用户主页结果中获取，**不可自行构造**。
+**Important:** most operations need a `feed_id` + `xsec_token` pair. Both come from search / recommendation / user profile results and **must never be made up**.
 
 ```
 search_feeds / list_feeds / user_profile
-        │
-        ▼
-  返回 feeds 数组，每个 feed 包含:
-  ├── id          → 用作 feed_id
-  ├── xsecToken   → 用作 xsec_token
-  └── noteCard    → 标题、作者、封面、互动数据
-        │
-        ▼
+        |
+        v
+  returns a feeds array; each feed contains:
+  +-- id          -> use as feed_id
+  +-- xsecToken   -> use as xsec_token
+  +-- noteCard    -> title, author, cover, engagement data
+        |
+        v
   get_feed_detail(feed_id, xsec_token)
-        │
-        ▼
-  返回完整笔记: 正文、图片列表、评论列表
-  评论中包含 comment_id、user_id（用于回复评论）
+        |
+        v
+  returns the full note: body text, image list, comment list
+  comments include comment_id and user_id (needed to reply)
 ```
 
-## 脚本参考
+## Script reference
 
-| 脚本 | 用途 | 参数 |
-|------|------|------|
-| `search.sh <关键词>` | 搜索笔记 | 关键词 |
-| `recommend.sh` | 首页推荐 | 无 |
-| `post-detail.sh <feed_id> <xsec_token>` | 帖子详情+评论 | 从搜索结果获取 |
-| `comment.sh <feed_id> <xsec_token> <内容>` | 发表评论 | 从搜索结果获取 |
-| `user-profile.sh <user_id> <xsec_token>` | 用户主页+笔记 | 从搜索结果获取 |
-| `track-topic.sh <话题> [选项]` | 热点分析报告 | `--limit N` `--output file` `--feishu` |
-| `export-long-image.sh` | 帖子导出长图 | `--posts-file json -o output.jpg` |
-| `mcp-call.sh <tool> [json_args]` | 通用 MCP 调用 | 见下方工具表 |
-| `start-mcp.sh` | 启动服务 | `--headless=false` `--port=N` |
-| `stop-mcp.sh` | 停止服务 | 无 |
-| `status.sh` | 检查登录 | 无 |
-| `install-check.sh` | 检查依赖 | 无 |
+| Script | Purpose | Arguments |
+|--------|---------|-----------|
+| `search.sh <keyword>` | Search notes | keyword |
+| `recommend.sh` | Home feed recommendations | none |
+| `post-detail.sh <feed_id> <xsec_token>` | Post detail + comments | from search results |
+| `comment.sh <feed_id> <xsec_token> <content>` | Post a comment | from search results |
+| `user-profile.sh <user_id> <xsec_token>` | User profile + notes | from search results |
+| `track-topic.sh <topic> [options]` | Hot topic analysis report | `--limit N` `--output file` `--feishu` |
+| `export-long-image.sh` | Export posts as a long image | `--posts-file json -o output.jpg` |
+| `mcp-call.sh <tool> [json_args]` | Generic MCP call | see tool details below |
+| `start-mcp.sh` | Start the service | `--headless=false` `--port=N` |
+| `stop-mcp.sh` | Stop the service | none |
+| `status.sh` | Check login | none |
+| `install-check.sh` | Check dependencies | none |
 
-## MCP 工具详细参数
+## MCP tool details
 
-### search_feeds — 搜索笔记
+Filter values below are the literal Chinese strings the service expects; keep them as written.
+
+### search_feeds - search notes
 
 ```json
 {"keyword": "咖啡", "filters": {"sort_by": "最新", "note_type": "图文", "publish_time": "一周内"}}
 ```
 
-filters 可选字段：
-- `sort_by`: 综合 | 最新 | 最多点赞 | 最多评论 | 最多收藏
-- `note_type`: 不限 | 视频 | 图文
-- `publish_time`: 不限 | 一天内 | 一周内 | 半年内
-- `search_scope`: 不限 | 已看过 | 未看过 | 已关注
-- `location`: 不限 | 同城 | 附近
+Optional filters:
+- `sort_by`: 综合 (overall) | 最新 (newest) | 最多点赞 (most likes) | 最多评论 (most comments) | 最多收藏 (most saves)
+- `note_type`: 不限 (any) | 视频 (video) | 图文 (image-text)
+- `publish_time`: 不限 (any) | 一天内 (1 day) | 一周内 (1 week) | 半年内 (6 months)
+- `search_scope`: 不限 (any) | 已看过 (seen) | 未看过 (unseen) | 已关注 (following)
+- `location`: 不限 (any) | 同城 (same city) | 附近 (nearby)
 
-### get_feed_detail — 帖子详情
+### get_feed_detail - post detail
 
 ```json
 {"feed_id": "...", "xsec_token": "...", "load_all_comments": true, "limit": 20}
 ```
 
-- `load_all_comments`: false(默认) 返回前10条，true 滚动加载更多
-- `limit`: 加载评论上限（仅 load_all_comments=true 时生效），默认 20
-- `click_more_replies`: 是否展开二级回复，默认 false
-- `reply_limit`: 跳过回复数超过此值的评论，默认 10
+- `load_all_comments`: false (default) returns the first 10 comments; true scrolls to load more
+- `limit`: maximum comments to load (only with load_all_comments=true), default 20
+- `click_more_replies`: expand second-level replies, default false
+- `reply_limit`: skip comments whose reply count exceeds this value, default 10
 - `scroll_speed`: slow | normal | fast
 
-### post_comment_to_feed — 发表评论
+### post_comment_to_feed - post a comment
 
 ```json
-{"feed_id": "...", "xsec_token": "...", "content": "写得真好！"}
+{"feed_id": "...", "xsec_token": "...", "content": "Great post!"}
 ```
 
-### reply_comment_in_feed — 回复评论
+### reply_comment_in_feed - reply to a comment
 
 ```json
-{"feed_id": "...", "xsec_token": "...", "content": "谢谢！", "comment_id": "...", "user_id": "..."}
+{"feed_id": "...", "xsec_token": "...", "content": "Thanks!", "comment_id": "...", "user_id": "..."}
 ```
 
-`comment_id` 和 `user_id` 从 get_feed_detail 返回的评论列表中获取。
+`comment_id` and `user_id` come from the comment list returned by get_feed_detail.
 
-### user_profile — 用户主页
+### user_profile - user profile
 
 ```json
 {"user_id": "...", "xsec_token": "..."}
 ```
 
-`user_id` 从 feed 的 `noteCard.user.userId` 获取，`xsec_token` 使用该 feed 的 `xsecToken`。
+`user_id` comes from the feed's `noteCard.user.userId`; use that feed's `xsecToken` as `xsec_token`.
 
-### like_feed — 点赞/取消
+### like_feed - like / unlike
 
 ```json
 {"feed_id": "...", "xsec_token": "..."}
 {"feed_id": "...", "xsec_token": "...", "unlike": true}
 ```
 
-### favorite_feed — 收藏/取消
+### favorite_feed - save / unsave
 
 ```json
 {"feed_id": "...", "xsec_token": "..."}
 {"feed_id": "...", "xsec_token": "...", "unfavorite": true}
 ```
 
-### publish_content — 发布图文
+### publish_content - publish an image-text note
 
 ```json
-{"title": "标题(≤20字)", "content": "正文(≤1000字)", "images": ["/path/to/img.jpg"], "tags": ["美食","旅行"]}
+{"title": "Title (max 20 chars)", "content": "Body (max 1000 chars)", "images": ["/path/to/img.jpg"], "tags": ["food","travel"]}
 ```
 
-- `images`: 至少1张，支持本地路径或 HTTP URL
-- `tags`: 可选，话题标签
-- `schedule_at`: 可选，定时发布（ISO8601，1小时~14天内）
+- `images`: at least 1; local paths or HTTP URLs
+- `tags`: optional topic tags
+- `schedule_at`: optional scheduled publishing (ISO8601, between 1 hour and 14 days ahead)
 
-### publish_with_video — 发布视频
+### publish_with_video - publish a video
 
 ```json
-{"title": "标题", "content": "正文", "video": "/path/to/video.mp4"}
+{"title": "Title", "content": "Body", "video": "/path/to/video.mp4"}
 ```
 
-### 其他工具
+### Other tools
 
-| 工具 | 参数 | 说明 |
-|------|------|------|
-| `check_login_status` | 无 | 检查登录状态 |
-| `list_feeds` | 无 | 获取首页推荐 |
-| `get_login_qrcode` | 无 | 获取登录二维码（Base64 PNG） |
-| `delete_cookies` | 无 | 删除 cookies，重置登录 |
+| Tool | Arguments | Description |
+|------|-----------|-------------|
+| `check_login_status` | none | Check login status |
+| `list_feeds` | none | Get home feed recommendations |
+| `get_login_qrcode` | none | Get the login QR code (Base64 PNG) |
+| `delete_cookies` | none | Delete cookies and reset login |
 
-## 热点跟踪
+## Hot topic tracking
 
-自动搜索 → 拉取详情 → 生成 Markdown 报告。
+Searches automatically, fetches details and generates a Markdown report.
 
 ```bash
 ./track-topic.sh "DeepSeek" --limit 5
-./track-topic.sh "春节旅游" --limit 10 --output report.md
-./track-topic.sh "iPhone 16" --limit 5 --feishu    # 导出飞书
+./track-topic.sh "Spring Festival travel" --limit 10 --output report.md
+./track-topic.sh "iPhone 16" --limit 5 --feishu    # export to Feishu (needs a feishu-docs skill installed)
 ```
 
-报告包含：概览统计、热帖详情（正文+热评）、评论关键词、趋势分析。
+The report contains overview statistics, hot post details (body + top comments), comment keywords and trend analysis.
 
-## 长图导出
+## Long image export
 
-将帖子导出为白底黑字的 JPG 长图。
+Exports posts as a black-on-white JPG long image.
 
 ```bash
 ./export-long-image.sh --posts-file posts.json -o output.jpg
 ```
 
-posts.json 格式：
+posts.json format:
 ```json
 [{
-  "title": "标题", "author": "作者", "stats": "1.3万赞",
-  "desc": "正文摘要", "images": ["https://..."],
-  "per_image_text": {"1": "第2张图的说明"}
+  "title": "Title", "author": "Author", "stats": "13k likes",
+  "desc": "Summary", "images": ["https://..."],
+  "per_image_text": {"1": "Caption for the 2nd image"}
 }]
 ```
 
-依赖：Python 3.10+、Pillow。
+Requires Python 3.10+ and Pillow.
 
-## 注意事项
+## Notes
 
-- Cookies 有效期约 30 天，过期需重新扫码
-- 首次启动会下载 headless 浏览器（~150MB）
-- 同一账号避免多客户端同时操作
-- 发布限制：标题≤20字符，正文≤1000字符，日发布≤50条
-- Linux 服务器无桌面环境需安装 xvfb（`apt-get install xvfb`，脚本自动管理）
+- Cookies are valid for about 30 days; scan the QR code again after they expire.
+- The first start downloads a headless browser (~150 MB).
+- Do not operate the same account from several clients at once.
+- Publishing limits: title max 20 characters, body max 1000 characters, at most 50 posts per day.
+- Linux servers without a desktop need xvfb (`apt-get install xvfb`; the scripts manage it automatically).

@@ -1,10 +1,9 @@
 ---
 name: "fastapi-templates"
-description: "Create production-ready FastAPI projects with async patterns, dependency injection, and comprehensive error handling. Use when building new FastAPI applications or setting up backend API projects."
-description_zh: "REST 和 GraphQL API 脚手架、框架选择、后端架构设计与 API 生成"
+description: "Create production-ready FastAPI projects with async patterns, dependency injection, and solid error handling. Use when building a new FastAPI app or backend API."
+description_zh: "创建生产级 FastAPI 项目：异步模式、依赖注入和完善的错误处理。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "api-scaffolding"
+source: agentz
 ---
 
 # FastAPI Project Templates

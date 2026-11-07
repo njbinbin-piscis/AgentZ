@@ -1,10 +1,9 @@
 ---
 name: "incident-runbook-templates"
-description: "Create structured incident response runbooks with step-by-step procedures, escalation paths, and recovery actions. Use when building runbooks, responding to incidents, or establishing incident response procedures."
-description_zh: "生产事故管理、分级处理工作流和自动化事故解决方案"
+description: "Create incident response runbooks with step-by-step procedures, escalation paths, and recovery actions. Use when writing runbooks or setting up incident response."
+description_zh: "编写事故响应手册：分步流程、升级路径和恢复操作。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "incident-response"
+source: agentz
 ---
 
 # Incident Runbook Templates

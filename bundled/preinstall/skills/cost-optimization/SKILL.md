@@ -1,10 +1,9 @@
 ---
 name: "cost-optimization"
-description: "Optimize cloud costs through resource rightsizing, tagging strategies, reserved instances, and spending analysis. Use when reducing cloud expenses, analyzing infrastructure costs, or implementing cost governance policies."
-description_zh: "云架构设计（AWS/Azure/GCP），Kubernetes 集群配置，Terraform 基础设施即代码，混合云网络，以及多云成本优化"
+description: "Optimize cloud costs through rightsizing, tagging, reserved instances and spend analysis. Use when reducing cloud expenses, analyzing infrastructure costs or setting cost governance."
+description_zh: "通过资源调优、标签策略、预留实例与支出分析优化云成本，用于降本与成本治理。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "cloud-infrastructure"
+source: agentz
 ---
 
 # Cloud Cost Optimization

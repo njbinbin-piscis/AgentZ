@@ -1,10 +1,9 @@
 ---
 name: "stripe-integration"
-description: "Implement Stripe payment processing for robust, PCI-compliant payment flows including checkout, subscriptions, and webhooks. Use when integrating Stripe payments, building subscription systems, or implementing secure checkout flows."
-description_zh: "支付网关集成,包含 Stripe 和 PayPal,实现结账流程、订阅计费和 PCI 合规性"
+description: "Implement Stripe payments including checkout, subscriptions, and webhooks with PCI-compliant flows. Use when integrating Stripe or building subscription billing."
+description_zh: "集成 Stripe 支付：结账、订阅与 Webhook，并满足 PCI 合规要求"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "payment-processing"
+source: agentz
 ---
 
 # Stripe Integration

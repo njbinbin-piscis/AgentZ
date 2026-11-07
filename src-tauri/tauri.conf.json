@@ -36,6 +36,7 @@
       "resources/node/": "resources/node/",
       "../bundled/preinstall/": "preinstall/",
       "../bundled/codebuddy/exclude.json": "codebuddy/exclude.json",
+      "../bundled/codebuddy/retired.json": "codebuddy/retired.json",
       "../bundled/codebuddy/manifest.json": "codebuddy/manifest.json"
     },
     "icon": [

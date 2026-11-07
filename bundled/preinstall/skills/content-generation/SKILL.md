@@ -1,443 +1,432 @@
 ---
-name: "PPT内容生成"
-description: "当用户需要撰写PPT演讲稿、生成演示大纲、组织演讲逻辑或丰富PPT内容时自动激活"
-description_zh: "AI驱动的PPT创作助手，支持智能内容生成、多格式导出和专业模板"
+name: "content-generation"
+description: "Write presentation outlines, slide content and speaker notes using SCQA, pyramid and story structures. Use when drafting or enriching a PPT talk or organizing its logic."
+description_zh: "使用 SCQA、金字塔与故事结构撰写 PPT 大纲、页面内容和演讲备注，适用于起草或充实演示文稿。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "ppt-writer"
+source: agentz
 ---
 
-# PPT内容生成技能
+# PPT Content Generation
 
-自动为PPT演示生成高质量的内容、大纲和演讲脚本。
+Generate high-quality content, outlines and speaker scripts for presentations.
 
-## 激活场景
+## When to Use
 
-此技能在以下情况自动激活：
+- The user needs a content outline for a presentation
+- The user asks for a speech script or speaker notes
+- Existing content needs to be expanded or enriched
+- The user asks how to organize the logic of a deck
+- The user needs cases, data or citations to support a point
 
-1. 用户需要创建PPT内容大纲
-2. 用户要求生成演讲稿或备注
-3. 用户需要扩展或丰富现有内容
-4. 用户询问如何组织PPT逻辑
-5. 用户需要案例、数据或引用支撑
+## Core Capabilities
 
-## 核心能力
+### 1. Content Structure Design
 
-### 1. 内容结构设计
+#### SCQA framework (Minto pyramid principle)
 
-#### SCQA框架（麦肯锡金字塔原理）
+**S (Situation)**: describe the current background and establish common ground with the audience.
+- Example: "As digital transformation accelerates..."
 
-**S (Situation) - 情境**：
-- 描述当前背景和环境
-- 建立与听众的共同认知
-- 示例：`"在数字化转型的浪潮下..."`
+**C (Complication)**: point out the problem or challenge to draw attention.
+- Example: "Yet 80% of enterprises hit a bottleneck during transformation..."
 
-**C (Complication) - 冲突**：
-- 指出存在的问题或挑战
-- 引发听众的关注和思考
-- 示例：`"然而，80%的企业在转型中遇到瓶颈..."`
+**Q (Question)**: state the core question to be solved and lead into the topic.
+- Example: "How can we break through these barriers and transform successfully?"
 
-**Q (Question) - 问题**：
-- 明确需要解决的核心问题
-- 引出演讲的主题
-- 示例：`"如何突破这些障碍，实现成功转型？"`
+**A (Answer)**: give the solution and the key message, then develop the argument and cases.
+- Example: "Our three-step method helps companies..."
 
-**A (Answer) - 答案**：
-- 提供解决方案和核心观点
-- 展开详细论述和案例
-- 示例：`"我们的三步法可以帮助企业..."`
+#### Three-act structure
 
-#### 三幕式结构
-
-**第一幕：开场（10%）**
+**Act 1: Opening (10%)**
 ```
-1. 引子：吸引注意（故事/数据/问题）
-2. 背景：建立情境
-3. 预告：概述主要内容
+1. Hook: grab attention (story / data / question)
+2. Background: set the scene
+3. Preview: outline the main content
 ```
 
-**第二幕：主体（70%）**
+**Act 2: Body (70%)**
 ```
-1. 核心观点1
-   - 论据1
-   - 论据2
-   - 案例支撑
-   
-2. 核心观点2
-   - 论据1
-   - 论据2
-   - 案例支撑
-   
-3. 核心观点3
-   - 论据1
-   - 论据2
-   - 案例支撑
-```
+1. Key point 1
+   - Argument 1
+   - Argument 2
+   - Supporting case
 
-**第三幕：结尾（20%）**
-```
-1. 总结：回顾核心要点
-2. 强化：重申关键信息
-3. 行动：明确下一步
+2. Key point 2
+   - Argument 1
+   - Argument 2
+   - Supporting case
+
+3. Key point 3
+   - Argument 1
+   - Argument 2
+   - Supporting case
 ```
 
-### 2. 标题撰写技巧
-
-#### 动词驱动型标题
-- `"提升效率的5个方法"` 而非 `"效率方法"`
-- `"如何降低运营成本"` 而非 `"运营成本"`
-- `"实现增长的关键策略"` 而非 `"增长策略"`
-
-#### 数字化标题
-- `"3个步骤优化用户体验"`
-- `"5大趋势塑造未来市场"`
-- `"7条原则打造高效团队"`
-
-#### 问题式标题
-- `"为什么我们需要改变？"`
-- `"如何在竞争中脱颖而出？"`
-- `"什么是成功的关键因素？"`
-
-#### 对比式标题
-- `"传统方法 vs 新型方案"`
-- `"问题现状与理想状态"`
-- `"Before & After：转型的力量"`
-
-### 3. 内容展开技法
-
-#### 金字塔原理
+**Act 3: Closing (20%)**
 ```
-核心观点（结论先行）
-├── 论据1
-│   ├── 数据支撑
-│   └── 案例说明
-├── 论据2
-│   ├── 数据支撑
-│   └── 案例说明
-└── 论据3
-    ├── 数据支撑
-    └── 案例说明
+1. Summary: recap the key points
+2. Reinforce: restate the critical message
+3. Action: make the next step explicit
 ```
 
-#### 5W2H分析法
-- **What**：是什么（定义问题）
-- **Why**：为什么（原因分析）
-- **Who**：谁相关（利益相关方）
-- **When**：何时（时间节点）
-- **Where**：何地（场景范围）
-- **How**：如何做（解决方案）
-- **How much**：多少（成本收益）
+### 2. Title Writing Techniques
 
-#### STAR法则（讲故事）
-- **Situation**：情境描述
-- **Task**：任务挑战
-- **Action**：采取行动
-- **Result**：最终结果
+#### Verb-driven titles
+- "5 Ways to Boost Efficiency" rather than "Efficiency Methods"
+- "How to Reduce Operating Costs" rather than "Operating Costs"
+- "Key Strategies for Growth" rather than "Growth Strategy"
 
-### 4. 演讲备注生成
+#### Numbered titles
+- "3 Steps to Improve User Experience"
+- "5 Trends Shaping the Future Market"
+- "7 Principles for an Efficient Team"
 
-为每一页生成演讲备注，包含：
+#### Question titles
+- "Why Do We Need to Change?"
+- "How Do We Stand Out from the Competition?"
+- "What Are the Key Success Factors?"
 
-#### 开场白（第1页）
+#### Contrast titles
+- "Traditional Approach vs New Solution"
+- "Current State vs Ideal State"
+- "Before & After: The Power of Transformation"
+
+### 3. Content Development Techniques
+
+#### Pyramid principle
 ```
-演讲时间：30秒
-重点强调：吸引注意、建立联系
-语气：热情、自信
-技巧：
-- 用一个引人入胜的故事或数据开场
-- 与听众建立眼神交流
-- 简要预告演讲内容
-```
-
-#### 内容页（中间页）
-```
-演讲时间：1-2分钟/页
-重点强调：核心观点、关键数据
-语气：专业、清晰
-技巧：
-- 先说结论，再展开论据
-- 用具体案例说明抽象概念
-- 适时提问，保持互动
-- 关键数据重复强调
+Key message (conclusion first)
+├── Argument 1
+│   ├── Supporting data
+│   └── Case example
+├── Argument 2
+│   ├── Supporting data
+│   └── Case example
+└── Argument 3
+    ├── Supporting data
+    └── Case example
 ```
 
-#### 总结页（最后页）
+#### 5W2H analysis
+- **What**: define the problem
+- **Why**: analyze causes
+- **Who**: stakeholders
+- **When**: timeline
+- **Where**: scope and setting
+- **How**: the solution
+- **How much**: cost and benefit
+
+#### STAR method (storytelling)
+- **Situation**: describe the context
+- **Task**: the challenge
+- **Action**: what was done
+- **Result**: the outcome
+
+### 4. Speaker Notes
+
+Generate speaker notes for every slide.
+
+#### Opening slide (slide 1)
 ```
-演讲时间：1分钟
-重点强调：核心要点回顾、行动号召
-语气：坚定、鼓舞
-技巧：
-- 简洁总结3-5个核心观点
-- 明确下一步行动
-- 以强有力的结语收尾
-- 留出Q&A时间
+Speaking time: 30 seconds
+Emphasis: grab attention, build rapport
+Tone: warm, confident
+Tips:
+- Open with a compelling story or number
+- Make eye contact with the audience
+- Briefly preview the talk
 ```
 
-### 5. 内容类型模板
+#### Content slides (middle)
+```
+Speaking time: 1-2 minutes per slide
+Emphasis: key message, key data
+Tone: professional, clear
+Tips:
+- State the conclusion first, then the arguments
+- Use concrete cases to explain abstract ideas
+- Ask questions at the right moments to keep engagement
+- Repeat key data for emphasis
+```
 
-#### 产品介绍PPT
+#### Closing slide (last)
+```
+Speaking time: 1 minute
+Emphasis: recap of key points, call to action
+Tone: firm, inspiring
+Tips:
+- Summarize 3-5 key points concisely
+- State the next action clearly
+- End with a strong closing line
+- Leave time for Q&A
+```
+
+### 5. Content Templates by Deck Type
+
+#### Product introduction
 ```markdown
-1. 封面：产品名称、Slogan
-2. 问题：用户痛点和需求
-3. 解决方案：产品如何解决问题
-4. 核心功能：3-5个主要功能
-5. 产品优势：与竞品对比
-6. 应用场景：典型使用案例
-7. 客户案例：成功故事
-8. 技术架构：（技术受众）
-9. 产品路线图：未来规划
-10. 定价方案：套餐和价格
-11. Q&A：常见问题
-12. 行动号召：联系方式、试用入口
+1. Cover: product name, slogan
+2. Problem: user pain points and needs
+3. Solution: how the product solves the problem
+4. Core features: 3-5 main features
+5. Advantages: comparison with competitors
+6. Use cases: typical scenarios
+7. Customer stories: success stories
+8. Technical architecture (for technical audiences)
+9. Roadmap: future plans
+10. Pricing: plans and prices
+11. Q&A: frequently asked questions
+12. Call to action: contact details, trial link
 ```
 
-#### 项目汇报PPT
+#### Project report
 ```markdown
-1. 封面：项目名称、汇报人
-2. 目录：汇报内容概览
-3. 项目背景：目标和重要性
-4. 项目进展：里程碑和完成度
-5. 关键成果：量化数据展示
-6. 遇到的挑战：问题和应对
-7. 经验教训：总结和反思
-8. 下一步计划：未来安排
-9. 资源需求：人力、预算
-10. 风险预警：潜在问题
-11. 总结：关键要点回顾
-12. Q&A：讨论和反馈
+1. Cover: project name, presenter
+2. Agenda: overview of the report
+3. Background: goals and importance
+4. Progress: milestones and completion
+5. Key results: quantified data
+6. Challenges: problems and responses
+7. Lessons learned: summary and reflection
+8. Next steps: upcoming plans
+9. Resource needs: people, budget
+10. Risks: potential issues
+11. Summary: recap of key points
+12. Q&A: discussion and feedback
 ```
 
-#### 培训课程PPT
+#### Training course
 ```markdown
-1. 封面：课程主题、讲师
-2. 学习目标：学员将掌握什么
-3. 课程大纲：内容模块预览
-4. 知识点1：概念+案例
-5. 实操演示：步骤展示
-6. 练习1：巩固知识点1
-7. 知识点2：概念+案例
-8. 实操演示：步骤展示
-9. 练习2：巩固知识点2
-10. 综合案例：综合应用
-11. 总结复习：关键要点
-12. 拓展资源：延伸学习
+1. Cover: course topic, instructor
+2. Learning objectives: what learners will master
+3. Course outline: preview of modules
+4. Topic 1: concept + case
+5. Hands-on demo: step-by-step
+6. Exercise 1: reinforce topic 1
+7. Topic 2: concept + case
+8. Hands-on demo: step-by-step
+9. Exercise 2: reinforce topic 2
+10. Capstone case: combined application
+11. Review: key takeaways
+12. Further resources: extended learning
 ```
 
-#### 商业计划PPT
+#### Business plan
 ```markdown
-1. 封面：公司名称、愿景
-2. 问题机会：市场痛点
-3. 解决方案：产品/服务
-4. 市场分析：规模和趋势
-5. 竞争格局：竞品分析
-6. 商业模式：如何赚钱
-7. 核心团队：创始人和高管
-8. 发展里程碑：历史成就
-9. 增长策略：市场拓展计划
-10. 财务预测：收入和成本
-11. 融资需求：金额和用途
-12. 联系方式：投资对接
+1. Cover: company name, vision
+2. Problem and opportunity: market pain points
+3. Solution: product / service
+4. Market analysis: size and trends
+5. Competitive landscape: competitor analysis
+6. Business model: how the company makes money
+7. Core team: founders and executives
+8. Milestones: achievements so far
+9. Growth strategy: market expansion plan
+10. Financial projections: revenue and costs
+11. Funding ask: amount and use of funds
+12. Contact: investor relations
 ```
 
-### 6. 内容增强技巧
+### 6. Content Enhancement Techniques
 
-#### 用数据说话
+#### Let the data speak
 ```
-弱：我们的产品很受欢迎
-强：我们的产品在过去6个月获得了10万用户，NPS评分达85分
+Weak:   Our product is very popular
+Strong: Our product gained 100,000 users in the past 6 months with an NPS of 85
 
-弱：市场增长很快
-强：市场年复合增长率达到35%，预计2025年规模将达到500亿美元
+Weak:   The market is growing fast
+Strong: The market grows at a 35% CAGR and is expected to reach $50 billion by 2025
 
-弱：我们节省了很多成本
-强：通过流程优化，我们将运营成本降低了40%，每年节省200万元
-```
-
-#### 用案例增强说服力
-```
-模板：
-[客户名称]遇到了[具体问题]，使用我们的[解决方案]后，
-[时间周期]内实现了[具体成果]，[量化指标]提升了[百分比/数值]。
-
-示例：
-某大型零售企业面临库存周转率低的问题，部署我们的智能库存管理系统后，
-3个月内库存周转率提升了50%，缺货率下降了30%，年度库存成本节省了800万元。
+Weak:   We saved a lot of cost
+Strong: Process optimization cut operating costs by 40%, saving $2 million a year
 ```
 
-#### 用类比简化复杂概念
+#### Persuade with cases
 ```
-复杂：我们的系统采用分布式微服务架构...
-类比：就像一个高效的快递网络，每个站点独立运作但协同配合
+Template:
+[Customer] faced [specific problem]. After adopting our [solution],
+they achieved [specific result] within [time period], improving [metric] by [percentage/value].
 
-复杂：机器学习通过大量数据训练模型...
-类比：就像教小孩识字，看得多了自然就会认
-
-复杂：区块链是一种去中心化的分布式账本...
-类比：就像全班同学都有一本账本，任何交易大家都同步记录
-```
-
-#### 用故事打动人心
-```
-故事结构：
-1. 设置情境：介绍主人公和背景
-2. 遇到挑战：描述问题或困境
-3. 转折点：引入解决方案
-4. 克服困难：展示行动过程
-5. 结果和启示：说明影响和意义
-
-示例：
-"两年前，张经理的团队每周要花20小时手动整理销售报表，
-经常加班到深夜。他们尝试过多种工具，但都不理想。
-直到使用了我们的自动化报表系统，现在只需点击一个按钮，
-5分钟就能生成精准的分析报告。张经理说：
-'这个工具让我们重新找回了工作的意义，有更多时间服务客户。'"
+Example:
+A large retailer struggled with low inventory turnover. After deploying our smart
+inventory system, turnover rose 50% in 3 months, stock-outs fell 30%, and annual
+inventory cost dropped by $8 million.
 ```
 
-### 7. 内容优化清单
-
-#### 开场（第1-2页）
-- [ ] 有吸引力的开场（故事/数据/问题）
-- [ ] 明确演讲目标和价值
-- [ ] 预告内容结构
-- [ ] 建立与听众的联系
-
-#### 主体内容
-- [ ] 逻辑清晰（总分总结构）
-- [ ] 观点明确（结论先行）
-- [ ] 论据充分（数据+案例）
-- [ ] 层次分明（3-5个核心观点）
-- [ ] 详略得当（重点突出）
-
-#### 每一页
-- [ ] 标题简洁有力（5-10字）
-- [ ] 核心观点突出（一句话主旨）
-- [ ] 要点数量适中（3-5个）
-- [ ] 信息具体量化（数据/案例）
-- [ ] 演讲备注完整（时间/要点/技巧）
-
-#### 结尾（最后2-3页）
-- [ ] 总结核心要点
-- [ ] 强化关键信息
-- [ ] 明确行动号召
-- [ ] 留出Q&A时间
-- [ ] 联系方式清晰
-
-### 8. 常见内容问题和解决方案
-
-#### 问题1：内容空洞
-**表现**：大量空话套话，缺少实质内容
-**解决**：
-- 每个观点都有数据或案例支撑
-- 用具体事例替代抽象描述
-- 提供可操作的建议
-- 量化所有可量化的内容
-
-#### 问题2：逻辑混乱
-**表现**：内容跳跃，前后不连贯
-**解决**：
-- 使用SCQA或三幕式结构
-- 明确每页的核心观点
-- 添加过渡页承上启下
-- 确保整体叙事流畅
-
-#### 问题3：信息过载
-**表现**：想说的太多，听众记不住
-**解决**：
-- 聚焦3-5个核心观点
-- 删减次要信息
-- 一页一个重点
-- 使用"Rule of Three"原则
-
-#### 问题4：缺少互动
-**表现**：单向输出，听众注意力下降
-**解决**：
-- 在关键位置设置提问
-- 邀请听众分享经验
-- 设计小测验或投票
-- 预留讨论时间
-
-#### 问题5：结尾无力
-**表现**：草草收场，缺少行动号召
-**解决**：
-- 明确总结核心要点
-- 提出清晰的下一步行动
-- 用强有力的结语收尾
-- 留下深刻印象
-
-## 内容生成流程
-
-### 第一步：需求分析
+#### Simplify complex ideas with analogies
 ```
-询问用户：
-1. PPT主题和目标是什么？
-2. 目标听众是谁？（背景、职位、需求）
-3. 演讲场合和时长？
-4. 希望传达的核心信息？
-5. 有没有必须包含的内容？
+Complex: Our system uses a distributed microservice architecture...
+Analogy: Like an efficient courier network, where each station works independently yet in coordination
+
+Complex: Machine learning trains models on large amounts of data...
+Analogy: Like teaching a child to read: the more they see, the more they recognize
+
+Complex: A blockchain is a decentralized distributed ledger...
+Analogy: Like everyone in the class holding the same ledger, with every transaction recorded in sync
 ```
 
-### 第二步：结构设计
+#### Move people with stories
 ```
-根据需求设计结构：
-- 确定总页数（根据演讲时长）
-- 划分章节（3-5个核心主题）
-- 分配页数（每个主题2-5页）
-- 设计过渡（章节间的衔接）
-```
+Story structure:
+1. Set the scene: introduce the protagonist and background
+2. Challenge: describe the problem or dilemma
+3. Turning point: introduce the solution
+4. Overcoming difficulty: show the actions taken
+5. Result and takeaway: explain the impact and meaning
 
-### 第三步：内容撰写
-```
-逐页生成内容：
-- 撰写页面标题（简洁有力）
-- 提炼核心观点（一句话）
-- 展开支撑要点（3-5个）
-- 添加数据案例（具体量化）
-- 编写演讲备注（时间+要点）
+Example:
+"Two years ago, Manager Zhang's team spent 20 hours every week compiling sales
+reports by hand, often working late into the night. They tried many tools, none
+satisfactory. With our automated reporting system, one click now produces an
+accurate analysis in 5 minutes. As Zhang put it: 'This tool gave us back the
+meaning of our work, and more time to serve customers.'"
 ```
 
-### 第四步：优化迭代
+### 7. Content Optimization Checklist
+
+#### Opening (slides 1-2)
+- [ ] Compelling opening (story / data / question)
+- [ ] Clear goal and value of the talk
+- [ ] Preview of the structure
+- [ ] Connection with the audience
+
+#### Body
+- [ ] Clear logic (summary-detail-summary structure)
+- [ ] Clear viewpoints (conclusion first)
+- [ ] Sufficient evidence (data + cases)
+- [ ] Well layered (3-5 key points)
+- [ ] Balanced detail (emphasis where it matters)
+
+#### Every slide
+- [ ] Short, strong title
+- [ ] One-sentence main message
+- [ ] A moderate number of points (3-5)
+- [ ] Specific, quantified information (data / cases)
+- [ ] Complete speaker notes (timing / points / tips)
+
+#### Closing (last 2-3 slides)
+- [ ] Summary of key points
+- [ ] Reinforced key message
+- [ ] Clear call to action
+- [ ] Time left for Q&A
+- [ ] Clear contact details
+
+### 8. Common Content Problems and Fixes
+
+#### Problem 1: Empty content
+**Symptom**: lots of platitudes, little substance
+**Fix**:
+- Back every viewpoint with data or a case
+- Replace abstract statements with concrete examples
+- Offer actionable advice
+- Quantify everything that can be quantified
+
+#### Problem 2: Confused logic
+**Symptom**: content jumps around and does not connect
+**Fix**:
+- Use SCQA or the three-act structure
+- State the core message of each slide
+- Add transition slides between sections
+- Keep the overall narrative flowing
+
+#### Problem 3: Information overload
+**Symptom**: too much to say, the audience cannot remember it
+**Fix**:
+- Focus on 3-5 core points
+- Cut secondary information
+- One point per slide
+- Apply the "Rule of Three"
+
+#### Problem 4: No interaction
+**Symptom**: one-way delivery, attention drops
+**Fix**:
+- Ask questions at key moments
+- Invite the audience to share experience
+- Add a quiz or poll
+- Reserve discussion time
+
+#### Problem 5: Weak ending
+**Symptom**: rushed finish, no call to action
+**Fix**:
+- Summarize the key points clearly
+- Give a clear next step
+- End with a strong closing line
+- Leave a lasting impression
+
+## Content Generation Process
+
+### Step 1: Requirements analysis
 ```
-检查和改进：
-- 整体逻辑是否清晰？
-- 信息量是否适中？
-- 重点是否突出？
-- 案例是否充分？
-- 语言是否精炼？
+Ask the user:
+1. What are the topic and goal of the deck?
+2. Who is the audience? (background, role, needs)
+3. What is the occasion and the length of the talk?
+4. What core message should it convey?
+5. Is there content that must be included?
 ```
 
-## 快速内容生成技巧
+### Step 2: Structure design
+```
+Design the structure from the requirements:
+- Decide the slide count (from the talk length)
+- Divide into sections (3-5 core topics)
+- Allocate slides (2-5 per topic)
+- Design transitions between sections
+```
 
-### 10分钟生成大纲
-1. 确定核心信息（30秒）
-2. 列出3-5个观点（2分钟）
-3. 每个观点展开3个要点（5分钟）
-4. 添加开场和结尾（2分钟）
-5. 检查逻辑流畅性（30秒）
+### Step 3: Content writing
+```
+Generate content slide by slide:
+- Write the slide title (short and strong)
+- Distill the core message (one sentence)
+- Expand the supporting points (3-5)
+- Add data and cases (specific and quantified)
+- Write speaker notes (timing + points)
+```
 
-### 内容扩展套路
-- **What + Why + How**：是什么 → 为什么重要 → 如何实现
-- **Problem + Solution + Benefit**：问题 → 解决方案 → 好处
-- **Past + Present + Future**：过去 → 现在 → 未来
-- **Theory + Example + Practice**：理论 → 案例 → 实践
+### Step 4: Optimize and iterate
+```
+Check and improve:
+- Is the overall logic clear?
+- Is the amount of information moderate?
+- Are the key points prominent?
+- Are the cases sufficient?
+- Is the language concise?
+```
 
-### 应急内容方案
-时间紧迫时：
-1. 明确3个核心观点
-2. 每个观点找1个数据或案例
-3. 开场用提问或数据吸引注意
-4. 结尾总结观点并号召行动
-5. 确保逻辑连贯即可
+## Quick Generation Tips
 
-## 学习资源
+### Outline in 10 minutes
+1. Fix the core message (30 seconds)
+2. List 3-5 viewpoints (2 minutes)
+3. Expand each viewpoint into 3 points (5 minutes)
+4. Add the opening and closing (2 minutes)
+5. Check the logical flow (30 seconds)
 
-### 演讲参考
-- TED Talks（学习开场和故事讲述）
-- 苹果发布会（学习产品展示）
-- 学术会议演讲（学习专业表达）
+### Expansion patterns
+- **What + Why + How**: what it is, why it matters, how to do it
+- **Problem + Solution + Benefit**
+- **Past + Present + Future**
+- **Theory + Example + Practice**
 
-### 内容写作
-- 《金字塔原理》（逻辑思维）
-- 《演讲的力量》（演讲技巧）
-- 《Made to Stick》（让观点更有粘性）
+### Emergency plan
+When time is short:
+1. Settle on 3 core viewpoints
+2. Find one data point or case for each
+3. Open with a question or a number
+4. Close by summarizing the viewpoints and calling for action
+5. Just make sure the logic is coherent
 
-通过系统应用这些内容生成技巧，帮助用户创建清晰、有说服力、引人入胜的PPT演示内容。
+## Learning Resources
+
+### Speaking references
+- TED Talks (openings and storytelling)
+- Apple keynotes (product presentation)
+- Academic conference talks (professional expression)
+
+### Writing
+- *The Pyramid Principle* (logical thinking)
+- *Made to Stick* (making ideas memorable)
+
+Apply these techniques systematically to help users build clear, persuasive and engaging presentation content.

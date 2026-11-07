@@ -1,9 +1,9 @@
 ---
 name: "prompt-engineering-patterns"
-description: "Master advanced prompt engineering techniques to maximize LLM performance, reliability, and controllability in production. Use when optimizing prompts, improving LLM outputs, or designing production prompt templates."
+description: "Advanced prompt engineering techniques for reliable, controllable LLM output in production. Use when optimizing prompts, improving LLM outputs, or designing production prompt templates."
+description_zh: "生产级提示词工程技巧，用于优化提示词、提升 LLM 输出质量并设计提示模板"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "llm-application-dev"
+source: agentz
 ---
 
 # Prompt Engineering Patterns

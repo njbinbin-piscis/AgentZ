@@ -1,5 +1,4 @@
-# Iterative Self-Correcting Loop Rules (`ralph-loop`)
-
+# Iterative Self-Correcting Loop Rules
 Follow an iterative, self-referential convergence loop on every multi-step task in this project:
 
 1. **Explicit Task Ledger (`plan_todo`)**:

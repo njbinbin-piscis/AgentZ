@@ -1,10 +1,9 @@
 ---
 name: "workflow-orchestration-patterns"
-description: "Design durable workflows with Temporal for distributed systems. Covers workflow vs activity separation, saga patterns, state management, and determinism constraints. Use when building long-running processes, distributed transactions, or microservice orchestration."
-description_zh: "后端 API 设计、GraphQL 架构、Temporal 工作流编排及测试驱动的后端开发"
+description: "Design durable distributed workflows with Temporal: workflow vs activity separation, sagas, state and determinism. Use for long-running processes or microservice orchestration."
+description_zh: "用 Temporal 设计可靠的分布式工作流：工作流与活动拆分、Saga 模式、状态管理和确定性约束"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "backend-development"
+source: agentz
 ---
 
 # Workflow Orchestration Patterns

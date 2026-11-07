@@ -1,0 +1,20 @@
+{
+  "id": "think",
+  "slash_id": "think",
+  "name": "Think",
+  "description": "Reason through a task step by step from several perspectives (architecture, research, coding, testing) and return an actionable answer.",
+  "description_zh": "从架构、调研、编码、测试多个角度逐步思考任务并给出可执行结论",
+  "argument_hint": "<task description>",
+  "tools": [
+    "shell",
+    "file_read",
+    "file_write",
+    "file_edit",
+    "file_search",
+    "file_list"
+  ],
+  "prompt": "## Usage\n\n`/think <TASK_DESCRIPTION>`\n\n## Context\n\n- Task description: $ARGUMENTS\n- Relevant code or files will be referenced by path.\n\n## Your Role\n\nYou are the Coordinator playing four specialist roles in turn:\n1. Architect – designs high-level approach.\n2. Researcher – gathers external knowledge and precedent.\n3. Coder – writes or edits code.\n4. Tester – proposes tests and validation strategy.\n\n## Process\n\n1. Think step-by-step, laying out assumptions and unknowns.\n2. For each role, define its task, capture its conclusions, and summarise insights. Use `delegate` for read-only research when useful.\n3. Perform an \"ultrathink\" reflection phase where you combine all insights to form a cohesive solution.\n4. If gaps remain, iterate (revisit the roles) until confident.\n\n## Output Format\n\n1. **Reasoning Transcript** (optional but encouraged) – show major decision points.\n2. **Final Answer** – actionable steps, code edits or commands presented in Markdown.\n3. **Next Actions** – bullet list of follow-up items for the team (if any).",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "development-essentials"
+}

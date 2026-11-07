@@ -1,102 +1,81 @@
 ---
 name: "playwright"
-description: "Browser automation with Playwright MCP. Use for web scraping, testing, screenshots, and browser interactions."
-description_zh: "完整的 OMC (Oh My AgentZ) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
+description: "Automate browsers through a user-configured Playwright MCP server for scraping, testing and screenshots. Use when Playwright MCP tools are available."
+description_zh: "通过用户配置的 Playwright MCP 服务器自动化浏览器：抓取、测试与截图"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "oh-my-agentz"
+source: agentz
 ---
 
 # Playwright Browser Automation
 
-This skill provides browser automation capabilities via the Playwright MCP server.
+Browser automation through a Playwright MCP server that the user has configured in **Settings → MCP Servers**. If no Playwright MCP tools are available, use AgentZ's builtin `browser` tool instead, or the `playwright-cli` skill.
 
 ## When to Use
 
-Use this skill for:
 - Web scraping and data extraction
 - Automated browser testing
 - Taking screenshots of web pages
 - Form filling and user interaction simulation
 - Monitoring and validation of web applications
-- DOM element inspection and manipulation
+- DOM element inspection
 
 ## Capabilities
 
-Through the Playwright MCP, this skill provides:
-
-### Navigation & Page Control
+### Navigation and page control
 - Navigate to URLs
 - Take screenshots (full page or specific elements)
-- Execute JavaScript in page context
+- Execute JavaScript in the page context
 - Get page content and HTML
 
-### Element Interaction
-- Click elements
-- Fill in forms and inputs
-- Select dropdown options
-- Hover over elements
-- Press keyboard keys
+### Element interaction
+- Click elements, fill in forms and inputs
+- Select dropdown options, hover, press keyboard keys
 
-### Inspection & Validation
-- Get element attributes and properties
-- Extract text content
-- Verify element existence
-- Check element visibility
-- Validate page state
+### Inspection and validation
+- Get element attributes and properties, extract text
+- Verify element existence and visibility, validate page state
 
-### Advanced Features
-- Handle multiple tabs/windows
+### Advanced features
+- Handle multiple tabs and windows
 - Wait for specific conditions
-- Capture network requests
-- Manage browser cookies
-- Handle file uploads/downloads
+- Capture network requests, manage cookies
+- Handle file uploads and downloads
 
 ## Usage Examples
 
-### Basic Navigation and Screenshot
-```
-Use skill playwright to navigate to https://example.com and take a screenshot
-```
+### Navigation and screenshot
+Navigate to https://example.com and take a screenshot.
 
-### Form Automation
-```
-Use skill playwright to:
+### Form automation
 1. Navigate to https://example.com/login
-2. Fill in username field with "test@example.com"
-3. Fill in password field with "password123"
+2. Fill in the username field with "test@example.com"
+3. Fill in the password field
 4. Click the submit button
 5. Take a screenshot of the result
-```
 
-### Data Extraction
-```
-Use skill playwright to scrape product prices from https://example.com/products
-```
+### Data extraction
+Scrape product prices from https://example.com/products.
 
 ### Testing
-```
-Use skill playwright to test the checkout flow on our staging site
-```
+Test the checkout flow on the staging site.
+
+## Setup
+
+Add an MCP server in **Settings → MCP Servers** with command `npx` and arguments `@playwright/mcp@latest`. Requirements:
+
+- Node.js 18+ (for `npx`)
+- Network access on first use to download the server and a Chromium browser
+- Enough disk space for Chromium
 
 ## Notes
 
-- The Playwright MCP server will be automatically started when this skill is used
-- Browser runs in headless mode by default
-- Screenshots are saved to the current directory
-- Supports modern web standards (ES6+, Web Components, etc.)
-- Works with SPA frameworks (React, Vue, Angular)
-
-## Requirements
-
-- Node.js 14+ (for npx)
-- Internet connection (to install MCP server on first use)
-- Sufficient disk space for Chromium browser
+- Browser runs headless by default unless the server is configured otherwise
+- Works with SPA frameworks (React, Vue, Angular) and modern web standards
 
 ## Troubleshooting
 
-If the skill fails to start:
+If the MCP server fails to start:
 1. Verify Node.js is installed: `node --version`
 2. Check network connectivity
-3. Try manual installation: `npm install -g @playwright/mcp`
+3. Try installing manually: `npm install -g @playwright/mcp`
 4. Check system resources (RAM, disk space)

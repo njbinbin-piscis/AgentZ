@@ -1,15 +1,14 @@
 ---
 name: "things-mac"
-description: "Manage Things 3 via the `things` CLI on macOS (add/update projects+todos via URL scheme; read/search/list from the local Things database). Use when a user asks AgentZ Code to add a task to Things, list inbox/today/upcoming, search tasks, or inspect projects/areas/tags."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Manage Things 3 on macOS with the things CLI: add and update todos and projects, list inbox, today and upcoming, and search tasks. Use when the user asks to add or look up tasks in Things."
+description_zh: "在 macOS 上通过 things 命令行管理 Things 3：添加更新待办、查看收件箱和今日任务、搜索任务"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # Things 3 CLI
 
-Use `things` to read your local Things database (inbox/today/search/projects/areas/tags) and to add/update todos via the Things URL scheme.
+Use `things` (run through `shell`) to read your local Things database (inbox/today/search/projects/areas/tags) and to add/update todos via the Things URL scheme.
 
 Setup
 - Install: `GOBIN=/opt/homebrew/bin go install github.com/ossianhempel/things3-cli/cmd/things@latest`

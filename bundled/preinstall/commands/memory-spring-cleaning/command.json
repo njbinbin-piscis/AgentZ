@@ -1,0 +1,18 @@
+{
+  "id": "memory-spring-cleaning",
+  "slash_id": "memory-spring-cleaning",
+  "name": "Clean Project Rules",
+  "description": "Review the project rule files under .agentz/rules/, verify them against the code and remove outdated or duplicate guidance. Use periodically to keep rules accurate.",
+  "description_zh": "核对 .agentz/rules/ 下的项目规则与代码是否一致，清理过时和重复内容。",
+  "argument_hint": "",
+  "tools": [
+    "file_read",
+    "file_search",
+    "file_edit",
+    "file_write"
+  ],
+  "prompt": "# Clean Project Rules\n\nClean and organize the project rule files. Focus (optional): $ARGUMENTS\n\n## Instructions\n\n1. **Get overview**\n   - List all rule files: `.agentz/rules/*.md` and any rule files in subdirectories.\n2. **Iterative review**\n   - Process each file in turn, starting with the project overview.\n   - Load the current content and compare the documented patterns with the actual implementation.\n   - Identify outdated, incorrect or missing information.\n3. **Update and refactor**\n   - Verify every technical claim against the current code base.\n   - Remove obsolete information and consolidate duplicates.\n   - Put information in the most appropriate file. For example UI-specific patterns belong in a UI rule file, API conventions in an API rule file, and infrastructure details in an infrastructure rule file.\n4. **Focus on quality**\n   - Prioritize clarity, accuracy and relevance.\n   - Remove anything that no longer serves the project.\n5. Finish with a summary of what changed.",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-team-collaboration"
+}

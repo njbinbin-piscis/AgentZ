@@ -1,9 +1,9 @@
 ---
 name: "similarity-search-patterns"
-description: "Implement efficient similarity search with vector databases. Use when building semantic search, implementing nearest neighbor queries, or optimizing retrieval performance."
+description: "Implement efficient similarity search with vector databases. Use when building semantic search, nearest neighbor queries, or optimizing retrieval performance."
+description_zh: "基于向量数据库实现高效相似度检索，适用于语义搜索和近邻查询优化"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "llm-application-dev"
+source: agentz
 ---
 
 # Similarity Search Patterns

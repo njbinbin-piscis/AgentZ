@@ -1,199 +1,96 @@
 ---
 name: "deep-research"
-description: "Complete research workflow system for codebase analysis, deep external research, and comprehensive technical wiki generation"
-description_zh: "完整的 OMC (Oh My AgentZ) 插件，包含 agents、commands、skills、hooks、tools 和 MCP servers。提供多代理编排、深度研究、代码分析等功能。"
-version: "1.0.0"
-source: AgentZ
-source_plugin: "oh-my-agentz"
+description: "Research workflow for analyzing a codebase, doing deep web research and generating a technical wiki. Use when you need an in-depth research report on a project or technology."
+description_zh: "研究型工作流：分析代码库、联网深度调研并生成技术 Wiki，适用于需要深入研究报告的项目或技术。"
+version: "1.1.0"
+source: agentz
 ---
 
-# Deep Research Workflow Skill
+# Deep Research Workflow
 
-完整的研究型工作流系统，实现从代码库分析、深度调研到技术文档生成的完整流程。
+A research workflow that takes a project from codebase analysis, through deep external research, to a complete technical wiki. Every phase uses builtin tools only: `file_search`, `file_read`, `file_write`, `web_search`, `web_fetch`, `shell`, `delegate`.
 
-## 功能概述
+## Phases
 
-本技能提供了一套完整的研究型工作流系统，包括：
+1. **Codebase research analysis**: analyze the codebase and mark places that need web research.
+2. **Deep research loop**: resolve every research marker with real sources.
+3. **Wiki generation**: produce a complete technical analysis document.
+4. **GitHub repository research** (optional): clone and analyze a referenced repository.
 
-1. **代码库研究分析** (`/init-research`) - 分析代码库并标记需要联网调研的内容
-2. **深度调研循环** (`/ralph-loop-research`) - 处理所有 TODO 标记，执行深度调研
-3. **Wiki 生成循环** (`/ralph-loop-wiki`) - 生成完整的技术分析文档
-4. **GitHub 仓库研究** (`gh-repo-research`) - 克隆并分析 GitHub 仓库
+Run the phases in order. Tell the user what each phase produced before starting the next one.
 
-## 命令
+## Phase 1: Codebase research analysis
 
-### /init-research
+Analyze the codebase and write `deep-search.md` files (project root plus important subdirectories). Wherever web research is needed, place a marker line `TODO: RESEARCH HERE` with the question to answer.
 
-初始化研究文档，分析代码库并生成 `deep-search.md` 文件，在需要联网调研的地方标记 `TODO: RESEARCH HERE`。
+- Start from `.agentz/REPO_WIKI.md` and `.agentz/rules/` if they exist.
+- Limit directory depth (default 2) so the result stays reviewable.
+- If `deep-search.md` already exists, update it instead of regenerating it, unless the user asks for a fresh start.
 
-**用法**:
-```
-/init-research                      # 更新模式
-/init-research --create-new         # 重新生成所有文件
-/init-research --max-depth=2        # 限制目录深度
-```
+Output: `deep-search.md` files with research markers.
 
-**输出**: `deep-search.md` 文件（根目录 + 重要子目录）
+## Phase 2: Deep research loop
 
-### /ralph-loop-research
+Resolve every `TODO: RESEARCH HERE` marker. Repeat up to 3 passes (or the number the user asks for).
 
-深度调研循环，处理所有 `TODO: RESEARCH HERE` 标记。
+- Scan all `deep-search.md` files and list the markers.
+- Research each one with `web_search` and `web_fetch`; prefer primary sources (official docs, specs, source repositories).
+- Write professional, wiki-style content and replace the marker with it, citing the source URLs.
+- Save raw notes under `.research/` (`research-001.md`, `research-002.md`, ...).
+- When a GitHub repository link turns up, run Phase 4 for it.
 
-**用法**:
-```
-/ralph-loop-research                      # 默认 3 次循环
-/ralph-loop-research --max-iterations=5   # 自定义循环次数
-```
+Output: all markers replaced; notes saved under `.research/`.
 
-**功能**:
-- 扫描所有 `deep-search.md` 文件
-- 查找所有 `TODO: RESEARCH HERE` 标记
-- 执行深度调研（联网搜索）
-- 生成专业的 wiki 格式内容
-- 替换 TODO 标记为实际内容
-- 处理发现的链接（GitHub 链接激活 `gh-repo-research`）
+## Phase 3: Wiki generation
 
-**输出**: 
-- 替换所有 TODO 标记
-- 调研笔记保存在 `.research/` 目录
+Generate the complete technical wiki.
 
-### /ralph-loop-wiki
+- Read the PRD if one exists (project root or a path the user gives).
+- Read everything under `.research/`.
+- Use `.agentz/rules/` and `.agentz/REPO_WIKI.md` as codebase context.
+- Write the wiki with sections for overview, architecture, core modules, key flows, and open questions.
+- Do 3 verification passes: check completeness, check every claim against its source, fix gaps.
+- Finish with optimization suggestions and a short summary.
 
-生成完整的技术 wiki 文档。
+Output:
 
-**用法**:
-```
-/ralph-loop-wiki                              # 默认 3 次循环
-/ralph-loop-wiki --prd-path=docs/PRD.md      # 指定 PRD 文件
-/ralph-loop-wiki --max-iterations=5           # 自定义循环次数
-```
+- `.agentz/WIKI_DEEP.md`: the full technical analysis document
+- `.agentz/wiki-optimization.md`: optimization suggestions
+- `.agentz/wiki-summary.md`: summary report
 
-**功能**:
-- 读取 PRD 文档（如果存在）
-- 读取 `.research/` 目录下的所有调研内容
-- 结合 `init-deep` 生成的 AgentZ.md 文件
-- 按照 `wiki_template.md` 的格式生成完整 wiki
-- 循环 3 次，确保内容完整
-- 生成优化建议和总结
+## Phase 4: GitHub repository research
 
-**输出**: 
-- `.agentz/WIKI_DEEP.md` - 完整的技术分析文档
-- `.agentz/wiki-optimization.md` - 优化建议
-- `.agentz/wiki-summary.md` - 总结报告
-- `.agentz/AGENT_CODING_BRIEF.md` - Agent 编码简报（重建图谱时自动生成，agent turn 自动注入）
+Research a repository by cloning and analyzing it.
 
-## 智能体
+- Clone it into `.gh-repo/` with `shell` (`git clone --depth 1`).
+- Analyze structure and code; a `delegate` sub-agent is useful for broad read-only exploration.
+- Write architecture, core modules, API and features notes.
+- Save the results under `.research/gh-repo/<repo-name>/`.
 
-### gh-repo-research
-
-GitHub 仓库研究智能体，用于克隆和分析 GitHub 仓库。
-
-**功能**:
-- 克隆 GitHub 仓库到 `.gh-repo/` 目录
-- 在克隆的仓库中执行 `/init-deep` 操作
-- 生成技术文档（架构、核心模块、API、功能分析）
-- 保存到 `.research/gh-repo/repo-name/` 目录
-
-**使用方式**:
-通过 `ralph-loop-research` 自动调用（当发现 GitHub 链接时），或手动调用。
-
-## 工作流程
-
-### 完整工作流
+## Resulting files
 
 ```
-1. /init-research
-   ↓
-   生成 deep-search.md（带 TODO: RESEARCH HERE 标记）
-   
-2. /ralph-loop-research
-   ↓
-   处理所有 TODO 标记
-   ↓
-   深度调研 → 生成 wiki 格式内容
-   ↓
-   发现链接 → GitHub 链接 → gh-repo-research
-   ↓
-   所有 TODO 替换完成
-   
-3. /ralph-loop-wiki
-   ↓
-   整合 PRD + .research + AgentZ.md
-   ↓
-   生成完整 wiki（按 wiki_template.md 格式）
-   ↓
-   3 次验证循环
-   ↓
-   生成优化建议和总结
-```
-
-### 快速开始
-
-```bash
-# 步骤 1: 初始化研究文档
-/init-research
-
-# 步骤 2: 执行深度调研
-/ralph-loop-research
-
-# 步骤 3: 生成技术 Wiki
-/ralph-loop-wiki
-```
-
-## 文件结构
-
-执行工作流后，项目目录将包含：
-
-```
-项目根目录/
-├── deep-search.md                    # 研究文档（带 TODO 标记）
-├── AgentZ.md                      # 代码库分析（来自 init-deep）
-├── .research/                        # 调研结果
-│   ├── research-001.md              # 调研笔记
-│   ├── research-002.md
-│   └── gh-repo/                      # GitHub 仓库研究
+project root/
+├── deep-search.md                    # research document (with markers)
+├── .research/                        # research results
+│   ├── research-001.md
+│   └── gh-repo/
 │       └── repo-name/
 │           ├── architecture.md
 │           ├── core-modules.md
 │           ├── api-reference.md
 │           └── features.md
-├── .gh-repo/                         # 克隆的仓库
-│   └── repo-name/
-├── wiki.md                           # 旧路径（已弃用，请用 .agentz/WIKI_DEEP.md）
-├── .agentz/
-│   ├── graph.json                    # 知识图谱（结构）
-│   ├── AGENT_CODING_BRIEF.md         # Agent 编码简报（自动注入 agent turn）
-│   ├── REPO_WIKI.md                  # 快速模块概览
-│   ├── WIKI_DEEP.md                  # 深度 wiki（ralph-loop-wiki 输出）
-│   ├── wiki-optimization.md
-│   └── wiki-summary.md
+├── .gh-repo/                         # cloned repositories
+└── .agentz/
+    ├── REPO_WIKI.md                  # quick module overview
+    ├── WIKI_DEEP.md                  # deep wiki
+    ├── wiki-optimization.md
+    └── wiki-summary.md
 ```
 
-## 安装
+## Notes
 
-运行安装脚本：
-
-```bash
-cd AgentZ-marketplace/skills/deep-research
-bash install.sh
-```
-
-这将安装到：
-- `~/.AgentZ/skills/deep-research/`
-- `~/.claude/skills/deep-research/`
-
-## 注意事项
-
-1. **首次使用前**：建议先运行 `/init-deep` 生成 AgentZ.md 文件
-2. **PRD 文档**：如果有 PRD 文档，放在项目根目录或使用 `--prd-path` 指定
-3. **网络要求**：深度调研需要联网访问外部资源
-4. **GitHub 访问**：`gh-repo-research` 需要能够克隆 GitHub 仓库
-5. **存储空间**：克隆的仓库会占用磁盘空间，注意 `.gh-repo/` 目录大小
-
-## 相关文档
-
-- [README.md](README.md) - 详细使用文档
-- [init-research.md](../omc-commands/init-research.md) - init-research 命令文档
-- [ralph-loop-research.md](../omc-commands/ralph-loop-research.md) - ralph-loop-research 命令文档
-- [ralph-loop-wiki.md](../omc-commands/ralph-loop-wiki.md) - ralph-loop-wiki 命令文档
-- [gh-repo-research.md](../omc-agents/gh-repo-research.md) - gh-repo-research 智能体文档
+1. **Context first**: make sure the project has useful context, such as `.agentz/REPO_WIKI.md` or rules in `.agentz/rules/`.
+2. **Network**: deep research needs access to external resources.
+3. **Git access**: Phase 4 needs `git` and access to the repository.
+4. **Disk space**: cloned repositories consume space; watch the size of `.gh-repo/`, and add `.gh-repo/` to `.gitignore`.

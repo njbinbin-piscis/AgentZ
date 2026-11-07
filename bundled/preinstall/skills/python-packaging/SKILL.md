@@ -1,10 +1,9 @@
 ---
 name: "python-packaging"
-description: "Create distributable Python packages with proper project structure, setup.py/pyproject.toml, and publishing to PyPI. Use when packaging Python libraries, creating CLI tools, or distributing Python code."
-description_zh: "现代 Python 开发工具，支持 Python 3.12+、Django、FastAPI、异步编程模式及生产环境最佳实践"
+description: "Create distributable Python packages with proper structure, pyproject.toml, and PyPI publishing. Use when packaging Python libraries, building CLI tools, or distributing Python code."
+description_zh: "创建可分发的 Python 包，涵盖项目结构、pyproject.toml 与 PyPI 发布"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "python-development"
+source: agentz
 ---
 
 # Python Packaging

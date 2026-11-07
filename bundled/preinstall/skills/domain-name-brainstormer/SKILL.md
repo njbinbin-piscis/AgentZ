@@ -1,9 +1,9 @@
 ---
 name: "domain-name-brainstormer"
-description: "Generates creative domain name ideas for your project and checks availability across multiple TLDs (.com, .io, .dev, .ai, etc.). Saves hours of brainstorming and manual checking."
+description: "Generate creative domain name ideas for a project and check availability across TLDs such as .com, .io, .dev, and .ai. Use when naming a product or startup."
+description_zh: "为项目头脑风暴域名创意，并检查 .com、.io、.dev、.ai 等后缀的可用性。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "domain-name-brainstormer"
+source: agentz
 ---
 
 # Domain Name Brainstormer

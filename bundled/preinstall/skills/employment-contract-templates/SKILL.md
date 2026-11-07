@@ -1,10 +1,9 @@
 ---
 name: "employment-contract-templates"
-description: "Create employment contracts, offer letters, and HR policy documents following legal best practices. Use when drafting employment agreements, creating HR policies, or standardizing employment documentation."
-description_zh: "人力资源政策文档、法律合规模板（GDPR/SOC2/HIPAA）、雇佣合同及监管文件"
+description: "Draft employment contracts, offer letters, and HR policy documents following legal best practices. Use when writing employment agreements or standardizing HR documentation."
+description_zh: "起草雇佣合同、录用通知和人力资源政策文档，遵循法律合规最佳实践。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hr-legal-compliance"
+source: agentz
 ---
 
 # Employment Contract Templates

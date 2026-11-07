@@ -1,9 +1,9 @@
 ---
 name: "color-curator"
-description: "Browse and select color palettes from Coolors or curated fallbacks. Use to find the perfect color palette for a design project."
+description: "Browse and select color palettes from Coolors or curated fallbacks. Use when choosing a color palette for a design project."
+description_zh: "从 Coolors 或内置精选方案中浏览并挑选配色，适用于为设计项目选择调色板。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "frontend-design-pro"
+source: agentz
 ---
 
 # Color Curator

@@ -1,10 +1,9 @@
 ---
 name: "gog"
-description: "Google Workspace CLI for Gmail, Calendar, Drive, Contacts, Sheets, and Docs."
-description_zh: "精选热门 AI Agent 技能合集，汇集社区高下载量技能于一处。"
+description: "Google Workspace CLI for Gmail, Calendar, Drive, Contacts, Sheets, and Docs. Use when you need to read or manage Google Workspace data from the shell."
+description_zh: "通过 gog 命令行操作 Gmail、日历、云端硬盘、联系人、表格和文档。"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "hot-skills"
+source: agentz
 ---
 
 # gog

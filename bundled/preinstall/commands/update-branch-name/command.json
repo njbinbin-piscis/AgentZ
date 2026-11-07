@@ -1,0 +1,20 @@
+{
+  "id": "update-branch-name",
+  "slash_id": "update-branch-name",
+  "name": "Update Branch Name",
+  "description": "Rename the current git branch to match the changes made, based on a diff against main. Use when the branch name no longer fits the work.",
+  "description_zh": "根据与主分支的差异，将当前 git 分支重命名为合适的名称",
+  "argument_hint": "",
+  "tools": [
+    "shell",
+    "file_read",
+    "file_write",
+    "file_edit",
+    "file_search",
+    "file_list"
+  ],
+  "prompt": "# Update Branch Name\n\nFollow these steps to update the current branch name:\n\n1. Check differences between current branch and main branch HEAD using `git diff main...HEAD`\n2. Analyze the changed files to understand what work is being done\n3. Determine an appropriate descriptive branch name based on the changes\n4. Update the current branch name using `git branch -m [new-branch-name]`\n5. Verify the branch name was updated with `git branch`",
+  "prompt_zh": "",
+  "source": "agentz",
+  "source_plugin": "commands-version-control-git"
+}

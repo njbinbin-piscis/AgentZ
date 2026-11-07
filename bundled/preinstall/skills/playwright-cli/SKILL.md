@@ -1,10 +1,9 @@
 ---
 name: "playwright-cli"
-description: "Automates browser interactions for web testing, form filling, screenshots, and data extraction. Use when the user needs to navigate websites, interact with web pages, fill forms, take screenshots, test web applications, or extract information from web pages."
-description_zh: "基于 Playwright 的 CLI 浏览器自动化工具，专为编程代理优化。通过命令行控制浏览器进行网页导航、元素交互、表单填写、截图、网络拦截和会话管理，比 MCP 方案更节省 Token。"
+description: "Automate browsers with the playwright-cli command line for testing, form filling, screenshots and data extraction. Use when you need to drive web pages from the shell."
+description_zh: "用 playwright-cli 命令行自动化浏览器：网页测试、填表、截图与数据提取"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "playwright-cli"
+source: agentz
 ---
 
 # Browser Automation with playwright-cli

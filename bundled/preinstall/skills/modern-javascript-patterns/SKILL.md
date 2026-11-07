@@ -1,10 +1,9 @@
 ---
 name: "modern-javascript-patterns"
-description: "Master ES6+ features including async/await, destructuring, spread operators, arrow functions, promises, modules, iterators, generators, and functional programming patterns for writing clean, efficient JavaScript code. Use when refactoring legacy code, implementing modern patterns, or optimizing JavaScript applications."
-description_zh: "JavaScript 和 TypeScript 开发，支持 ES6+、Node.js、React 及现代 Web 框架"
+description: "Write clean modern JavaScript with ES6+ features: async/await, destructuring, modules, iterators, generators and functional patterns. Use when refactoring legacy code or optimizing JS apps."
+description_zh: "现代 JavaScript（ES6+）实践：async/await、解构、模块与函数式编程，适用于重构和优化 JS 代码"
 version: "1.0.0"
-source: AgentZ
-source_plugin: "javascript-typescript"
+source: agentz
 ---
 
 # Modern JavaScript Patterns
