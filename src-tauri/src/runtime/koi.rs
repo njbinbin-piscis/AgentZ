@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{oneshot, Mutex};
 use uuid::Uuid;
 
@@ -301,6 +301,9 @@ async fn run_in_process_koi_turn(
         ));
     }
 
+    app.state::<crate::state::AppState>()
+        .browser
+        .set_surface(&request.session_id, "botz");
     let (db, settings) = match open_project_kernel_state(&app, &project_dir) {
         Ok(state) => state,
         Err(e) => return Ok(crashed_outcome(handle, &e)),

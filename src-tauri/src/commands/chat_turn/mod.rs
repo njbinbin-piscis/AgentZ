@@ -38,6 +38,7 @@ pub(crate) use prompt_assembly::{load_installed_skills, SkillManifest};
 pub(crate) use tool_approval::{
     apply_llm_provider, materialize_headless_llm_settings, resolve_koi_llm_provider_for_turn,
     run_subagent_research, run_subagent_with_options, run_subagent_with_prompt, SubagentOptions,
+    SubagentProgressTarget,
 };
 
 use post_turn::{
@@ -401,6 +402,9 @@ pub async fn run_agentz_turn(
                 .id
         }
     };
+    app.state::<crate::state::AppState>()
+        .browser
+        .set_surface(&session_id, &expected_source);
 
     if workz_team_id.is_some() || workz_pool_id.is_some() {
         let guard = db.lock().await;
@@ -700,6 +704,7 @@ pub async fn run_agentz_turn(
         chat_mode,
         prefer_zh,
         allow_outside_workspace,
+        &policy_mode,
         request.extra_system_context.as_deref(),
         agent.as_ref(),
         &enabled_skills,

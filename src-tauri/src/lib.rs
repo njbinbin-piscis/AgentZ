@@ -249,6 +249,9 @@ pub fn run() {
             commands::agent_task::agent_task_rollback_snapshot,
             // Embedded browser panel (CDP via chromiumoxide)
             commands::browser::browser_navigate,
+            commands::browser::browser_list_tabs,
+            commands::browser::browser_switch_tab,
+            commands::browser::browser_set_surface,
             commands::browser::browser_screenshot,
             commands::browser::browser_click_at,
             commands::browser::browser_insert_text,

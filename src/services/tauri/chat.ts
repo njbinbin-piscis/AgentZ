@@ -27,6 +27,16 @@ export type AgentEvent =
   | { type: "text_delta"; delta: string }
   | { type: "tool_start"; id: string; name: string; input: unknown }
   | { type: "tool_end"; id: string; name: string; result: string; is_error: boolean }
+  | {
+      type: "subagent_progress";
+      tool_id: string;
+      step_id: string;
+      iteration: number;
+      phase: "thinking" | "tool";
+      status: "running" | "done" | "error";
+      name: string;
+      detail: string;
+    }
   | { type: "permission_request"; request_id: string; tool_name: string; tool_input: unknown; description: string; approval?: { digest: string; taskId: string; environmentId: string; expiresMs: number } }
   | { type: "plan_update"; items: PlanTodoItem[] }
   | {

@@ -140,6 +140,94 @@ fn awaits_user(text: &str) -> bool {
     WAITING.iter().any(|phrase| lower.contains(phrase))
 }
 
+/// Reply text with model reasoning removed.
+///
+/// A thinking-only message (`[Thinking] …`, `<think>…</think>`, `<thinking>…`)
+/// yields an empty string. The agent loop must not treat that as a finished
+/// answer: the model has only planned, it has not called tools or reported.
+pub fn visible_model_text(text: &str) -> String {
+    let stripped = strip_think_tags(text);
+    let trimmed = stripped.trim();
+    match split_thinking_banner(trimmed) {
+        Some(after) => after.trim().to_string(),
+        None => trimmed.to_string(),
+    }
+}
+
+/// True when `text` has content but none of it is a user-visible answer.
+pub fn is_thinking_only(text: &str) -> bool {
+    !text.trim().is_empty() && visible_model_text(text).is_empty()
+}
+
+fn strip_think_tags(text: &str) -> String {
+    let lower = text.to_ascii_lowercase();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < lower.len() {
+        if let Some((open, close)) = think_open_at(&lower, i) {
+            let from = i + open.len();
+            match find_think_close(&lower, from, close) {
+                Some(end) => {
+                    i = end;
+                    continue;
+                }
+                None => break,
+            }
+        }
+        let ch = text[i..].chars().next().unwrap();
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+    out
+}
+
+fn think_open_at(lower: &str, i: usize) -> Option<(&'static str, &'static str)> {
+    let rest = &lower[i..];
+    if rest.starts_with("<thinking>") {
+        Some(("<thinking>", "</thinking>"))
+    } else if rest.starts_with("<think>") {
+        Some(("<think>", "</think>"))
+    } else {
+        None
+    }
+}
+
+fn find_think_close(lower: &str, from: usize, close: &str) -> Option<usize> {
+    let mut search_from = from;
+    while search_from < lower.len() {
+        let rest = &lower[search_from..];
+        let p = rest.find(close)?;
+        let abs = search_from + p;
+        if close == "</think>" && lower[abs..].starts_with("</thinking>") {
+            search_from = abs + "</think>".len();
+            continue;
+        }
+        return Some(abs + close.len());
+    }
+    None
+}
+
+/// `Some(answer)` when `trimmed` opens with a thinking banner.
+/// The answer is empty when the banner has no closing tag — the whole
+/// message is the thought, as in `[Thinking] Let me start by exploring…`.
+fn split_thinking_banner(trimmed: &str) -> Option<String> {
+    const BANNERS: &[&str] = &["[Thinking]", "[thinking]", "[思考]", "【思考】", "【Thinking】"];
+    const CLOSES: &[&str] = &["[/Thinking]", "[/thinking]", "[/思考]", "【/思考】", "【/Thinking】"];
+    let lower = trimmed.to_ascii_lowercase();
+    let banner = BANNERS
+        .iter()
+        .find(|b| lower.starts_with(&b.to_ascii_lowercase()))?;
+    let rest = &trimmed[banner.len()..];
+    let rest_lower = rest.to_ascii_lowercase();
+    for close in CLOSES {
+        let cl = close.to_ascii_lowercase();
+        if let Some(p) = rest_lower.find(&cl) {
+            return Some(rest[p + close.len()..].to_string());
+        }
+    }
+    Some(String::new())
+}
+
 #[cfg(test)]
 mod awaits_user_tests {
     use super::awaits_user;
@@ -157,6 +245,43 @@ mod awaits_user_tests {
     fn a_plain_progress_report_does_not() {
         assert!(!awaits_user("已完成 r6a：网关路由接好，测试 12 项通过。"));
         assert!(!awaits_user("Updated `a?.b` handling in parser.ts and reran the tests."));
+    }
+}
+
+#[cfg(test)]
+mod visible_model_text_tests {
+    use super::{is_thinking_only, visible_model_text};
+
+    #[test]
+    fn a_thinking_banner_is_not_an_answer() {
+        let thought = "[Thinking] The user is asking me to investigate the device access architecture layering in the DimLab workspace. Let me start by exploring the directory structure and then dive into each of the 5 questions.\n\nLet me begin with understanding the overall structure.";
+        assert!(is_thinking_only(thought));
+        assert!(visible_model_text(thought).is_empty());
+    }
+
+    #[test]
+    fn think_tags_are_removed_and_the_answer_kept() {
+        assert_eq!(
+            visible_model_text("<think>plan the search</think>\n\nFound it at desktop/src/execution/engine.rs:40."),
+            "Found it at desktop/src/execution/engine.rs:40."
+        );
+        assert!(is_thinking_only("<thinking>only a plan</thinking>"));
+        assert!(visible_model_text("<think>unclosed plan that never answers").is_empty());
+    }
+
+    #[test]
+    fn a_closed_banner_keeps_the_text_after_it() {
+        assert_eq!(
+            visible_model_text("[Thinking] look at engine.rs\n[/Thinking]\n\nSimServices is selected in engine.rs:12."),
+            "SimServices is selected in engine.rs:12."
+        );
+    }
+
+    #[test]
+    fn an_ordinary_report_is_unchanged() {
+        let report = "控制层在 engine.rs:88 按 execution_mode 分发到 SimServices。";
+        assert_eq!(visible_model_text(report), report);
+        assert!(!is_thinking_only(report));
     }
 }
 
@@ -3265,6 +3390,11 @@ impl AgentLoop {
         // keeps stopping to ask the user is pushed on indefinitely.
         const TODO_REMINDER_MAX: usize = 2;
         let mut todo_reminder_count: usize = 0;
+        // A thinking-only reply (no tool call, no visible answer) is not a
+        // finished turn. Cap the re-prompts so a model that only ever thinks
+        // still terminates.
+        const THINKING_NUDGE_MAX: usize = 2;
+        let mut thinking_nudge_count: usize = 0;
         let mut rolling_summary_version = 0i64;
         let mut cumulative_input_tokens = 0i64;
         let mut cumulative_output_tokens = 0i64;
@@ -3996,17 +4126,28 @@ impl AgentLoop {
                 }
             }
 
-            let text_buf = response.content.clone();
+            let raw_text = response.content.clone();
+            let visible = visible_model_text(&raw_text);
             let tool_calls: Vec<(String, String, serde_json::Value)> = response
                 .tool_calls
                 .iter()
                 .map(|tc| (tc.id.clone(), tc.name.clone(), tc.input.clone()))
                 .collect();
+            // Reasoning with no tool call and no answer must not end the turn.
+            let thinking_only = tool_calls.is_empty()
+                && !raw_text.trim().is_empty()
+                && visible.trim().is_empty();
+            let text_buf = if thinking_only {
+                String::new()
+            } else {
+                visible
+            };
 
             // In non-streaming mode we emit the whole response as a single
             // `TextDelta`. Streaming mode already forwarded per-chunk deltas
             // inside `llm_call_unified`, so re-emitting here would duplicate
-            // the text in the UI.
+            // the text in the UI. Thinking-only text is not an answer, so it
+            // is not emitted; the sub-agent report is collected from these deltas.
             if !self.enable_streaming && !text_buf.is_empty() {
                 let _ = event_tx
                     .send(AgentEvent::TextDelta {
@@ -4018,6 +4159,33 @@ impl AgentLoop {
             // If no tool calls, check for unfinished plan_todo items before exiting.
             // If any todo is still in_progress or pending, inject a reminder and continue.
             if tool_calls.is_empty() {
+                if thinking_only && thinking_nudge_count < THINKING_NUDGE_MAX {
+                    thinking_nudge_count += 1;
+                    warn!(
+                        "LLM returned thinking only, continuing ({}/{})",
+                        thinking_nudge_count, THINKING_NUDGE_MAX
+                    );
+                    let asst_msg = LlmMessage {
+                        role: "assistant".into(),
+                        content: MessageContent::text(&raw_text),
+                    };
+                    new_messages.push(asst_msg.clone());
+                    messages.push(asst_msg.clone());
+                    self.persist_message(&ctx.session_id, &asst_msg, turn_index)
+                        .await;
+                    let nudge = "系统提示：上一条只有思考过程，没有调用工具，也没有给出结论，因此不能结束本轮。\
+                         请继续执行任务：需要信息就调用工具，信息已经足够就直接写出结论。不要再只输出思考。";
+                    let nudge_msg = LlmMessage {
+                        role: "user".into(),
+                        content: MessageContent::text(nudge),
+                    };
+                    new_messages.push(nudge_msg.clone());
+                    messages.push(nudge_msg.clone());
+                    self.persist_message(&ctx.session_id, &nudge_msg, turn_index)
+                        .await;
+                    continue 'iterations;
+                }
+
                 // Check if there are any in_progress or pending todos that haven't been resolved
                 let unfinished_todos = if let Some(ref plan_state_arc) = self.plan_state {
                     let plan_state = plan_state_arc.lock().await;
@@ -5826,6 +5994,107 @@ mod tests {
             events.push(event);
         }
         events
+    }
+
+    struct ThinkingScript {
+        calls: Arc<AtomicUsize>,
+        /// When true, every turn is thinking-only, so the loop must stop on its own.
+        always_think: bool,
+    }
+
+    #[async_trait]
+    impl crate::llm::LlmClient for ThinkingScript {
+        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
+            unreachable!("thinking-only test uses complete")
+        }
+
+        async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
+            if req.system.is_none() {
+                return Ok(LlmResponse {
+                    content: "summary".into(),
+                    tool_calls: vec![],
+                    input_tokens: 1,
+                    output_tokens: 1,
+                });
+            }
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            let nudged = req
+                .messages
+                .iter()
+                .any(|m| m.content.as_text().contains("只有思考过程"));
+            let content = if nudged && !self.always_think {
+                "SimServices is selected in desktop/src/execution/engine.rs:40."
+            } else {
+                "[Thinking] The user is asking me to investigate the device access architecture. Let me start by exploring the directory structure.\n\nLet me begin with understanding the overall structure."
+            };
+            Ok(LlmResponse {
+                content: content.into(),
+                tool_calls: vec![],
+                input_tokens: 3,
+                output_tokens: 3,
+            })
+        }
+    }
+
+    async fn run_thinking(script: ThinkingScript, max_iterations: u32) -> (usize, String) {
+        let calls = script.calls.clone();
+        let budget = crate::agent::harness::LayeredBudget::from_context_window(
+            TIER_TEST_CONTEXT_WINDOW,
+            TIER_TEST_MAX_TOKENS,
+        );
+        let agent = tier_agent(script, None, budget);
+        let (event_tx, mut event_rx) = mpsc::channel(64);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut ctx = tier_tool_context("thinking-not-final".into());
+        ctx.max_iterations = Some(max_iterations);
+        agent
+            .run(
+                vec![make_text_msg("user", "调研设备接入分层")],
+                event_tx,
+                cancel,
+                ctx,
+            )
+            .await
+            .expect("thinking script run");
+        let mut visible = String::new();
+        while let Ok(event) = event_rx.try_recv() {
+            if let AgentEvent::TextDelta { delta } = event {
+                visible.push_str(&delta);
+            }
+        }
+        (calls.load(Ordering::SeqCst), visible)
+    }
+
+    #[tokio::test]
+    async fn thinking_only_reply_continues_until_there_is_an_answer() {
+        let (calls, visible) = run_thinking(
+            ThinkingScript {
+                calls: Arc::new(AtomicUsize::new(0)),
+                always_think: false,
+            },
+            4,
+        )
+        .await;
+        assert_eq!(calls, 2, "the thinking turn must be followed by one more call");
+        assert_eq!(
+            visible,
+            "SimServices is selected in desktop/src/execution/engine.rs:40."
+        );
+        assert!(!visible.contains("[Thinking]"));
+    }
+
+    #[tokio::test]
+    async fn repeated_thinking_stops_instead_of_looping_forever() {
+        let (calls, visible) = run_thinking(
+            ThinkingScript {
+                calls: Arc::new(AtomicUsize::new(0)),
+                always_think: true,
+            },
+            8,
+        )
+        .await;
+        assert_eq!(calls, 3, "two nudges, then the third thinking reply ends the turn");
+        assert!(visible.is_empty(), "thinking text must not become the answer");
     }
 
     #[tokio::test]

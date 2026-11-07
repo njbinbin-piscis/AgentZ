@@ -1178,6 +1178,9 @@ const zh = {
     subagentTokens: "{{count}} token",
     subagentCached: "缓存",
     subagentBrief: "任务",
+    subagentActivity: "过程",
+    subagentStepThinking: "思考 {{n}}",
+    subagentStepTool: "工具",
     subagentReport: "报告",
     subagentFallback: "主模型",
     fileEditOpen: "在编辑器中打开 {{path}}",
@@ -1641,6 +1644,8 @@ const zh = {
     closeConfirm: "Agent 可能正在使用这个会话的浏览器。确定关闭吗？只会关闭本会话的页面，其他会话不受影响。",
     needsSession: "先打开或发送一个任务，再打开浏览器。",
     agentAction: "Agent：{{action}}",
+    newTab: "新标签页",
+    tabTitleHint: "{{surface}} · {{url}}",
   },
 
   clawhub: {

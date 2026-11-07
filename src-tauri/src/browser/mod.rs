@@ -25,6 +25,13 @@ use tokio::sync::Mutex;
 const PAGE_OP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
 /// Longest a caller waits to get the browser lock before reporting it busy.
 const PAGE_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(20);
+/// Panel polling (screenshot, scroll geometry) must not sit in the lock queue.
+/// A user navigate or viewport change is waiting behind at most the current holder.
+const PANEL_POLL_LOCK_WAIT: std::time::Duration = std::time::Duration::from_millis(250);
+const PANEL_POLL_OP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(8);
+/// Longest Chromium may take to create or focus a tab. This runs while holding
+/// the shared gate, so it stays shorter than a user navigate's wait.
+const PAGE_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 /// Longest a single agent `browser` tool action may run.
 const AGENT_ACTION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
 /// How long navigation waits for the load event before returning anyway.
@@ -130,6 +137,26 @@ pub fn session_tab_id(session_id: &str) -> String {
     format!("session:{key}")
 }
 
+/// Which product surface owns a browser session.
+pub fn browser_surface(source: &str) -> String {
+    match source.trim() {
+        "workz" | "workz-team" => "workz".to_string(),
+        "pool" | "piscis-heartbeat-pool" => "botz".to_string(),
+        "codez" | "agentz" => "codez".to_string(),
+        "" => "unknown".to_string(),
+        other => other.to_string(),
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct BrowserTabInfo {
+    pub id: String,
+    pub session_id: String,
+    pub surface: String,
+    pub url: String,
+    pub active: bool,
+}
+
 fn tab_belongs_to_session(session_id: &str, tab: &str) -> bool {
     let primary = session_tab_id(session_id);
     tab == primary || tab.starts_with(&format!("{primary}#"))
@@ -154,7 +181,7 @@ impl Tool for GuardedBrowserTool {
         // retarget the shared "active tab" while RobotZ runs.
         let Ok(_gate) = tokio::time::timeout(PAGE_LOCK_WAIT, self.manager.lock_ops()).await else {
             return Ok(ToolResult::err(
-                "browser is busy with another session; try again".to_string(),
+                "browser is busy; try again".to_string(),
             ));
         };
 
@@ -237,6 +264,10 @@ impl Tool for GuardedBrowserTool {
             return Ok(ToolResult::err(e.to_string()));
         }
 
+        let noted_url = input
+            .get("url")
+            .and_then(|v| v.as_str())
+            .map(|url| url.to_string());
         // RobotZ holds the shared browser lock for the whole action; a page that
         // never settles (open JS dialog, load that never fires) would otherwise
         // hang this turn and every later browser call. Dropping the future
@@ -262,7 +293,7 @@ impl Tool for GuardedBrowserTool {
             res.content = format!("{}\n[snapshot_generation={gen}]", res.content);
         }
         if !res.is_error {
-            if let Some(id) = created {
+            if let Some(id) = created.as_ref() {
                 self.manager.remember(&ctx.session_id, &id);
             } else if action == "switch_tab" {
                 if let Some(id) = input_tab_id_from_result(&res.content) {
@@ -273,6 +304,26 @@ impl Tool for GuardedBrowserTool {
                     self.manager.forget_tab(&ctx.session_id, &closed);
                 }
             }
+        }
+        if matches!(
+            action.as_str(),
+            "navigate" | "goto" | "open" | "reload" | "new_tab" | "switch_tab"
+        ) {
+            let tab = created
+                .clone()
+                .unwrap_or_else(|| self.manager.current_tab(&ctx.session_id));
+            if let Some(url) = noted_url.as_deref() {
+                self.manager.note_url(&tab, url);
+            }
+            let surface = self
+                .manager
+                .surfaces
+                .lock()
+                .unwrap()
+                .get(&session_tab_id(&ctx.session_id))
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+            res.content = format!("tab_id: {tab}\nsurface: {surface}\n{}", res.content);
         }
         Ok(res)
     }
@@ -363,6 +414,10 @@ pub struct BrowserManager {
     trackers: Arc<StdMutex<HashMap<String, BrowserGenerationTracker>>>,
     viewports: Arc<StdMutex<HashMap<String, (u32, u32)>>>,
     auto_screenshot: Arc<StdMutex<HashMap<String, bool>>>,
+    /// `session:{id}` -> surface name (`codez`, `workz`, `botz`, …).
+    surfaces: Arc<StdMutex<HashMap<String, String>>>,
+    /// Chromium tab id -> last URL this process navigated to.
+    tab_urls: Arc<StdMutex<HashMap<String, String>>>,
 }
 
 impl Default for BrowserManager {
@@ -379,6 +434,8 @@ impl Default for BrowserManager {
             trackers: Arc::new(StdMutex::new(HashMap::new())),
             viewports: Arc::new(StdMutex::new(HashMap::new())),
             auto_screenshot: Arc::new(StdMutex::new(HashMap::new())),
+            surfaces: Arc::new(StdMutex::new(HashMap::new())),
+            tab_urls: Arc::new(StdMutex::new(HashMap::new())),
         }
     }
 }
@@ -437,37 +494,103 @@ impl BrowserManager {
         self.owned_tabs
             .lock()
             .unwrap()
-            .entry(key)
+            .entry(key.clone())
             .or_default()
             .insert(tab.to_string());
     }
 
-    fn session_tab_report(&self, session_id: &str) -> String {
-        let key = session_tab_id(session_id);
-        let current = self.current_tab(session_id);
-        let tabs = self
-            .owned_tabs
+    pub fn set_surface(&self, session_id: &str, surface: &str) {
+        let surface = browser_surface(surface);
+        self.surfaces
             .lock()
             .unwrap()
-            .get(&key)
-            .cloned()
-            .unwrap_or_default();
-        if tabs.is_empty() {
-            return "No open tabs in this session".to_string();
+            .insert(session_tab_id(session_id), surface);
+    }
+
+    pub fn note_url(&self, tab_id: &str, url: &str) {
+        if tab_id.trim().is_empty() || url.trim().is_empty() {
+            return;
         }
-        let mut list: Vec<_> = tabs.into_iter().collect();
-        list.sort();
-        let lines: Vec<_> = list
-            .into_iter()
-            .map(|t| {
-                if t == current {
-                    format!("* {t} (active)")
-                } else {
-                    t
-                }
-            })
-            .collect();
-        format!("Open tabs:\n{}", lines.join("\n"))
+        self.tab_urls
+            .lock()
+            .unwrap()
+            .insert(tab_id.to_string(), url.trim().to_string());
+    }
+
+    pub fn list_tab_info(&self) -> Vec<BrowserTabInfo> {
+        let owned = self.owned_tabs.lock().unwrap().clone();
+        let currents = self.session_tabs.lock().unwrap().clone();
+        let urls = self.tab_urls.lock().unwrap().clone();
+        let surfaces = self.surfaces.lock().unwrap().clone();
+        let mut out = Vec::new();
+        for (key, tabs) in owned {
+            let session_id = key
+                .strip_prefix("session:")
+                .unwrap_or(key.as_str())
+                .to_string();
+            let surface = surfaces
+                .get(&key)
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+            let active = currents.get(&key).cloned().unwrap_or_else(|| key.clone());
+            for id in tabs {
+                out.push(BrowserTabInfo {
+                    active: id == active,
+                    url: urls.get(&id).cloned().unwrap_or_default(),
+                    surface: surface.clone(),
+                    session_id: session_id.clone(),
+                    id,
+                });
+            }
+        }
+        out.sort_by(|a, b| a.surface.cmp(&b.surface).then(a.id.cmp(&b.id)));
+        out
+    }
+
+    pub async fn switch_owned_tab(&self, session_id: &str, tab: &str) -> Result<()> {
+        if !tab_belongs_to_session(session_id, tab) {
+            anyhow::bail!("tab '{tab}' belongs to another session");
+        }
+        let _gate = tokio::time::timeout(PAGE_OP_TIMEOUT, self.ops.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy; try again"))?;
+        self.remember(session_id, tab);
+        self.bind(session_id).await?;
+        Ok(())
+    }
+
+    fn session_tab_report(&self, session_id: &str) -> String {
+        let tabs = self.list_tab_info();
+        if tabs.is_empty() {
+            return "No open browser tabs.".to_string();
+        }
+        let mine = session_tab_id(session_id);
+        let mut lines = vec!["Browser tabs:".to_string()];
+        for tab in tabs {
+            let scope = if tab.id == mine || tab.id.starts_with(&format!("{mine}#")) {
+                "this-session"
+            } else {
+                "other-session"
+            };
+            let url = if tab.url.is_empty() {
+                "(empty)"
+            } else {
+                tab.url.as_str()
+            };
+            lines.push(format!(
+                "{}tab_id={} surface={} session_id={} url={} {scope}",
+                if tab.active { "* " } else { "  " },
+                tab.id,
+                tab.surface,
+                tab.session_id,
+                url,
+            ));
+        }
+        lines.push(
+            "switch_tab and close_tab only accept tab ids marked this-session. navigate/new_tab return the tab_id they used."
+                .to_string(),
+        );
+        lines.join("\n")
     }
 
     /// Focus this session's tab and make it the browser's active page.
@@ -477,8 +600,9 @@ impl BrowserManager {
         let mut mgr = tokio::time::timeout(PAGE_LOCK_WAIT, self.inner.lock())
             .await
             .map_err(|_| anyhow::anyhow!("browser is busy with another operation; try again"))?;
-        mgr.get_or_create_page(&tab)
+        tokio::time::timeout(PAGE_OPEN_TIMEOUT, mgr.get_or_create_page(&tab))
             .await
+            .map_err(|_| anyhow::anyhow!("browser did not open a page in time"))?
             .context("failed to open the session browser tab")?;
         mgr.switch_tab(&tab)
             .context("failed to focus the session browser tab")?;
@@ -517,7 +641,7 @@ impl BrowserManager {
     pub async fn close_all(&self) -> Result<()> {
         let _gate = tokio::time::timeout(PAGE_LOCK_WAIT, self.ops.lock())
             .await
-            .map_err(|_| anyhow::anyhow!("browser is busy with another session; try again"))?;
+            .map_err(|_| anyhow::anyhow!("browser is busy; try again"))?;
         self.session_tabs.lock().unwrap().clear();
         self.owned_tabs.lock().unwrap().clear();
         self.trackers.lock().unwrap().clear();
@@ -534,7 +658,7 @@ impl BrowserManager {
     pub async fn close_session(&self, session_id: &str) -> Result<()> {
         let _gate = tokio::time::timeout(PAGE_LOCK_WAIT, self.ops.lock())
             .await
-            .map_err(|_| anyhow::anyhow!("browser is busy with another session; try again"))?;
+            .map_err(|_| anyhow::anyhow!("browser is busy; try again"))?;
         self.close_session_locked(session_id).await
     }
 
@@ -573,16 +697,54 @@ impl BrowserManager {
         F: FnOnce(Page) -> Fut,
         Fut: std::future::Future<Output = Result<T>>,
     {
-        let _gate = tokio::time::timeout(PAGE_LOCK_WAIT, self.ops.lock())
+        self.with_page_limits(session_id, PAGE_OP_TIMEOUT, PAGE_OP_TIMEOUT, f)
             .await
-            .map_err(|_| anyhow::anyhow!("browser is busy with another session; try again"))?;
+    }
+
+    /// Same as [`Self::with_page`], but a caller that is only refreshing the
+    /// panel gives up immediately when a navigate or viewport change holds the gate.
+    async fn with_page_polling<T, F, Fut>(&self, session_id: &str, f: F) -> Result<T>
+    where
+        F: FnOnce(Page) -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        self.with_page_limits(session_id, PANEL_POLL_LOCK_WAIT, PANEL_POLL_OP_TIMEOUT, f)
+            .await
+    }
+
+    async fn with_page_limits<T, F, Fut>(
+        &self,
+        session_id: &str,
+        lock_wait: std::time::Duration,
+        op_timeout: std::time::Duration,
+        f: F,
+    ) -> Result<T>
+    where
+        F: FnOnce(Page) -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        let _gate = tokio::time::timeout(lock_wait, self.ops.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy; try again"))?;
         self.bind(session_id).await?;
-        self.with_active_page(f).await
+        self.with_active_page_timeout(op_timeout, f).await
     }
 
     /// Run a closure with the active page. Caller must already hold `ops` and
     /// have [`Self::bind`]ed the right tab.
     async fn with_active_page<T, F, Fut>(&self, f: F) -> Result<T>
+    where
+        F: FnOnce(Page) -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        self.with_active_page_timeout(PAGE_OP_TIMEOUT, f).await
+    }
+
+    async fn with_active_page_timeout<T, F, Fut>(
+        &self,
+        op_timeout: std::time::Duration,
+        f: F,
+    ) -> Result<T>
     where
         F: FnOnce(Page) -> Fut,
         Fut: std::future::Future<Output = Result<T>>,
@@ -593,15 +755,15 @@ impl BrowserManager {
         let mut mgr = tokio::time::timeout(PAGE_LOCK_WAIT, self.inner.lock())
             .await
             .map_err(|_| anyhow::anyhow!("browser is busy with another operation; try again"))?;
-        tokio::time::timeout(PAGE_OP_TIMEOUT, mgr.launch())
+        tokio::time::timeout(op_timeout, mgr.launch())
             .await
             .map_err(|_| anyhow::anyhow!("browser launch timed out"))?
             .context("failed to launch browser")?;
-        let page = tokio::time::timeout(PAGE_OP_TIMEOUT, mgr.active_page())
+        let page = tokio::time::timeout(op_timeout, mgr.active_page())
             .await
             .map_err(|_| anyhow::anyhow!("browser did not return an active page"))?
             .context("no active browser page")?;
-        tokio::time::timeout(PAGE_OP_TIMEOUT, f(page.as_ref().clone()))
+        tokio::time::timeout(op_timeout, f(page.as_ref().clone()))
             .await
             .map_err(|_| anyhow::anyhow!("browser operation timed out"))?
     }
@@ -615,9 +777,9 @@ impl BrowserManager {
 
         let w = width.clamp(320, 3840);
         let h = height.clamp(200, 2160);
-        let _gate = tokio::time::timeout(PAGE_LOCK_WAIT, self.ops.lock())
+        let _gate = tokio::time::timeout(PAGE_OP_TIMEOUT, self.ops.lock())
             .await
-            .map_err(|_| anyhow::anyhow!("browser is busy with another session; try again"))?;
+            .map_err(|_| anyhow::anyhow!("browser is busy; try again"))?;
         let tab = self.bind(session_id).await?;
         self.viewports.lock().unwrap().insert(tab, (w, h));
         self.with_active_page(|page| async move {
@@ -691,22 +853,25 @@ impl BrowserManager {
         let tab = self.current_tab(session_id);
         self.tracker(&tab).advance_navigation();
         let target = normalise_url(url);
-        self.with_page(session_id, |page| async move {
-            page.goto(target.as_str())
-                .await
-                .context("navigation failed")?;
-            // Pages that never fire `load` must not pin the browser lock.
-            let _ = tokio::time::timeout(NAV_SETTLE_TIMEOUT, page.wait_for_navigation()).await;
-            current_url(&page).await
-        })
-        .await
+        let final_url = self
+            .with_page(session_id, |page| async move {
+                page.goto(target.as_str())
+                    .await
+                    .context("navigation failed")?;
+                // Pages that never fire `load` must not pin the browser lock.
+                let _ = tokio::time::timeout(NAV_SETTLE_TIMEOUT, page.wait_for_navigation()).await;
+                current_url(&page).await
+            })
+            .await?;
+        self.note_url(&self.current_tab(session_id), &final_url);
+        Ok(final_url)
     }
 
     /// Capture the current page as a base64-encoded PNG.
     pub async fn screenshot_png_base64(&self, session_id: &str) -> Result<String> {
         use base64::Engine;
         let bytes = self
-            .with_page(session_id, |page| async move {
+            .with_page_polling(session_id, |page| async move {
                 page.screenshot(
                     ScreenshotParams::builder()
                         .format(CaptureScreenshotFormat::Png)
@@ -736,7 +901,7 @@ impl BrowserManager {
     /// Evaluate a JS expression and return its JSON value.
     pub async fn eval(&self, session_id: &str, script: &str) -> Result<serde_json::Value> {
         let script = script.to_string();
-        self.with_page(session_id, |page| async move {
+        self.with_page_polling(session_id, |page| async move {
             let res = page
                 .evaluate(script.as_str())
                 .await
@@ -908,7 +1073,7 @@ impl BrowserManager {
 
     /// The page's current URL.
     pub async fn current_url(&self, session_id: &str) -> Result<String> {
-        self.with_page(session_id, |page| async move { current_url(&page).await })
+        self.with_page_polling(session_id, |page| async move { current_url(&page).await })
             .await
     }
 
@@ -1095,6 +1260,25 @@ fn normalise_url(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tab_list_records_surface_url_and_active_tab() {
+        let mgr = BrowserManager::new();
+        mgr.set_surface("code", "codez");
+        mgr.set_surface("task", "workz");
+        mgr.remember("code", &session_tab_id("code"));
+        mgr.remember("task", &session_tab_id("task"));
+        mgr.note_url(&session_tab_id("code"), "file:///C:/demo.html");
+        let report = mgr.session_tab_report("code");
+        assert!(report.contains("surface=codez"));
+        assert!(report.contains("surface=workz"));
+        assert!(report.contains("tab_id=session:code"));
+        assert!(report.contains("file:///C:/demo.html"));
+        assert!(report.contains("this-session"));
+        assert!(report.contains("other-session"));
+        assert_eq!(browser_surface("pool"), "botz");
+        assert_eq!(browser_surface("workz-team"), "workz");
+    }
 
     #[test]
     fn snapshot_generation_rejects_stale_element_refs_after_navigation() {

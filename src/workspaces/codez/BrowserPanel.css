@@ -7,6 +7,51 @@
   background: var(--bg-primary);
 }
 
+.agentz-browser-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.agentz-browser-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--text-dim, #9a9ab0);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.agentz-browser-tab.active {
+  color: var(--text, #e8e8f0);
+  background: var(--bg-primary);
+  border-color: var(--border);
+}
+
+.agentz-browser-tab-surface {
+  flex: none;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agentz-browser-tab-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agentz-browser-toolbar {
   display: flex;
   align-items: center;

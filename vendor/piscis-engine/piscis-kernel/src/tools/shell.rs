@@ -143,7 +143,7 @@ impl Tool for ShellTool {
 
     fn description(&self) -> &str {
         #[cfg(windows)]
-        return "Execute a Windows shell command inside a Windows AppContainer with filesystem access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled (cwd may leave workspace_root). The working directory must be inside workspace_root unless the sandbox is disabled; by default it is workspace_root. Elevated execution and other platforms are unavailable. Setup or cleanup failures stop execution without an unsandboxed retry. Supports PowerShell, 32-bit PowerShell, and cmd.exe. Windows PowerShell 5.1 drops double quotes inside arguments passed to native programs (python, node, git): write them as \\\" (python -c 'print(\\\"x\\\")') or use code_run, whose cmd syntax passes quotes unchanged. In strict mode, cmd directory listings and PowerShell location/child-process commands fail because ancestors of the workspace are not listable, and cmd built-ins print non-ANSI characters as '?'; use PowerShell, file_list/file_search or .NET APIs instead.";
+        return "Execute a Windows shell command. Network and isolation follow the user's security level in Settings: strict = Windows AppContainer with no network and filesystem limited to the workspace; balanced = current user with network, working directory pinned inside the workspace; dev = sandbox disabled, current user, working directory may leave workspace_root. Elevated execution and other platforms are unavailable. Setup or cleanup failures stop execution without an unsandboxed retry. Supports PowerShell, 32-bit PowerShell, and cmd.exe. Windows PowerShell 5.1 reads a script file with no UTF-8 BOM using the Windows ANSI code page, so this host writes .ps1/.psm1/.psd1 with a UTF-8 BOM. PowerShell 5.1 also drops double quotes inside arguments passed to native programs (python, node, git): write them as \\\" (python -c 'print(\\\"x\\\")') or use code_run, whose cmd syntax passes quotes unchanged. In strict mode, cmd directory listings and PowerShell location/child-process commands fail because ancestors of the workspace are not listable, and cmd built-ins print non-ANSI characters as '?'; use PowerShell, file_list/file_search or .NET APIs instead.";
 
         #[cfg(not(windows))]
         return "Unavailable: this platform does not have an enabled operating-system command sandbox. Commands are not executed.";
@@ -213,7 +213,7 @@ impl Tool for ShellTool {
 
     fn description_minimal(&self) -> Cow<'_, str> {
         #[cfg(windows)]
-        return Cow::Borrowed("Run a Windows shell command in an AppContainer scoped to workspace_root; network/isolation follow the Settings security level (strict/balanced/dev, dev disables the sandbox). cwd must remain inside that root unless the sandbox is disabled. elevated=true is refused; other platforms do not execute shell commands.");
+        return Cow::Borrowed("Run a Windows shell command. Security level in Settings: strict = Windows AppContainer with no network; balanced = current user, cwd pinned to workspace_root; dev = sandbox disabled. elevated=true is refused.");
 
         #[cfg(not(windows))]
         Cow::Borrowed("Unavailable: shell commands are not executed because an OS sandbox is unavailable on this platform.")
@@ -549,9 +549,7 @@ impl Tool for ShellTool {
                     unreachable!("detached handled above")
                 }
                 Ok(Err(error)) => {
-                    return recovery_error(format!(
-                        "Sandbox setup or cleanup failed; command was not retried outside the sandbox: {error:#}"
-                    ), ctx, true)
+                    return recovery_error(sandbox_mode.setup_failure(format!("{error:#}")), ctx, true)
                 }
                 Err(error) => {
                     return recovery_error(format!(
@@ -562,14 +560,16 @@ impl Tool for ShellTool {
             let mut report = output.recovery_report(recovery_operation_id(ctx))?;
             if output.timed_out {
                 return report.attach(ToolResult::err(format!(
-                    "Command timed out after {timeout_secs}s; the AppContainer Job Object was terminated."
+                    "Command timed out after {timeout_secs}s; {}.",
+                    sandbox_mode.stop_note()
                 ))).map_err(anyhow::Error::msg);
             }
             if output.cancelled {
                 return report
-                    .attach(ToolResult::err(
-                        "Command was cancelled; the AppContainer Job Object was terminated.",
-                    ))
+                    .attach(ToolResult::err(format!(
+                        "Command was cancelled; {}.",
+                        sandbox_mode.stop_note()
+                    )))
                     .map_err(anyhow::Error::msg);
             }
 

@@ -393,6 +393,28 @@ pub fn fish_system_prompt(workspace_root: &str, fish_name: &str, persona: &str) 
     )
 }
 
+pub fn command_security_section(policy_mode: &str) -> String {
+    let mode = policy_mode.trim().to_ascii_lowercase();
+    let (name, body) = match mode.as_str() {
+        "strict" => (
+            "strict",
+            "shell and code_run run inside a Windows AppContainer with no network. Filesystem access is limited to the workspace.",
+        ),
+        "dev" => (
+            "dev",
+            "the sandbox is disabled. shell and code_run run as the current user, and the working directory may leave the workspace.",
+        ),
+        _ => (
+            "balanced",
+            "shell and code_run run as the current user with network access. The working directory stays inside the workspace. This is not an AppContainer.",
+        ),
+    };
+    format!(
+        "## Command security\n\
+         The active security level is `{name}`. {body}"
+    )
+}
+
 fn workspace_section(workspace_root: &str, allow_outside: bool) -> String {
     if workspace_root.trim().is_empty() {
         String::new()
@@ -423,6 +445,15 @@ mod tests {
         assert!(p.contains("only** user-facing mode decision"));
         assert!(p.contains("real Plan-mode harness"));
         assert!(p.contains("toggle the mode selector manually"));
+    }
+
+    #[test]
+    fn dev_security_section_says_the_sandbox_is_off() {
+        let dev = command_security_section("dev");
+        assert!(dev.contains("sandbox is disabled"));
+        assert!(!dev.contains("Do not tell"));
+        assert!(command_security_section("strict").contains("AppContainer"));
+        assert!(command_security_section("balanced").contains("not an AppContainer"));
     }
 
     #[test]

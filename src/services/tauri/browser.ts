@@ -46,6 +46,26 @@ export interface PickedElement {
   react_component?: string;
 }
 
+export interface BrowserTabInfo {
+  id: string;
+  session_id: string;
+  surface: string;
+  url: string;
+  active: boolean;
+}
+
+export function browserListTabs(): Promise<BrowserTabInfo[]> {
+  return invoke<BrowserTabInfo[]>("browser_list_tabs");
+}
+
+export function browserSwitchTab(sessionId: string, tabId: string): Promise<void> {
+  return invoke<void>("browser_switch_tab", { sessionId, tabId });
+}
+
+export function browserSetSurface(sessionId: string, surface: string): Promise<void> {
+  return invoke<void>("browser_set_surface", { sessionId, surface });
+}
+
 /** Navigate this session's page; returns the final URL. */
 export function browserNavigate(sessionId: string, url: string): Promise<string> {
   return invoke<string>("browser_navigate", { sessionId, url });

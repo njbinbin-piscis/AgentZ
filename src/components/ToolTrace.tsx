@@ -2,7 +2,12 @@ import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from
 import { useTranslation } from "react-i18next";
 import { toolIcon, toolSummary } from "./toolDisplay";
 import { fileEditDiff, type FileEditDiff } from "./fileEditDiff";
-import { isSubagentCall, parseSubagent } from "./subagentCard";
+import {
+  isSubagentCall,
+  parseSubagent,
+  subagentStepText,
+  type SubagentStep,
+} from "./subagentCard";
 import InteractiveCard from "./chat/InteractiveCard";
 import {
   InteractiveCardsContext,
@@ -22,6 +27,8 @@ export interface ToolTraceItem {
   status: "running" | "done" | "error";
   /** Length of the assistant text already streamed when this call started. */
   textOffset?: number;
+  /** Live sub-agent iterations, present only for delegate / task / call_fish. */
+  activity?: SubagentStep[];
 }
 
 export interface ToolTextSegment {
@@ -291,7 +298,14 @@ export function FileEditCard({ item, diff }: { item: ToolTraceItem; diff: FileEd
 export function SubagentCard({ item }: { item: ToolTraceItem }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const steps = item.activity ?? [];
+  const listRef = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    if (!expanded || !listRef.current) return;
+    listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [expanded, steps.length, steps[steps.length - 1]?.status]);
   const view = parseSubagent(item);
+  const latest = steps.length > 0 ? subagentStepText(steps[steps.length - 1], t) : "";
   const statusText =
     item.status === "running"
       ? t("chat.subagentRunning")
@@ -321,6 +335,7 @@ export function SubagentCard({ item }: { item: ToolTraceItem }) {
         </span>
         <span className="agentz-subagent-meta">
           {statusText}
+          {item.status === "running" && latest && ` · ${latest}`}
           {view.toolCalls !== null && ` · ${t("chat.subagentToolCalls", { count: view.toolCalls })}`}
           {view.tokens !== null && ` · ${t("chat.subagentTokens", { count: view.tokens })}`}
           {view.cached && ` · ${t("chat.subagentCached")}`}
@@ -334,6 +349,29 @@ export function SubagentCard({ item }: { item: ToolTraceItem }) {
         <div className="agentz-subagent-body">
           <span className="agentz-tool-trace-label">{t("chat.subagentBrief")}</span>
           <pre className="agentz-tool-trace-pre">{view.brief}</pre>
+          {steps.length > 0 && (
+            <>
+              <span className="agentz-tool-trace-label">{t("chat.subagentActivity")}</span>
+              <ol className="agentz-subagent-steps" ref={listRef}>
+                {steps.map((step) => (
+                  <li key={step.id} className={`agentz-subagent-step is-${step.status}`}>
+                    <span className="agentz-subagent-step-mark" aria-hidden>
+                      {step.status === "running" ? (
+                        <span className="agentz-tool-trace-spinner" />
+                      ) : step.status === "error" ? (
+                        "✕"
+                      ) : (
+                        "✓"
+                      )}
+                    </span>
+                    <span className="agentz-subagent-step-label" title={subagentStepText(step, t)}>
+                      {subagentStepText(step, t)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
           {item.status !== "running" && view.report && (
             <>
               <span

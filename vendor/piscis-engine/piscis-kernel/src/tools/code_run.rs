@@ -30,7 +30,7 @@ impl Tool for CodeRunTool {
 
     fn description(&self) -> &str {
         #[cfg(windows)]
-        return "Run commands inside a Windows AppContainer with access limited to the selected workspace. Network and isolation follow the user's security level in Settings: strict = AppContainer with no network, balanced = run as the current user with network and cwd pinned to the workspace, dev = sandbox disabled. The command is cmd.exe syntax, passed through unchanged with UTF-8 output: double quotes work as usual (python -c \"print('hi')\", node -e \"console.log(1)\"), && / || / & / | / > chain and redirect, %VAR% expands, ! is literal. For PowerShell syntax use the shell tool. Set cwd to the workspace root with \".\", not a drive-letter path. Examples: command=\"cargo test\", cwd=\".\" ; command=\"python main.py\", cwd=\".\" ; command=\"npm run build\", cwd=\".\".";
+        return "Run commands on Windows. Network and isolation follow the user's security level in Settings: strict = Windows AppContainer with no network and filesystem limited to the workspace; balanced = current user with network, working directory pinned inside the workspace; dev = sandbox disabled, current user. The command is cmd.exe syntax, passed through unchanged with UTF-8 output: double quotes work as usual (python -c \"print('hi')\", node -e \"console.log(1)\"), && / || / & / | / > chain and redirect, %VAR% expands, ! is literal. For PowerShell syntax use the shell tool. Set cwd to the workspace root with \".\", not a drive-letter path. Examples: command=\"cargo test\", cwd=\".\" ; command=\"python main.py\", cwd=\".\" ; command=\"npm run build\", cwd=\".\".";
 
         #[cfg(not(windows))]
         "Unavailable: this platform does not have an enabled operating-system command sandbox. Foreground commands are not executed."
@@ -320,9 +320,7 @@ impl Tool for CodeRunTool {
                     unreachable!("detached handled above")
                 }
                 Ok(Err(error)) => {
-                    return recovery_error(format!(
-                        "Sandbox setup or cleanup failed; command was not retried outside the sandbox: {error:#}"
-                    ), ctx, true)
+                    return recovery_error(sandbox_mode.setup_failure(format!("{error:#}")), ctx, true)
                 }
                 Err(error) => {
                     return recovery_error(format!(
@@ -333,14 +331,16 @@ impl Tool for CodeRunTool {
             let report = output.recovery_report(recovery_operation_id(ctx))?;
             if output.timed_out {
                 return report.attach(ToolResult::err(format!(
-                    "Sandbox command timed out after {timeout_secs}s; the Job Object was terminated."
+                    "Command timed out after {timeout_secs}s; {}.",
+                    sandbox_mode.stop_note()
                 ))).map_err(anyhow::Error::msg);
             }
             if output.cancelled {
                 return report
-                    .attach(ToolResult::err(
-                        "Sandbox command was cancelled; the Job Object was terminated.",
-                    ))
+                    .attach(ToolResult::err(format!(
+                        "Command was cancelled; {}.",
+                        sandbox_mode.stop_note()
+                    )))
                     .map_err(anyhow::Error::msg);
             }
             (

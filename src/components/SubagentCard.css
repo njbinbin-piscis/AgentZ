@@ -43,3 +43,36 @@
   flex-direction: column;
   gap: 4px;
 }
+.agentz-subagent-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.agentz-subagent-step {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  min-width: 0;
+}
+.agentz-subagent-step.is-done {
+  opacity: 0.8;
+}
+.agentz-subagent-step.is-error {
+  color: #f85149;
+}
+.agentz-subagent-step-mark {
+  width: 1em;
+  flex: none;
+  text-align: center;
+}
+.agentz-subagent-step-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

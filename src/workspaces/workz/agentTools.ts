@@ -1,3 +1,4 @@
+import { settleSubagentActivity } from "../../components/subagentCard";
 import type { AgentEvent } from "../../services/tauri/chat";
 import { pathFromToolEvent, type AgentToolEvent } from "./agentArtifacts";
 
@@ -27,6 +28,7 @@ export function applyToolEnd(tools: AgentToolEvent[], evt: Extract<AgentEvent, {
     status,
     result: evt.result,
     path: path ?? t.path,
+    activity: settleSubagentActivity(t.activity, evt.is_error),
   });
 
   const byId = tools.findIndex((t) => t.id === evt.id);

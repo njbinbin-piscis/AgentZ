@@ -13,6 +13,34 @@ fn session_of(session_id: Option<String>) -> String {
 }
 
 #[tauri::command]
+pub async fn browser_list_tabs(state: State<'_, AppState>) -> Result<Vec<crate::browser::BrowserTabInfo>, String> {
+    Ok(state.browser.list_tab_info())
+}
+
+#[tauri::command]
+pub async fn browser_switch_tab(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+    tab_id: String,
+) -> Result<(), String> {
+    state
+        .browser
+        .switch_owned_tab(&session_of(session_id), &tab_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn browser_set_surface(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+    surface: String,
+) -> Result<(), String> {
+    state.browser.set_surface(&session_of(session_id), &surface);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn browser_navigate(
     state: State<'_, AppState>,
     session_id: Option<String>,

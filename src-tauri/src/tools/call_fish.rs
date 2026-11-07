@@ -15,7 +15,7 @@ use piscis_kernel::store::settings::Settings;
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
-use crate::commands::chat_turn::run_subagent_with_prompt;
+use crate::commands::chat_turn::{run_subagent_with_prompt, SubagentProgressTarget};
 use crate::commands::fish::{find_fish, load_fish_library};
 use crate::commands::system_prompt::fish_system_prompt;
 use crate::lsp::manager::LspManager;
@@ -150,6 +150,10 @@ impl Tool for CallFishTool {
             task,
             ctx.cancel.clone(),
             self.budget.clone(),
+            ctx.tool_use_id.as_ref().map(|tool_id| SubagentProgressTarget {
+                session_id: ctx.session_id.clone(),
+                tool_id: tool_id.clone(),
+            }),
         )
         .await;
 

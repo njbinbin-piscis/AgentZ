@@ -1,7 +1,13 @@
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 import ToolTrace, { type ToolTraceItem } from "./ToolTrace";
-import { isSubagentCall, parseSubagent } from "./subagentCard";
+import {
+  applySubagentProgress,
+  isSubagentCall,
+  parseSubagent,
+  settleSubagentActivity,
+  type SubagentProgress,
+} from "./subagentCard";
 
 vi.mock("react-i18next", () => {
   const hook = {
@@ -78,6 +84,57 @@ describe("parseSubagent", () => {
   });
 });
 
+function progress(over: Partial<SubagentProgress>): SubagentProgress {
+  return {
+    type: "subagent_progress",
+    tool_id: "1",
+    step_id: "think-1",
+    iteration: 1,
+    phase: "thinking",
+    status: "running",
+    name: "",
+    detail: "",
+    ...over,
+  };
+}
+
+describe("sub-agent activity", () => {
+  it("appends steps and updates the same step in place", () => {
+    const started = applySubagentProgress(
+      [item({ id: "1", name: "delegate", status: "running" })],
+      progress({}),
+    );
+    const withTool = applySubagentProgress(started, progress({
+      step_id: "call-a",
+      phase: "tool",
+      name: "file_read",
+      detail: "desktop/src/execution/engine.rs",
+    }));
+    const finished = applySubagentProgress(withTool, progress({
+      step_id: "call-a",
+      phase: "tool",
+      status: "done",
+      name: "file_read",
+      detail: "",
+    }));
+    expect(finished[0].activity).toMatchObject([
+      { id: "think-1", status: "running" },
+      { id: "call-a", status: "done", detail: "desktop/src/execution/engine.rs" },
+    ]);
+  });
+
+  it("stops the spinner when the parent call finishes", () => {
+    const settled = settleSubagentActivity(
+      [
+        { id: "think-1", iteration: 1, phase: "thinking", status: "done", name: "", detail: "" },
+        { id: "call-a", iteration: 1, phase: "tool", status: "running", name: "file_read", detail: "a.rs" },
+      ],
+      true,
+    );
+    expect(settled?.map((step) => step.status)).toEqual(["done", "error"]);
+  });
+});
+
 describe("SubagentCard rendering", () => {
   async function render(items: ToolTraceItem[]): Promise<ReactTestRenderer> {
     let root!: ReactTestRenderer;
@@ -98,6 +155,24 @@ describe("SubagentCard rendering", () => {
     ]);
     expect(cards(root)).toHaveLength(1);
     expect(JSON.stringify(root.toJSON())).toContain(label);
+  });
+
+  it("shows the live step in the header and the full list when expanded", async () => {
+    const [withActivity] = applySubagentProgress(
+      [item({ id: "1", name: "delegate", status: "running", input: { task: "BRIEF-TEXT" } })],
+      progress({ step_id: "call-a", phase: "tool", name: "file_read", detail: "engine.rs" }),
+    );
+    const root = await render([withActivity]);
+    const collapsed = JSON.stringify(root.toJSON());
+    expect(collapsed).toContain("file_read · engine.rs");
+    expect(collapsed).not.toContain("chat.subagentActivity");
+    const head = root.root.findByProps({ className: "agentz-subagent-head" });
+    await act(async () => {
+      head.props.onClick();
+    });
+    const open = JSON.stringify(root.toJSON());
+    expect(open).toContain("chat.subagentActivity");
+    expect(open).toContain("file_read · engine.rs");
   });
 
   it("expands to show brief and report", async () => {

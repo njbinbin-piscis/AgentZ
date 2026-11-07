@@ -153,6 +153,7 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
             <div className="agentz-workz-preview browser">
               <BrowserPanel
                 sessionId={s.selectedId}
+                surface="workz"
                 projectDir={s.projectDir}
                 onClose={() => s.setPreviewPath(null)}
                 onSendElementToChat={(el) => {

@@ -759,6 +759,7 @@ pub(crate) async fn run_subagent_research(
     task: String,
     cancel: Arc<AtomicBool>,
     budget: crate::runtime::task_budget::BudgetScope,
+    progress: Option<SubagentProgressTarget>,
 ) -> Result<String> {
     let system_prompt = subagent_system_prompt(&workspace_root);
     run_subagent_with_prompt(
@@ -772,6 +773,7 @@ pub(crate) async fn run_subagent_research(
         task,
         cancel,
         budget,
+        progress,
     )
     .await
 }
@@ -788,7 +790,10 @@ pub(crate) async fn run_subagent_with_prompt(
     task: String,
     cancel: Arc<AtomicBool>,
     budget: crate::runtime::task_budget::BudgetScope,
+    progress: Option<SubagentProgressTarget>,
 ) -> Result<String> {
+    let mut options = SubagentOptions::default();
+    options.progress = progress;
     run_subagent_with_options(
         app,
         db,
@@ -800,7 +805,7 @@ pub(crate) async fn run_subagent_with_prompt(
         task,
         cancel,
         budget,
-        SubagentOptions::default(),
+        options,
     )
     .await
     .map(|o| o.text)
@@ -821,6 +826,65 @@ pub(crate) struct SubagentOptions {
     /// Hook chain for the sub-agent's tool calls. Writable runs must pass the
     /// parent's approval/journal chain (see `runtime::subagent_bridge`).
     pub hooks: Option<Arc<dyn piscis_kernel::agent::hooks::AgentHooks>>,
+    /// Parent chat tool call this run belongs to. When set, each iteration and
+    /// tool call is mirrored onto that session so the open bubble can show
+    /// progress before the final report.
+    pub progress: Option<SubagentProgressTarget>,
+}
+
+/// Where a sub-agent's live steps should appear in the parent transcript.
+#[derive(Clone)]
+pub(crate) struct SubagentProgressTarget {
+    pub session_id: String,
+    pub tool_id: String,
+}
+
+fn tool_detail(input: &serde_json::Value) -> String {
+    const KEYS: &[&str] = &["path", "command", "query", "pattern", "url", "file"];
+    for key in KEYS {
+        if let Some(text) = input.get(*key).and_then(|v| v.as_str()) {
+            let one: String = text
+                .chars()
+                .filter(|c| *c != '\n' && *c != '\r')
+                .take(80)
+                .collect();
+            if !one.is_empty() {
+                return one;
+            }
+        }
+    }
+    String::new()
+}
+
+fn emit_subagent_step(
+    app: &tauri::AppHandle,
+    progress: Option<&SubagentProgressTarget>,
+    step_id: &str,
+    iteration: u32,
+    phase: &str,
+    status: &str,
+    name: &str,
+    detail: &str,
+) {
+    let Some(progress) = progress else { return };
+    use tauri::Emitter;
+    let _ = app.emit(
+        crate::commands::chat::CHAT_EVENT,
+        serde_json::json!({
+            "sessionId": progress.session_id,
+            "channel": "agent_event",
+            "payload": {
+                "type": "subagent_progress",
+                "tool_id": progress.tool_id,
+                "step_id": step_id,
+                "iteration": iteration,
+                "phase": phase,
+                "status": status,
+                "name": name,
+                "detail": detail,
+            }
+        }),
+    );
 }
 
 pub(crate) struct SubagentOutcome {
@@ -954,6 +1018,7 @@ async fn run_subagent_attempt(
         (rt, fallback)
     };
 
+    let progress_app = app.clone();
     let mut registry = build_subagent_registry(
         app,
         db.clone(),
@@ -1074,16 +1139,71 @@ async fn run_subagent_attempt(
     }];
 
     let (tx, mut rx) = mpsc::channel::<AgentEvent>(256);
+    let progress = options.progress.clone();
     let collector = tokio::spawn(async move {
         let mut text = String::new();
         let mut tool_calls = 0u32;
         let mut tokens = (0u32, 0u32);
         let mut edited: Vec<String> = Vec::new();
+        let mut iteration = 0u32;
+        let mut think_open = false;
         while let Some(event) = rx.recv().await {
             match event {
                 AgentEvent::TextDelta { delta } => text.push_str(&delta),
-                AgentEvent::ToolStart { name, input, .. } => {
+                AgentEvent::TextSegmentStart { iteration: n } => {
+                    if think_open {
+                        emit_subagent_step(
+                            &progress_app,
+                            progress.as_ref(),
+                            &format!("think-{iteration}"),
+                            iteration,
+                            "thinking",
+                            "done",
+                            "",
+                            "",
+                        );
+                    }
+                    iteration = n;
+                    think_open = true;
+                    emit_subagent_step(
+                        &progress_app,
+                        progress.as_ref(),
+                        &format!("think-{iteration}"),
+                        iteration,
+                        "thinking",
+                        "running",
+                        "",
+                        "",
+                    );
+                }
+                AgentEvent::ToolStart { id, name, input, .. } => {
                     tool_calls += 1;
+                    // Narration emitted before a tool call is a plan, not the
+                    // findings. Keep only text that arrives after the last tool.
+                    text.clear();
+                    if think_open {
+                        emit_subagent_step(
+                            &progress_app,
+                            progress.as_ref(),
+                            &format!("think-{iteration}"),
+                            iteration,
+                            "thinking",
+                            "done",
+                            "",
+                            "",
+                        );
+                        think_open = false;
+                    }
+                    emit_subagent_step(
+                        &progress_app,
+                        progress.as_ref(),
+                        &id,
+                        iteration,
+                        "tool",
+                        "running",
+                        &name,
+                        &tool_detail(&input),
+                    );
                     if matches!(name.as_str(), "file_write" | "file_edit") {
                         if let Some(p) = input.get("path").and_then(|v| v.as_str()) {
                             if !edited.iter().any(|e| e == p) {
@@ -1091,6 +1211,18 @@ async fn run_subagent_attempt(
                             }
                         }
                     }
+                }
+                AgentEvent::ToolEnd { id, name, is_error, .. } => {
+                    emit_subagent_step(
+                        &progress_app,
+                        progress.as_ref(),
+                        &id,
+                        iteration,
+                        "tool",
+                        if is_error { "error" } else { "done" },
+                        &name,
+                        "",
+                    );
                 }
                 AgentEvent::Done {
                     total_input_tokens,
@@ -1110,6 +1242,9 @@ async fn run_subagent_attempt(
     let run_res = tokio::time::timeout(Duration::from_secs(timeout_secs), run_fut).await;
     let (mut text, tool_calls, (mut input_tokens, mut output_tokens), edited_paths) =
         collector.await.unwrap_or_default();
+    // A thinking-only trace is not a report. Drop it so the follow-up below
+    // still asks for findings instead of returning the plan as the result.
+    text = piscis_kernel::agent::loop_::visible_model_text(&text);
 
     // A run that spends every iteration on tool calls ends without a report.
     // Ask once more, with no tools offered, for findings from what it gathered.
@@ -1139,7 +1274,7 @@ async fn run_subagent_attempt(
                 Ok(Ok(resp)) => {
                     input_tokens = input_tokens.saturating_add(resp.input_tokens);
                     output_tokens = output_tokens.saturating_add(resp.output_tokens);
-                    text = resp.content;
+                    text = piscis_kernel::agent::loop_::visible_model_text(&resp.content);
                 }
                 Ok(Err(e)) => tracing::warn!("sub-agent final report request failed: {e}"),
                 Err(_) => tracing::warn!("sub-agent final report request timed out"),

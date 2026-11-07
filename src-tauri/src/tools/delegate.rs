@@ -16,7 +16,7 @@ use piscis_kernel::store::settings::Settings;
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
-use crate::commands::chat_turn::run_subagent_research;
+use crate::commands::chat_turn::{run_subagent_research, SubagentProgressTarget};
 use crate::lsp::manager::LspManager;
 
 pub struct DelegateTool {
@@ -95,6 +95,10 @@ impl Tool for DelegateTool {
             task,
             ctx.cancel.clone(),
             self.budget.clone(),
+            ctx.tool_use_id.as_ref().map(|tool_id| SubagentProgressTarget {
+                session_id: ctx.session_id.clone(),
+                tool_id: tool_id.clone(),
+            }),
         )
         .await;
 

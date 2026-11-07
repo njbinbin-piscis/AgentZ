@@ -21,7 +21,7 @@ use tokio::sync::Mutex;
 
 use crate::commands::agents::{load_all_manifests, AgentManifest};
 use crate::commands::chat_turn::{
-    load_installed_skills, run_subagent_with_options, SubagentOptions,
+    load_installed_skills, run_subagent_with_options, SubagentOptions, SubagentProgressTarget,
 };
 use crate::commands::fish::{find_fish, load_fish_library};
 use crate::commands::system_prompt::{delegated_agent_system_prompt, fish_system_prompt};
@@ -204,7 +204,7 @@ impl Tool for TaskTool {
         let narrow = CallNarrowing { force_read_only };
 
         let original_workspace = workspace.clone();
-        let (mut system_prompt, display, options) =
+        let (mut system_prompt, display, mut options) =
             if let Some(m) = manifests.iter().find(|m| m.id == agent_id) {
                 if !m.delegable {
                     return Ok(ToolResult::err(format!(
@@ -246,6 +246,7 @@ impl Tool for TaskTool {
                         }),
                         writable,
                         hooks: None,
+                        progress: None,
                     },
                 )
             } else if let Some(f) = find_fish(&config_dir, &agent_id) {
@@ -259,6 +260,10 @@ impl Tool for TaskTool {
                     "unknown agent '{agent_id}' — use action=list"
                 )));
             };
+        options.progress = ctx.tool_use_id.as_ref().map(|tool_id| SubagentProgressTarget {
+            session_id: ctx.session_id.clone(),
+            tool_id: tool_id.clone(),
+        });
 
         // Writers: isolated worktree (parallel) in a git repo, otherwise exclusive
         // and serialized. Guards live until the run (and merge) finishes.

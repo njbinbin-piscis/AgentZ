@@ -8,15 +8,19 @@ import {
   browserPressKey,
   browserCurrentUrl,
   browserInspectAt,
+  browserListTabs,
   browserNavigate,
   browserPickAt,
   browserScreenshot,
   browserScrollBy,
   browserScrollInfo,
   browserScrollTo,
+  browserSetSurface,
   browserSetViewport,
+  browserSwitchTab,
   browserState,
   onBrowserChanged,
+  type BrowserTabInfo,
   type PickedElement,
   type ScrollInfo,
 } from "../../services/tauri/browser";
@@ -38,6 +42,8 @@ const EMPTY_SCROLL: ScrollInfo = {
 interface BrowserPanelProps {
   /** Chat session whose browser tab this panel shows. */
   sessionId: string;
+  /** Product surface that owns this panel: codez, workz, or botz. */
+  surface?: string;
   /** Active project, so localhost opens through a remote port forward. */
   projectDir?: string | null;
   onClose: () => void;
@@ -73,6 +79,7 @@ function rectStyle(el: PickedElement, img: HTMLImageElement): React.CSSPropertie
  */
 export default function BrowserPanel({
   sessionId,
+  surface = "codez",
   projectDir = null,
   onClose,
   onSendElementToChat,
@@ -111,7 +118,23 @@ export default function BrowserPanel({
   const wheelAccum = useRef({ dx: 0, dy: 0 });
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [tabs, setTabs] = useState<BrowserTabInfo[]>([]);
   const lastShotRef = useRef<string | null>(null);
+  const refreshTabs = useCallback(async () => {
+    try {
+      const all = await browserListTabs();
+      const mine = sessionId || "default";
+      setTabs(all.filter((tab) => tab.session_id === mine));
+    } catch {
+      setTabs([]);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    void browserSetSurface(sessionId, surface);
+    void refreshTabs();
+  }, [sessionId, surface, refreshTabs]);
+
   /** Resolves `true` when the page image changed since the previous capture. */
   const refreshShot = useCallback(async (): Promise<boolean> => {
     try {
@@ -208,6 +231,7 @@ export default function BrowserPanel({
       const mine = sessionIdRef.current;
       if (payload.session_id && mine && payload.session_id !== mine) return;
       void refreshShot();
+      void refreshTabs();
       void syncAddressFromBackend();
       void refreshScrollInfo();
     }).then((fn) => {
@@ -218,7 +242,7 @@ export default function BrowserPanel({
       disposed = true;
       unlisten?.();
     };
-  }, [refreshShot, refreshScrollInfo, syncAddressFromBackend]);
+  }, [refreshShot, refreshTabs, refreshScrollInfo, syncAddressFromBackend]);
 
   // Switching chats shows that session's page, not the one we were just looking at.
   useEffect(() => {
@@ -354,6 +378,7 @@ export default function BrowserPanel({
       const opened = await rewriteRemoteBrowserUrl(projectDir, url);
       const finalUrl = await browserNavigate(sessionIdRef.current, opened);
       setAddress(finalUrl || url);
+      await refreshTabs();
       await syncViewport();
       await refreshShot();
       await refreshScrollInfo();
@@ -362,7 +387,7 @@ export default function BrowserPanel({
     } finally {
       setLoading(false);
     }
-  }, [address, projectDir, refreshShot, refreshScrollInfo, syncViewport]);
+  }, [address, projectDir, refreshShot, refreshScrollInfo, refreshTabs, syncViewport]);
 
   const toPageCoords = (e: React.MouseEvent<HTMLDivElement>) => {
     const img = imgRef.current;
@@ -578,6 +603,33 @@ export default function BrowserPanel({
 
   return (
     <div className="agentz-browser">
+      {tabs.length > 0 && (
+        <div className="agentz-browser-tabs" role="tablist">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={tab.active}
+              className={`agentz-browser-tab${tab.active ? " active" : ""}`}
+              title={t("browser.tabTitleHint", {
+                surface: tab.surface,
+                url: tab.url || tab.id,
+              })}
+              onClick={() => {
+                if (tab.active) return;
+                void browserSwitchTab(sessionId, tab.id)
+                  .then(() => refreshTabs())
+                  .then(() => refreshShot())
+                  .then(() => syncAddressFromBackend());
+              }}
+            >
+              <span className="agentz-browser-tab-surface">{tab.surface}</span>
+              <span className="agentz-browser-tab-url">{tab.url || tab.id}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="agentz-browser-toolbar">
         <button className="agentz-browser-btn" onClick={() => historyStep(-1)} title={t("browser.back", { defaultValue: "Back" })}>
           ←

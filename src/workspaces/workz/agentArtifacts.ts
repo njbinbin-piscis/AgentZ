@@ -1,3 +1,4 @@
+import type { SubagentStep } from "../../components/subagentCard";
 import type { GitFileStatus } from "../codez/types";
 import { relativizeArtifactPath } from "./artifactPaths";
 
@@ -9,6 +10,8 @@ export interface AgentToolEvent {
   path?: string;
   input?: unknown;
   textOffset?: number;
+  /** Live sub-agent iterations, kept on the card until this task is reloaded. */
+  activity?: SubagentStep[];
 }
 
 export interface AgentStep {

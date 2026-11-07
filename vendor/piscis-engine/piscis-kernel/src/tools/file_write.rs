@@ -17,7 +17,15 @@ const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 /// use a different tool instead of silently truncating or OOM-ing."
 const MAX_FILE_WRITE_CONTENT_CHARS: usize = 200_000;
 
-/// Return true if the file starts with a UTF-8 BOM.
+fn powershell_script_needs_utf8_bom(path: &std::path::Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_ascii_lowercase())
+            .as_deref(),
+        Some("ps1" | "psm1" | "psd1")
+    )
+}
 fn file_has_utf8_bom(path: &std::path::Path) -> bool {
     let mut buf = [0u8; 3];
     if let Ok(mut f) = std::fs::File::open(path) {
@@ -169,6 +177,8 @@ impl Tool for FileWriteTool {
          \n\
          Encoding: this tool always writes UTF-8. If the target file already exists and has a UTF-8 BOM \
          (common for files created by Notepad or PowerShell on Windows), the BOM is automatically preserved. \
+         New and edited .ps1, .psm1, and .psd1 files are written with a UTF-8 BOM because Windows PowerShell 5.1 \
+         reads a script file that has no BOM using the Windows ANSI code page (GBK on Chinese Windows). \
          WARNING: do NOT use file_write for files that must stay in GBK/GB18030 or other non-UTF-8 encodings \
          (for example legacy config files). To keep GBK, on Windows use the shell tool with PowerShell \
          `[System.IO.File]::WriteAllText(path, content, [System.Text.Encoding]::GetEncoding('gbk'))`. \
@@ -259,7 +269,8 @@ impl Tool for FileWriteTool {
         }
 
         let existed = path.exists();
-        let preserve_bom = existed && file_has_utf8_bom(&path);
+        let preserve_bom = powershell_script_needs_utf8_bom(&path)
+            || (existed && file_has_utf8_bom(&path));
         write_with_bom_policy(&path, content, preserve_bom)?;
 
         let action = if existed { "Updated" } else { "Created" };
@@ -380,6 +391,8 @@ impl Tool for FileEditTool {
          \n\
          Encoding: file_edit reads the file as bytes, strips any UTF-8 BOM before matching, \
          then restores the BOM on write-back — so BOM-bearing files are handled transparently. \
+         .ps1, .psm1, and .psd1 are written back with a UTF-8 BOM so Windows PowerShell 5.1 reads them as UTF-8 \
+         instead of the Windows ANSI code page. \
          However, file_edit only supports UTF-8 and UTF-8-BOM files. Do NOT use file_edit on \
          GBK/GB18030 files — the byte-level mismatch will corrupt the file. If file_read reports \
          '[encoding: gbk]' for a file, do not use file_edit. On Windows, edit it through the shell tool with PowerShell. On Linux and macOS, use a program that selects the encoding."
@@ -518,7 +531,7 @@ impl Tool for FileEditTool {
         };
 
         let raw = std::fs::read(&path)?;
-        let preserve_bom = raw.starts_with(UTF8_BOM);
+        let preserve_bom = powershell_script_needs_utf8_bom(&path) || raw.starts_with(UTF8_BOM);
         let (content, encoding) = decode_bytes(&raw);
         let lines_before = content.lines().count();
 
@@ -667,5 +680,24 @@ mod eol_tests {
     fn ambiguous_match_lines_reports_one_based_lines() {
         let content = "let a = 1;\nlet b = 2;\nlet a = 1;\n";
         assert_eq!(find_ambiguous_match_lines(content, "let a = 1;", 5), vec![1, 3]);
+    }
+}
+
+#[cfg(test)]
+mod powershell_bom_tests {
+    use super::{powershell_script_needs_utf8_bom, write_with_bom_policy};
+
+    #[test]
+    fn powershell_scripts_are_written_with_a_utf8_bom() {
+        assert!(powershell_script_needs_utf8_bom(std::path::Path::new("task.ps1")));
+        assert!(powershell_script_needs_utf8_bom(std::path::Path::new("Mod.PSM1")));
+        assert!(!powershell_script_needs_utf8_bom(std::path::Path::new("main.rs")));
+        let dir = std::env::temp_dir().join(format!("agentz-ps1-bom-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("note.ps1");
+        write_with_bom_policy(&path, "# comment\nWrite-Output 1\n", true).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(&bytes[..3], &[0xEF, 0xBB, 0xBF]);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

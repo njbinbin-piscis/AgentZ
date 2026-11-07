@@ -56,6 +56,24 @@ impl SandboxMode {
             _ => Self::Networked,
         }
     }
+
+    /// What actually stopped the process, for messages the model will repeat.
+    pub fn stop_note(self) -> &'static str {
+        match self {
+            Self::Isolated => "the AppContainer was terminated",
+            Self::Networked => "the workspace-pinned process was terminated",
+            Self::Disabled => "the unsandboxed process was terminated",
+        }
+    }
+
+    pub fn setup_failure(self, error: impl std::fmt::Display) -> String {
+        match self {
+            Self::Disabled => format!("Command failed to start: {error}"),
+            _ => format!(
+                "Sandbox setup or cleanup failed; command was not retried outside the sandbox: {error}"
+            ),
+        }
+    }
 }
 
 impl ToolSettings {
@@ -733,6 +751,9 @@ mod tests {
         assert_eq!(SandboxMode::from_policy_mode("dev"), SandboxMode::Disabled);
         assert_eq!(SandboxMode::from_policy_mode(""), SandboxMode::Networked);
         assert_eq!(SandboxMode::default(), SandboxMode::Networked);
+        assert!(SandboxMode::Disabled.stop_note().contains("unsandboxed"));
+        assert!(SandboxMode::Isolated.stop_note().contains("AppContainer"));
+        assert!(!SandboxMode::Disabled.setup_failure("boom").contains("Sandbox setup"));
     }
 
     #[test]

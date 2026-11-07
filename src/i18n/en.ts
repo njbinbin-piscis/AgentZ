@@ -1211,6 +1211,9 @@ const en = {
     subagentTokens: "{{count}} tokens",
     subagentCached: "cached",
     subagentBrief: "Task",
+    subagentActivity: "Activity",
+    subagentStepThinking: "Thinking {{n}}",
+    subagentStepTool: "Tool",
     subagentReport: "Report",
     subagentFallback: "main model",
     fileEditOpen: "Open {{path}} in the editor",
@@ -1693,6 +1696,8 @@ const en = {
       "The agent may be using this session's browser. Close anyway? Only this session's page is closed.",
     needsSession: "Open or send a task before opening the browser.",
     agentAction: "Agent: {{action}}",
+    newTab: "New tab",
+    tabTitleHint: "{{surface}} · {{url}}",
   },
 
   clawhub: {

@@ -61,6 +61,7 @@ import {
   type WorkflowStatus,
 } from "../../services/tauri/workflow";
 import { collectArtifacts, type AgentStep } from "./agentArtifacts";
+import { applySubagentProgress } from "../../components/subagentCard";
 import { applyToolEnd, applyToolStart, finalizeTools } from "./agentTools";
 import { workzGoalFromText } from "./taskTitle";
 import {
@@ -777,6 +778,17 @@ export function useWorkzSessionStore({
           if (!streamTimerRef.current) {
             streamTimerRef.current = setTimeout(flushStreamDelta, STREAM_FLUSH_MS);
           }
+          break;
+        case "subagent_progress":
+          setSteps((prev) => {
+            if (prev.length === 0) return prev;
+            const copy = prev.slice();
+            const last = { ...copy[copy.length - 1] };
+            if (last.role !== "assistant") return prev;
+            last.tools = applySubagentProgress(last.tools.slice(), evt);
+            copy[copy.length - 1] = last;
+            return copy;
+          });
           break;
         case "tool_start":
           setSteps((prev) => {

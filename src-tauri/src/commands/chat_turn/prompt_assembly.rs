@@ -709,6 +709,7 @@ pub(super) async fn build_turn_system_prompt(
     chat_mode: &str,
     prefer_zh: bool,
     allow_outside_workspace: bool,
+    policy_mode: &str,
     extra_system_context: Option<&str>,
     agent: Option<&AgentManifest>,
     enabled_skills: &[String],
@@ -831,6 +832,7 @@ pub(super) async fn build_turn_system_prompt(
             ));
         }
     }
+    extra_sections.push(crate::commands::system_prompt::command_security_section(policy_mode));
     if let Some(hook_ctx) =
         crate::commands::workbench::run_event_hooks(workspace_root, "beforeAgentTurn").await
     {

@@ -462,7 +462,7 @@ fn builtin_tool_catalog() -> Vec<BuiltinToolInfo> {
 fn command_sandbox_catalog_hint() -> &'static str {
     #[cfg(windows)]
     {
-        "Run commands in a Windows AppContainer scoped to the selected workspace; network and isolation follow the Settings security level (strict/balanced/dev). Other platforms and elevated commands are unavailable."
+        "Command execution follows the Settings security level: strict = Windows AppContainer with no network; balanced = current user with the working directory pinned to the workspace; dev = sandbox disabled. Other platforms and elevated commands are unavailable."
     }
     #[cfg(not(windows))]
     {

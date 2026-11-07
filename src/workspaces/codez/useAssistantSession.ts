@@ -64,6 +64,11 @@ import { formatUserMessageDisplay } from "../../components/chatFileRefs";
 import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import { queryTaskPlan, type DurablePlan } from "../../services/tauri/chatPlan";
 import {
+  applySubagentProgress,
+  indexSubagentActivity,
+  settleSubagentActivity,
+} from "../../components/subagentCard";
+import {
   ensureChatUiStep,
   truncateToolResultForUi,
   upsertToolStep,
@@ -836,6 +841,9 @@ export function useAssistantSession({
             streamTimerRef.current = setTimeout(flushStreamDelta, 80);
           }
           break;
+        case "subagent_progress":
+          setToolSteps((prev) => applySubagentProgress(prev, evt));
+          break;
         case "tool_start":
           setToolSteps((prev) => upsertToolStep(prev, evt, streamLenRef.current));
           break;
@@ -848,6 +856,7 @@ export function useAssistantSession({
                       ...step,
                       status: evt.is_error ? "error" : "done",
                       result: truncateToolResultForUi(evt.result),
+                      activity: settleSubagentActivity(step.activity, evt.is_error),
                     }
                   : step,
             );
@@ -1449,14 +1458,24 @@ export function useAssistantSession({
       historyCursorRef.current = { sessionId, offset: page.next_offset };
       setHasMoreOlder(page.has_more);
       const loaded = page.messages.map(messageFromDto);
+      const liveActivity = indexSubagentActivity([
+        ...toolStepsRef.current,
+        // The in-memory transcript may already hold steps from earlier in this turn.
+      ]);
       setMessages((prev) => {
+        const activity = indexSubagentActivity(prev.flatMap((m) => m.tools ?? []));
+        for (const [id, steps] of liveActivity) activity.set(id, steps);
         const turnById = new Map<string, string>();
         for (const m of prev) {
           if (m.id && m.turnId) turnById.set(m.id, m.turnId);
         }
         return loaded.map((msg) => {
           const turnId = msg.id ? turnById.get(msg.id) : undefined;
-          return turnId ? { ...msg, turnId } : msg;
+          const tools = msg.tools?.map((tool) => {
+            const steps = activity.get(tool.id);
+            return steps ? { ...tool, activity: steps } : tool;
+          });
+          return { ...msg, ...(turnId ? { turnId } : {}), ...(tools ? { tools } : {}) };
         });
       });
       return loaded;
