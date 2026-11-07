@@ -1,3 +1,4 @@
+import { sendWhenGateFree } from "../workz/taskGate";
 import { chatSend, onChatEvent, SESSION_SOURCE_WORKZ, type AgentEvent } from "../../services/tauri/chat";
 import { botzGetBot, botzHomeDir, botzSaveBot, type BotProfile, type BotRoutine } from "../../services/tauri/botz";
 
@@ -102,6 +103,8 @@ export async function sendToBot(opts: {
   routine?: BotRoutine;
   preferZh?: boolean;
   taskKey?: string;
+  /** Return false to stop waiting behind a held session gate (user pressed Stop). */
+  shouldContinue?: () => boolean;
 }): Promise<BotSendResult> {
   const { agentId, text, routine } = opts;
   if (busyBots.has(agentId)) {
@@ -126,18 +129,24 @@ export async function sendToBot(opts: {
       const evt = env.payload as AgentEvent;
       if (evt.type === "done") tokens += evt.total_input_tokens + evt.total_output_tokens;
     });
-    const res = await chatSend({
-      prompt: buildBotPrompt(profile.memory, text, routine?.name),
-      displayPrompt: routine ? `⏰ ${routine.name}\n${text}` : text,
-      sessionId,
-      projectDir: homeDir,
-      chatMode: "agent",
-      clearPlan: false,
-      taskKey: opts.taskKey ?? null,
-      agentId,
-      sessionSource: SESSION_SOURCE_WORKZ,
-      preferZh: opts.preferZh ?? null,
-    });
+    // A background continuation or heartbeat may hold this session's gate:
+    // wait behind it (as CodeZ does) instead of failing the message.
+    const res = await sendWhenGateFree(
+      () =>
+        chatSend({
+          prompt: buildBotPrompt(profile.memory, text, routine?.name),
+          displayPrompt: routine ? `⏰ ${routine.name}\n${text}` : text,
+          sessionId,
+          projectDir: homeDir,
+          chatMode: "agent",
+          clearPlan: false,
+          taskKey: opts.taskKey ?? null,
+          agentId,
+          sessionSource: SESSION_SOURCE_WORKZ,
+          preferZh: opts.preferZh ?? null,
+        }),
+      opts.shouldContinue,
+    );
     const fresh = await botzGetBot(agentId);
     let next = addUsage(fresh, today, tokens);
     const mem = extractMemoryUpdate(res.response_text);

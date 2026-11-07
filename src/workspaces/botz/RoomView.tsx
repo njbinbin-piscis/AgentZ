@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { sendWhenGateFree } from "../workz/taskGate";
 import {
   chatCancel,
   chatSend,
@@ -665,19 +666,23 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
         `down into todos, assign them to member assistants, and integrate their results.${orgSection}\n\nTask:\n${text}`;
     }
     try {
-      await chatSend({
-        prompt,
-        displayPrompt: text,
-        sessionId,
-        projectDir: room.dir,
-        chatMode: "agent",
-        clearPlan: false,
-        taskKey,
-        sessionSource: SESSION_SOURCE_WORKZ_TEAM,
-        teamId: room.team_id,
-        poolId,
-        preferZh: i18n.language.startsWith("zh"),
-      });
+      await sendWhenGateFree(
+        () =>
+          chatSend({
+            prompt,
+            displayPrompt: text,
+            sessionId,
+            projectDir: room.dir,
+            chatMode: "agent",
+            clearPlan: false,
+            taskKey,
+            sessionSource: SESSION_SOURCE_WORKZ_TEAM,
+            teamId: room.team_id,
+            poolId,
+            preferZh: i18n.language.startsWith("zh"),
+          }),
+        () => taskKeyRef.current === taskKey,
+      );
     } catch (e) {
       setError(String(e));
     } finally {
@@ -1012,7 +1017,11 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
                     onChange={setInput}
                     onSubmit={() => void sendToTeam()}
                     busy={busy}
-                    onStop={() => void chatCancel(taskKeyRef.current)}
+                    onStop={() => {
+                      const key = taskKeyRef.current;
+                      taskKeyRef.current = null;
+                      void chatCancel(key);
+                    }}
                     placeholder={t("botz.composerPlaceholder")}
                     canSend={Boolean(input.trim() && poolId)}
                     sendLabel={t("botz.send")}

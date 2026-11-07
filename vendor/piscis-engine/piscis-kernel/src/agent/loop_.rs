@@ -171,7 +171,14 @@ fn strip_think_tags(text: &str) -> String {
                     i = end;
                     continue;
                 }
-                None => break,
+                None => {
+                    // An unclosed tag at the very start is an unfinished thought.
+                    // Mid-answer it is just prose that mentions the tag: keep it.
+                    if !out.trim().is_empty() {
+                        out.push_str(&text[i..]);
+                    }
+                    break;
+                }
             }
         }
         let ch = text[i..].chars().next().unwrap();
@@ -267,6 +274,14 @@ mod visible_model_text_tests {
         );
         assert!(is_thinking_only("<thinking>only a plan</thinking>"));
         assert!(visible_model_text("<think>unclosed plan that never answers").is_empty());
+    }
+
+    #[test]
+    fn a_tag_mentioned_mid_answer_does_not_swallow_the_rest() {
+        assert_eq!(
+            visible_model_text("Wrap the reasoning in a <think> tag and then answer."),
+            "Wrap the reasoning in a <think> tag and then answer."
+        );
     }
 
     #[test]

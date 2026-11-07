@@ -85,7 +85,7 @@ export default function BotHome({ agent, activity, onBack }: { agent: AgentInfo;
       const key = crypto.randomUUID();
       taskKeyRef.current = key;
       setMessages((prev) => [...prev, { id: `local-${key}`, role: "user", content: routine ? `⏰ ${routine.name}\n${text}` : text }]);
-      const res = await sendToBot({ agentId: agent.id, text, routine, preferZh: i18n.language.startsWith("zh"), taskKey: key });
+      const res = await sendToBot({ agentId: agent.id, text, routine, preferZh: i18n.language.startsWith("zh"), taskKey: key, shouldContinue: () => taskKeyRef.current === key });
       if (res.error === "budget") setError(t("botz.overBudget"));
       else if (res.error === "busy") setError(t("botz.botBusy"));
       else if (res.error) setError(res.error);
@@ -149,7 +149,11 @@ export default function BotHome({ agent, activity, onBack }: { agent: AgentInfo;
             }}
           />
           {busy ? (
-            <button type="button" onClick={() => void chatCancel(taskKeyRef.current)}>
+            <button type="button" onClick={() => {
+              const key = taskKeyRef.current;
+              taskKeyRef.current = null;
+              void chatCancel(key);
+            }}>
               {t("botz.stop")}
             </button>
           ) : (

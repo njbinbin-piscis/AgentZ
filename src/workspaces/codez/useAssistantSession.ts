@@ -1011,6 +1011,15 @@ export function useAssistantSession({
       const restore = () => {
         turnBookRef.current.enqueueFront(turn);
         syncQueuedView(key);
+        if (!turnBookRef.current.isRunning(key)) {
+          // The turn ended while the steer was in flight; nobody would drain the queue.
+          const next = turnBookRef.current.shiftNext(key);
+          syncQueuedView(key);
+          if (next) {
+            void runTurnRef.current(next);
+            return;
+          }
+        }
         setToast(t("chat.queueSteerQueued"));
       };
       void chatSteer(key, guidance).then((delivered) => {
