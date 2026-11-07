@@ -8,6 +8,17 @@ interface Turn {
 
 const turn = (sessionId: string, text: string): Turn => ({ sessionId, text });
 
+describe("SessionTurnBookkeeping.rekey", () => {
+  it("moves a queue and keeps an existing queue under the new id", () => {
+    const book = new SessionTurnBookkeeping<Turn>();
+    book.enqueue(turn("draft", "one"));
+    book.enqueue(turn("real", "two"));
+    book.rekey("draft", "real", (t) => ({ ...t, sessionId: "real" }));
+    expect(book.queueFor("draft")).toEqual([]);
+    expect(book.queueFor("real").map((t) => t.text)).toEqual(["one", "two"]);
+  });
+});
+
 describe("SessionTurnBookkeeping", () => {
   it("tracks running state per session", () => {
     const book = new SessionTurnBookkeeping<Turn>();

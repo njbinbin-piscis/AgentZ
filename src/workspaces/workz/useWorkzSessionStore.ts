@@ -710,9 +710,10 @@ export function useWorkzSessionStore({
       // Turn completion must update every session — including background runs
       // after the user clicks「新建」— or the sidebar dot stays yellow forever.
       if (env.channel === "agent_final") {
-        const fin = env.payload as { ok: boolean; error?: string; timed_out?: boolean };
+        const fin = env.payload as { ok: boolean; error?: string; timed_out?: boolean; empty_reply?: boolean };
         const fg = foregroundSessionRef.current;
         const isFg = liveRef.current && !!fg && env.sessionId === fg;
+        if (isFg && fin.ok && fin.empty_reply) setToast(t("chat.emptyReply"));
         if (isFg && fin.ok) autoResumeRef.current = 0;
         // A wall-clock turn timeout is not a failure: the run loop restarts the
         // turn itself once this one has fully wound down.

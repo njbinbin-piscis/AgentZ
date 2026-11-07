@@ -1145,6 +1145,7 @@ const en = {
     dropToAddRefs: "Drop files to add references",
     visionRequired:
       "The current model does not support images. Enable vision in Settings or switch to a multimodal model.",
+    emptyReply: "The model ended this turn without an answer (it only produced reasoning). Send a message to ask it to continue.",
     turnTimeoutResuming: "Turn hit its time limit — continuing the unfinished task automatically…",
     chipTerminal: "Terminal",
     chipTerminalLines: "Terminal · {{count}} lines",

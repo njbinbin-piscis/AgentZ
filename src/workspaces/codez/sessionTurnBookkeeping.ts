@@ -77,7 +77,9 @@ export class SessionTurnBookkeeping<T extends SessionTurnLike> {
     const q = this.queues.get(from);
     if (!q) return;
     this.queues.delete(from);
-    this.queues.set(to, q.map(remap));
+    // Never overwrite a queue that already exists under the new id: the moved
+    // messages were queued first, so they go ahead of it.
+    this.queues.set(to, [...q.map(remap), ...(this.queues.get(to) ?? [])]);
   }
 
   deleteSession(id: string): void {

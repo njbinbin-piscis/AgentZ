@@ -1020,7 +1020,7 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
                     onStop={() => {
                       const key = taskKeyRef.current;
                       taskKeyRef.current = null;
-                      void chatCancel(key);
+                      if (key) void chatCancel(key);
                     }}
                     placeholder={t("botz.composerPlaceholder")}
                     canSend={Boolean(input.trim() && poolId)}

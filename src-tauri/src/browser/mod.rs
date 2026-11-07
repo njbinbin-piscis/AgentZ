@@ -143,8 +143,8 @@ pub fn browser_surface(source: &str) -> String {
         "workz" | "workz-team" => "workz".to_string(),
         "pool" | "piscis-heartbeat-pool" => "botz".to_string(),
         "codez" | "agentz" => "codez".to_string(),
-        "" => "unknown".to_string(),
-        other => other.to_string(),
+        // Unrecognised labels (the panel sends free text) are not stored.
+        _ => "unknown".to_string(),
     }
 }
 
@@ -319,7 +319,7 @@ impl Tool for GuardedBrowserTool {
                 .manager
                 .surfaces
                 .lock()
-                .unwrap()
+                .unwrap_or_else(|e| e.into_inner())
                 .get(&session_tab_id(&ctx.session_id))
                 .cloned()
                 .unwrap_or_else(|| "unknown".to_string());
@@ -459,7 +459,7 @@ impl BrowserManager {
         let key = session_tab_id(session_id);
         self.session_tabs
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .get(&key)
             .cloned()
             .unwrap_or(key)
@@ -468,7 +468,7 @@ impl BrowserManager {
     pub fn tracker(&self, tab: &str) -> BrowserGenerationTracker {
         self.trackers
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .entry(tab.to_string())
             .or_default()
             .clone()
@@ -476,10 +476,10 @@ impl BrowserManager {
 
     fn forget_tab(&self, session_id: &str, tab: &str) {
         let key = session_tab_id(session_id);
-        if let Some(set) = self.owned_tabs.lock().unwrap().get_mut(&key) {
+        if let Some(set) = self.owned_tabs.lock().unwrap_or_else(|e| e.into_inner()).get_mut(&key) {
             set.remove(tab);
         }
-        let mut current = self.session_tabs.lock().unwrap();
+        let mut current = self.session_tabs.lock().unwrap_or_else(|e| e.into_inner());
         if current.get(&key).map(|t| t == tab).unwrap_or(false) {
             current.insert(key.clone(), key);
         }
@@ -489,11 +489,11 @@ impl BrowserManager {
         let key = session_tab_id(session_id);
         self.session_tabs
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .insert(key.clone(), tab.to_string());
         self.owned_tabs
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .entry(key.clone())
             .or_default()
             .insert(tab.to_string());
@@ -503,7 +503,7 @@ impl BrowserManager {
         let surface = browser_surface(surface);
         self.surfaces
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .insert(session_tab_id(session_id), surface);
     }
 
@@ -513,15 +513,15 @@ impl BrowserManager {
         }
         self.tab_urls
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .insert(tab_id.to_string(), url.trim().to_string());
     }
 
     pub fn list_tab_info(&self) -> Vec<BrowserTabInfo> {
-        let owned = self.owned_tabs.lock().unwrap().clone();
-        let currents = self.session_tabs.lock().unwrap().clone();
-        let urls = self.tab_urls.lock().unwrap().clone();
-        let surfaces = self.surfaces.lock().unwrap().clone();
+        let owned = self.owned_tabs.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let currents = self.session_tabs.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let urls = self.tab_urls.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let surfaces = self.surfaces.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let mut out = Vec::new();
         for (key, tabs) in owned {
             let session_id = key
@@ -551,11 +551,28 @@ impl BrowserManager {
         if !tab_belongs_to_session(session_id, tab) {
             anyhow::bail!("tab '{tab}' belongs to another session");
         }
+        let key = session_tab_id(session_id);
+        let known = tab == key
+            || self
+                .owned_tabs
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(&key)
+                .map(|set| set.contains(tab))
+                .unwrap_or(false);
+        if !known {
+            anyhow::bail!("tab '{tab}' is not open in this session");
+        }
         let _gate = tokio::time::timeout(PAGE_OP_TIMEOUT, self.ops.lock())
             .await
             .map_err(|_| anyhow::anyhow!("browser is busy; try again"))?;
+        let previous = self.current_tab(session_id);
         self.remember(session_id, tab);
-        self.bind(session_id).await?;
+        if let Err(e) = self.bind(session_id).await {
+            // Do not leave the session pointing at a tab that failed to open.
+            self.remember(session_id, &previous);
+            return Err(e);
+        }
         Ok(())
     }
 
@@ -624,14 +641,14 @@ impl BrowserManager {
     pub fn set_auto_screenshot(&self, session_id: &str, on: bool) {
         self.auto_screenshot
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .insert(session_tab_id(session_id), on);
     }
 
     fn auto_screenshot_for(&self, session_id: &str) -> bool {
         self.auto_screenshot
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .get(&session_tab_id(session_id))
             .copied()
             .unwrap_or(false)
@@ -642,10 +659,12 @@ impl BrowserManager {
         let _gate = tokio::time::timeout(PAGE_LOCK_WAIT, self.ops.lock())
             .await
             .map_err(|_| anyhow::anyhow!("browser is busy; try again"))?;
-        self.session_tabs.lock().unwrap().clear();
-        self.owned_tabs.lock().unwrap().clear();
-        self.trackers.lock().unwrap().clear();
-        self.viewports.lock().unwrap().clear();
+        self.session_tabs.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        self.owned_tabs.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        self.trackers.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        self.viewports.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        self.surfaces.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        self.tab_urls.lock().unwrap_or_else(|e| e.into_inner()).clear();
         let mut mgr = self.inner.lock().await;
         if mgr.is_running() {
             let _ = mgr.close().await;
@@ -667,10 +686,10 @@ impl BrowserManager {
         let mut tabs = self
             .owned_tabs
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .remove(&key)
             .unwrap_or_default();
-        if let Some(current) = self.session_tabs.lock().unwrap().remove(&key) {
+        if let Some(current) = self.session_tabs.lock().unwrap_or_else(|e| e.into_inner()).remove(&key) {
             tabs.insert(current);
         }
         tabs.insert(key);
@@ -679,9 +698,11 @@ impl BrowserManager {
             if mgr.list_tabs().iter().any(|t| t == tab) {
                 let _ = mgr.close_tab(tab).await;
             }
-            self.trackers.lock().unwrap().remove(tab);
-            self.viewports.lock().unwrap().remove(tab);
+            self.trackers.lock().unwrap_or_else(|e| e.into_inner()).remove(tab);
+            self.viewports.lock().unwrap_or_else(|e| e.into_inner()).remove(tab);
+            self.tab_urls.lock().unwrap_or_else(|e| e.into_inner()).remove(tab);
         }
+        self.surfaces.lock().unwrap_or_else(|e| e.into_inner()).remove(&session_tab_id(session_id));
         if mgr.list_tabs().is_empty() && mgr.is_running() {
             let _ = mgr.close().await;
         }
@@ -781,7 +802,7 @@ impl BrowserManager {
             .await
             .map_err(|_| anyhow::anyhow!("browser is busy; try again"))?;
         let tab = self.bind(session_id).await?;
-        self.viewports.lock().unwrap().insert(tab, (w, h));
+        self.viewports.lock().unwrap_or_else(|e| e.into_inner()).insert(tab, (w, h));
         self.with_active_page(|page| async move {
             // Keep screen.width/height in sync with innerWidth/innerHeight — otherwise
             // CSS media queries and min-width layouts still assume a desktop screen
@@ -822,7 +843,7 @@ impl BrowserManager {
         let tab = self.current_tab(session_id);
         self.viewports
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .get(&tab)
             .copied()
             .unwrap_or((1280, 800))
@@ -1089,7 +1110,7 @@ impl BrowserManager {
         let (width, height) = self
             .viewports
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .get(&tab)
             .copied()
             .unwrap_or((1280, 800));
@@ -1278,6 +1299,40 @@ mod tests {
         assert!(report.contains("other-session"));
         assert_eq!(browser_surface("pool"), "botz");
         assert_eq!(browser_surface("workz-team"), "workz");
+        assert_eq!(browser_surface("<script>"), "unknown");
+    }
+
+    #[tokio::test]
+    async fn switch_rejects_tabs_the_session_does_not_own() {
+        let mgr = BrowserManager::new();
+        mgr.remember("code", &session_tab_id("code"));
+        // Right prefix but never opened by this session.
+        let err = mgr
+            .switch_owned_tab("code", "session:code#ghost")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("not open in this session"), "{err}");
+        // Someone else's tab.
+        let err = mgr
+            .switch_owned_tab("code", "session:task")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("another session"), "{err}");
+        // Failed attempts must not have changed the current tab.
+        assert_eq!(mgr.current_tab("code"), session_tab_id("code"));
+    }
+
+    #[tokio::test]
+    async fn closing_a_session_forgets_its_surface_and_urls() {
+        let mgr = BrowserManager::new();
+        mgr.set_surface("code", "codez");
+        mgr.remember("code", &session_tab_id("code"));
+        mgr.note_url(&session_tab_id("code"), "file:///C:/demo.html");
+        mgr.close_session("code").await.unwrap();
+        assert!(mgr.surfaces.lock().unwrap().is_empty());
+        assert!(mgr.tab_urls.lock().unwrap().is_empty());
     }
 
     #[test]
@@ -1375,6 +1430,6 @@ mod tests {
         mgr.tracker(&a).advance_navigation();
         assert_eq!(mgr.tracker(&b).current_generation(), 1);
         assert_eq!(mgr.tracker(&a).current_generation(), 2);
-        assert_eq!(mgr.session_tab_report("sess-a"), "No open tabs in this session");
+        assert_eq!(mgr.session_tab_report("sess-a"), "No open browser tabs.");
     }
 }

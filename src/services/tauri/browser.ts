@@ -54,8 +54,8 @@ export interface BrowserTabInfo {
   active: boolean;
 }
 
-export function browserListTabs(): Promise<BrowserTabInfo[]> {
-  return invoke<BrowserTabInfo[]>("browser_list_tabs");
+export function browserListTabs(sessionId?: string): Promise<BrowserTabInfo[]> {
+  return invoke<BrowserTabInfo[]>("browser_list_tabs", { sessionId: sessionId ?? null });
 }
 
 export function browserSwitchTab(sessionId: string, tabId: string): Promise<void> {

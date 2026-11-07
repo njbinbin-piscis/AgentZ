@@ -1,5 +1,5 @@
 import { act, create } from "react-test-renderer";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import MarkdownPreview from "./workspaces/codez/MarkdownPreview";
 import { ChoiceField } from "./components/chat/interactiveUi/ChoiceField";
 
@@ -13,6 +13,8 @@ const samples = [
 ];
 
 describe("restore render crash", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("markdown preview does not throw on common documents", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     for (const content of samples) {

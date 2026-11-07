@@ -152,7 +152,7 @@ export default function BotHome({ agent, activity, onBack }: { agent: AgentInfo;
             <button type="button" onClick={() => {
               const key = taskKeyRef.current;
               taskKeyRef.current = null;
-              void chatCancel(key);
+              if (key) void chatCancel(key);
             }}>
               {t("botz.stop")}
             </button>

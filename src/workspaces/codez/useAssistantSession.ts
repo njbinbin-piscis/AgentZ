@@ -748,8 +748,10 @@ export function useAssistantSession({
           error?: string;
           timed_out?: boolean;
           open_todos?: number;
+          empty_reply?: boolean;
         };
         const isViewed = sid === sessionRef.current;
+        if (isViewed && fin.ok && fin.empty_reply) setToast(t("chat.emptyReply"));
         // Auto-resume: a turn-level wall-clock timeout is not a failure. Whatever
         // was streamed is already persisted, so the turn is restarted on its own
         // (no click). A user Stop ends the turn without `timed_out`, so this never
@@ -980,7 +982,7 @@ export function useAssistantSession({
       turnBookRef.current.enqueueFront(turn);
       syncQueuedView(key);
       if (turnBookRef.current.isRunning(key)) {
-        void chatCancel(taskKeyBySessionRef.current.get(key) ?? null);
+        void chatCancel(taskKeyBySessionRef.current.get(key) ?? null, key);
         return;
       }
       const next = turnBookRef.current.shiftNext(key);
@@ -999,7 +1001,7 @@ export function useAssistantSession({
       const fileName = turn.attachment?.filename || turn.attachment?.path || "";
       let guidance = turn.text.trim();
       if (fileName) {
-        const note = `附件：${fileName}`;
+        const note = `Attachment: ${fileName}`;
         guidance = guidance ? `${guidance}\n${note}` : note;
       }
       if (!guidance) {
@@ -1467,10 +1469,8 @@ export function useAssistantSession({
       historyCursorRef.current = { sessionId, offset: page.next_offset };
       setHasMoreOlder(page.has_more);
       const loaded = page.messages.map(messageFromDto);
-      const liveActivity = indexSubagentActivity([
-        ...toolStepsRef.current,
-        // The in-memory transcript may already hold steps from earlier in this turn.
-      ]);
+      // The in-memory transcript may already hold steps from earlier in this turn.
+      const liveActivity = indexSubagentActivity(toolStepsRef.current);
       setMessages((prev) => {
         const activity = indexSubagentActivity(prev.flatMap((m) => m.tools ?? []));
         for (const [id, steps] of liveActivity) activity.set(id, steps);
@@ -1794,7 +1794,7 @@ export function useAssistantSession({
   const stopCurrent = useCallback(() => {
     const sid = sessionRef.current;
     if (!sid) return;
-    void chatCancel(taskKeyBySessionRef.current.get(sid) ?? null);
+    void chatCancel(taskKeyBySessionRef.current.get(sid) ?? null, sid);
   }, []);
 
   const removeSession = useCallback(

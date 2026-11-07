@@ -122,17 +122,16 @@ export default function BrowserPanel({
   const lastShotRef = useRef<string | null>(null);
   const refreshTabs = useCallback(async () => {
     try {
-      const all = await browserListTabs();
-      const mine = sessionId || "default";
-      setTabs(all.filter((tab) => tab.session_id === mine));
+      setTabs(await browserListTabs(sessionId));
     } catch {
       setTabs([]);
     }
   }, [sessionId]);
 
   useEffect(() => {
-    void browserSetSurface(sessionId, surface);
-    void refreshTabs();
+    void browserSetSurface(sessionId, surface)
+      .catch(() => {})
+      .then(() => refreshTabs());
   }, [sessionId, surface, refreshTabs]);
 
   /** Resolves `true` when the page image changed since the previous capture. */
@@ -621,7 +620,8 @@ export default function BrowserPanel({
                 void browserSwitchTab(sessionId, tab.id)
                   .then(() => refreshTabs())
                   .then(() => refreshShot())
-                  .then(() => syncAddressFromBackend());
+                  .then(() => syncAddressFromBackend())
+                  .catch(() => void refreshTabs());
               }}
             >
               <span className="agentz-browser-tab-surface">{tab.surface}</span>

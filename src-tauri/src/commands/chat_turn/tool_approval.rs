@@ -868,7 +868,7 @@ fn emit_subagent_step(
 ) {
     let Some(progress) = progress else { return };
     use tauri::Emitter;
-    let _ = app.emit(
+    if let Err(e) = app.emit(
         crate::commands::chat::CHAT_EVENT,
         serde_json::json!({
             "sessionId": progress.session_id,
@@ -884,7 +884,9 @@ fn emit_subagent_step(
                 "detail": detail,
             }
         }),
-    );
+    ) {
+        tracing::debug!("sub-agent progress event not delivered: {e}");
+    }
 }
 
 pub(crate) struct SubagentOutcome {
@@ -1147,6 +1149,8 @@ async fn run_subagent_attempt(
         let mut edited: Vec<String> = Vec::new();
         let mut iteration = 0u32;
         let mut think_open = false;
+        // Tool steps that started but never reported an end (timeout, cancel).
+        let mut open_tools: Vec<(String, String)> = Vec::new();
         while let Some(event) = rx.recv().await {
             match event {
                 AgentEvent::TextDelta { delta } => text.push_str(&delta),
@@ -1194,6 +1198,7 @@ async fn run_subagent_attempt(
                         );
                         think_open = false;
                     }
+                    open_tools.push((id.clone(), name.clone()));
                     emit_subagent_step(
                         &progress_app,
                         progress.as_ref(),
@@ -1213,6 +1218,7 @@ async fn run_subagent_attempt(
                     }
                 }
                 AgentEvent::ToolEnd { id, name, is_error, .. } => {
+                    open_tools.retain(|(open_id, _)| open_id != &id);
                     emit_subagent_step(
                         &progress_app,
                         progress.as_ref(),
@@ -1234,17 +1240,40 @@ async fn run_subagent_attempt(
                 _ => {}
             }
         }
+        // The stream can end without a closing event for the last thought or a
+        // running tool; settle them so the card never shows "running" forever.
+        if think_open {
+            emit_subagent_step(
+                &progress_app,
+                progress.as_ref(),
+                &format!("think-{iteration}"),
+                iteration,
+                "thinking",
+                "done",
+                "",
+                "",
+            );
+        }
+        for (id, name) in open_tools {
+            emit_subagent_step(&progress_app, progress.as_ref(), &id, iteration, "tool", "error", &name, "");
+        }
         (text, tool_calls, tokens, edited)
     });
 
     let timeout_secs = options.timeout_secs.filter(|n| *n > 0).unwrap_or(default_timeout_secs);
     let run_fut = agent.run(messages, tx, cancel.clone(), ctx);
     let run_res = tokio::time::timeout(Duration::from_secs(timeout_secs), run_fut).await;
-    let (mut text, tool_calls, (mut input_tokens, mut output_tokens), edited_paths) =
-        collector.await.unwrap_or_default();
+    let (raw_text, tool_calls, (mut input_tokens, mut output_tokens), edited_paths) =
+        match collector.await {
+            Ok(collected) => collected,
+            Err(e) => {
+                tracing::warn!("sub-agent event collector failed: {e}");
+                Default::default()
+            }
+        };
     // A thinking-only trace is not a report. Drop it so the follow-up below
     // still asks for findings instead of returning the plan as the result.
-    text = piscis_kernel::agent::loop_::visible_model_text(&text);
+    let mut text = piscis_kernel::agent::loop_::visible_model_text(&raw_text);
 
     // A run that spends every iteration on tool calls ends without a report.
     // Ask once more, with no tools offered, for findings from what it gathered.
@@ -1279,6 +1308,15 @@ async fn run_subagent_attempt(
                 Ok(Err(e)) => tracing::warn!("sub-agent final report request failed: {e}"),
                 Err(_) => tracing::warn!("sub-agent final report request timed out"),
             }
+        }
+        // Last resort: the direct request failed or was empty too. Hand the
+        // parent whatever text the run produced, clearly labelled, rather than
+        // an empty report.
+        if text.trim().is_empty() && !raw_text.trim().is_empty() {
+            text = format!(
+                "[sub-agent gave no final report; its last output follows, unverified]\n{}",
+                raw_text.trim()
+            );
         }
     }
 

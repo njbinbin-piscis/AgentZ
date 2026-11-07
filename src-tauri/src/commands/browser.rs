@@ -13,8 +13,20 @@ fn session_of(session_id: Option<String>) -> String {
 }
 
 #[tauri::command]
-pub async fn browser_list_tabs(state: State<'_, AppState>) -> Result<Vec<crate::browser::BrowserTabInfo>, String> {
-    Ok(state.browser.list_tab_info())
+pub async fn browser_list_tabs(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+) -> Result<Vec<crate::browser::BrowserTabInfo>, String> {
+    let tabs = state.browser.list_tab_info();
+    // A panel only ever sees its own session's tabs.
+    Ok(match session_id {
+        Some(sid) => {
+            let key = crate::browser::session_tab_id(&sid);
+            let mine = key.strip_prefix("session:").unwrap_or(&key).to_string();
+            tabs.into_iter().filter(|tab| tab.session_id == mine).collect()
+        }
+        None => tabs,
+    })
 }
 
 #[tauri::command]

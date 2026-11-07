@@ -1115,6 +1115,7 @@ const zh = {
     dropToAttach: "拖入文件作为附件",
     dropToAddRefs: "拖放文件以添加引用",
     visionRequired: "当前模型不支持图片输入。请在设置中启用「视觉」，或切换至多模态模型。",
+    emptyReply: "模型结束了本轮但没有给出回答（只输出了思考）。发一条消息让它继续。",
     turnTimeoutResuming: "本轮已达时间上限，正在自动继续未完成的任务…",
     chipTerminal: "终端",
     chipTerminalLines: "终端 · {{count}} 行",

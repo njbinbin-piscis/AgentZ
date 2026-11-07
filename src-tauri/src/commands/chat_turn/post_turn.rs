@@ -632,7 +632,25 @@ pub(super) async fn finalize_turn_and_spawn_background(
             }),
         );
     } else {
-        event_sink.emit_session(&session_id, "agent_final", serde_json::json!({"ok": true}));
+        // The model ended the turn with no answer at all (only reasoning, or
+        // nothing). Tell the UI so it can say so instead of showing silence.
+        let last_reply = if !streamed_text.is_empty() {
+            streamed_text.clone()
+        } else {
+            new_messages
+                .iter()
+                .rev()
+                .find(|m| m.role == "assistant")
+                .map(|m| m.content.as_text())
+                .unwrap_or_default()
+        };
+        let empty_reply = !cancellation_requested
+            && piscis_kernel::agent::loop_::visible_model_text(&last_reply).is_empty();
+        event_sink.emit_session(
+            &session_id,
+            "agent_final",
+            serde_json::json!({"ok": true, "empty_reply": empty_reply}),
+        );
     }
 
     status_guard
