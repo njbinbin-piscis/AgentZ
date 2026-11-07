@@ -82,6 +82,20 @@ describe("useInteractiveCards wait timeout", () => {
     expect(ids()).toEqual([]);
   });
 
+  it("retires the card when the result says it timed out", async () => {
+    await act(async () => api.handleAgentEvent(show("a")));
+    await act(async () =>
+      api.handleAgentEvent({
+        type: "tool_end",
+        id: "a",
+        name: "chat_ui",
+        result: "Interactive UI timed out after 5 minutes with no user response.",
+        is_error: false,
+      } as unknown as AgentEvent),
+    );
+    expect(ids()).toEqual([]);
+  });
+
   it("keeps the card when chat_ui ends normally (action flow)", async () => {
     await act(async () => api.handleAgentEvent(show("a")));
     await act(async () =>

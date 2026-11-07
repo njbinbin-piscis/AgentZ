@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { toolIcon, toolSummary } from "./toolDisplay";
 import { fileEditDiff, type FileEditDiff } from "./fileEditDiff";
@@ -39,8 +39,13 @@ export function interleaveTools(text: string, tools: ToolTraceItem[]): ToolTextS
   const segments: ToolTextSegment[] = [];
   let cursor = 0;
   let current: ToolTextSegment | null = null;
-  for (const tool of tools) {
-    const at = Math.min(text.length, Math.max(cursor, tool.textOffset ?? text.length));
+  // Place each call at the text length captured when it started, even if a
+  // later reload appended the call after newer ones. Later output stays below.
+  const ordered = tools
+    .map((tool, index) => ({ tool, index, at: tool.textOffset ?? text.length }))
+    .sort((a, b) => a.at - b.at || a.index - b.index);
+  for (const { tool, at: rawAt } of ordered) {
+    const at = Math.min(text.length, Math.max(cursor, rawAt));
     if (at > cursor || !current) {
       if (at > cursor) segments.push({ text: text.slice(cursor, at), tools: [] });
       current = { text: "", tools: [] };
@@ -84,6 +89,21 @@ export function upsertToolStep(
     ...prev,
     { id: evt.id, name: evt.name, input: evt.input, status: "running", textOffset },
   ];
+}
+
+/** Keep a chat_ui form in the transcript at the moment it was asked. */
+export function ensureChatUiStep(
+  prev: ToolTraceItem[],
+  requestId: string,
+  uiDefinition: unknown,
+  textOffset?: number,
+): ToolTraceItem[] {
+  if (prev.some((step) => step.id === requestId)) return prev;
+  return upsertToolStep(
+    prev,
+    { id: requestId, name: "chat_ui", input: { ui_definition: uiDefinition } },
+    textOffset,
+  );
 }
 
 const RESULT_PREVIEW_CHARS = 400;
@@ -387,36 +407,38 @@ function ChatUiInline({ item }: { item: ToolTraceItem }) {
 }
 
 export default function ToolTrace({ items, hideEdits = false }: { items: ToolTraceItem[]; hideEdits?: boolean }) {
-  const chatUi = items.filter((item) => item.name === "chat_ui");
-  const chatUiIds = new Set(chatUi.map((c) => c.id));
-  const subagents = items.filter((item) => isSubagentCall(item));
-  const subagentIds = new Set(subagents.map((s) => s.id));
-  const rest = items.filter((item) => !subagentIds.has(item.id) && !chatUiIds.has(item.id));
-  const edits = rest.flatMap((item) => {
-    if (item.status === "error" || hideEdits) return [];
-    const diff = fileEditDiff(item.name, item.input);
-    return diff ? [{ item, diff }] : [];
-  });
-  const editIds = new Set(edits.map((e) => e.item.id));
-  // Settled edits from earlier turns are dropped (no card, no batch row).
-  const settledEditIds = hideEdits
-    ? new Set(rest.filter((item) => item.status !== "error" && fileEditDiff(item.name, item.input)).map((item) => item.id))
-    : editIds;
-  const others = rest.filter((item) => !settledEditIds.has(item.id));
-  return (
-    <>
-      {others.length > 0 && <ToolBatch items={others} />}
-      {chatUi.map((item) => (
-        <ChatUiInline key={item.id} item={item} />
-      ))}
-      {subagents.map((item) => (
-        <SubagentCard key={item.id} item={item} />
-      ))}
-      {edits.map(({ item, diff }) => (
-        <FileEditCard key={item.id} item={item} diff={diff} />
-      ))}
-    </>
-  );
+  // Call order, not "all forms last". A timed-out form stays where it was
+  // asked; tools and text that happen afterwards render under it.
+  const nodes: ReactNode[] = [];
+  let batch: ToolTraceItem[] = [];
+  const flush = () => {
+    if (batch.length === 0) return;
+    const key = batch.map((item) => item.id).join("\n");
+    nodes.push(<ToolBatch key={key} items={batch} />);
+    batch = [];
+  };
+  for (const item of items) {
+    if (item.name === "chat_ui") {
+      flush();
+      nodes.push(<ChatUiInline key={item.id} item={item} />);
+      continue;
+    }
+    if (isSubagentCall(item)) {
+      flush();
+      nodes.push(<SubagentCard key={item.id} item={item} />);
+      continue;
+    }
+    const diff = item.status === "error" || hideEdits ? null : fileEditDiff(item.name, item.input);
+    if (diff) {
+      flush();
+      nodes.push(<FileEditCard key={item.id} item={item} diff={diff} />);
+      continue;
+    }
+    if (hideEdits && item.status !== "error" && fileEditDiff(item.name, item.input)) continue;
+    batch.push(item);
+  }
+  flush();
+  return <>{nodes}</>;
 }
 
 function ToolBatch({ items }: { items: ToolTraceItem[] }) {

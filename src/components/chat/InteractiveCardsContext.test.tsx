@@ -1,6 +1,6 @@
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { describe, expect, it } from "vitest";
-import ToolTrace, { type ToolTraceItem } from "../ToolTrace";
+import ToolTrace, { interleaveTools, type ToolTraceItem } from "../ToolTrace";
 import { parseChatUiDefinition, parseInteractiveResponse } from "./InteractiveCardsContext";
 
 const ui = {
@@ -44,6 +44,34 @@ describe("chat_ui tool step in the message flow", () => {
     expect(out).toContain("ic-readonly");
     expect(out).toContain("Pick one");
     expect(out).toContain("Ada");
+  });
+
+  it("keeps a timed-out form where it was asked, with later output underneath", async () => {
+    const segments = interleaveTools("Please choose\n\nContinuing with defaults", [
+      { id: "later", name: "shell", status: "done", input: { command: "echo later" }, textOffset: 200 },
+      { id: "c2", name: "chat_ui", status: "error", input: { ui_definition: ui }, result: "timed out", textOffset: 13 },
+    ]);
+    const formAt = segments.findIndex((segment) => segment.tools.some((tool) => tool.id === "c2"));
+    const laterAt = segments.findIndex((segment) => segment.tools.some((tool) => tool.id === "later"));
+    expect(formAt).toBeGreaterThanOrEqual(0);
+    expect(laterAt).toBeGreaterThan(formAt);
+    expect(segments.slice(formAt + 1).some((segment) => segment.text.includes("Continuing"))).toBe(true);
+
+    let root!: ReactTestRenderer;
+    await act(async () => {
+      root = create(
+        <ToolTrace
+          items={[
+            { id: "before", name: "shell", status: "done", input: { command: "echo before" } },
+            { id: "c2", name: "chat_ui", status: "error", input: { ui_definition: ui }, result: "Interactive UI timed out" },
+            { id: "after", name: "shell", status: "done", input: { command: "echo after" } },
+          ]}
+        />,
+      );
+    });
+    const out = JSON.stringify(root.toJSON());
+    expect(out.indexOf("echo before")).toBeLessThan(out.indexOf("ic-readonly"));
+    expect(out.indexOf("ic-readonly")).toBeLessThan(out.indexOf("echo after"));
   });
 
   it("a timed-out call is read-only and says nobody answered", async () => {

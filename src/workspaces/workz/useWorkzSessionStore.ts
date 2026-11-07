@@ -748,6 +748,21 @@ export function useWorkzSessionStore({
         evt.type === "cancelled"
       ) {
         handleAgentEvent(evt);
+        if (evt.type === "interactive_ui" && liveRef.current) {
+          setSteps((prev) => {
+            if (prev.length === 0) return prev;
+            const copy = prev.slice();
+            const last = { ...copy[copy.length - 1] };
+            if (last.role !== "assistant" || last.tools.some((tool) => tool.id === evt.request_id)) return prev;
+            last.tools = applyToolStart(
+              last.tools.slice(),
+              { type: "tool_start", id: evt.request_id, name: "chat_ui", input: { ui_definition: evt.ui_definition } },
+              last.text.length,
+            );
+            copy[copy.length - 1] = last;
+            return copy;
+          });
+        }
         return;
       }
       // A failed chat_ui / chat_ui_listen call means nobody waits on its form any more.

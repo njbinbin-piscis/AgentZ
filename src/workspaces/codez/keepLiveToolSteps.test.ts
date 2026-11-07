@@ -18,9 +18,18 @@ describe("keepLiveToolSteps", () => {
     expect(out[1].tools?.map((t) => t.status)).toEqual(["done", "error"]);
   });
 
-  it("keeps calls already reloaded from the database", () => {
+  it("does not duplicate calls already reloaded from the database", () => {
     const reloaded = [{ role: "assistant" as const, text: "x", tools: [step("db", "done")] }];
-    expect(keepLiveToolSteps(reloaded, [step("live", "done")])).toBe(reloaded);
+    expect(keepLiveToolSteps(reloaded, [step("db", "done")])).toBe(reloaded);
+  });
+
+  it("keeps a live call the reloaded bubble does not have yet", () => {
+    const reloaded = [{ role: "assistant" as const, text: "asked", tools: [step("db", "done")] }];
+    const out = keepLiveToolSteps(reloaded, [step("db", "done"), { ...step("form", "running"), name: "chat_ui" }]);
+    expect(out[0].tools?.map((tool) => [tool.id, tool.status])).toEqual([
+      ["db", "done"],
+      ["form", "error"],
+    ]);
   });
 
   it("does nothing without live steps", () => {

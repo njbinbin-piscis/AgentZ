@@ -270,10 +270,20 @@ function AssistantMessageList({
         const showEdits = isLastMessage && (busy || !!m.turnId);
         const diffs = showEdits && m.turnId ? turnDiffsByTurnId[m.turnId] : undefined;
         // Live steps drive the in-flight turn; otherwise use what was persisted.
-        const msgTools =
+        const baseTools =
           isLastMessage && (busy || !m.tools?.length) && toolSteps.length > 0
             ? toolSteps
             : (m.tools ?? []);
+        // A form opened in this turn must stay in the bubble even when the
+        // reloaded row does not list it yet. Its text offset keeps later
+        // output underneath.
+        const msgTools = isLastMessage
+          ? baseTools.concat(
+              toolSteps.filter(
+                (step) => step.name === "chat_ui" && !baseTools.some((tool) => tool.id === step.id),
+              ),
+            )
+          : baseTools;
 
         return (
           <div key={m.id ?? `msg-${absoluteIndex}`} className="agentz-msg assistant">

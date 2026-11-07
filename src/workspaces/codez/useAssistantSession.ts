@@ -64,6 +64,7 @@ import { formatUserMessageDisplay } from "../../components/chatFileRefs";
 import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import { queryTaskPlan, type DurablePlan } from "../../services/tauri/chatPlan";
 import {
+  ensureChatUiStep,
   truncateToolResultForUi,
   upsertToolStep,
   type ToolTraceItem,
@@ -107,14 +108,15 @@ interface ChatMessage {
  *  unless that bubble was already reloaded with its persisted calls. */
 export function keepLiveToolSteps(messages: ChatMessage[], steps: ToolTraceItem[]): ChatMessage[] {
   const last = messages[messages.length - 1];
-  if (steps.length === 0 || last?.role !== "assistant" || (last.tools?.length ?? 0) > 0) {
-    return messages;
-  }
+  if (steps.length === 0 || last?.role !== "assistant") return messages;
+  const existing = last.tools ?? [];
+  const have = new Set(existing.map((tool) => tool.id));
+  const extra = steps
+    .filter((step) => !have.has(step.id))
+    .map((step) => (step.status === "running" ? { ...step, status: "error" as const } : step));
+  if (extra.length === 0) return messages;
   const copy = messages.slice();
-  copy[copy.length - 1] = {
-    ...last,
-    tools: steps.map((s) => (s.status === "running" ? { ...s, status: "error" as const } : s)),
-  };
+  copy[copy.length - 1] = { ...last, tools: [...existing, ...extra] };
   return copy;
 }
 
@@ -811,6 +813,13 @@ export function useAssistantSession({
       ) {
         if (evt.type === "done" || evt.type === "cancelled") setPermissionRequest(null);
         handleAgentEvent(evt);
+        // The form belongs in the transcript at the question, not under every
+        // later line. tool_start usually arrives first; this covers the race.
+        if (evt.type === "interactive_ui") {
+          setToolSteps((prev) =>
+            ensureChatUiStep(prev, evt.request_id, evt.ui_definition, streamLenRef.current),
+          );
+        }
         return;
       }
       // A failed chat_ui / chat_ui_listen call means nobody waits on its form any more.

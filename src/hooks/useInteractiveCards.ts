@@ -72,7 +72,8 @@ export function useInteractiveCards() {
         // nobody is listening any more, so the form is dead. chat_ui's
         // tool_use_id is the card's request id; chat_ui_listen belongs to
         // whichever card was listening.
-        if (!evt.is_error) break;
+        const timedOut = evt.is_error || /timed out/i.test(evt.result ?? "");
+        if (!timedOut) break;
         const isListen = evt.name === "chat_ui_listen";
         if (evt.name !== "chat_ui" && !isListen) break;
         setCards((prev) => {

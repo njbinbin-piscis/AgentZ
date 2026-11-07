@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.60] - 2026-11-07
+
+### Fixed
+
+- **A timed-out CodeZ form stays where it was asked.** `chat_ui` no longer remains pinned under the whole session after it expires. The form collapses into the reply at the question, and later text and tool calls render below it.
+
 ## [1.0.59] - 2026-11-07
 
 ### Fixed
