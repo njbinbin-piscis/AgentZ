@@ -5702,7 +5702,7 @@ mod tests {
     }
 
     /// Real sandboxed code_run, cancelled mid-run through the agent's execution path.
-    /// Its own teardown returns "Sandbox command was cancelled"; the watcher's generic
+    /// Its own teardown returns "Command was cancelled"; the watcher's generic
     /// "已被用户取消" must not replace it.
     #[cfg(windows)]
     #[tokio::test]
@@ -5752,7 +5752,7 @@ mod tests {
             .await;
         let elapsed = started.elapsed();
         let text = format!("{blocks:?}");
-        assert!(text.contains("Sandbox command was cancelled"), "code_run must report its own cancel: {text}");
+        assert!(text.contains("Command was cancelled"), "code_run must report its own cancel: {text}");
         assert!(!text.contains("已被用户取消"), "watcher must not replace code_run teardown: {text}");
         assert!(elapsed < std::time::Duration::from_secs(20), "cancel took {elapsed:?}: {text}");
     }

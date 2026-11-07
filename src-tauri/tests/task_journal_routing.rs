@@ -247,15 +247,19 @@ async fn reopened_task_journal_restores_only_its_environment() {
             .await
             .is_err()
     );
-    // A stale branch is rejected before any journal can be opened in a fallback root.
+    // Switching branches inside the task's own worktree keeps the task usable (members and the
+    // coordinator check out other branches while they work); the journal still opens in that
+    // worktree, never in a fallback root.
     git(&roots[1], &["switch", "-c", "wrong-branch"]);
-    assert!(open_task_journal(Some(&project_root), "task-b")
+    open_task_journal(Some(&project_root), "task-b")
         .await
-        .is_err());
-    let error = agent_task_change_set(Some(project_root.clone()), "task-b".into())
-        .await
-        .unwrap_err();
-    assert_eq!(error.code, "environment_invalid");
+        .unwrap();
+    // A directory that is no longer a worktree of the repository is what gets rejected.
+    assert!(
+        resolve_task_workspace(&project, Some("task-a"), Some(&project_root), true)
+            .await
+            .is_err()
+    );
     assert_eq!(
         fs::read_to_string(roots[1].join("shared.txt")).unwrap(),
         "b edited\n"

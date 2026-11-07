@@ -170,6 +170,10 @@ impl DurablePlanSession {
             }
             normalized
         };
+        let proposed = keep_new_after_finished(
+            current.as_ref().map(|p| p.items.as_slice()).unwrap_or(&[]),
+            proposed,
+        );
         let items = from_kernel(&proposed)?;
         let committed = match &self.captured {
             Some((id, revision)) => repository.update(&self.binding, id, *revision, items, now)?,
@@ -180,6 +184,39 @@ impl DurablePlanSession {
         Ok(committed)
     }
 }
+/// A replacement list is written in whatever order the model chose, and it sometimes puts a
+/// new step between steps that were already finished. Finished history keeps its place: a new
+/// step is never placed before an older step that is finished in the written list, it goes
+/// right after the last of them.
+/// New steps keep their relative order; every other item keeps the order it was given.
+pub(crate) fn keep_new_after_finished(
+    existing: &[PlanItem],
+    proposed: Vec<PlanTodoItem>,
+) -> Vec<PlanTodoItem> {
+    let is_new = |id: &str| !existing.iter().any(|item| item.id == id);
+    // An older step that is finished in the written list (it may have been finished just now).
+    let Some(last_finished) = proposed.iter().rposition(|item| {
+        !is_new(&item.id) && matches!(item.status.as_str(), "completed" | "cancelled")
+    }) else {
+        return proposed;
+    };
+    let mut head = Vec::with_capacity(proposed.len());
+    let mut moved = Vec::new();
+    let mut tail = Vec::new();
+    for (index, item) in proposed.into_iter().enumerate() {
+        if index > last_finished {
+            tail.push(item);
+        } else if is_new(&item.id) {
+            moved.push(item);
+        } else {
+            head.push(item);
+        }
+    }
+    head.extend(moved);
+    head.extend(tail);
+    head
+}
+
 fn validate_current(plan: Option<&Plan>, binding: &PlanBinding) -> Result<(), String> {
     if let Some(plan) = plan {
         if &plan.binding != binding {
@@ -391,6 +428,45 @@ mod tests {
                 status: (*status).into(),
             })
             .collect()
+    }
+
+    #[test]
+    fn replacement_never_puts_a_new_step_between_finished_ones() {
+        let (directory, b) = sqlite_fixture();
+        let mut repository = PlanStore::open(&directory.0).unwrap();
+        let mut session = DurablePlanSession::recover(&repository, b.clone()).unwrap();
+        let mut write = |items: &[(&str, &str)], merge: bool, now: u64| {
+            session
+                .write(&mut repository, || Ok(b.clone()), &todo_items(items), merge, "p", "goal", now)
+                .unwrap();
+        };
+        write(&[("a", "completed"), ("b", "completed"), ("c", "in_progress")], false, 1);
+        // The model re-sends the whole list with the new step wedged in the middle.
+        write(
+            &[("a", "completed"), ("new1", "pending"), ("b", "completed"), ("c", "completed"), ("new2", "pending")],
+            false,
+            2,
+        );
+        let ids: Vec<String> = repository
+            .continue_plan(&b)
+            .unwrap()
+            .unwrap()
+            .items
+            .into_iter()
+            .map(|item| item.id)
+            .collect();
+        assert_eq!(ids, ["a", "b", "c", "new1", "new2"]);
+    }
+
+    #[test]
+    fn reordering_unfinished_steps_is_still_allowed() {
+        let existing = vec![
+            PlanItem { id: "a".into(), description: "a".into(), state: ItemState::Done },
+            PlanItem { id: "b".into(), description: "b".into(), state: ItemState::Pending },
+            PlanItem { id: "c".into(), description: "c".into(), state: ItemState::Pending },
+        ];
+        let out = keep_new_after_finished(&existing, todo_items(&[("a", "completed"), ("c", "pending"), ("b", "pending")]));
+        assert_eq!(out.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(), ["a", "c", "b"]);
     }
 
     /// Restart, then a continuation that lists only one step. The open sibling must survive
