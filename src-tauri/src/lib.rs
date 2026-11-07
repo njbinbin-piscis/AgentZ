@@ -18,6 +18,7 @@ pub mod journal;
 pub mod lsp;
 pub mod path_filter;
 pub mod remote;
+pub mod safe_delete;
 pub mod runtime;
 pub mod skills;
 pub mod state;
@@ -247,6 +248,7 @@ pub fn run() {
             commands::agent_task::agent_task_discard,
             commands::agent_task::agent_task_open_pr,
             commands::agent_task::agent_task_rollback_snapshot,
+            commands::agent_task::agent_task_rollback_preview,
             // Embedded browser panel (CDP via chromiumoxide)
             commands::browser::browser_navigate,
             commands::browser::browser_list_tabs,

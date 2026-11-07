@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
+import { confirmDialog } from "../../services/tauri/confirm";
 import { CloseIcon } from "../../components/TitleBarIcons";
 import {
   clearImSessions,
@@ -194,17 +195,18 @@ export default function AssistantMessagesPanel({ onClose }: AssistantMessagesPan
 
   const handleClear = useCallback(async () => {
     if (!active) return;
+    if (!(await confirmDialog(t("assistantPanel.clearConfirm"), { title: t("assistantPanel.clear") }))) return;
     setBusy(true);
     try {
       await clearImSessions(active);
       setMessages([]);
       await refreshSessions(active);
-    } catch {
-      /* ignore */
+    } catch (e) {
+      window.alert(String(e));
     } finally {
       setBusy(false);
     }
-  }, [active, refreshSessions]);
+  }, [active, refreshSessions, t]);
 
   const st = statusText(t, activeStatus);
 

@@ -63,6 +63,7 @@ import type { ContextUsageSnapshot } from "../../components/ContextUsageRing";
 import { formatUserMessageDisplay } from "../../components/chatFileRefs";
 import { useSlashCompletion } from "../../hooks/useSlashCompletion";
 import { queryTaskPlan, type DurablePlan } from "../../services/tauri/chatPlan";
+import { confirmDialog } from "../../services/tauri/confirm";
 import {
   applySubagentProgress,
   indexSubagentActivity,
@@ -1702,10 +1703,10 @@ export function useAssistantSession({
   const restoreToCheckpoint = useCallback(
     async (messageId: string) => {
       if (!sessionRef.current || !projectDir || busy) return;
-      if (!window.confirm(t("chat.checkpointRestoreConfirm"))) return;
+      if (!(await confirmDialog(t("chat.checkpointRestoreConfirm"), { title: t("chat.checkpointRestoreTitle") }))) return;
       // Offer to also roll back the file edits the agent applied afterwards.
       // The file watcher reloads affected tabs + refreshes git status.
-      const restoreFiles = window.confirm(t("chat.checkpointRestoreFiles"));
+      const restoreFiles = await confirmDialog(t("chat.checkpointRestoreFiles"), { title: t("chat.checkpointRestoreTitle") });
       try {
         await restoreCheckpoint(sessionRef.current, messageId, projectDir!, restoreFiles);
         await syncMessagesFromDb(sessionRef.current);
@@ -1722,6 +1723,7 @@ export function useAssistantSession({
   const undoTurnChanges = useCallback(
     async (turnId: string) => {
       if (!sessionRef.current || !projectDir || busy) return;
+      if (!(await confirmDialog(t("agent.rollbackTurnConfirm"), { title: t("agent.rollbackTurn") }))) return;
       try {
         const restored = await journalUndoTurn(projectDir, sessionRef.current, turnId);
         setTurnDiffsByTurnId((prev) => {
@@ -1800,6 +1802,7 @@ export function useAssistantSession({
   const removeSession = useCallback(
     async (id: string) => {
       if (!projectDir) return;
+      if (!(await confirmDialog(t("chat.deleteSessionConfirm"), { title: t("chat.deleteSessionTitle") }))) return;
       try {
         await deleteSession(id, projectDir!);
         turnBookRef.current.deleteSession(id);
@@ -1810,7 +1813,7 @@ export function useAssistantSession({
         setError(String(e));
       }
     },
-    [projectDir, newSession, refreshSessions],
+    [projectDir, newSession, refreshSessions, t],
   );
 
   const handleAttach = useCallback(async () => {

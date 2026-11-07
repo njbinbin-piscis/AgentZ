@@ -4,6 +4,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { ideApi } from "../../services/tauri/ide";
+import { confirmDialog } from "../../services/tauri/confirm";
 import type { FileNode } from "./types";
 import FileIcon from "./FileIcon";
 
@@ -544,8 +545,7 @@ export default function FileTree({
       (count === 1
         ? `Delete ${hasDir ? "folder" : "file"} "${name}"?`
         : `Delete ${count} items?`);
-    // eslint-disable-next-line no-alert
-    if (!window.confirm(msg)) return;
+    if (!(await confirmDialog(msg))) return;
     // Delete in reverse-path order so children come before parents (avoids
     // the "parent already gone" failure when both are in the selection).
     const ordered = [...selectedNodeInfo].sort((a, b) => b.path.localeCompare(a.path));

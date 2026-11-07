@@ -6,6 +6,7 @@ import {
   type TaskFileView,
   type AgentTaskInfo,
 } from "../../services/tauri/agentTask";
+import { confirmDialog } from "../../services/tauri/confirm";
 import { fetchCodeMap } from "../../services/tauri/codeMap";
 import { diffLines } from "../codez/lineDiff";
 import "./AgentTaskReview.css";
@@ -220,7 +221,7 @@ function TaskReviewContent({
   }, [projectDir, task.id, targetBranch, reviewHead, uncommitted, t, onResolved]);
 
   const discard = useCallback(async () => {
-    if (!window.confirm(t("agent.discardConfirm"))) return;
+    if (!(await confirmDialog(t("agent.discardConfirm"), { title: t("agent.discard") }))) return;
     setBusy(true);
     setError(null);
     try {

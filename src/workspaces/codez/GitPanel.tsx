@@ -1,6 +1,7 @@
 import { Fragment, useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ideApi } from "../../services/tauri/ide";
+import { confirmDialog } from "../../services/tauri/confirm";
 import type { GitFileStatus, GitRepoSnapshot, BranchInfo } from "./types";
 
 interface GitPanelProps {
@@ -78,7 +79,7 @@ function GitRepoSection({
 
   const handleDiscard = useCallback(
     async (path: string) => {
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         (t("ide.discardConfirm", { name: path }) as string) ||
           `Discard all changes in "${path}"? This cannot be undone.`,
       );
@@ -96,7 +97,7 @@ function GitRepoSection({
   const handleDiscardAll = useCallback(
     async (paths: string[]) => {
       if (paths.length === 0) return;
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         (t("ide.discardAllConfirm", { count: paths.length }) as string) ||
           `Discard changes in ${paths.length} file(s)? This cannot be undone.`,
       );
@@ -143,7 +144,7 @@ function GitRepoSection({
     async (branch: string) => {
       const dirty = repo.files.length > 0;
       if (dirty) {
-        const ok = window.confirm(
+        const ok = await confirmDialog(
           (t("ide.checkoutDirtyWarn") as string) ||
             `Switch to '${branch}'? You have uncommitted changes that may be overwritten.`,
         );

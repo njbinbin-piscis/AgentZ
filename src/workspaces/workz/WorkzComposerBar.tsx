@@ -1,5 +1,6 @@
 import { useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
+import { confirmDialog } from "../../services/tauri/confirm";
 import ChatComposer from "../../components/ChatComposer";
 import DropdownSelect, { type DropdownOption } from "../../components/DropdownSelect";
 import { CODEBASE_MENTION, GRAPH_MENTION } from "../../hooks/useAtMention";
@@ -378,8 +379,40 @@ export default function WorkzComposerBar({
               disabled={busy}
               onClick={async () => {
                 try {
-                  const restored = await agentTaskApi.rollbackSnapshot(projectDir, selectedId);
-                  onShowToast(t("agent.rollbackSnapshotOk", { count: restored.length }));
+                  const items = await agentTaskApi.rollbackPreview(projectDir, selectedId);
+                  const created = items.filter((item) => item.created);
+                  const modified = items.length - created.length;
+                  if (items.length === 0) {
+                    onShowToast(t("agent.rollbackNothing"));
+                    return;
+                  }
+                  const go = await confirmDialog(
+                    t("agent.rollbackConfirm", { modified, created: created.length }),
+                    { title: t("agent.rollbackSnapshot") },
+                  );
+                  if (!go) return;
+                  // Deleting files the task created is a separate, explicit choice.
+                  const deleteCreated =
+                    created.length > 0 &&
+                    (await confirmDialog(
+                      t("agent.rollbackDeleteCreated", {
+                        count: created.length,
+                        examples: created
+                          .slice(0, 5)
+                          .map((item) => item.path)
+                          .join("\n"),
+                      }),
+                      { title: t("agent.rollbackSnapshot") },
+                    ));
+                  const out = await agentTaskApi.rollbackSnapshot(projectDir, selectedId, deleteCreated);
+                  onShowToast(
+                    t("agent.rollbackSnapshotOk", {
+                      restored: out.restored.length,
+                      deleted: out.deleted.length,
+                      kept: out.kept_created.length,
+                      backup: out.backup_dir ?? "-",
+                    }),
+                  );
                 } catch (e) {
                   onSetError(String(e));
                 }

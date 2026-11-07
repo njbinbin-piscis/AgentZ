@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { getProjectScope, useProjectScope } from "../services/tauri/projectScope";
 import { clearNotifications, listNotifications, markNotificationRead, type InboxPage, type NoticeKind, type TaskNotice } from "../services/tauri/notificationInbox";
+import { confirmDialog } from "../services/tauri/confirm";
 import { pollReminders } from "../services/tauri/automationReminder";
 import { coalesce, FOCUS_REFRESH_GAP_MS } from "../utils/coalesce";
 import { canPortalToBody, useFixedPopupPosition } from "../utils/popupPosition";
@@ -106,6 +107,7 @@ export default function NotificationInbox({ projectDir, onOpenTask }: Props) {
 
   async function clearAll() {
     if (!projectDir || !scope) return;
+    if (!(await confirmDialog(t("notifications.clearConfirm"), { title: t("notifications.clear") }))) return;
     setBusy(true);
     try {
       await clearNotifications(scope.handle);

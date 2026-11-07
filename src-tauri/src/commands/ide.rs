@@ -645,22 +645,28 @@ pub async fn ide_file_action(
                 std::fs::create_dir_all(parent)
                     .map_err(|e| format!("Failed to create directories: {}", e))?;
             }
-            std::fs::write(&file_path, "").map_err(|e| format!("Failed to create file: {}", e))
+            // `create_new` fails instead of emptying a file that already exists.
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&file_path)
+                .map(|_| ())
+                .map_err(|e| format!("Failed to create file: {}", e))
         }
         "create_dir" => std::fs::create_dir_all(&file_path)
             .map_err(|e| format!("Failed to create directory: {}", e)),
-        "delete" => {
-            if file_path.is_dir() {
-                std::fs::remove_dir_all(&file_path)
-                    .map_err(|e| format!("Failed to delete directory: {}", e))
-            } else {
-                std::fs::remove_file(&file_path)
-                    .map_err(|e| format!("Failed to delete file: {}", e))
-            }
-        }
+        // Moved into `<project>/.agentz/trash`, never erased outright.
+        "delete" => crate::safe_delete::move_to_trash(&file_path).map(|_| ()),
         "rename" => {
             let target = new_path.ok_or("rename requires 'new_path' parameter")?;
             let target_path = PathBuf::from(&target);
+            // `rename` silently replaces an existing file on Windows.
+            let same_path_other_case = target_path
+                .to_string_lossy()
+                .eq_ignore_ascii_case(&file_path.to_string_lossy());
+            if target_path.exists() && !same_path_other_case {
+                return Err(format!("{} already exists", target_path.display()));
+            }
             if let Some(parent) = target_path.parent() {
                 std::fs::create_dir_all(parent)
                     .map_err(|e| format!("Failed to create directories: {}", e))?;
@@ -1368,6 +1374,18 @@ async fn ide_git_discard_bound(
     let tracked = tracked_listing_contains(&tracked_paths, &path_in_repo)?;
 
     if tracked {
+        // Keep the uncommitted work reachable before dropping it: a dangling
+        // stash commit pinned under refs/agentz/discard/ (`git stash apply <ref>`).
+        if let Ok(commit) = run_git_cmd(&root, &["stash", "create"]).await {
+            let commit = commit.trim();
+            if !commit.is_empty() {
+                let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+                let ref_name = format!("refs/agentz/discard/{stamp}");
+                run_git_cmd(&root, &["update-ref", &ref_name, commit])
+                    .await
+                    .map_err(|e| format!("could not save your changes before discarding, nothing was discarded: {e}"))?;
+            }
+        }
         run_git_cmd(&root, &["checkout", "HEAD", "--", &path_in_repo])
             .await
             .map_err(|e| format!("git discard failed: {}", e))?;
@@ -1386,10 +1404,9 @@ async fn ide_git_discard_bound(
                 serde_json::json!({ "path": remote_path, "recursive": true }),
             )
             .await?;
-        } else if abs.is_dir() {
-            std::fs::remove_dir_all(&abs).map_err(|e| format!("remove dir failed: {}", e))?;
-        } else if abs.exists() {
-            std::fs::remove_file(&abs).map_err(|e| format!("remove file failed: {}", e))?;
+        } else {
+            // Untracked work has no git copy, so it goes to the project trash.
+            crate::safe_delete::move_to_trash(&abs)?;
         }
     }
     Ok(())

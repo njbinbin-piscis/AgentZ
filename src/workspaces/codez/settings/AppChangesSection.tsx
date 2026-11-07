@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { confirmDialog } from "../../../services/tauri/confirm";
 import { notifySettingsRefresh } from "../../../services/settingsRefresh";
 
 interface ChangeEntry {
@@ -38,7 +39,7 @@ export default function AppChangesSection() {
 
   const rollback = useCallback(
     async (id: string) => {
-      if (!window.confirm(t("appChanges.confirmRollback"))) return;
+      if (!(await confirmDialog(t("appChanges.confirmRollback")))) return;
       try {
         await invoke("app_changes_rollback", { id });
         setError(null);

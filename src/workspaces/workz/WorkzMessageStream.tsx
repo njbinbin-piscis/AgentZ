@@ -1,6 +1,7 @@
 import { useMemo, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { journalUndoTurn } from "../../services/tauri/chat";
+import { confirmDialog } from "../../services/tauri/confirm";
 import PermissionCard, { type PermissionRequestCard } from "../../components/chat/PermissionCard";
 import InteractiveCard from "../../components/chat/InteractiveCard";
 import { InteractiveCardsContext } from "../../components/chat/InteractiveCardsContext";
@@ -194,6 +195,7 @@ export default function WorkzMessageStream({
                         onClick={async () => {
                           const sid = sessionId ?? selectedId;
                           if (!sid || !projectDir || !m.turnId) return;
+                          if (!(await confirmDialog(t("agent.rollbackTurnConfirm"), { title: t("agent.rollbackTurn") }))) return;
                           try {
                             const restored = await journalUndoTurn(projectDir, sid, m.turnId);
                             onRefreshGitChanges();

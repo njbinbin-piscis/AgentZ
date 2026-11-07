@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProjectEdgeActions, useProjectEdgeState } from "../contexts/ProjectEdgeContext";
+import { useTranslation } from "react-i18next";
 import { ideApi } from "../services/tauri/ide";
+import { confirmDialog } from "../services/tauri/confirm";
 import {
   journalKeep,
   journalListPending,
@@ -19,6 +21,7 @@ interface ProjectEdgeShellProps {
  * Artifacts = files the agent wrote that still exist on disk.
  */
 export default function ProjectEdgeShell({ projectDir }: ProjectEdgeShellProps) {
+  const { t } = useTranslation();
   const { setGitChanges, registerWorkspaceRefresh, scheduleWorkspaceRefresh, setPendingReview } =
     useProjectEdgeActions();
   const pendingReview = useProjectEdgeState((s) => s.pendingReview);
@@ -81,6 +84,13 @@ export default function ProjectEdgeShell({ projectDir }: ProjectEdgeShellProps) 
   const undo = useCallback(
     async (paths?: string[]) => {
       if (!projectDir || !pendingReview) return;
+      const ok = await confirmDialog(
+        paths && paths.length > 0
+          ? t("agent.reviewUndoSome", { count: paths.length })
+          : t("agent.reviewUndoAll"),
+        { title: t("agent.rollbackTurn") },
+      );
+      if (!ok) return;
       setUndoing(true);
       try {
         await journalUndo(projectDir, pendingReview.sessionId, paths);
@@ -90,7 +100,7 @@ export default function ProjectEdgeShell({ projectDir }: ProjectEdgeShellProps) 
         setUndoing(false);
       }
     },
-    [projectDir, pendingReview, reloadReview, scheduleWorkspaceRefresh],
+    [projectDir, pendingReview, reloadReview, scheduleWorkspaceRefresh, t],
   );
 
   const keep = useCallback(

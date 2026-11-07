@@ -30,6 +30,27 @@ static BLOCKED_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
+/// Prefix of the warning text for a command that can permanently destroy
+/// uncommitted work. The agent loop always asks the user about these, even when
+/// the user switched shell confirmation off.
+pub const DESTRUCTIVE_WARNING_PREFIX: &str = "Destructive command";
+
+/// Commands that delete or overwrite work in ways git or the recycle bin cannot undo.
+static DESTRUCTIVE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+    vec![
+        Regex::new(r"(?i)\brm\s+(-[a-z]*r[a-z]*|--recursive)\b").unwrap(),
+        Regex::new(r"(?i)\bRemove-Item\b[^|;&]*-Recurse").unwrap(),
+        Regex::new(r"(?i)\b(rd|rmdir)\s+/s\b").unwrap(),
+        Regex::new(r"(?i)\bdel\s+(/[a-z]\s+)*/s\b").unwrap(),
+        Regex::new(r"(?i)\bgit\s+reset\s+--hard\b").unwrap(),
+        Regex::new(r"(?i)\bgit\s+clean\s+(-[a-z]*f|--force)").unwrap(),
+        Regex::new(r"(?i)\bgit\s+checkout\s+(-f\b|--force\b|--\s+\.)").unwrap(),
+        Regex::new(r"(?i)\bgit\s+restore\s+(--source[^|;&]*\s)?(--worktree\s+)?\.\s*$").unwrap(),
+        Regex::new(r"(?i)\bgit\s+(stash\s+(drop|clear)|branch\s+-D)\b").unwrap(),
+        Regex::new(r"(?i)\brimraf\b").unwrap(),
+    ]
+});
+
 static WARN_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(r"(?i)pip\s+install").unwrap(),
@@ -243,16 +264,24 @@ impl PolicyGate {
 
     /// Check a shell command string
     pub fn check_command(&self, command: &str) -> PolicyDecision {
+        if self.mode != PolicyMode::Dev {
+            for pattern in BLOCKED_PATTERNS.iter() {
+                if pattern.is_match(command) {
+                    return PolicyDecision::Deny(format!(
+                        "Command matches blocked pattern: {}",
+                        pattern.as_str()
+                    ));
+                }
+            }
+        }
+        // Destroying work is never silent, in any mode.
+        if DESTRUCTIVE_PATTERNS.iter().any(|p| p.is_match(command)) {
+            return PolicyDecision::Warn(format!(
+                "{DESTRUCTIVE_WARNING_PREFIX}: this can permanently delete or overwrite files that are not committed. Check the command before allowing it."
+            ));
+        }
         if self.mode == PolicyMode::Dev {
             return PolicyDecision::Allow;
-        }
-        for pattern in BLOCKED_PATTERNS.iter() {
-            if pattern.is_match(command) {
-                return PolicyDecision::Deny(format!(
-                    "Command matches blocked pattern: {}",
-                    pattern.as_str()
-                ));
-            }
         }
         for pattern in WARN_PATTERNS.iter() {
             if pattern.is_match(command) {
@@ -486,6 +515,44 @@ mod tests {
 
     use super::*;
     use std::env;
+
+    #[test]
+    fn commands_that_destroy_uncommitted_work_always_ask_in_every_mode() {
+        for mode in ["strict", "balanced", "dev"] {
+            let g = PolicyGate::with_profile(env::current_dir().unwrap(), mode, 0);
+            for cmd in [
+                "rm -rf ./project",
+                "rm -r src",
+                "Remove-Item -Path .\\src -Recurse -Force",
+                "rd /s /q build",
+                "del /s /q *.rs",
+                "git reset --hard HEAD~1",
+                "git clean -fd",
+                "git checkout -- .",
+                "git stash drop",
+                "git branch -D feature",
+                "npx rimraf dist",
+            ] {
+                match g.check_command(cmd) {
+                    PolicyDecision::Warn(msg) => {
+                        assert!(msg.starts_with(DESTRUCTIVE_WARNING_PREFIX), "{mode} {cmd}")
+                    }
+                    other => panic!("{mode} `{cmd}` should warn, got {other:?}"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ordinary_commands_are_not_flagged_as_destructive() {
+        let g = PolicyGate::with_profile(env::current_dir().unwrap(), "balanced", 0);
+        for cmd in ["git status", "git diff", "cargo test", "ls -la", "git reset --soft HEAD~1", "rm file.txt"] {
+            assert!(
+                !matches!(g.check_command(cmd), PolicyDecision::Warn(m) if m.starts_with(DESTRUCTIVE_WARNING_PREFIX)),
+                "{cmd}"
+            );
+        }
+    }
 
     fn gate() -> PolicyGate {
         PolicyGate::new(env::current_dir().unwrap())

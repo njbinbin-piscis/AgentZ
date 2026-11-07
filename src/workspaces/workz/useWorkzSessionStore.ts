@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { confirmDialog } from "../../services/tauri/confirm";
 import {
   chatSend,
   chatCancel,
@@ -1594,15 +1595,21 @@ export function useWorkzSessionStore({
 
   const deleteSessionIn = useCallback(
     (dir: string, id: string) => {
-      if (sameScope(dir)) {
-        void removeTask(id);
-        return;
-      }
-      deleteSession(id, dir)
-        .then(refreshGroups)
-        .catch((e) => setError(String(e)));
+      void (async () => {
+        if (!(await confirmDialog(t("chat.deleteSessionConfirm"), { title: t("chat.deleteSessionTitle") }))) return;
+        if (sameScope(dir)) {
+          await removeTask(id);
+          return;
+        }
+        try {
+          await deleteSession(id, dir);
+          refreshGroups();
+        } catch (e) {
+          setError(String(e));
+        }
+      })();
     },
-    [sameScope, removeTask, refreshGroups],
+    [sameScope, removeTask, refreshGroups, t],
   );
 
   const addProject = useCallback(async () => {

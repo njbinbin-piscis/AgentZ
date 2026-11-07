@@ -5,7 +5,7 @@ use tauri::AppHandle;
 use crate::commands::data_scope::require_project_dir;
 use crate::journal::{open_project_journal, FileJournal, JournalChange, JournalFileDiff};
 
-async fn task_journal_root(project_dir: Option<&str>, session_id: &str) -> Result<String, String> {
+pub(crate) async fn task_journal_root(project_dir: Option<&str>, session_id: &str) -> Result<String, String> {
     let project = require_project_dir(project_dir)?;
     super::agent_task::resolve_task_workspace(
         std::path::Path::new(&project),

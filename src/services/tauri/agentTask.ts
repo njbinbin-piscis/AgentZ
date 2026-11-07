@@ -8,6 +8,20 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 
+export interface RollbackPreviewItem {
+  path: string;
+  /** The agent created it; a full rollback deletes it. */
+  created: boolean;
+  exists_now: boolean;
+}
+
+export interface RollbackOutcome {
+  restored: string[];
+  deleted: string[];
+  kept_created: string[];
+  backup_dir: string | null;
+}
+
 export interface AgentTaskInfo {
   id: string;
   branch: string;
@@ -154,10 +168,18 @@ export const agentTaskApi = {
       expectedTaskHead,
       autoCommitUncommitted: autoCommitUncommitted ?? false,
     }),
-  rollbackSnapshot: (projectDir: string, taskId: string) =>
-    invoke<string[]>("agent_task_rollback_snapshot", {
+  /** What an undo-all would touch; nothing is changed. */
+  rollbackPreview: (projectDir: string, taskId: string) =>
+    invoke<RollbackPreviewItem[]>("agent_task_rollback_preview", {
       projectDir,
       taskId,
+    }),
+  /** Backs the current files up first; created files are deleted only if `deleteCreated`. */
+  rollbackSnapshot: (projectDir: string, taskId: string, deleteCreated = false) =>
+    invoke<RollbackOutcome>("agent_task_rollback_snapshot", {
+      projectDir,
+      taskId,
+      deleteCreated,
     }),
   merge: (
     projectDir: string,

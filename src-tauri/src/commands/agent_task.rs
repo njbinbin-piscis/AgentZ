@@ -741,15 +741,144 @@ pub fn rollback_session_journal_changes(
     Ok(restored_set.into_iter().collect())
 }
 
+/// One file a task rollback would touch.
+#[derive(Debug, Clone, Serialize)]
+pub struct RollbackPreviewItem {
+    pub path: String,
+    /// The agent created this file; a full rollback deletes it.
+    pub created: bool,
+    /// The file is on disk right now (so it will be backed up first).
+    pub exists_now: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RollbackOutcome {
+    /// Files put back to their pre-task content.
+    pub restored: Vec<String>,
+    /// Files the task created that were deleted (only when asked for).
+    pub deleted: Vec<String>,
+    /// Task-created files that were left in place.
+    pub kept_created: Vec<String>,
+    /// Where the current content of every touched file was copied first.
+    pub backup_dir: Option<String>,
+}
+
+/// A journal path is relative to the task workspace; refuse anything that
+/// could point outside it.
+fn safe_rel_path(rel: &str) -> bool {
+    let p = Path::new(rel);
+    !rel.is_empty()
+        && !p.is_absolute()
+        && p.components()
+            .all(|c| matches!(c, std::path::Component::Normal(_)))
+}
+
+fn rollback_preview_items(
+    journal: &crate::journal::FileJournal,
+    root: &Path,
+    session_id: &str,
+) -> Result<Vec<RollbackPreviewItem>, String> {
+    let candidates = journal
+        .rollback_candidates(session_id)
+        .map_err(|e| e.to_string())?;
+    Ok(candidates
+        .into_iter()
+        .filter(|(rel, _)| safe_rel_path(rel))
+        .map(|(rel, existed)| RollbackPreviewItem {
+            exists_now: root.join(&rel).is_file(),
+            created: !existed,
+            path: rel,
+        })
+        .collect())
+}
+
+/// Copy the current content of every file the rollback will touch to
+/// `<root>/.agentz/rollback-backups/<stamp>/`. Any failure aborts the rollback:
+/// nothing may be destroyed without a copy.
+fn backup_before_rollback(root: &Path, items: &[RollbackPreviewItem]) -> Result<Option<PathBuf>, String> {
+    let existing: Vec<&RollbackPreviewItem> = items.iter().filter(|i| i.exists_now).collect();
+    if existing.is_empty() {
+        return Ok(None);
+    }
+    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+    let dir = root.join(".agentz").join("rollback-backups").join(stamp);
+    for item in existing {
+        let from = root.join(&item.path);
+        let to = dir.join(&item.path);
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("backup failed, nothing was changed: {e}"))?;
+        }
+        std::fs::copy(&from, &to).map_err(|e| {
+            format!("backup of {} failed, nothing was changed: {e}", item.path)
+        })?;
+    }
+    Ok(Some(dir))
+}
+
+/// Roll a task's journaled file changes back, after copying the current files
+/// to a backup folder. Files the task created are only deleted when
+/// `delete_created` is true.
+pub fn rollback_session_with_backup(
+    journal: &crate::journal::FileJournal,
+    root: &Path,
+    session_id: &str,
+    delete_created: bool,
+) -> Result<RollbackOutcome, String> {
+    let items = rollback_preview_items(journal, root, session_id)?;
+    let backup_dir = backup_before_rollback(root, &items)?;
+    let created: Vec<String> = items.iter().filter(|i| i.created).map(|i| i.path.clone()).collect();
+    if delete_created {
+        let touched = rollback_session_journal_changes(journal, session_id)?;
+        let deleted = touched.iter().filter(|p| created.contains(p)).cloned().collect();
+        let restored = touched.into_iter().filter(|p| !created.contains(p)).collect();
+        return Ok(RollbackOutcome {
+            restored,
+            deleted,
+            kept_created: Vec::new(),
+            backup_dir: backup_dir.map(|d| d.to_string_lossy().into_owned()),
+        });
+    }
+    let modified: Vec<String> = items.iter().filter(|i| !i.created).map(|i| i.path.clone()).collect();
+    let restored = if modified.is_empty() {
+        Vec::new()
+    } else {
+        journal
+            .undo_paths(session_id, Some(&modified))
+            .map_err(|e| e.to_string())?
+    };
+    Ok(RollbackOutcome {
+        restored,
+        deleted: Vec::new(),
+        kept_created: created,
+        backup_dir: backup_dir.map(|d| d.to_string_lossy().into_owned()),
+    })
+}
+
+/// What a rollback would do, without doing it.
+#[tauri::command]
+pub async fn agent_task_rollback_preview(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_dir: Option<String>,
+    task_id: String,
+) -> Result<Vec<RollbackPreviewItem>, String> {
+    let _lease = state.environment_access.execution().await;
+    let root = super::journal::task_journal_root(project_dir.as_deref(), &task_id).await?;
+    let journal = crate::journal::open_project_journal(&root)?;
+    rollback_preview_items(&journal, Path::new(&root), &task_id)
+}
+
 #[tauri::command]
 pub async fn agent_task_rollback_snapshot(
     state: tauri::State<'_, crate::state::AppState>,
     project_dir: Option<String>,
     task_id: String,
-) -> Result<Vec<String>, String> {
+    delete_created: Option<bool>,
+) -> Result<RollbackOutcome, String> {
     let _lease = state.environment_access.execution().await;
-    let journal = super::journal::open_task_journal(project_dir.as_deref(), &task_id).await?;
-    rollback_session_journal_changes(&journal, &task_id)
+    let root = super::journal::task_journal_root(project_dir.as_deref(), &task_id).await?;
+    let journal = crate::journal::open_project_journal(&root)?;
+    rollback_session_with_backup(&journal, Path::new(&root), &task_id, delete_created.unwrap_or(false))
 }
 
 #[cfg(test)]
@@ -817,5 +946,56 @@ mod snapshot_rollback_tests {
         assert!(!file_b.exists());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn task_with_modified_and_created_file() -> (PathBuf, crate::journal::FileJournal) {
+        let dir = std::env::temp_dir().join(format!("agentz-rollback-safe-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("notes.md"), b"original notes\n").unwrap();
+        let journal = crate::journal::open_project_journal(dir.to_str().unwrap()).unwrap();
+        journal.begin_turn("t");
+        apply_journal_edit(&journal, "t", "1", "notes.md", &dir, b"edited\n");
+        apply_journal_edit(&journal, "t", "2", "app.rs", &dir, b"the overnight work\n");
+        (dir, journal)
+    }
+
+    #[test]
+    fn rollback_keeps_created_files_unless_asked_and_always_backs_up_first() {
+        let (dir, journal) = task_with_modified_and_created_file();
+        let preview = rollback_preview_items(&journal, &dir, "t").unwrap();
+        assert!(preview.iter().any(|i| i.path == "app.rs" && i.created && i.exists_now));
+        assert!(preview.iter().any(|i| i.path == "notes.md" && !i.created));
+
+        let out = rollback_session_with_backup(&journal, &dir, "t", false).unwrap();
+        assert_eq!(out.restored, vec!["notes.md".to_string()]);
+        assert_eq!(out.kept_created, vec!["app.rs".to_string()]);
+        assert!(out.deleted.is_empty());
+        // The created file survives; the modified one is back to its original.
+        assert_eq!(std::fs::read(dir.join("app.rs")).unwrap(), b"the overnight work\n");
+        assert_eq!(std::fs::read(dir.join("notes.md")).unwrap(), b"original notes\n");
+        // Both pre-rollback versions were copied first.
+        let backup = PathBuf::from(out.backup_dir.expect("backup dir"));
+        assert_eq!(std::fs::read(backup.join("notes.md")).unwrap(), b"edited\n");
+        assert_eq!(std::fs::read(backup.join("app.rs")).unwrap(), b"the overnight work\n");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn deleting_created_files_still_leaves_a_backup_copy() {
+        let (dir, journal) = task_with_modified_and_created_file();
+        let out = rollback_session_with_backup(&journal, &dir, "t", true).unwrap();
+        assert_eq!(out.deleted, vec!["app.rs".to_string()]);
+        assert!(!dir.join("app.rs").exists());
+        let backup = PathBuf::from(out.backup_dir.expect("backup dir"));
+        assert_eq!(std::fs::read(backup.join("app.rs")).unwrap(), b"the overnight work\n");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn journal_paths_that_escape_the_workspace_are_ignored() {
+        assert!(safe_rel_path("src/a.rs"));
+        assert!(!safe_rel_path("../outside.txt"));
+        assert!(!safe_rel_path("/etc/passwd"));
+        assert!(!safe_rel_path(""));
     }
 }

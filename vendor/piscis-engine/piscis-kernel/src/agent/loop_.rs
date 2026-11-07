@@ -2626,12 +2626,35 @@ impl AgentLoop {
                     .read()
                     .map(|f| (f.confirm_shell, f.confirm_file_write))
                     .unwrap_or((true, true));
-                let user_disabled = match name {
-                    "shell" | "bash" | "powershell" | "powershell_query" => !confirm_shell,
-                    "file_write" | "file_edit" => !confirm_file_write,
-                    _ => false,
-                };
-                if tool_wants_confirm && !user_disabled {
+                // Turning confirmation off never covers a command that can
+                // permanently destroy work.
+                let destructive = msg.starts_with(crate::policy::gate::DESTRUCTIVE_WARNING_PREFIX);
+                let user_disabled = !destructive
+                    && match name {
+                        "shell" | "bash" | "powershell" | "powershell_query" => !confirm_shell,
+                        "file_write" | "file_edit" => !confirm_file_write,
+                        _ => false,
+                    };
+                if (tool_wants_confirm || destructive) && !user_disabled {
+                    if self.confirmation_responses.is_none() && destructive {
+                        // Nobody can be asked (headless or background run): refuse.
+                        let reason = "Refused: this command can permanently destroy work and no one is available to confirm it.";
+                        warn!("Tool '{}' refused without a confirmer: {}", name, msg);
+                        let _ = event_tx
+                            .send(AgentEvent::ToolEnd {
+                                id: id.to_string(),
+                                name: name.to_string(),
+                                result: reason.into(),
+                                is_error: true,
+                            })
+                            .await;
+                        blocks.push(ContentBlock::ToolResult {
+                            tool_use_id: id.to_string(),
+                            content: reason.into(),
+                            is_error: true,
+                        });
+                        return blocks;
+                    }
                     if let Some(confirms) = &self.confirmation_responses {
                         let request_id = uuid::Uuid::new_v4().to_string();
                         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();

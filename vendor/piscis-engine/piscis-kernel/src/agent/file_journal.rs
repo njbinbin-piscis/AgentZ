@@ -362,8 +362,82 @@ impl FileJournal {
         Ok(restored)
     }
 
-    fn restore(&self, rel: &str, existed: bool, before: Option<&[u8]>) -> Result<()> {
+    /// Every path a full-session rollback (`undo_turn` replayed over all turns)
+    /// would touch, with whether the agent created it (`existed == false`, so
+    /// the rollback would delete it). One entry per path, oldest first.
+    pub fn rollback_candidates(&self, session_id: &str) -> Result<Vec<(String, bool)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT rel_path, existed FROM file_snapshots
+             WHERE session_id = ?1 AND applied = 1 AND undone = 0
+             ORDER BY id ASC",
+        )?;
+        let rows = stmt.query_map(params![session_id], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? != 0))
+        })?;
+        let mut seen = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for row in rows {
+            let row = row?;
+            if seen.insert(row.0.clone()) {
+                out.push(row);
+            }
+        }
+        Ok(out)
+    }
+
+    /// Copy a file's current content to
+    /// `<workspace>/.agentz/rollback-backups/<stamp>/<rel>` before an undo
+    /// overwrites or deletes it. Every undo path goes through `restore`, so no
+    /// undo can destroy content (the agent's work, or the user's later edits)
+    /// without leaving a copy. Failure aborts the undo.
+    fn backup_current(&self, rel: &str) -> Result<()> {
         let abs = self.abs_path(rel);
+        if !abs.is_file() {
+            return Ok(());
+        }
+        let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+        let base = self
+            .workspace_root
+            .join(".agentz")
+            .join("rollback-backups")
+            .join(&stamp);
+        let mut dest = base.join(rel);
+        let mut n = 1;
+        while dest.exists() {
+            // Never overwrite an earlier backup of the same file.
+            dest = base.join(format!("{rel}.{n}"));
+            n += 1;
+        }
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("backup before undo failed for {rel}; nothing was changed"))?;
+        }
+        std::fs::copy(&abs, &dest)
+            .with_context(|| format!("backup before undo failed for {rel}; nothing was changed"))?;
+        Ok(())
+    }
+
+    fn restore(&self, rel: &str, existed: bool, before: Option<&[u8]>) -> Result<()> {
+        // A journal row must never point outside the workspace.
+        let rel_path = Path::new(rel);
+        if rel.is_empty()
+            || rel_path.is_absolute()
+            || !rel_path
+                .components()
+                .all(|c| matches!(c, std::path::Component::Normal(_)))
+        {
+            anyhow::bail!("refusing to restore '{rel}': path is outside the workspace");
+        }
+        let abs = self.abs_path(rel);
+        let unchanged = match (existed, before, std::fs::read(&abs)) {
+            (true, Some(b), Ok(now)) => b == now.as_slice(),
+            (false, _, Err(_)) => true,
+            _ => false,
+        };
+        if !unchanged {
+            self.backup_current(rel)?;
+        }
         if existed {
             if let Some(bytes) = before {
                 if let Some(parent) = abs.parent() {
@@ -509,6 +583,62 @@ mod undo_tests {
             [0, 255, 13, 10]
         );
         assert!(journal.undo_turn("a", &turn).unwrap().is_empty());
+    }
+    fn backups(dir: &Path) -> Vec<(String, Vec<u8>)> {
+        fn walk(dir: &Path, out: &mut Vec<(String, Vec<u8>)>) {
+            for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else {
+                    let name = path.file_name().unwrap().to_string_lossy().into_owned();
+                    out.push((name, std::fs::read(&path).unwrap()));
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(&dir.join(".agentz").join("rollback-backups"), &mut out);
+        out
+    }
+    #[test]
+    fn undo_backs_up_what_it_overwrites_and_what_it_deletes() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
+        std::fs::write(dir.path().join("a.txt"), b"original").unwrap();
+        let turn = journal.begin_turn("a");
+        change(&journal, "a", "one", "a.txt", b"agent edit", true);
+        change(&journal, "a", "two", "new.rs", b"overnight work", true);
+        // The user kept editing after the agent.
+        std::fs::write(dir.path().join("a.txt"), b"agent edit + my own change").unwrap();
+
+        journal.undo_turn("a", &turn).unwrap();
+
+        assert_eq!(std::fs::read(dir.path().join("a.txt")).unwrap(), b"original");
+        assert!(!dir.path().join("new.rs").exists());
+        let saved = backups(dir.path());
+        assert!(saved.contains(&("a.txt".to_string(), b"agent edit + my own change".to_vec())));
+        assert!(saved.contains(&("new.rs".to_string(), b"overnight work".to_vec())));
+    }
+    #[test]
+    fn a_failed_backup_aborts_the_undo_and_leaves_the_file_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
+        std::fs::write(dir.path().join("a.txt"), b"original").unwrap();
+        let turn = journal.begin_turn("a");
+        change(&journal, "a", "one", "a.txt", b"agent edit", true);
+        // A plain file where the backup folder must go makes the backup impossible.
+        std::fs::create_dir_all(dir.path().join(".agentz")).unwrap();
+        std::fs::write(dir.path().join(".agentz").join("rollback-backups"), b"in the way").unwrap();
+
+        assert!(journal.undo_turn("a", &turn).is_err());
+        assert_eq!(std::fs::read(dir.path().join("a.txt")).unwrap(), b"agent edit");
+    }
+    #[test]
+    fn journal_rows_outside_the_workspace_are_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
+        assert!(journal.restore("../escape.txt", true, Some(b"x")).is_err());
+        assert!(journal.restore("", false, None).is_err());
     }
     #[test]
     fn previously_undone_snapshot_is_not_selected_for_restore() {

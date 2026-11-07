@@ -1,6 +1,6 @@
 //! Chat session management — list / load / fork / delete / checkpoints.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -1219,6 +1219,24 @@ pub async fn chat_restore_checkpoint(
             )
             .map_err(|e| format!("checkpoint message not found: {e}"))?;
 
+        // The messages after the checkpoint are about to be erased for good:
+        // keep a full copy of the conversation first, and refuse to go on
+        // without it.
+        let data = export_session_data(db, &session_id, Some(&project))
+            .map_err(|e| format!("could not back up the conversation, nothing was deleted: {e}"))?;
+        let backup_dir = PathBuf::from(&project).join(".agentz").join("deleted-sessions");
+        std::fs::create_dir_all(&backup_dir)
+            .and_then(|_| {
+                let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+                let json = serde_json::to_string_pretty(&data)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                std::fs::write(
+                    backup_dir.join(format!("{session_id}-before-checkpoint-{stamp}.json")),
+                    json,
+                )
+            })
+            .map_err(|e| format!("could not back up the conversation, nothing was deleted: {e}"))?;
+
         db.conn
             .execute(
                 "DELETE FROM messages WHERE session_id = ?1 AND rowid > ?2",
@@ -1256,6 +1274,31 @@ pub async fn chat_delete_session(
     session_id: String,
     project_dir: Option<String>,
 ) -> Result<(), String> {
+    // Deleting is permanent, so keep a copy first. If the copy cannot be
+    // written, the session is left alone and the user is told why.
+    let pd = project_dir.clone();
+    let sid = session_id.clone();
+    let data = with_db(&app, ProjectDirParam { project_dir: project_dir.clone() }, move |db| {
+        export_session_data(db, &sid, pd.as_deref())
+    })
+    .await
+    .map_err(|e| format!("could not back up the session before deleting it, nothing was deleted: {e}"))?;
+    if !data.messages.is_empty() {
+        let base = match project_dir.as_deref() {
+            Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir).join(".agentz"),
+            _ => crate::commands::data_scope::resolve_global_config_dir(&app)
+                .map_err(|e| format!("could not locate a backup folder, nothing was deleted: {e}"))?,
+        };
+        let dir = base.join("deleted-sessions");
+        let json = serde_json::to_string_pretty(&data)
+            .map_err(|e| format!("could not back up the session, nothing was deleted: {e}"))?;
+        std::fs::create_dir_all(&dir)
+            .and_then(|_| {
+                let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+                std::fs::write(dir.join(format!("{session_id}-{stamp}.json")), json)
+            })
+            .map_err(|e| format!("could not back up the session, nothing was deleted: {e}"))?;
+    }
     // Deleting a session terminates its background tasks and drops any parked
     // continuation, so a deleted session never resurrects via auto-resume.
     if let Some(state) = app.try_state::<crate::state::AppState>() {
