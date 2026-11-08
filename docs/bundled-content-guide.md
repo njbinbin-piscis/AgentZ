@@ -15,7 +15,9 @@ parts and is part of the release gate.
 | Project rules | `<project>/.agentz/rules/*.md` (also reads `.cursor/rules/*.md|mdc`). There is no `AgentZ.md`, `CLAUDE.md` or `CODEBUDDY.md` memory file. |
 | Project files | `.agentz/plans/*.md` (plans), `.agentz/REPO_WIKI.md` (repo wiki), `.agentz/screenshots/`, `.agentz/*.db` (internal, never edit). |
 | MCP servers / connectors | Configured in **Settings → MCP Servers / Connectors**, not in plugin files. Agents call connectors through `api_connector`. |
-| Not present | Plugins, `plugin.json`, plugin marketplaces, `hooks.json` / hook scripts, `.claude*` / `.codebuddy*` directories, `${..._PLUGIN_ROOT}` variables, `settings.local.md` plugin settings. Content that teaches these must be removed or rewritten for the AgentZ equivalent. |
+| Project hooks | `<project>/.agentz/hooks.json` (Settings → Hooks). Each hook is `{id, name, event, command, enabled}`; `event` is `beforeAgentTurn`, `afterAgentTurn`, `beforeFileEdit` or `afterFileEdit`. The command runs through the OS shell in the project root with a 10 s timeout. **Only `beforeAgentTurn` is executed today**: its stdout is injected into the system prompt. Exit codes are ignored; hooks cannot block or modify tool calls. There are no hook scripts shipped with plugins and no Claude-style `PreToolUse`/`Stop` events or prompt-based hooks. See the `hook-development` skill. |
+| Marketplace | The Resource library has a marketplace (official backend, ClawHub, SkillHub) for agents, skills, connectors, teams and tools. It does not distribute multi-component plugins. |
+| Not present | Plugins, `plugin.json`, plugin bundles, Claude-style plugin hooks (`PreToolUse`, `PostToolUse`, `Stop`, prompt-based hooks), `.claude*` / `.codebuddy*` directories, `${..._PLUGIN_ROOT}` variables, `settings.local.md` plugin settings. Content that teaches these must be removed or rewritten for the AgentZ equivalent. |
 
 ## Tool names
 

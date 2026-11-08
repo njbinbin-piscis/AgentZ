@@ -1,0 +1,7 @@
+{
+  "id": "tpl-hookify-template",
+  "name": "Lifecycle Hooks",
+  "name_zh": "生命周期钩子",
+  "description": "Project hooks workflow: write small, fast, idempotent shell hooks in .agentz/hooks.json and keep post-edit diagnostics repeatable.",
+  "description_zh": "项目钩子工作流：在 .agentz/hooks.json 中编写简短、快速、可重复执行的 shell 钩子，并保持改动后的静态检查可复现。"
+}
