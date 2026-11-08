@@ -1687,6 +1687,7 @@ const en = {
     pickHint: "Hover to preview, click to select. Use the inspector panel to send to chat.",
     screenshotToChat: "Send a screenshot to chat (for vision models)",
     close: "Close browser",
+    closeTab: "Close tab",
     loading: "Loading…",
     empty: "Enter a URL above to start browsing.",
     inspector: "Element",

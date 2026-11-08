@@ -115,6 +115,46 @@ export function browserClickAt(sessionId: string, x: number, y: number): Promise
   return invoke<boolean>("browser_click_at", { sessionId, x, y });
 }
 
+/** Real mouse click; `clickCount` 2 selects a word, 3 a paragraph. */
+export function browserMouseClick(
+  sessionId: string,
+  x: number,
+  y: number,
+  clickCount: number,
+): Promise<void> {
+  return invoke<void>("browser_mouse_click", { sessionId, x, y, clickCount });
+}
+
+/** Press, drag and release between two viewport points: selects the text between them. */
+export function browserDragSelect(
+  sessionId: string,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): Promise<void> {
+  return invoke<void>("browser_drag_select", {
+    sessionId,
+    fromX: from.x,
+    fromY: from.y,
+    toX: to.x,
+    toY: to.y,
+  });
+}
+
+/** Text currently selected in the page. */
+export function browserSelectionText(sessionId: string): Promise<string> {
+  return invoke<string>("browser_selection_text", { sessionId });
+}
+
+/** Select everything in the focused field, or the whole page. */
+export function browserSelectAll(sessionId: string): Promise<void> {
+  return invoke<void>("browser_select_all", { sessionId });
+}
+
+/** Close one of this session's tabs. */
+export function browserCloseTab(sessionId: string, tabId: string): Promise<void> {
+  return invoke<void>("browser_close_tab", { sessionId, tabId });
+}
+
 /** Identify the element at viewport coordinates for pick / inspect. */
 export function browserPickAt(sessionId: string, x: number, y: number): Promise<PickedElement | null> {
   return invoke<PickedElement | null>("browser_pick_at", { sessionId, x, y });

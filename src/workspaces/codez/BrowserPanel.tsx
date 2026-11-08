@@ -3,7 +3,12 @@ import { useTranslation } from "react-i18next";
 import {
   browserClickAt,
   browserClose,
+  browserCloseTab,
+  browserDragSelect,
   browserHistoryStep,
+  browserMouseClick,
+  browserSelectAll,
+  browserSelectionText,
   browserInsertText,
   browserPressKey,
   browserCurrentUrl,
@@ -477,14 +482,54 @@ export default function BrowserPanel({
     setHovered(null);
   }, []);
 
+  // Text selection by dragging: remember where the press happened, and on
+  // release send one press-drag-release to the page. The click that follows a
+  // drag must not be forwarded, or it would clear the new selection.
+  const dragRef = useRef<{ cx: number; cy: number; pt: { x: number; y: number } } | null>(null);
+  const justDraggedRef = useRef(false);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      justDraggedRef.current = false;
+      if (pickMode || e.button !== 0) return;
+      const pt = toPageCoords(e);
+      dragRef.current = pt ? { cx: e.clientX, cy: e.clientY, pt } : null;
+    },
+    [pickMode],
+  );
+
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const start = dragRef.current;
+      dragRef.current = null;
+      if (!start || pickMode) return;
+      if (Math.hypot(e.clientX - start.cx, e.clientY - start.cy) < 5) return;
+      const end = toPageCoords(e);
+      if (!end) return;
+      justDraggedRef.current = true;
+      void browserDragSelect(sessionIdRef.current, start.pt, end)
+        .then(() => setTimeout(() => void refreshShot(), 120))
+        .catch((err) => setError(String(err)));
+    },
+    [pickMode, refreshShot],
+  );
+
   const handleCanvasClick = useCallback(
     async (e: React.MouseEvent<HTMLDivElement>) => {
+      if (justDraggedRef.current) {
+        justDraggedRef.current = false;
+        return;
+      }
       const pt = toPageCoords(e);
       if (!pt) return;
       try {
         if (pickMode) {
           const el = await browserPickAt(sessionIdRef.current, pt.x, pt.y);
           if (el) setSelected(el);
+        } else if (e.detail >= 2) {
+          // Double / triple click: select the word / paragraph.
+          await browserMouseClick(sessionIdRef.current, pt.x, pt.y, Math.min(3, e.detail));
+          setTimeout(() => void refreshShot(), 120);
         } else {
           await browserClickAt(sessionIdRef.current, pt.x, pt.y);
           setTimeout(() => {
@@ -518,7 +563,20 @@ export default function BrowserPanel({
         void browserInsertText(sessionIdRef.current, e.key).then(refreshSoon, (err) => setError(String(err)));
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key.length === 1) return; // let paste/copy shortcuts reach onPaste
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.length === 1) {
+        const k = e.key.toLowerCase();
+        if (k === "c") {
+          // Copy the page's selection to the system clipboard.
+          e.preventDefault();
+          void browserSelectionText(sessionIdRef.current)
+            .then((text) => (text ? navigator.clipboard.writeText(text) : undefined))
+            .catch((err) => setError(String(err)));
+        } else if (k === "a") {
+          e.preventDefault();
+          void browserSelectAll(sessionIdRef.current).then(refreshSoon, (err) => setError(String(err)));
+        }
+        return; // paste (Ctrl+V) still reaches onPaste
+      }
       if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") return;
       e.preventDefault();
       void browserPressKey(sessionIdRef.current, e.key, mods).then(refreshSoon, () => {});
@@ -605,12 +663,18 @@ export default function BrowserPanel({
       {tabs.length > 0 && (
         <div className="agentz-browser-tabs" role="tablist">
           {tabs.map((tab) => (
-            <button
+            <div
               key={tab.id}
-              type="button"
               role="tab"
+              tabIndex={0}
               aria-selected={tab.active}
               className={`agentz-browser-tab${tab.active ? " active" : ""}`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.currentTarget.click();
+                }
+              }}
               title={t("browser.tabTitleHint", {
                 surface: tab.surface,
                 url: tab.url || tab.id,
@@ -626,7 +690,23 @@ export default function BrowserPanel({
             >
               <span className="agentz-browser-tab-surface">{tab.surface}</span>
               <span className="agentz-browser-tab-url">{tab.url || tab.id}</span>
-            </button>
+              <button
+                type="button"
+                className="agentz-browser-tab-close"
+                aria-label={t("browser.closeTab")}
+                title={t("browser.closeTab")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void browserCloseTab(sessionId, tab.id)
+                    .catch((err) => setError(String(err)))
+                    .then(() => refreshTabs())
+                    .then(() => refreshShot())
+                    .then(() => syncAddressFromBackend());
+                }}
+              >
+                ✕
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -694,8 +774,13 @@ export default function BrowserPanel({
           <div
             className="agentz-browser-canvas"
             ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
             onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
+            onMouseLeave={() => {
+              dragRef.current = null;
+              handleMouseLeave();
+            }}
             tabIndex={0}
             onKeyDown={handleCanvasKeyDown}
             onPaste={handleCanvasPaste}

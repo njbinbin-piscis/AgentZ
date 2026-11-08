@@ -254,3 +254,71 @@ pub async fn browser_history_step(
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn browser_mouse_click(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+    x: f64,
+    y: f64,
+    click_count: i64,
+) -> Result<(), String> {
+    state
+        .browser
+        .mouse_click(&session_of(session_id), x, y, click_count)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn browser_drag_select(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+    from_x: f64,
+    from_y: f64,
+    to_x: f64,
+    to_y: f64,
+) -> Result<(), String> {
+    state
+        .browser
+        .mouse_drag(&session_of(session_id), (from_x, from_y), (to_x, to_y))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn browser_selection_text(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+) -> Result<String, String> {
+    state
+        .browser
+        .selection_text(&session_of(session_id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn browser_select_all(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+) -> Result<(), String> {
+    state
+        .browser
+        .select_all(&session_of(session_id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn browser_close_tab(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+    tab_id: String,
+) -> Result<(), String> {
+    state
+        .browser
+        .close_owned_tab(&session_of(session_id), &tab_id)
+        .await
+        .map_err(|e| e.to_string())
+}

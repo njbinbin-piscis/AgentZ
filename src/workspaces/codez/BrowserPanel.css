@@ -46,6 +46,29 @@
   letter-spacing: 0.04em;
 }
 
+.agentz-browser-tab-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.agentz-browser-tab-close:hover {
+  opacity: 1;
+  background: var(--bg-hover, rgba(128, 128, 128, 0.25));
+}
+
 .agentz-browser-tab-url {
   overflow: hidden;
   text-overflow: ellipsis;

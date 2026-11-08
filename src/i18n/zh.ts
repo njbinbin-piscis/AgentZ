@@ -1636,6 +1636,7 @@ const zh = {
     pickHint: "悬停预览，点击选中；在右侧属性面板发送到聊天。",
     screenshotToChat: "截图发送到聊天（供视觉模型使用）",
     close: "关闭浏览器",
+    closeTab: "关闭标签页",
     loading: "加载中…",
     empty: "在上方输入 URL 开始浏览。",
     inspector: "元素",

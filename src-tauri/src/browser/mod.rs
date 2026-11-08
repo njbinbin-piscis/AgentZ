@@ -937,7 +937,7 @@ impl BrowserManager {
     pub async fn click_at(&self, session_id: &str, x: f64, y: f64) -> Result<bool> {
         // Real input events first: they move focus into inputs, follow links and
         // trigger form controls the way a user click does.
-        if self.mouse_click(session_id, x, y).await.is_ok() {
+        if self.mouse_click(session_id, x, y, 1).await.is_ok() {
             return Ok(true);
         }
         let js = format!(
@@ -946,16 +946,25 @@ impl BrowserManager {
         Ok(self.eval(session_id, &js).await?.as_bool().unwrap_or(false))
     }
 
-    /// Dispatch a genuine left click (move, press, release) at viewport coordinates.
-    pub async fn mouse_click(&self, session_id: &str, x: f64, y: f64) -> Result<()> {
+    /// Dispatch a genuine left click (move, press, release) at viewport
+    /// coordinates. `click_count` 2 / 3 selects a word / a paragraph, like a
+    /// real double / triple click.
+    pub async fn mouse_click(
+        &self,
+        session_id: &str,
+        x: f64,
+        y: f64,
+        click_count: i64,
+    ) -> Result<()> {
         use chromiumoxide::cdp::browser_protocol::input::{
             DispatchMouseEventParams, DispatchMouseEventType, MouseButton,
         };
+        let click_count = click_count.clamp(1, 3);
         self.with_page(session_id, |page| async move {
             for (kind, button, count) in [
                 (DispatchMouseEventType::MouseMoved, MouseButton::None, 0),
-                (DispatchMouseEventType::MousePressed, MouseButton::Left, 1),
-                (DispatchMouseEventType::MouseReleased, MouseButton::Left, 1),
+                (DispatchMouseEventType::MousePressed, MouseButton::Left, click_count),
+                (DispatchMouseEventType::MouseReleased, MouseButton::Left, click_count),
             ] {
                 let params = DispatchMouseEventParams::builder()
                     .r#type(kind)
@@ -970,6 +979,111 @@ impl BrowserManager {
             Ok(())
         })
         .await
+    }
+
+    /// Press at `from`, drag to `to` with the button held, release: selects the
+    /// text between the two points (or drags a slider / resizes a pane).
+    pub async fn mouse_drag(
+        &self,
+        session_id: &str,
+        from: (f64, f64),
+        to: (f64, f64),
+    ) -> Result<()> {
+        use chromiumoxide::cdp::browser_protocol::input::{
+            DispatchMouseEventParams, DispatchMouseEventType, MouseButton,
+        };
+        const STEPS: i32 = 8;
+        self.with_page(session_id, |page| async move {
+            let send = |kind: DispatchMouseEventType, x: f64, y: f64, button: MouseButton, buttons: i64, count: i64| {
+                let page = page.clone();
+                async move {
+                    let params = DispatchMouseEventParams::builder()
+                        .r#type(kind)
+                        .x(x)
+                        .y(y)
+                        .button(button)
+                        .buttons(buttons)
+                        .click_count(count)
+                        .build()
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                    page.execute(params).await.context("mouse event failed")?;
+                    anyhow::Ok(())
+                }
+            };
+            send(DispatchMouseEventType::MouseMoved, from.0, from.1, MouseButton::None, 0, 0).await?;
+            send(DispatchMouseEventType::MousePressed, from.0, from.1, MouseButton::Left, 1, 1).await?;
+            for i in 1..=STEPS {
+                let f = f64::from(i) / f64::from(STEPS);
+                let x = from.0 + (to.0 - from.0) * f;
+                let y = from.1 + (to.1 - from.1) * f;
+                send(DispatchMouseEventType::MouseMoved, x, y, MouseButton::Left, 1, 0).await?;
+            }
+            send(DispatchMouseEventType::MouseReleased, to.0, to.1, MouseButton::Left, 0, 1).await?;
+            Ok(())
+        })
+        .await
+    }
+
+    /// Text currently selected in the page (including inside inputs).
+    pub async fn selection_text(&self, session_id: &str) -> Result<String> {
+        let js = "(() => { const a = document.activeElement; if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && typeof a.selectionStart === 'number' && a.selectionStart !== a.selectionEnd) { return a.value.substring(a.selectionStart, a.selectionEnd); } const s = window.getSelection(); return s ? s.toString() : ''; })()";
+        Ok(self
+            .eval(session_id, js)
+            .await?
+            .as_str()
+            .unwrap_or_default()
+            .to_string())
+    }
+
+    /// Select everything in the focused field, or the whole page.
+    pub async fn select_all(&self, session_id: &str) -> Result<()> {
+        let js = "(() => { const a = document.activeElement; if (a && typeof a.select === 'function' && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) { a.select(); } else { document.execCommand('selectAll'); } return true; })()";
+        self.eval(session_id, js).await?;
+        Ok(())
+    }
+
+    /// Close one tab of this session (the panel's tab X). When it was the
+    /// active tab, focus another tab of the session if one is left.
+    pub async fn close_owned_tab(&self, session_id: &str, tab: &str) -> Result<()> {
+        if !tab_belongs_to_session(session_id, tab) {
+            anyhow::bail!("tab '{tab}' belongs to another session");
+        }
+        let _gate = tokio::time::timeout(PAGE_OP_TIMEOUT, self.ops.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy; try again"))?;
+        {
+            let mut mgr = self.inner.lock().await;
+            if mgr.list_tabs().iter().any(|t| t == tab) {
+                let _ = mgr.close_tab(tab).await;
+            }
+        }
+        self.forget_tab(session_id, tab);
+        self.trackers.lock().unwrap_or_else(|e| e.into_inner()).remove(tab);
+        self.viewports.lock().unwrap_or_else(|e| e.into_inner()).remove(tab);
+        self.tab_urls.lock().unwrap_or_else(|e| e.into_inner()).remove(tab);
+
+        let key = session_tab_id(session_id);
+        let open: HashSet<String> = self.inner.lock().await.list_tabs().into_iter().collect();
+        let mut remaining: Vec<String> = self
+            .owned_tabs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&key)
+            .map(|set| set.iter().filter(|t| open.contains(*t)).cloned().collect())
+            .unwrap_or_default();
+        remaining.sort();
+        let current_closed = self.current_tab(session_id) == key && !open.contains(&key);
+        if current_closed {
+            if let Some(next) = remaining.first() {
+                self.remember(session_id, next);
+                let _ = self.bind(session_id).await;
+            }
+        }
+        let mut mgr = self.inner.lock().await;
+        if mgr.list_tabs().is_empty() && mgr.is_running() {
+            let _ = mgr.close().await;
+        }
+        Ok(())
     }
 
     /// Insert text at the focused element (typing, IME and paste).
@@ -1415,6 +1529,61 @@ mod tests {
             .expect("browser should launch");
         assert!(mgr.is_open().await);
         mgr.close_session("t").await.unwrap();
+        assert!(!mgr.is_open().await);
+    }
+
+    /// Panel input against a real page: drag / double-click selection, copying
+    /// the selection, and closing one tab of a session.
+    #[tokio::test]
+    #[ignore = "requires local Chromium"]
+    async fn panel_selection_and_tab_close_live() {
+        let mgr = BrowserManager::new();
+        mgr.set_viewport("t", 900, 500).await.unwrap();
+        let page = std::env::temp_dir().join(format!("agentz-sel-{}.html", std::process::id()));
+        std::fs::write(
+            &page,
+            "<body style='margin:0;font:32px monospace'><p id=a style='margin:20px'>alpha beta gamma delta</p><input id=i value='typed value' style='font:24px monospace;margin:20px'></body>",
+        )
+        .unwrap();
+        let url = format!("file:///{}", page.to_string_lossy().replace('\\', "/"));
+        mgr.navigate("t", &url).await.expect("browser should launch");
+
+        // Drag across the first paragraph.
+        mgr.mouse_drag("t", (20.0, 40.0), (600.0, 40.0)).await.unwrap();
+        let sel = mgr.selection_text("t").await.unwrap();
+        assert!(sel.contains("alpha beta"), "drag selection: {sel:?}");
+
+        // Double click selects one word (the panel sends a plain click first).
+        mgr.click_at("t", 40.0, 40.0).await.unwrap();
+        mgr.mouse_click("t", 40.0, 40.0, 2).await.unwrap();
+        let word = mgr.selection_text("t").await.unwrap();
+        assert_eq!(word.trim(), "alpha", "double click selection");
+
+        // Triple click selects the paragraph.
+        mgr.mouse_click("t", 40.0, 40.0, 3).await.unwrap();
+        let para = mgr.selection_text("t").await.unwrap();
+        assert!(para.contains("alpha beta gamma delta"), "triple click: {para:?}");
+
+        // Select all inside the focused input only selects its value.
+        mgr.click_at("t", 60.0, 120.0).await.unwrap();
+        mgr.select_all("t").await.unwrap();
+        assert_eq!(mgr.selection_text("t").await.unwrap(), "typed value");
+
+        // A second tab can be closed on its own; the first stays.
+        let second = format!("{}#2", session_tab_id("t"));
+        mgr.remember("t", &second);
+        mgr.bind("t").await.unwrap();
+        assert_eq!(mgr.list_tab_info().len(), 2);
+        mgr.close_owned_tab("t", &second).await.unwrap();
+        let tabs = mgr.list_tab_info();
+        assert_eq!(tabs.len(), 1, "{tabs:?}");
+        assert_eq!(tabs[0].id, session_tab_id("t"));
+        assert!(tabs[0].active);
+        assert!(mgr.session_has_page("t").await);
+        assert!(mgr.close_owned_tab("t", "session:other").await.is_err());
+
+        // Closing the last tab leaves nothing open.
+        mgr.close_owned_tab("t", &session_tab_id("t")).await.unwrap();
         assert!(!mgr.is_open().await);
     }
 
