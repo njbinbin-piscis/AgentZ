@@ -956,7 +956,7 @@ const zh = {
 
   hooks: {
     title: "钩子（Hooks）",
-    hint: "钩子保存在 .agentz/hooks.json。beforeAgentTurn 钩子的输出会注入到 Agent 上下文。",
+    hint: "钩子保存在 .agentz/hooks.json，命令在项目根目录执行，超时 10 秒。beforeAgentTurn 的输出会注入 Agent 上下文；beforeFileEdit 以非 0 退出码结束时会阻止本次文件修改；afterFileEdit 和 afterAgentTurn 只执行不返回输出。环境变量：AGENTZ_HOOK_EVENT、AGENTZ_PROJECT_DIR、AGENTZ_SESSION_ID、AGENTZ_TOOL_NAME、AGENTZ_FILE_PATH。",
     empty: "暂无钩子。点击下方新建一条。",
     namePlaceholder: "钩子名称",
     enabledLabel: "启用",

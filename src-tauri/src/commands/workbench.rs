@@ -383,6 +383,16 @@ pub async fn hooks_run(project_dir: String, command: String) -> Result<HookRunRe
 
 /// Spawn a shell command rooted at `cwd`, capturing stdout/stderr with a timeout.
 pub async fn run_hook_command(cwd: &str, command: &str) -> Result<HookRunResult, std::io::Error> {
+    run_hook_command_with_env(cwd, command, &[]).await
+}
+
+/// Like [`run_hook_command`] but also sets environment variables (event
+/// context such as `AGENTZ_FILE_PATH`).
+pub async fn run_hook_command_with_env(
+    cwd: &str,
+    command: &str,
+    env: &[(&str, String)],
+) -> Result<HookRunResult, std::io::Error> {
     use tokio::process::Command;
 
     #[cfg(windows)]
@@ -399,6 +409,10 @@ pub async fn run_hook_command(cwd: &str, command: &str) -> Result<HookRunResult,
     };
 
     cmd.current_dir(cwd);
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    cmd.kill_on_drop(true);
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
 
@@ -461,4 +475,196 @@ pub async fn run_event_hooks(workspace_root: &str, event: &str) -> Option<String
         "## Hook output ({event})\nThe following context was produced by project hooks:\n{}",
         blocks.join("\n\n")
     ))
+}
+
+/// Enabled, non-empty hooks of `event` for a valid project directory.
+fn enabled_hooks(workspace_root: &str, event: &str) -> Vec<HookDef> {
+    let trimmed = workspace_root.trim();
+    if trimmed.is_empty() || !Path::new(trimmed).is_dir() {
+        return Vec::new();
+    }
+    hooks_get(trimmed.to_string())
+        .map(|c| {
+            c.hooks
+                .into_iter()
+                .filter(|h| h.enabled && h.event == event && !h.command.trim().is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn hook_label(hook: &HookDef) -> &str {
+    if hook.name.trim().is_empty() {
+        &hook.id
+    } else {
+        &hook.name
+    }
+}
+
+/// Environment passed to every hook command so scripts know what happened.
+fn hook_env(
+    workspace_root: &str,
+    event: &str,
+    session_id: Option<&str>,
+    tool_name: Option<&str>,
+    file_path: Option<&str>,
+) -> Vec<(&'static str, String)> {
+    let mut env = vec![
+        ("AGENTZ_HOOK_EVENT", event.to_string()),
+        ("AGENTZ_PROJECT_DIR", workspace_root.trim().to_string()),
+    ];
+    if let Some(v) = session_id {
+        env.push(("AGENTZ_SESSION_ID", v.to_string()));
+    }
+    if let Some(v) = tool_name {
+        env.push(("AGENTZ_TOOL_NAME", v.to_string()));
+    }
+    if let Some(v) = file_path {
+        env.push(("AGENTZ_FILE_PATH", v.to_string()));
+    }
+    env
+}
+
+fn clip_hook_text(s: &str, max: usize) -> String {
+    let t = s.trim();
+    if t.chars().count() <= max {
+        t.to_string()
+    } else {
+        let mut out: String = t.chars().take(max).collect();
+        out.push('…');
+        out
+    }
+}
+
+/// Run the enabled `beforeFileEdit` hooks. A hook that exits with a positive
+/// status blocks the edit: the returned message goes back to the model.
+/// Spawn failures, timeouts and signal exits never block (fail open), so a
+/// broken hook cannot wedge the agent.
+pub async fn run_before_file_edit_hooks(
+    workspace_root: &str,
+    session_id: &str,
+    tool_name: &str,
+    file_path: Option<&str>,
+) -> Option<String> {
+    let root = workspace_root.trim();
+    for hook in enabled_hooks(root, "beforeFileEdit") {
+        let env = hook_env(root, "beforeFileEdit", Some(session_id), Some(tool_name), file_path);
+        let Ok(res) = run_hook_command_with_env(root, &hook.command, &env).await else {
+            continue;
+        };
+        if res.exit_code > 0 {
+            let detail = if res.stderr.trim().is_empty() {
+                res.stdout.as_str()
+            } else {
+                res.stderr.as_str()
+            };
+            return Some(format!(
+                "Edit blocked by project hook '{}' (beforeFileEdit, exit code {}): {}",
+                hook_label(&hook),
+                res.exit_code,
+                clip_hook_text(detail, 1000)
+            ));
+        }
+    }
+    None
+}
+
+/// Run the enabled hooks of an "after" event (`afterFileEdit`,
+/// `afterAgentTurn`) for their side effects (formatters, linters, notifiers).
+/// Output and exit codes are only logged: the model never sees them.
+pub async fn run_after_hooks(
+    workspace_root: &str,
+    event: &str,
+    session_id: Option<&str>,
+    tool_name: Option<&str>,
+    file_path: Option<&str>,
+) {
+    let root = workspace_root.trim();
+    for hook in enabled_hooks(root, event) {
+        let env = hook_env(root, event, session_id, tool_name, file_path);
+        match run_hook_command_with_env(root, &hook.command, &env).await {
+            Ok(res) if res.exit_code != 0 => tracing::debug!(
+                "hook '{}' ({event}) exited with {}: {}",
+                hook_label(&hook),
+                res.exit_code,
+                clip_hook_text(&res.stderr, 300)
+            ),
+            Ok(_) => {}
+            Err(e) => tracing::debug!("hook '{}' ({event}) failed to start: {e}", hook_label(&hook)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod hook_tests {
+    use super::*;
+
+    fn project(hooks: serde_json::Value) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "agentz-hooks-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(dir.join(".agentz")).unwrap();
+        std::fs::write(
+            dir.join(".agentz/hooks.json"),
+            serde_json::json!({"version": 1, "hooks": hooks}).to_string(),
+        )
+        .unwrap();
+        dir
+    }
+
+    fn hook(id: &str, event: &str, command: &str, enabled: bool) -> serde_json::Value {
+        serde_json::json!({"id": id, "name": id, "event": event, "command": command, "enabled": enabled})
+    }
+
+    #[tokio::test]
+    async fn before_file_edit_blocks_only_on_positive_exit() {
+        let dir = project(serde_json::json!([hook("ok", "beforeFileEdit", "exit 0", true)]));
+        let root = dir.to_string_lossy().to_string();
+        assert!(run_before_file_edit_hooks(&root, "s", "file_write", Some("a.txt")).await.is_none());
+
+        let dir = project(serde_json::json!([
+            hook("ok", "beforeFileEdit", "exit 0", true),
+            hook("guard", "beforeFileEdit", "echo nope 1>&2 && exit 3", true),
+        ]));
+        let root = dir.to_string_lossy().to_string();
+        let msg = run_before_file_edit_hooks(&root, "s", "file_write", Some("a.txt"))
+            .await
+            .expect("blocked");
+        assert!(msg.contains("guard") && msg.contains("exit code 3") && msg.contains("nope"), "{msg}");
+    }
+
+    #[tokio::test]
+    async fn disabled_and_other_event_hooks_never_block() {
+        let dir = project(serde_json::json!([
+            hook("off", "beforeFileEdit", "exit 9", false),
+            hook("other", "afterFileEdit", "exit 9", true),
+        ]));
+        let root = dir.to_string_lossy().to_string();
+        assert!(run_before_file_edit_hooks(&root, "s", "file_edit", None).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn missing_hooks_file_is_a_no_op() {
+        let dir = std::env::temp_dir();
+        let root = dir.to_string_lossy().to_string();
+        assert!(enabled_hooks(&root, "afterAgentTurn").is_empty());
+    }
+
+    #[tokio::test]
+    async fn after_hooks_run_with_event_context_in_env() {
+        #[cfg(windows)]
+        let cmd = "echo %AGENTZ_HOOK_EVENT% %AGENTZ_FILE_PATH%> hook-out.txt";
+        #[cfg(not(windows))]
+        let cmd = "echo \"$AGENTZ_HOOK_EVENT $AGENTZ_FILE_PATH\" > hook-out.txt";
+        let dir = project(serde_json::json!([hook("fmt", "afterFileEdit", cmd, true)]));
+        let root = dir.to_string_lossy().to_string();
+        run_after_hooks(&root, "afterFileEdit", Some("s"), Some("file_edit"), Some("src/a.rs")).await;
+        let out = std::fs::read_to_string(dir.join("hook-out.txt")).unwrap();
+        assert!(out.contains("afterFileEdit") && out.contains("src/a.rs"), "{out}");
+    }
 }

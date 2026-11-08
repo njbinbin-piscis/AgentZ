@@ -285,7 +285,7 @@ isolated in parallel. **This is where AgentZ's "multi-agent parallelism" lands**
   the global `{config}/piscis.db` stores skill metadata/revisions (separate from the session DB).
 - **Project rules**: `*.md` / `*.mdc` under `{workspace}/.agentz/rules/` (preferred) or `.cursor/rules/` (compatibility)
   are concatenated into `## Project rules` and injected as system constraints.
-- **Hooks**: event hooks such as `beforeAgentTurn` in `{project}/.agentz/hooks.json`; their output is injected as additional system context.
+- **Hooks**: shell-command hooks in `{project}/.agentz/hooks.json` (10 s timeout, project root, `AGENTZ_*` env). `beforeAgentTurn` output is injected as additional system context; a `beforeFileEdit` hook exiting non-zero blocks the edit (wired in `JournalWithIdeNotify::before_tool`); `afterFileEdit` (same hook, after the tool) and `afterAgentTurn` (spawned after a successful turn) are side-effect only.
 - **MCP**: during turn assembly, `settings.mcp_servers` are connected (stdio/SSE) through `register_mcp_tools`
   and their tools registered.
 - **Management surface**: `commands/workbench.rs` (list/uninstall skills, rules CRUD/enable/disable, read/write/run hooks).

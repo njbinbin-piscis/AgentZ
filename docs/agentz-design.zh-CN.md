@@ -284,7 +284,7 @@ Agent 模式的多 worktree 任务（§6）仍是主要路径：每个任务一�
   全局 `{config}/piscis.db` 存 skill 元数据/revisions（与会话 DB 分离）。
 - **项目规则**：`{workspace}/.agentz/rules/`（优先）或 `.cursor/rules/`（兼容）下的
   `*.md` / `*.mdc` 拼成 `## Project rules` 注入为系统约束。
-- **钩子**：`{project}/.agentz/hooks.json` 的 `beforeAgentTurn` 等事件钩子，输出注入为附加系统上下文。
+- **钩子**：`{project}/.agentz/hooks.json` 中的 shell 命令钩子（项目根目录执行，超时 10 秒，带 `AGENTZ_*` 环境变量）。`beforeAgentTurn` 的输出注入为附加系统上下文；`beforeFileEdit` 以非 0 退出码结束时阻止该次修改（接在 `JournalWithIdeNotify::before_tool`）；`afterFileEdit`（同一钩子，工具执行后）和 `afterAgentTurn`（回合成功后后台启动）只执行、不返回输出。
 - **MCP**：`settings.mcp_servers` 在 turn 装配时通过 `register_mcp_tools` 连接 stdio/SSE
   服务器并注册其工具。
 - **管理面**：`commands/workbench.rs`（skills 列表/卸载、rules CRUD/启停、hooks 读写/运行）。

@@ -86,12 +86,24 @@ impl JournalWithIdeNotify {
 impl AgentHooks for JournalWithIdeNotify {
     async fn before_tool(&self, ev: &ToolHookEvent<'_>) -> HookDecision {
         if FILE_TOOLS.contains(&ev.tool_name) {
-            if let Some(path) = ev.input.get("path").and_then(|v| v.as_str()) {
+            let path = ev.input.get("path").and_then(|v| v.as_str());
+            if let Some(path) = path {
                 if Self::is_locked_skill_path(path) {
                     return HookDecision::Deny(
                         "Cannot modify locked skill files via file_write/file_edit. Use skill_manage for draft/learned skills.".into(),
                     );
                 }
+            }
+            // Project `beforeFileEdit` hooks: a positive exit status blocks the edit.
+            if let Some(msg) = crate::commands::workbench::run_before_file_edit_hooks(
+                &ev.workspace_root.to_string_lossy(),
+                ev.session_id,
+                ev.tool_name,
+                path,
+            )
+            .await
+            {
+                return HookDecision::Deny(msg);
             }
         }
         self.journal.before_tool(ev).await
@@ -111,6 +123,16 @@ impl AgentHooks for JournalWithIdeNotify {
         if result.is_error || !FILE_TOOLS.contains(&ev.tool_name) {
             return;
         }
+        // Project `afterFileEdit` hooks (formatters, linters) run before the
+        // IDE is told about the change, so it refreshes the final content.
+        crate::commands::workbench::run_after_hooks(
+            &ev.workspace_root.to_string_lossy(),
+            "afterFileEdit",
+            Some(ev.session_id),
+            Some(ev.tool_name),
+            ev.input.get("path").and_then(|v| v.as_str()),
+        )
+        .await;
         self.emit_file_changed(ev, "modified");
     }
 

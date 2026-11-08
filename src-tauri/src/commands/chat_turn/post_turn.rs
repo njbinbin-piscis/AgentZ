@@ -697,6 +697,21 @@ pub(super) async fn finalize_turn_and_spawn_background(
         let max_tokens_ev = runtime.max_tokens;
         let budget_post = budget_scope.clone();
         let ws_root_ev = workspace_root.clone();
+        {
+            // Project `afterAgentTurn` hooks: side effects only, never delay the reply.
+            let ws_hook = workspace_root.clone();
+            let session_hook = session_id.clone();
+            tokio::spawn(async move {
+                crate::commands::workbench::run_after_hooks(
+                    &ws_hook,
+                    "afterAgentTurn",
+                    Some(&session_hook),
+                    None,
+                    None,
+                )
+                .await;
+            });
+        }
         tokio::spawn(async move {
             crate::commands::post_turn::auto_extract_repo_notes(
                 ws_root_ev,

@@ -980,7 +980,7 @@ const en = {
 
   hooks: {
     title: "Hooks",
-    hint: "Hooks live in .agentz/hooks.json. Output of beforeAgentTurn hooks is injected into the agent context.",
+    hint: "Hooks live in .agentz/hooks.json and run in the project root with a 10 s timeout. beforeAgentTurn output is injected into the agent context; a beforeFileEdit hook that exits non-zero blocks that file edit; afterFileEdit and afterAgentTurn run for side effects only. Environment: AGENTZ_HOOK_EVENT, AGENTZ_PROJECT_DIR, AGENTZ_SESSION_ID, AGENTZ_TOOL_NAME, AGENTZ_FILE_PATH.",
     empty: "No hooks yet. Create one below.",
     namePlaceholder: "Hook name",
     enabledLabel: "Enabled",
