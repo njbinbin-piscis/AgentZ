@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-AgentZ is a desktop AI IDE (current source version **1.0.63**; local engineering and automated acceptance gates pass, see the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md)). It puts an editor and autonomous agents in one app on a shared agent kernel. You can edit code by hand in the editor, or hand a goal to an agent that works in an isolated git worktree and comes back for review.
+AgentZ is a desktop AI IDE (current source version **1.0.64**; local engineering and automated acceptance gates pass, see the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md)). It puts an editor and autonomous agents in one app on a shared agent kernel. You can edit code by hand in the editor, or hand a goal to an agent that works in an isolated git worktree and comes back for review.
 
 The UI has three first-class modes, switched from the title bar:
 

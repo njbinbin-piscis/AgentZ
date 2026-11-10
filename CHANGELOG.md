@@ -5,6 +5,19 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.64] - 2026-11-11
+
+### Added
+
+- **Project hooks now run.** `beforeAgentTurn` (stdout goes into the system prompt), `beforeFileEdit` (non-zero exit blocks the edit and tells the model why), `afterFileEdit` and `afterAgentTurn` (side effects). 10 s timeout, fail open, `AGENTZ_*` environment variables. File-edit hooks cover `file_write` and `file_edit` only.
+- **Built-in browser text selection:** live drag highlight, double-click word, triple-click paragraph, Ctrl/Cmd+A, Ctrl/Cmd+C.
+- **Built-in browser tab close button.** Closing the active tab switches to another; closing the last one shuts the browser down.
+
+### Changed
+
+- **Bundled agents, skills, commands and project templates aligned with AgentZ.** Third-party wording replaced, descriptions are plain text, inapplicable entries removed (32 skills, 21 agents, 110 commands). Existing installs migrate once; only bundled items are touched and replaced ones go to `preinstall-retired/`.
+- New `hook-development` skill and "Lifecycle Hooks" project template.
+
 ## [1.0.63] - 2026-11-08
 
 ## Changed
