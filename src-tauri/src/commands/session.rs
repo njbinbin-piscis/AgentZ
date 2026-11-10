@@ -1229,7 +1229,7 @@ pub async fn chat_restore_checkpoint(
             .and_then(|_| {
                 let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
                 let json = serde_json::to_string_pretty(&data)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                    .map_err(std::io::Error::other)?;
                 std::fs::write(
                     backup_dir.join(format!("{session_id}-before-checkpoint-{stamp}.json")),
                     json,

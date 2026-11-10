@@ -177,7 +177,7 @@ pub async fn remote_sync_extensions(
         .into_iter()
         .filter(|e| {
             let manifest = remote::read_manifest(Path::new(&e.extension_path));
-            if !manifest.as_ref().is_some_and(|m| remote::runs_on_workspace(m)) {
+            if !manifest.as_ref().is_some_and(remote::runs_on_workspace) {
                 return false;
             }
             if let (Some(platform), Some(arch)) = (&platform, &arch) {

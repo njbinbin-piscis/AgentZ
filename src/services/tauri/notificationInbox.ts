@@ -31,6 +31,7 @@ const NOTICE_KEYS = ["event_key", "task_id", "kind", "summary", "created_ms", "r
 const OPTIONAL_TEXT_KEYS = ["session_title", "last_reply"] as const;
 
 function text(value: unknown, max: number): asserts value is string {
+  // eslint-disable-next-line no-control-regex -- intentionally rejects control characters
   if (typeof value !== "string" || value.length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value))
     throw new Error("Invalid inbox text");
 }

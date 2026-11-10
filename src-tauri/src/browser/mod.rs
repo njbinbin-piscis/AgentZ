@@ -206,7 +206,7 @@ impl Tool for GuardedBrowserTool {
             let id = format!(
                 "{}#{}",
                 session_tab_id(&ctx.session_id),
-                &uuid_suffix()
+                uuid_suffix()
             );
             if let Some(obj) = input.as_object_mut() {
                 obj.insert("tab_id".into(), serde_json::Value::String(id.clone()));
@@ -294,7 +294,7 @@ impl Tool for GuardedBrowserTool {
         }
         if !res.is_error {
             if let Some(id) = created.as_ref() {
-                self.manager.remember(&ctx.session_id, &id);
+                self.manager.remember(&ctx.session_id, id);
             } else if action == "switch_tab" {
                 if let Some(id) = input_tab_id_from_result(&res.content) {
                     self.manager.remember(&ctx.session_id, &id);
@@ -330,8 +330,7 @@ impl Tool for GuardedBrowserTool {
 }
 
 fn uuid_suffix() -> String {
-    let u = uuid_simple();
-    u
+    uuid_simple()
 }
 
 fn uuid_simple() -> String {

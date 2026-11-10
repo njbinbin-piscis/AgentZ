@@ -792,8 +792,10 @@ pub(crate) async fn run_subagent_with_prompt(
     budget: crate::runtime::task_budget::BudgetScope,
     progress: Option<SubagentProgressTarget>,
 ) -> Result<String> {
-    let mut options = SubagentOptions::default();
-    options.progress = progress;
+    let options = SubagentOptions {
+        progress,
+        ..Default::default()
+    };
     run_subagent_with_options(
         app,
         db,
