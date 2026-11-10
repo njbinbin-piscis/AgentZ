@@ -981,44 +981,30 @@ impl BrowserManager {
         .await
     }
 
-    /// Press at `from`, drag to `to` with the button held, release: selects the
-    /// text between the two points (or drags a slider / resizes a pane).
-    pub async fn mouse_drag(
-        &self,
-        session_id: &str,
-        from: (f64, f64),
-        to: (f64, f64),
-    ) -> Result<()> {
+    /// One step of a mouse drag driven live from the panel: `down` presses the
+    /// left button, `move` moves with the button held (extends a text selection),
+    /// `up` releases it.
+    pub async fn mouse_event(&self, session_id: &str, phase: &str, x: f64, y: f64) -> Result<()> {
         use chromiumoxide::cdp::browser_protocol::input::{
             DispatchMouseEventParams, DispatchMouseEventType, MouseButton,
         };
-        const STEPS: i32 = 8;
+        let (kind, button, buttons, count) = match phase {
+            "down" => (DispatchMouseEventType::MousePressed, MouseButton::Left, 1, 1),
+            "move" => (DispatchMouseEventType::MouseMoved, MouseButton::Left, 1, 0),
+            "up" => (DispatchMouseEventType::MouseReleased, MouseButton::Left, 0, 1),
+            other => anyhow::bail!("unknown mouse phase '{other}'"),
+        };
         self.with_page(session_id, |page| async move {
-            let send = |kind: DispatchMouseEventType, x: f64, y: f64, button: MouseButton, buttons: i64, count: i64| {
-                let page = page.clone();
-                async move {
-                    let params = DispatchMouseEventParams::builder()
-                        .r#type(kind)
-                        .x(x)
-                        .y(y)
-                        .button(button)
-                        .buttons(buttons)
-                        .click_count(count)
-                        .build()
-                        .map_err(|e| anyhow::anyhow!(e))?;
-                    page.execute(params).await.context("mouse event failed")?;
-                    anyhow::Ok(())
-                }
-            };
-            send(DispatchMouseEventType::MouseMoved, from.0, from.1, MouseButton::None, 0, 0).await?;
-            send(DispatchMouseEventType::MousePressed, from.0, from.1, MouseButton::Left, 1, 1).await?;
-            for i in 1..=STEPS {
-                let f = f64::from(i) / f64::from(STEPS);
-                let x = from.0 + (to.0 - from.0) * f;
-                let y = from.1 + (to.1 - from.1) * f;
-                send(DispatchMouseEventType::MouseMoved, x, y, MouseButton::Left, 1, 0).await?;
-            }
-            send(DispatchMouseEventType::MouseReleased, to.0, to.1, MouseButton::Left, 0, 1).await?;
+            let params = DispatchMouseEventParams::builder()
+                .r#type(kind)
+                .x(x)
+                .y(y)
+                .button(button)
+                .buttons(buttons)
+                .click_count(count)
+                .build()
+                .map_err(|e| anyhow::anyhow!(e))?;
+            page.execute(params).await.context("mouse event failed")?;
             Ok(())
         })
         .await
@@ -1549,7 +1535,12 @@ mod tests {
         mgr.navigate("t", &url).await.expect("browser should launch");
 
         // Drag across the first paragraph.
-        mgr.mouse_drag("t", (20.0, 40.0), (600.0, 40.0)).await.unwrap();
+        mgr.mouse_event("t", "down", 20.0, 40.0).await.unwrap();
+        mgr.mouse_event("t", "move", 300.0, 40.0).await.unwrap();
+        let live = mgr.selection_text("t").await.unwrap();
+        assert!(!live.is_empty(), "selection grows while the button is held");
+        mgr.mouse_event("t", "move", 600.0, 40.0).await.unwrap();
+        mgr.mouse_event("t", "up", 600.0, 40.0).await.unwrap();
         let sel = mgr.selection_text("t").await.unwrap();
         assert!(sel.contains("alpha beta"), "drag selection: {sel:?}");
 

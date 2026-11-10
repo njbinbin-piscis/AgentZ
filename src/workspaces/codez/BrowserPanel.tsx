@@ -4,9 +4,9 @@ import {
   browserClickAt,
   browserClose,
   browserCloseTab,
-  browserDragSelect,
   browserHistoryStep,
   browserMouseClick,
+  browserMouseEvent,
   browserSelectAll,
   browserSelectionText,
   browserInsertText,
@@ -393,14 +393,20 @@ export default function BrowserPanel({
     }
   }, [address, projectDir, refreshShot, refreshScrollInfo, refreshTabs, syncViewport]);
 
-  const toPageCoords = (e: React.MouseEvent<HTMLDivElement>) => {
+  /** Screen position -> page pixel; `clamp` keeps a drag that left the image on its edge. */
+  const clientToPage = (clientX: number, clientY: number, clamp = false) => {
     const img = imgRef.current;
     if (!img || !img.naturalWidth) return null;
     const rect = img.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * img.naturalWidth;
-    const y = ((e.clientY - rect.top) / rect.height) * img.naturalHeight;
-    return { x: Math.round(x), y: Math.round(y) };
+    let fx = (clientX - rect.left) / rect.width;
+    let fy = (clientY - rect.top) / rect.height;
+    if (clamp) {
+      fx = Math.min(1, Math.max(0, fx));
+      fy = Math.min(1, Math.max(0, fy));
+    }
+    return { x: Math.round(fx * img.naturalWidth), y: Math.round(fy * img.naturalHeight) };
   };
+  const toPageCoords = (e: React.MouseEvent<HTMLDivElement>) => clientToPage(e.clientX, e.clientY);
 
   const scrollTo = useCallback(
     async (x: number, y: number) => {
@@ -485,31 +491,64 @@ export default function BrowserPanel({
   // Text selection by dragging: remember where the press happened, and on
   // release send one press-drag-release to the page. The click that follows a
   // drag must not be forwarded, or it would clear the new selection.
-  const dragRef = useRef<{ cx: number; cy: number; pt: { x: number; y: number } } | null>(null);
   const justDraggedRef = useRef(false);
 
+  // The page sees the press once the pointer has moved a few pixels, then every
+  // move (coalesced to the latest one) and the release, so the selection grows
+  // under the cursor. Listeners live on `window`: releasing outside the panel
+  // still ends the drag instead of leaving the page's button held down.
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       justDraggedRef.current = false;
       if (pickMode || e.button !== 0) return;
-      const pt = toPageCoords(e);
-      dragRef.current = pt ? { cx: e.clientX, cy: e.clientY, pt } : null;
-    },
-    [pickMode],
-  );
+      const startPt = clientToPage(e.clientX, e.clientY);
+      if (!startPt) return;
+      const sid = sessionIdRef.current;
+      const origin = { x: e.clientX, y: e.clientY };
+      let started = false;
+      let inflight = false;
+      let pendingMove: { x: number; y: number } | null = null;
+      let chain: Promise<unknown> = Promise.resolve();
 
-  const handleMouseUp = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const start = dragRef.current;
-      dragRef.current = null;
-      if (!start || pickMode) return;
-      if (Math.hypot(e.clientX - start.cx, e.clientY - start.cy) < 5) return;
-      const end = toPageCoords(e);
-      if (!end) return;
-      justDraggedRef.current = true;
-      void browserDragSelect(sessionIdRef.current, start.pt, end)
-        .then(() => setTimeout(() => void refreshShot(), 120))
-        .catch((err) => setError(String(err)));
+      const send = (phase: "down" | "move" | "up", pt: { x: number; y: number }) => {
+        chain = chain
+          .then(() => browserMouseEvent(sid, phase, pt.x, pt.y))
+          .catch((err) => setError(String(err)));
+        return chain;
+      };
+      const pumpMove = () => {
+        if (inflight || !pendingMove) return;
+        const pt = pendingMove;
+        pendingMove = null;
+        inflight = true;
+        void send("move", pt).then(() => {
+          inflight = false;
+          void refreshShot();
+          pumpMove();
+        });
+      };
+      const onMove = (ev: MouseEvent) => {
+        if (!started) {
+          if (Math.hypot(ev.clientX - origin.x, ev.clientY - origin.y) < 5) return;
+          started = true;
+          justDraggedRef.current = true;
+          void send("down", startPt);
+        }
+        const pt = clientToPage(ev.clientX, ev.clientY, true);
+        if (!pt) return;
+        pendingMove = pt;
+        pumpMove();
+      };
+      const onUp = (ev: MouseEvent) => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        if (!started) return;
+        pendingMove = null;
+        const pt = clientToPage(ev.clientX, ev.clientY, true) ?? startPt;
+        void send("up", pt).then(() => setTimeout(() => void refreshShot(), 80));
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
     },
     [pickMode, refreshShot],
   );
@@ -775,12 +814,8 @@ export default function BrowserPanel({
             className="agentz-browser-canvas"
             ref={canvasRef}
             onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
             onMouseMove={handleMouseMove}
-            onMouseLeave={() => {
-              dragRef.current = null;
-              handleMouseLeave();
-            }}
+            onMouseLeave={handleMouseLeave}
             tabIndex={0}
             onKeyDown={handleCanvasKeyDown}
             onPaste={handleCanvasPaste}

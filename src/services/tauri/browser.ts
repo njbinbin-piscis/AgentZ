@@ -125,19 +125,14 @@ export function browserMouseClick(
   return invoke<void>("browser_mouse_click", { sessionId, x, y, clickCount });
 }
 
-/** Press, drag and release between two viewport points: selects the text between them. */
-export function browserDragSelect(
+/** One step of a live mouse drag: press, move with the button held, release. */
+export function browserMouseEvent(
   sessionId: string,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
+  phase: "down" | "move" | "up",
+  x: number,
+  y: number,
 ): Promise<void> {
-  return invoke<void>("browser_drag_select", {
-    sessionId,
-    fromX: from.x,
-    fromY: from.y,
-    toX: to.x,
-    toY: to.y,
-  });
+  return invoke<void>("browser_mouse_event", { sessionId, phase, x, y });
 }
 
 /** Text currently selected in the page. */

@@ -256,7 +256,7 @@ pub fn run() {
             commands::browser::browser_screenshot,
             commands::browser::browser_click_at,
             commands::browser::browser_mouse_click,
-            commands::browser::browser_drag_select,
+            commands::browser::browser_mouse_event,
             commands::browser::browser_selection_text,
             commands::browser::browser_select_all,
             commands::browser::browser_close_tab,

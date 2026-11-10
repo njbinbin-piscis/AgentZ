@@ -271,17 +271,16 @@ pub async fn browser_mouse_click(
 }
 
 #[tauri::command]
-pub async fn browser_drag_select(
+pub async fn browser_mouse_event(
     state: State<'_, AppState>,
     session_id: Option<String>,
-    from_x: f64,
-    from_y: f64,
-    to_x: f64,
-    to_y: f64,
+    phase: String,
+    x: f64,
+    y: f64,
 ) -> Result<(), String> {
     state
         .browser
-        .mouse_drag(&session_of(session_id), (from_x, from_y), (to_x, to_y))
+        .mouse_event(&session_of(session_id), &phase, x, y)
         .await
         .map_err(|e| e.to_string())
 }
