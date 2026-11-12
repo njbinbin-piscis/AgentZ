@@ -1043,6 +1043,15 @@ fn validate_source_path(root: &Path, raw: &str) -> Result<(), String> {
     if piscis_kernel::agent::plan_doc::is_allowed_plan_path(root, &relative.to_string_lossy()) {
         return Ok(());
     }
+    // Tool-output spill files are written by the kernel itself and the tool
+    // result explicitly tells the agent to file_read them; blocking that path
+    // contradicts the tool's own recovery instructions.
+    {
+        let rel = relative.to_string_lossy().replace('\\', "/").to_lowercase();
+        if rel.starts_with(".agentz/logs/tool-output/") {
+            return Ok(());
+        }
+    }
     if relative.as_os_str().is_empty()
         || relative.components().any(|c| {
             let part = c.as_os_str().to_string_lossy().to_lowercase();
@@ -1074,6 +1083,23 @@ mod tests {
         assert!(validate_source_path(&root, ".agentz/plans/new.md").is_ok());
         assert!(validate_source_path(&root, ".agentz/journal.db").is_err());
         assert!(validate_source_path(&root, ".agentz/plans/p.txt").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn tool_output_spill_is_readable_but_other_agentz_logs_are_not() {
+        let dir = std::env::temp_dir().join(format!("agentz-spill-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(dir.join(".agentz").join("logs").join("tool-output")).unwrap();
+        std::fs::write(
+            dir.join(".agentz").join("logs").join("tool-output").join("x.txt"),
+            "x",
+        )
+        .unwrap();
+        let root = std::fs::canonicalize(&dir).unwrap();
+        assert!(validate_source_path(&root, ".agentz/logs/tool-output/x.txt").is_ok());
+        assert!(validate_source_path(&root, ".agentz/logs/tool-output/new.txt").is_ok());
+        assert!(validate_source_path(&root, ".agentz/logs/other.log").is_err());
+        assert!(validate_source_path(&root, ".agentz/config.json").is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

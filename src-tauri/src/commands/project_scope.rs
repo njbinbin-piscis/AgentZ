@@ -325,7 +325,7 @@ pub async fn project_scope_restore(
             if path.is_some() {
                 return Err("workspace restore does not accept a project path".into());
             }
-            super::workspace::workspace_load(app)
+            super::workspace::workspace_load(app.clone())
                 .await?
                 .and_then(|s| s.project_dir)
                 .map(PathBuf::from)
@@ -333,7 +333,7 @@ pub async fn project_scope_restore(
         }
         "workz_project" => {
             let requested = path.ok_or("known WorkZ project path required")?;
-            let overview = super::projects::workz_overview(app).await?;
+            let overview = super::projects::workz_overview(app.clone()).await?;
             select_known_project(
                 &requested,
                 &overview
@@ -347,11 +347,15 @@ pub async fn project_scope_restore(
             if path.is_some() {
                 return Err("free session scope does not accept a path".into());
             }
-            PathBuf::from(super::projects::workz_overview(app).await?.free_dir)
+            PathBuf::from(super::projects::workz_overview(app.clone()).await?.free_dir)
         }
         _ => return Err("unknown project restore source".into()),
     };
-    mint(&state, &project, TrustedOpenSource::RestoredWorkspace)
+    let dto = mint(&state, &project, TrustedOpenSource::RestoredWorkspace)?;
+    // Re-arm pool recovery for projects that already have pools: after an app
+    // restart nothing else starts a patrol until the next team sync/assign.
+    crate::runtime::patrol::ensure_pool_patrol_if_pools(&app, &dto.project_dir);
+    Ok(dto)
 }
 fn select_known_project(requested: &str, known: &[String]) -> Result<PathBuf, String> {
     let requested =

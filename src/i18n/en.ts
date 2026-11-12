@@ -337,6 +337,7 @@ const en = {
     feed: "Collaboration feed",
     col_todo: "To do",
     col_inProgress: "In progress",
+    col_review: "Needs review",
     col_done: "Done",
     cardWaitingDependency: "Waiting on dependency",
     cliWaiting: "Waiting for output…",

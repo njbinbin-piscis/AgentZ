@@ -3,7 +3,10 @@
 //! Complements `web_search`: use search to discover links, then fetch to
 //! read documentation, release notes, or API reference pages.
 
-use super::output::{format_err, format_ok, smart_truncate, ToolErrorCode, TruncateStrategy};
+use super::output::{
+    format_err, format_ok, smart_truncate, smart_truncate_with_line_cap, ToolErrorCode,
+    TruncateStrategy,
+};
 use crate::agent::tool::{Tool, ToolContext, ToolResult};
 use async_trait::async_trait;
 use reqwest::Client;
@@ -30,6 +33,9 @@ impl Tool for WebFetchTool {
          Parameters:\n\
          - 'url' (string): http or https URL.\n\
          - 'max_chars' (number): truncate output (default 32000).\n\
+         - 'raw' (boolean): keep long lines intact (default false). Set true for \
+         single-line payloads like base64 or minified JSON that the default \
+         1000-char/line middle-elision would corrupt.\n\
          \n\
          Output: page title (if found) plus extracted text."
     }
@@ -45,6 +51,10 @@ impl Tool for WebFetchTool {
                 "max_chars": {
                     "type": "integer",
                     "description": "Maximum characters to return (default 32000)."
+                },
+                "raw": {
+                    "type": "boolean",
+                    "description": "Keep long lines intact (no 1000-char/line middle-elision). Use for base64 / minified JSON payloads."
                 }
             },
             "required": ["url"]
@@ -140,7 +150,13 @@ impl Tool for WebFetchTool {
         }
         out.push_str(&text);
 
-        let (truncated, meta) = smart_truncate(&out, max_chars, TruncateStrategy::HeadTail);
+        let raw = input.get("raw").and_then(|v| v.as_bool()).unwrap_or(false);
+        let (truncated, meta) = if raw {
+            // No per-line elision; the overall max_chars budget still applies.
+            smart_truncate_with_line_cap(&out, max_chars, TruncateStrategy::HeadTail, usize::MAX)
+        } else {
+            smart_truncate(&out, max_chars, TruncateStrategy::HeadTail)
+        };
         if meta.truncated {
             Ok(ToolResult::ok_with_meta(
                 format_ok(&truncated, meta.clone()),

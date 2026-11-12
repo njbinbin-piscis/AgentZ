@@ -16,7 +16,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use piscis_core::host::{
@@ -69,11 +69,24 @@ impl PoolEventSink for TauriPoolEventSink {
 
 /// Build the desktop pool wiring (runtime + event sink) the kernel coordinator
 /// needs to fan team work out to member Koi from the main agent turn.
+///
+/// The runtime is a single process-wide instance: every dispatcher (chat turn,
+/// patrol, workflows, member tools) shares one inflight registry, so a cancel
+/// or wait issued from any of them reaches the turn that actually runs.
 pub fn pool_wiring(app: &AppHandle) -> (Arc<dyn SubagentRuntime>, Arc<dyn PoolEventSink>) {
     (
-        Arc::new(DesktopInProcessSubagentRuntime::new(app.clone())),
+        shared_subagent_runtime(app),
         Arc::new(TauriPoolEventSink::new(app.clone())),
     )
+}
+
+/// Process-wide shared Koi runtime (see [`pool_wiring`]).
+pub fn shared_subagent_runtime(app: &AppHandle) -> Arc<DesktopInProcessSubagentRuntime> {
+    use std::sync::OnceLock;
+    static RUNTIME: OnceLock<Arc<DesktopInProcessSubagentRuntime>> = OnceLock::new();
+    RUNTIME
+        .get_or_init(|| Arc::new(DesktopInProcessSubagentRuntime::new(app.clone())))
+        .clone()
 }
 
 struct PoolTurnEventSink {
@@ -113,7 +126,14 @@ pub struct DesktopInProcessSubagentRuntime {
 
 struct InflightTurn {
     cancel: Arc<AtomicBool>,
-    outcome_rx: Mutex<Option<oneshot::Receiver<anyhow::Result<KoiTurnOutcome>>>>,
+    /// Cached terminal outcome. `wait_koi_turn` is re-readable: the first
+    /// waiter fills the cache, later waiters (retry / recovery paths) clone it
+    /// instead of erroring on a consumed oneshot.
+    outcome: Mutex<Option<KoiTurnOutcome>>,
+    /// todo → turn binding, so the watchdog can cancel the live turn before
+    /// resetting the board row (prevents double dispatch of the same todo).
+    todo_id: Option<String>,
+    project_dir: Option<String>,
 }
 
 impl DesktopInProcessSubagentRuntime {
@@ -136,20 +156,31 @@ impl SubagentRuntime for DesktopInProcessSubagentRuntime {
         };
 
         let cancel = Arc::new(AtomicBool::new(false));
-        let (outcome_tx, outcome_rx) = oneshot::channel();
         let turn = Arc::new(InflightTurn {
             cancel: cancel.clone(),
-            outcome_rx: Mutex::new(Some(outcome_rx)),
+            outcome: Mutex::new(None),
+            todo_id: request.todo_id.clone(),
+            project_dir: request.workspace.clone(),
         });
-        self.inflight.lock().await.insert(turn_id, turn);
+        self.inflight.lock().await.insert(turn_id, turn.clone());
 
         let app = self.app.clone();
         let inflight = self.inflight.clone();
         let cleanup_turn_id = handle.turn_id.clone();
         let handle_for_task = handle.clone();
+        let handle_for_error = handle.clone();
+        let turn_for_task = turn.clone();
         tokio::spawn(async move {
-            let outcome = run_in_process_koi_turn(app, handle_for_task, request, cancel).await;
-            let _ = outcome_tx.send(outcome);
+            let outcome = run_in_process_koi_turn(app, handle_for_task, request, cancel)
+                .await
+                .unwrap_or_else(|e| KoiTurnOutcome {
+                    handle: handle_for_error,
+                    exit_kind: KoiTurnExit::Crashed,
+                    response_text: String::new(),
+                    error: Some(e.to_string()),
+                    exit_code: None,
+                });
+            *turn_for_task.outcome.lock().await = Some(outcome);
             cleanup_unclaimed_outcome(inflight, cleanup_turn_id).await;
         });
 
@@ -168,33 +199,53 @@ impl SubagentRuntime for DesktopInProcessSubagentRuntime {
     }
 
     async fn wait_koi_turn(&self, handle: &KoiTurnHandle) -> anyhow::Result<KoiTurnOutcome> {
-        let turn = {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(24 * 60 * 60);
+        loop {
+            let turn = {
+                let inflight = self.inflight.lock().await;
+                inflight
+                    .get(&handle.turn_id)
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("unknown Koi turn: {}", handle.turn_id))?
+            };
+            if let Some(outcome) = turn.outcome.lock().await.clone() {
+                self.inflight.lock().await.remove(&handle.turn_id);
+                return Ok(outcome);
+            }
+            if tokio::time::Instant::now() >= deadline {
+                anyhow::bail!("wait_koi_turn timed out for {}", handle.turn_id);
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+}
+
+impl DesktopInProcessSubagentRuntime {
+    /// Cancel every live turn bound to `todo_id` in this project. Called by the
+    /// patrol watchdog *before* it resets stale board rows, so a re-dispatch
+    /// can never race a still-running turn on the same todo.
+    pub async fn cancel_turns_for_todo(&self, project_dir: &str, todo_id: &str) -> usize {
+        let turns: Vec<Arc<InflightTurn>> = {
             let inflight = self.inflight.lock().await;
             inflight
-                .get(&handle.turn_id)
+                .values()
+                .filter(|t| {
+                    t.todo_id.as_deref() == Some(todo_id)
+                        && t.project_dir.as_deref() == Some(project_dir)
+                })
                 .cloned()
-                .ok_or_else(|| anyhow::anyhow!("unknown Koi turn: {}", handle.turn_id))?
+                .collect()
         };
-        let rx =
-            turn.outcome_rx.lock().await.take().ok_or_else(|| {
-                anyhow::anyhow!("wait_koi_turn called twice for {}", handle.turn_id)
-            })?;
-        let outcome = rx.await.unwrap_or_else(|_| {
-            Ok(KoiTurnOutcome {
-                handle: handle.clone(),
-                exit_kind: KoiTurnExit::Crashed,
-                response_text: String::new(),
-                error: Some("in-process Koi task dropped before completion".into()),
-                exit_code: None,
-            })
-        })?;
-        self.inflight.lock().await.remove(&handle.turn_id);
-        Ok(outcome)
+        for turn in &turns {
+            turn.cancel.store(true, Ordering::SeqCst);
+        }
+        turns.len()
     }
 }
 
 /// Reap an outcome that `wait_koi_turn` never claimed (e.g. the coordinator
-/// gave up), so the inflight map does not grow unbounded.
+/// gave up), so the inflight map does not grow unbounded. The drop is logged
+/// with the exit kind so a lost deliverable is at least observable.
 async fn cleanup_unclaimed_outcome(
     inflight: Arc<Mutex<HashMap<String, Arc<InflightTurn>>>>,
     turn_id: String,
@@ -207,7 +258,17 @@ async fn cleanup_unclaimed_outcome(
     let Some(turn) = turn else {
         return;
     };
-    if turn.outcome_rx.lock().await.is_some() {
+    let unclaimed = turn.outcome.lock().await.is_some();
+    if unclaimed {
+        if let Some(outcome) = turn.outcome.lock().await.as_ref() {
+            tracing::warn!(
+                target: "pool::koi",
+                turn_id = %turn_id,
+                todo_id = ?turn.todo_id,
+                exit_kind = ?outcome.exit_kind,
+                "dropping unclaimed Koi turn outcome (no waiter within 60s)"
+            );
+        }
         inflight.lock().await.remove(&turn_id);
     }
 }
@@ -519,5 +580,89 @@ fn crashed_outcome(handle: KoiTurnHandle, reason: &str) -> KoiTurnOutcome {
         response_text: String::new(),
         error: Some(reason.to_string()),
         exit_code: Some(1),
+    }
+}
+
+#[cfg(test)]
+mod inflight_tests {
+    use super::*;
+
+    fn turn(todo_id: Option<&str>, project: Option<&str>) -> Arc<InflightTurn> {
+        Arc::new(InflightTurn {
+            cancel: Arc::new(AtomicBool::new(false)),
+            outcome: Mutex::new(None),
+            todo_id: todo_id.map(String::from),
+            project_dir: project.map(String::from),
+        })
+    }
+
+    fn outcome(handle: &KoiTurnHandle) -> KoiTurnOutcome {
+        KoiTurnOutcome {
+            handle: handle.clone(),
+            exit_kind: KoiTurnExit::Completed,
+            response_text: "done".into(),
+            error: None,
+            exit_code: Some(0),
+        }
+    }
+
+    #[tokio::test]
+    async fn wait_is_rereadable_and_removes_entry() {
+        let inflight: Arc<Mutex<HashMap<String, Arc<InflightTurn>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let handle = KoiTurnHandle {
+            turn_id: "t1".into(),
+            pool_id: "p".into(),
+            koi_id: "k".into(),
+        };
+        let t = turn(Some("todo-1"), Some("D:/proj"));
+        *t.outcome.lock().await = Some(outcome(&handle));
+        inflight.lock().await.insert("t1".into(), t);
+
+        // First wait claims the outcome…
+        let first = {
+            let t = { inflight.lock().await.get("t1").cloned().unwrap() };
+            let guard = t.outcome.lock().await;
+            guard.clone().unwrap()
+        };
+        assert_eq!(first.exit_kind, KoiTurnExit::Completed);
+        // …and a second read still sees it (cache, not consumed oneshot).
+        let second = {
+            let t = { inflight.lock().await.get("t1").cloned().unwrap() };
+            let guard = t.outcome.lock().await;
+            guard.clone().unwrap()
+        };
+        assert_eq!(second.response_text, "done");
+    }
+
+    #[tokio::test]
+    async fn cancel_turns_for_todo_matches_todo_and_project() {
+        let inflight: Arc<Mutex<HashMap<String, Arc<InflightTurn>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let a = turn(Some("todo-1"), Some("D:/proj"));
+        let b = turn(Some("todo-1"), Some("D:/other"));
+        let c = turn(Some("todo-2"), Some("D:/proj"));
+        inflight.lock().await.insert("a".into(), a.clone());
+        inflight.lock().await.insert("b".into(), b.clone());
+        inflight.lock().await.insert("c".into(), c.clone());
+
+        let turns: Vec<Arc<InflightTurn>> = {
+            let guard = inflight.lock().await;
+            guard
+                .values()
+                .filter(|t| {
+                    t.todo_id.as_deref() == Some("todo-1")
+                        && t.project_dir.as_deref() == Some("D:/proj")
+                })
+                .cloned()
+                .collect()
+        };
+        for t in &turns {
+            t.cancel.store(true, Ordering::SeqCst);
+        }
+        assert_eq!(turns.len(), 1);
+        assert!(a.cancel.load(Ordering::SeqCst));
+        assert!(!b.cancel.load(Ordering::SeqCst));
+        assert!(!c.cancel.load(Ordering::SeqCst));
     }
 }

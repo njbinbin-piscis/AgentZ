@@ -87,10 +87,38 @@ pub fn ensure_pool_patrol(app: &AppHandle, project_dir: &str) {
     });
 }
 
+/// Like [`ensure_pool_patrol`], but only when the project DB already holds
+/// non-archived pools. Used on project restore so idle projects don't spawn a
+/// patrol that would immediately retire.
+pub fn ensure_pool_patrol_if_pools(app: &AppHandle, project_dir: &str) {
+    let app = app.clone();
+    let dir = project_dir.trim().to_string();
+    if dir.is_empty() {
+        return;
+    }
+    tokio::spawn(async move {
+        let has_pools = match open_project_kernel_state(&app, &dir) {
+            Ok((db, _)) => {
+                let guard = db.lock().await;
+                guard
+                    .list_pool_sessions()
+                    .map(|pools| pools.iter().any(|p| p.status != "archived"))
+                    .unwrap_or(false)
+            }
+            Err(_) => false,
+        };
+        if has_pools {
+            ensure_pool_patrol(&app, &dir);
+        }
+    });
+}
+
 async fn run_patrol(app: AppHandle, project_dir: String) {
     info!(target: "pool::patrol", project_dir = %project_dir, "swarm patrol started");
-    // Startup sweep recovers anything left stale by a previous crash immediately.
-    run_round_isolated(&app, &project_dir, 0).await;
+    // Startup sweep recovers anything left stale by a previous crash. Use the
+    // real staleness threshold (not 0): an unconditional reset would clobber
+    // turns legitimately running in another instance sharing the project DB.
+    run_round_isolated(&app, &project_dir, STALE_BUSY_SECS).await;
 
     let mut empty_rounds = 0u32;
     loop {
@@ -102,14 +130,17 @@ async fn run_patrol(app: AppHandle, project_dir: String) {
             }
         }
         match run_round_isolated(&app, &project_dir, STALE_BUSY_SECS).await {
-            Some(0) => {
+            Some(RoundOutcome::NoPools) => {
                 empty_rounds += 1;
                 if empty_rounds >= EMPTY_ROUNDS_BEFORE_EXIT {
-                    info!(target: "pool::patrol", project_dir = %project_dir, "swarm patrol retiring (no active pools)");
+                    info!(target: "pool::patrol", project_dir = %project_dir, "swarm patrol retiring (no pools left)");
                     return;
                 }
             }
-            Some(_) => empty_rounds = 0,
+            // Paused pools still exist: stay alive (cheap idle rounds) so a
+            // resume is picked up even without an explicit kick.
+            Some(RoundOutcome::PausedOnly) => empty_rounds = 0,
+            Some(RoundOutcome::Active(_)) => empty_rounds = 0,
             None => {
                 // DB could not be opened (project removed?) — retire.
                 return;
@@ -118,10 +149,23 @@ async fn run_patrol(app: AppHandle, project_dir: String) {
     }
 }
 
+/// What a patrol round observed. `PausedOnly` keeps the patrol alive so a
+/// later resume is picked up; only `NoPools` counts toward retirement.
+#[derive(Debug, PartialEq, Eq)]
+enum RoundOutcome {
+    NoPools,
+    PausedOnly,
+    Active(u32),
+}
+
 /// Run one round inside its own task so a panic in DB/runtime code is contained
-/// to that round (logged + treated as a non-empty round) rather than killing
-/// the whole patrol loop.
-async fn run_round_isolated(app: &AppHandle, project_dir: &str, max_busy_secs: i64) -> Option<u32> {
+/// to that round (logged + treated as work present) rather than killing the
+/// whole patrol loop.
+async fn run_round_isolated(
+    app: &AppHandle,
+    project_dir: &str,
+    max_busy_secs: i64,
+) -> Option<RoundOutcome> {
     let app = app.clone();
     let dir = project_dir.to_string();
     match tokio::spawn(async move { run_round(&app, &dir, max_busy_secs).await }).await {
@@ -134,14 +178,14 @@ async fn run_round_isolated(app: &AppHandle, project_dir: &str, max_busy_secs: i
             );
             // Treat a panicked round as "work present" so the patrol keeps going
             // instead of prematurely retiring.
-            Some(1)
+            Some(RoundOutcome::Active(1))
         }
     }
 }
 
-/// One patrol round. Returns the number of non-archived pools observed, or
-/// `None` if the project DB could not be opened.
-async fn run_round(app: &AppHandle, project_dir: &str, max_busy_secs: i64) -> Option<u32> {
+/// One patrol round. Returns what it observed, or `None` if the project DB
+/// could not be opened.
+async fn run_round(app: &AppHandle, project_dir: &str, max_busy_secs: i64) -> Option<RoundOutcome> {
     let (db, _settings) = open_project_kernel_state(app, project_dir).ok()?;
     let store = PoolStore::new(db.clone());
 
@@ -156,7 +200,7 @@ async fn run_round(app: &AppHandle, project_dir: &str, max_busy_secs: i64) -> Op
     };
     let active_pools = pools.iter().filter(|p| p.status == "active").count() as u32;
     if pools.is_empty() {
-        return Some(0);
+        return Some(RoundOutcome::NoPools);
     }
 
     let effective_max_busy = if max_busy_secs <= 0 {
@@ -177,6 +221,35 @@ async fn run_round(app: &AppHandle, project_dir: &str, max_busy_secs: i64) -> Op
     };
 
     if effective_max_busy > 0 {
+        // Cancel live turns bound to stale todos BEFORE the DB reset, so the
+        // re-dispatch below can never race a still-running turn (double write
+        // on the same worktree). Only steady-state rounds do this; the startup
+        // round (max_busy_secs == 0) has no live turns of its own.
+        let stale_todo_ids: Vec<String> = {
+            let guard = db.lock().await;
+            let cutoff = chrono::Utc::now() - chrono::Duration::seconds(effective_max_busy);
+            guard
+                .list_koi_todos(None)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|t| t.status == "in_progress" && t.updated_at < cutoff)
+                .map(|t| t.id)
+                .collect()
+        };
+        if !stale_todo_ids.is_empty() {
+            let runtime = crate::runtime::koi::shared_subagent_runtime(app);
+            let mut cancelled = 0usize;
+            for todo_id in &stale_todo_ids {
+                cancelled += runtime.cancel_turns_for_todo(project_dir, todo_id).await;
+            }
+            if cancelled > 0 {
+                info!(
+                    target: "pool::patrol",
+                    project_dir = %project_dir,
+                    "cancelled {cancelled} live turn(s) before watchdog recovery"
+                );
+            }
+        }
         let (stale_koi, stale_todo) =
             coordinator::watchdog_recover(&store, effective_max_busy).await;
         if stale_koi > 0 || stale_todo > 0 {
@@ -223,7 +296,11 @@ async fn run_round(app: &AppHandle, project_dir: &str, max_busy_secs: i64) -> Op
         }
         wake_finished_parents(&db, &store, &pool.id, sink.clone(), subagent.clone(), &cfg).await;
     }
-    Some(active_pools)
+    Some(if active_pools > 0 {
+        RoundOutcome::Active(active_pools)
+    } else {
+        RoundOutcome::PausedOnly
+    })
 }
 
 /// Ask the owner of a parent todo to wrap up once all its subtasks are finished.

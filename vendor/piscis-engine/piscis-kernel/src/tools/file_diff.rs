@@ -20,7 +20,9 @@ impl Tool for FileDiffTool {
     fn description(&self) -> &str {
         "Preview changes before writing, or compare two files. Read-only — makes no modifications.\n\
          Two modes:\n\
-         1. Preview mode: provide `path` + `new_content` — shows what file_write/file_edit would produce.\n\
+         1. Preview mode: provide `path` + `new_content` — shows what file_write/file_edit would produce. \
+         IMPORTANT: `new_content` must be the COMPLETE new file content, not a fragment or append — \
+         the diff treats it as a full replacement of the existing file.\n\
          2. Compare mode: provide `path_a` + `path_b` — shows differences between two existing files.\n\
          Output is unified diff format (--- / +++ / @@ hunks). \
          Use this before file_edit on large files to verify your changes are correct."

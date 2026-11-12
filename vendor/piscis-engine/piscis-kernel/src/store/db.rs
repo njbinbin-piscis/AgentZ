@@ -1194,6 +1194,8 @@ impl Database {
                 result_message_id INTEGER,
                 source_type TEXT NOT NULL DEFAULT 'user',
                 task_timeout_secs INTEGER NOT NULL DEFAULT 0,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                next_retry_at TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY(owner_id) REFERENCES kois(id) ON DELETE CASCADE,
@@ -1215,6 +1217,8 @@ impl Database {
             "ALTER TABLE koi_todos ADD COLUMN task_timeout_secs INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE koi_todos ADD COLUMN git_branch TEXT",
             "ALTER TABLE koi_todos ADD COLUMN integration_status TEXT NOT NULL DEFAULT 'none'",
+            "ALTER TABLE koi_todos ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE koi_todos ADD COLUMN next_retry_at TEXT",
         ] {
             let _ = self.conn.execute(col, []);
         }
@@ -4293,6 +4297,8 @@ impl Database {
             result_message_id: None,
             source_type: source_type.to_string(),
             task_timeout_secs,
+            retry_count: 0,
+            next_retry_at: None,
             created_at: now,
             updated_at: now,
         })
@@ -4300,7 +4306,7 @@ impl Database {
 
     const KOI_TODO_COLS: &'static str = "id, owner_id, title, description, status, priority, assigned_by, \
         pool_session_id, claimed_by, claimed_at, depends_on, blocked_reason, result_message_id, source_type, \
-        task_timeout_secs, git_branch, integration_status, created_at, updated_at";
+        task_timeout_secs, git_branch, integration_status, created_at, updated_at, retry_count, next_retry_at";
 
     pub fn list_koi_todos(
         &self,
@@ -4368,6 +4374,10 @@ impl Database {
                 .get::<_, String>(18)?
                 .parse::<DateTime<Utc>>()
                 .unwrap_or_else(|_| Utc::now()),
+            retry_count: r.get::<_, u32>(19).unwrap_or(0),
+            next_retry_at: r
+                .get::<_, Option<String>>(20)?
+                .and_then(|s| s.parse::<DateTime<Utc>>().ok()),
         })
     }
 
@@ -4489,6 +4499,25 @@ impl Database {
         Ok(count > 0)
     }
 
+    /// Requeue a todo for automatic retry after a transient failure.
+    /// Clears the claim so the patrol can re-dispatch, bumps `retry_count`,
+    /// and parks it behind `next_retry_at` (exponential backoff).
+    pub fn schedule_koi_todo_retry(
+        &self,
+        id: &str,
+        reason: &str,
+        next_retry_at: DateTime<Utc>,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        self.conn.execute(
+            "UPDATE koi_todos SET status = 'todo', claimed_by = NULL, claimed_at = NULL, \
+             blocked_reason = ?2, retry_count = retry_count + 1, next_retry_at = ?3, updated_at = ?4 \
+             WHERE id = ?1",
+            params![id, reason, next_retry_at.to_rfc3339(), now],
+        )?;
+        Ok(())
+    }
+
     /// Block a todo with a reason
     pub fn block_koi_todo(&self, id: &str, reason: &str) -> Result<()> {
         let now = Utc::now().to_rfc3339();
@@ -4591,6 +4620,8 @@ impl Database {
                     result_message_id: None,
                     source_type: source_type.to_string(),
                     task_timeout_secs,
+                    retry_count: 0,
+                    next_retry_at: None,
                     created_at: now,
                     updated_at: now,
                 })

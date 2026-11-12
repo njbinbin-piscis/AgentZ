@@ -46,12 +46,17 @@ interface CollabBoardProps {
 const TODO_COLUMNS: { key: string; statuses: string[] }[] = [
   { key: "todo", statuses: ["todo"] },
   { key: "inProgress", statuses: ["in_progress", "blocked"] },
+  { key: "review", statuses: ["needs_review"] },
   { key: "done", statuses: ["done", "completed"] },
 ];
 
+/** Low-frequency reconciliation so a lost terminal event can't freeze the board. */
+const BOARD_POLL_MS = 15_000;
+
 /**
  * Live collaboration board for a team Pool: members, a todo kanban, and the
- * recent pool_chat / event feed. Refreshes on every `agentz:pool-event`.
+ * recent pool_chat / event feed. Refreshes on every `agentz:pool-event` and
+ * reconciles on a 15s poll as a safety net against missed events.
  */
 export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoardProps) {
   const { t } = useTranslation();
@@ -74,12 +79,14 @@ export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoard
       setTodos(td);
       setMessages(msg);
     } catch {
-      // best-effort; board polls again on the next event
+      // best-effort; the next event or the 15s reconciliation poll retries
     }
   }, [projectDir, poolId]);
 
   useEffect(() => {
     void refresh();
+    const poll = setInterval(() => void refresh(), BOARD_POLL_MS);
+    return () => clearInterval(poll);
   }, [refresh]);
 
   useEffect(() => {

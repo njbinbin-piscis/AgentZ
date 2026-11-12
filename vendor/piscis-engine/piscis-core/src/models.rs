@@ -25,6 +25,12 @@ pub struct KoiTodo {
     pub source_type: String,
     #[serde(default)]
     pub task_timeout_secs: u32,
+    /// Number of automatic re-dispatches after transient failures.
+    #[serde(default)]
+    pub retry_count: u32,
+    /// Earliest time the patrol may re-dispatch this todo (retry backoff).
+    #[serde(default)]
+    pub next_retry_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

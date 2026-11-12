@@ -195,8 +195,8 @@ fn now() -> String {
 }
 
 async fn drive(app: AppHandle, run_id: &str) -> Result<(), String> {
-    // One runtime instance per run so an in-flight turn can be cancelled.
-    let runtime = Arc::new(DesktopInProcessSubagentRuntime::new(app.clone()));
+    // Shared process-wide runtime: cancels from any dispatcher reach the turn.
+    let runtime = crate::runtime::koi::shared_subagent_runtime(&app);
     loop {
         let mut run = load_run(&app, run_id)?;
         if run.status != "running" {
@@ -490,7 +490,12 @@ async fn run_agent_node(
         system_prompt: koi_system_prompt,
         user_prompt,
         workspace: Some(run.project_dir.clone()),
-        task_timeout_secs: None,
+        // A hung LLM call must not block the whole workflow forever; fall back
+        // to the kernel coordinator default instead of the chat "no timeout".
+        task_timeout_secs: Some(
+            piscis_kernel::pool::coordinator::CoordinatorConfig::default()
+                .default_task_timeout_secs,
+        ),
         extra_tool_profile: Vec::new(),
         extra_system_context: Some(extra_context),
     };

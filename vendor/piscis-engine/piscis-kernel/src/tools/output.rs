@@ -110,6 +110,12 @@ pub const MAX_LINE_CHARS: usize = 1_000;
 /// Elide the middle of every line longer than [`MAX_LINE_CHARS`].
 /// Returns the rewritten text and how many lines were elided.
 pub fn cap_long_lines(s: &str) -> (String, usize) {
+    cap_long_lines_with(s, MAX_LINE_CHARS)
+}
+
+/// Like [`cap_long_lines`] with a caller-provided per-line cap, for tools
+/// whose payloads are legitimately one long line (base64, minified JSON).
+pub fn cap_long_lines_with(s: &str, max_line_chars: usize) -> (String, usize) {
     let mut elided = 0usize;
     let mut out = String::with_capacity(s.len().min(1 << 20));
     for (i, line) in s.split('\n').enumerate() {
@@ -117,13 +123,13 @@ pub fn cap_long_lines(s: &str) -> (String, usize) {
             out.push('\n');
         }
         let chars: Vec<(usize, char)> = line.char_indices().collect();
-        if chars.len() <= MAX_LINE_CHARS {
+        if chars.len() <= max_line_chars {
             out.push_str(line);
             continue;
         }
         elided += 1;
-        let head_chars = MAX_LINE_CHARS * 3 / 5;
-        let tail_chars = MAX_LINE_CHARS - head_chars - 40;
+        let head_chars = max_line_chars * 3 / 5;
+        let tail_chars = max_line_chars.saturating_sub(head_chars + 40);
         let head_end = chars[head_chars - 1].0 + chars[head_chars - 1].1.len_utf8();
         let tail_start = chars[chars.len() - tail_chars].0;
         out.push_str(&line[..char_boundary_index(line, head_end)]);
@@ -138,10 +144,22 @@ pub fn cap_long_lines(s: &str) -> (String, usize) {
 
 /// Smart truncate `s` to at most `max_bytes` using `strategy`.
 pub fn smart_truncate(s: &str, max_bytes: usize, strategy: TruncateStrategy) -> (String, ToolMeta) {
+    smart_truncate_with_line_cap(s, max_bytes, strategy, MAX_LINE_CHARS)
+}
+
+/// Like [`smart_truncate`] with a caller-provided per-line cap. Pass a cap
+/// >= the payload's longest line to keep single-line payloads (base64,
+/// minified JSON) intact; the overall byte budget still applies.
+pub fn smart_truncate_with_line_cap(
+    s: &str,
+    max_bytes: usize,
+    strategy: TruncateStrategy,
+    max_line_chars: usize,
+) -> (String, ToolMeta) {
     let total = s.len();
     // Balance step 1: cap individual long lines first so one huge line
     // cannot consume the entire budget (wasted tokens, no information).
-    let (capped, elided_lines) = cap_long_lines(s);
+    let (capped, elided_lines) = cap_long_lines_with(s, max_line_chars);
     if capped.len() <= max_bytes {
         let truncated = elided_lines > 0;
         return (
@@ -152,7 +170,7 @@ pub fn smart_truncate(s: &str, max_bytes: usize, strategy: TruncateStrategy) -> 
                 shown_bytes: capped.len(),
                 hint: truncated.then(|| {
                     format!(
-                        "{elided_lines} over-long line(s) were middle-elided (cap {MAX_LINE_CHARS} chars/line)."
+                        "{elided_lines} over-long line(s) were middle-elided (cap {max_line_chars} chars/line)."
                     )
                 }),
             },

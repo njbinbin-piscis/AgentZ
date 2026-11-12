@@ -247,14 +247,24 @@ impl LspManager {
             .into_iter()
             .find(|l| l.language_id == language)
             .ok_or_else(|| format!("unsupported language: {language}"))?;
-        let cmd = Self::resolve_command(&lang.server_command, project_root)
+        let resolved = Self::resolve_command(&lang.server_command, project_root);
+        let proxy_present = resolved.is_some();
+        let cmd = resolved
             .filter(|c| language != "rust" || runs_ok(c, "--version"))
             .ok_or_else(|| {
-                format!(
-                    "language server '{}' is not installed — {}",
-                    lang.server_command,
-                    Self::install_hint(language)
-                )
+                // A rustup proxy shim exists but the component is missing:
+                // `--version` exits non-zero. Say so instead of "not installed".
+                if language == "rust" && proxy_present {
+                    format!(
+                        "rust-analyzer proxy found but the component is missing or broken — run `rustup component add rust-analyzer` (then retry)"
+                    )
+                } else {
+                    format!(
+                        "language server '{}' is not installed — {}",
+                        lang.server_command,
+                        Self::install_hint(language)
+                    )
+                }
             })?;
         let mut last_err = String::new();
         let (cmd, args) = server_launch(&cmd, &lang.server_args);

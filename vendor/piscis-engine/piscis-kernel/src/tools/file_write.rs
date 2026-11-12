@@ -539,15 +539,25 @@ impl Tool for FileEditTool {
         // file on disk may be CRLF (or vice versa). If the snippet does not match
         // verbatim, retry with its line endings converted to the file's style, and
         // convert `new` the same way so the file keeps a consistent EOL.
+        // Mixed-EOL files: try both styles — a whole-file "contains CRLF" guess
+        // would wrongly convert snippets targeting the LF regions.
         let file_is_crlf = content.contains("\r\n");
         for (old, new) in pairs.iter_mut() {
             if content.contains(old.as_str()) {
                 continue;
             }
-            let adapted_old = adapt_eol(old, file_is_crlf);
-            if adapted_old != *old && content.contains(adapted_old.as_str()) {
-                *new = adapt_eol(new, file_is_crlf);
-                *old = adapted_old;
+            let mut adapted = adapt_eol(old, file_is_crlf);
+            let mut target_crlf = file_is_crlf;
+            if adapted == *old || !content.contains(adapted.as_str()) {
+                let other = adapt_eol(old, !file_is_crlf);
+                if other != *old && content.contains(other.as_str()) {
+                    adapted = other;
+                    target_crlf = !file_is_crlf;
+                }
+            }
+            if adapted != *old && content.contains(adapted.as_str()) {
+                *new = adapt_eol(new, target_crlf);
+                *old = adapted;
             }
         }
 
@@ -699,5 +709,65 @@ mod powershell_bom_tests {
         let bytes = std::fs::read(&path).unwrap();
         assert_eq!(&bytes[..3], &[0xEF, 0xBB, 0xBF]);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod mixed_eol_tests {
+    use super::*;
+    use crate::agent::tool::ToolSettings;
+    use serde_json::json;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    fn test_ctx(root: std::path::PathBuf) -> ToolContext {
+        ToolContext {
+            session_id: "mixed-eol-test".into(),
+            workspace_root: root,
+            bypass_permissions: false,
+            settings: Arc::new(ToolSettings::default()),
+            max_iterations: Some(1),
+            memory_owner_id: "piscis".into(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel: Arc::new(AtomicBool::new(false)),
+            loop_halt: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn edit_matches_lf_region_of_a_mixed_eol_file() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("piscis-mixed-eol-{nanos}"));
+        std::fs::create_dir_all(&root).unwrap();
+        let ctx = test_ctx(root.clone());
+
+        // CRLF head, LF tail: a whole-file "contains CRLF" guess would convert
+        // the snippet to CRLF and fail to match the LF region.
+        let mixed = "head-a\r\nhead-b\r\ntail-a\ntail-b\n";
+        std::fs::write(root.join("mixed.txt"), mixed).unwrap();
+
+        let result = FileEditTool
+            .call(
+                json!({
+                    "path": "mixed.txt",
+                    "old_string": "tail-a\ntail-b",
+                    "new_string": "tail-x\ntail-y"
+                }),
+                &ctx,
+            )
+            .await
+            .expect("call should not error at the Rust level");
+        assert!(!result.is_error, "content={}", result.content);
+
+        let after = std::fs::read_to_string(root.join("mixed.txt")).unwrap();
+        assert!(after.contains("head-a\r\nhead-b\r\n"), "CRLF region untouched: {after:?}");
+        assert!(after.contains("tail-x\ntail-y"), "LF region edited with LF: {after:?}");
+        assert!(!after.contains("tail-x\r\n"), "must not inject CRLF into the LF region: {after:?}");
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

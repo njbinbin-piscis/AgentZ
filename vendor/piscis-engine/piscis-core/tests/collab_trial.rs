@@ -54,6 +54,8 @@ fn sample_todo(status: &str) -> KoiTodo {
         result_message_id: None,
         source_type: "piscis".into(),
         task_timeout_secs: 0,
+        retry_count: 0,
+        next_retry_at: None,
         created_at: now,
         updated_at: now,
     }
@@ -487,6 +489,8 @@ fn todo_at(status: &str, updated_at: DateTime<Utc>) -> KoiTodo {
         result_message_id: None,
         source_type: "piscis".into(),
         task_timeout_secs: 0,
+        retry_count: 0,
+        next_retry_at: None,
         created_at: updated_at,
         updated_at,
     }

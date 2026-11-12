@@ -37,6 +37,12 @@ const AGENT_ACTION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs
 /// How long navigation waits for the load event before returning anyway.
 const NAV_SETTLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(12);
 
+/// Desktop User-Agent applied to every page. Headless Chromium otherwise
+/// advertises `HeadlessChrome/<v>`, which sites use to serve mobile or
+/// bot-gated layouts. Applied at page acquisition so agent-only sessions
+/// (no panel viewport sync) get it too.
+const DESKTOP_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
 /// Tracks page navigation generations and snapshot-bound element refs (AZ-053 / R10-04).
 #[derive(Clone, Debug)]
 pub struct BrowserGenerationTracker {
@@ -616,13 +622,60 @@ impl BrowserManager {
         let mut mgr = tokio::time::timeout(PAGE_LOCK_WAIT, self.inner.lock())
             .await
             .map_err(|_| anyhow::anyhow!("browser is busy with another operation; try again"))?;
-        tokio::time::timeout(PAGE_OPEN_TIMEOUT, mgr.get_or_create_page(&tab))
-            .await
-            .map_err(|_| anyhow::anyhow!("browser did not open a page in time"))?
-            .context("failed to open the session browser tab")?;
+        match Self::open_page(&mut mgr, &tab).await {
+            Ok(()) => {}
+            Err(first) => {
+                // The Chromium process may have died (crash, external kill,
+                // system sleep) while the manager still holds a stale handle:
+                // robotz's launch() is a no-op when browser.is_some(), so every
+                // later call would hang on the dead CDP connection forever.
+                // Drop the dead instance and retry once with a fresh launch.
+                tracing::warn!(
+                    target: "browser",
+                    error = %first,
+                    "page open failed; restarting browser and retrying once"
+                );
+                mgr.close().await;
+                Self::open_page(&mut mgr, &tab).await.map_err(|second| {
+                    anyhow::anyhow!(
+                        "browser did not open a page in time (restart also failed: {second}; first error: {first})"
+                    )
+                })?;
+            }
+        }
         mgr.switch_tab(&tab)
             .context("failed to focus the session browser tab")?;
         Ok(tab)
+    }
+
+    /// Open (or reuse) the session tab under a bounded wait.
+    async fn open_page(
+        mgr: &mut robotz_browser::BrowserManager,
+        tab: &str,
+    ) -> Result<()> {
+        tokio::time::timeout(PAGE_OPEN_TIMEOUT, mgr.get_or_create_page(tab))
+            .await
+            .map_err(|_| anyhow::anyhow!("browser did not open a page in time"))?
+            .context("failed to open the session browser tab")?;
+        Ok(())
+    }
+
+    /// Launch (no-op when already running) and resolve the active page, each
+    /// phase bounded. Used by [`Self::with_active_page_timeout`] so a dead
+    /// Chromium process surfaces as an error instead of a silent hang.
+    async fn launch_and_get_page(
+        mgr: &mut robotz_browser::BrowserManager,
+        op_timeout: std::time::Duration,
+    ) -> Result<Page> {
+        tokio::time::timeout(op_timeout, mgr.launch())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser launch timed out"))?
+            .context("failed to launch browser")?;
+        let page = tokio::time::timeout(op_timeout, mgr.active_page())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser did not return an active page"))?
+            .context("no active browser page")?;
+        Ok((*page).clone())
     }
 
     pub async fn session_has_page(&self, session_id: &str) -> bool {
@@ -775,15 +828,33 @@ impl BrowserManager {
         let mut mgr = tokio::time::timeout(PAGE_LOCK_WAIT, self.inner.lock())
             .await
             .map_err(|_| anyhow::anyhow!("browser is busy with another operation; try again"))?;
-        tokio::time::timeout(op_timeout, mgr.launch())
-            .await
-            .map_err(|_| anyhow::anyhow!("browser launch timed out"))?
-            .context("failed to launch browser")?;
-        let page = tokio::time::timeout(op_timeout, mgr.active_page())
-            .await
-            .map_err(|_| anyhow::anyhow!("browser did not return an active page"))?
-            .context("no active browser page")?;
-        tokio::time::timeout(op_timeout, f(page.as_ref().clone()))
+        let page = match Self::launch_and_get_page(&mut mgr, op_timeout).await {
+            Ok(page) => page,
+            Err(first) => {
+                // Stale handle after the Chromium process died: robotz's
+                // launch() no-ops while browser.is_some(), so restart once.
+                tracing::warn!(
+                    target: "browser",
+                    error = %first,
+                    "page acquisition failed; restarting browser and retrying once"
+                );
+                mgr.close().await;
+                Self::launch_and_get_page(&mut mgr, op_timeout).await.map_err(|second| {
+                    anyhow::anyhow!(
+                        "browser did not return an active page (restart also failed: {second}; first error: {first})"
+                    )
+                })?
+            }
+        };
+        // CDP UA override is per-page and survives navigations; re-applying is
+        // idempotent and covers freshly created tabs.
+        let ua_params =
+            chromiumoxide::cdp::browser_protocol::network::SetUserAgentOverrideParams::builder()
+                .user_agent(DESKTOP_USER_AGENT)
+                .build()
+                .map_err(|e| anyhow::anyhow!(e))?;
+        let _ = page.execute(ua_params).await;
+        tokio::time::timeout(op_timeout, f(page))
             .await
             .map_err(|_| anyhow::anyhow!("browser operation timed out"))?
     }
@@ -826,9 +897,8 @@ impl BrowserManager {
 
             // Set explicit desktop User-Agent to prevent sites from detecting
             // this as a mobile/emulated environment via navigator.userAgent.
-            let ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
             let ua_params = SetUserAgentOverrideParams::builder()
-                .user_agent(ua)
+                .user_agent(DESKTOP_USER_AGENT)
                 .build()
                 .map_err(|e| anyhow::anyhow!(e))?;
             let _ = page.execute(ua_params).await;

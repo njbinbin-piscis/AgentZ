@@ -173,6 +173,7 @@ pub fn classify_error(msg: &str) -> ErrorClass {
     }
 
     if lower.contains("timeout")
+        || lower.contains("timed out")
         || lower.contains("connection")
         || lower.contains("overloaded")
         || lower.contains("error decoding response body")
@@ -342,6 +343,7 @@ mod tests {
     fn classifies_transient_upstream_errors() {
         for msg in [
             "request timeout after 120s",
+            "Koi 'Alpha' timed out after 600 seconds on task: fix the thing",
             "OpenAI API error 503 Service Unavailable: overloaded",
             "error decoding response body: unexpected eof",
             "connection reset by peer",

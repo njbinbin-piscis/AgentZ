@@ -90,7 +90,7 @@
 
 .agentz-collab-board {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   padding: 12px 16px;
   flex: 1;
@@ -139,6 +139,10 @@
 
 .agentz-collab-card.blocked {
   border-left-color: #fc5c65;
+}
+
+.agentz-collab-card.needs_review {
+  border-left-color: #45aaf2;
 }
 
 .agentz-collab-card.done,

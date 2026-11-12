@@ -20,7 +20,7 @@ use std::{
 #[cfg(windows)]
 const DEFAULT_TIMEOUT_SECS: u64 = 120;
 #[cfg(windows)]
-const MAX_TIMEOUT_SECS: u64 = 300;
+const MAX_TIMEOUT_SECS: u64 = 600;
 #[cfg(windows)]
 const MAX_OUTPUT_BYTES: usize = 200 * 1024;
 
@@ -179,7 +179,7 @@ impl Tool for ShellTool {
                 },
                 "timeout": {
                     "type": "integer",
-                    "description": "Foreground timeout in seconds (default 120, maximum 300). On timeout the still-running command is moved to the background registry instead of being killed."
+                    "description": "Foreground timeout in seconds (default 120, maximum 600). Aliases: timeout_secs, timeout_ms. On timeout the still-running command is moved to the background registry instead of being killed."
                 },
                 "background": {
                     "type": "boolean",
@@ -404,8 +404,13 @@ impl Tool for ShellTool {
                         .join(system_dir)
                         .join("WindowsPowerShell\\v1.0\\powershell.exe");
                     let compat_cmd = rewrite_powershell5_chain(command);
+                    // PS 5.1 turns native-command stderr (git progress, npm
+                    // notices) into a terminating NativeCommandError under
+                    // ErrorActionPreference=Stop, flipping a successful exit
+                    // code to 1. Keep Continue and propagate the real exit
+                    // code so failure detection stays exit-code based.
                     let full_command = format!(
-                        "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.Encoding]::UTF8; {compat_cmd}"
+                        "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.Encoding]::UTF8; $ErrorActionPreference='Continue'; {compat_cmd}; exit $LASTEXITCODE"
                     );
                     (
                         program,
@@ -426,8 +431,13 @@ impl Tool for ShellTool {
                 }
             };
 
+            // Accept the loop-level aliases too: callers that pass
+            // `timeout_secs` / `timeout_ms` must not silently fall back to the
+            // 120s default while the loop waits much longer.
             let timeout_secs = input["timeout"]
                 .as_u64()
+                .or_else(|| input["timeout_secs"].as_u64())
+                .or_else(|| input["timeout_ms"].as_u64().map(|ms| ms.div_ceil(1000)))
                 .unwrap_or(DEFAULT_TIMEOUT_SECS)
                 .clamp(1, MAX_TIMEOUT_SECS);
             let mut env_overrides = input["env"]

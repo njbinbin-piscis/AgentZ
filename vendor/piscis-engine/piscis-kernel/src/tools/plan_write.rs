@@ -111,7 +111,7 @@ impl Tool for PlanWriteTool {
         std::fs::write(&abs, content.as_bytes())?;
 
         Ok(ToolResult::ok(format!(
-            "计划已写入 `{rel_path}`（{} 个步骤）。Plan 模式完成后请总结 trade-off 并询问用户是否切换到 Agent 模式执行。",
+            "计划已写入 `{rel_path}`（{} 个步骤）。请立即调用 plan_mode_ui(action=plan_ready) 展示 Build 按钮，等待用户点击后再执行；不要用文字询问是否切换模式。",
             content.lines().filter(|l| l.starts_with("## Step")).count()
         )))
     }

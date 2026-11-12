@@ -127,6 +127,8 @@ mod tests {
             result_message_id: None,
             source_type: "koi".into(),
             task_timeout_secs: 0,
+            retry_count: 0,
+            next_retry_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

@@ -168,20 +168,24 @@ pub fn validate_plan_content(content: &str) -> Result<(), String> {
     if step_count == 0 {
         return Err(format!("至少定义 1 个原子步骤。{STEP_FORMAT_HINT}"));
     }
+    // Report every missing field at once so the caller fixes the plan in a
+    // single pass instead of one error per retry.
+    let mut problems: Vec<String> = Vec::new();
     for (i, block) in split_step_blocks(trimmed).iter().enumerate() {
         let n = i + 1;
-        if !block.contains("**状态**") {
-            return Err(format!("Step {n} 缺少 **状态** 字段"));
+        let missing: Vec<&str> = ["**状态**", "**描述**", "**预期产物**", "**验收证据**"]
+            .into_iter()
+            .filter(|field| !block.contains(field))
+            .collect();
+        if !missing.is_empty() {
+            problems.push(format!("Step {n} 缺少字段: {}", missing.join("、")));
         }
-        if !block.contains("**预期产物**") {
-            return Err(format!("Step {n} 缺少 **预期产物** 字段"));
-        }
-        if !block.contains("**验收证据**") {
-            return Err(format!("Step {n} 缺少 **验收证据** 字段"));
-        }
-        if !block.contains("**描述**") {
-            return Err(format!("Step {n} 缺少 **描述** 字段"));
-        }
+    }
+    if !problems.is_empty() {
+        return Err(format!(
+            "{}。每个 Step 必须包含 **状态** / **描述** / **预期产物** / **验收证据** 四个粗体字段。",
+            problems.join("；")
+        ));
     }
     Ok(())
 }
@@ -249,5 +253,16 @@ mod tests {
         assert!(!is_allowed_plan_path(&root, ".agentz/plans/foo.txt"));
         assert!(!is_allowed_plan_path(&root, "src/main.rs"));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn validate_reports_all_missing_fields_at_once() {
+        let body = "# 执行步骤\n\n## Step 1: only status\n- **状态**: pending\n\n## Step 2: nothing\n- foo\n";
+        let err = validate_plan_content(body).unwrap_err();
+        assert!(err.contains("Step 1"), "{err}");
+        assert!(err.contains("Step 2"), "{err}");
+        assert!(err.contains("**描述**"), "{err}");
+        assert!(err.contains("**预期产物**"), "{err}");
+        assert!(err.contains("**验收证据**"), "{err}");
     }
 }

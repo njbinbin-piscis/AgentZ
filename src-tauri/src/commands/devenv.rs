@@ -344,6 +344,36 @@ fn search_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+/// npm's global bin dir is configurable (`npm config set prefix`), so static
+/// guesses miss custom installs. Ask npm itself; cached for the process.
+fn npm_global_bin_dir() -> Option<PathBuf> {
+    static DIR: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        let npm = locate("npm")?;
+        let out = std::process::Command::new(&npm)
+            .args(["root", "-g"])
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let root = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if root.is_empty() {
+            return None;
+        }
+        // <root> is node_modules; the shims sit next to it (Windows) or in
+        // ../bin (unix prefix layout).
+        let root_path = PathBuf::from(&root);
+        let sibling = root_path.parent()?.to_path_buf();
+        if sibling.join("bin").is_dir() {
+            Some(sibling.join("bin"))
+        } else {
+            Some(sibling)
+        }
+    })
+    .clone()
+}
+
 pub fn locate(cmd: &str) -> Option<PathBuf> {
     locate_in(cmd, &search_dirs())
 }
@@ -1000,10 +1030,17 @@ fn probe_debugpy(project: &Path) -> ToolStatus {
     status
 }
 
-fn probe(spec: ToolSpec) -> ToolStatus {
+fn probe(spec: ToolSpec, project: &Path) -> ToolStatus {
     let mut path: Option<PathBuf> = None;
+    let mut dirs = search_dirs();
+    // Project-local installs (node_modules/.bin) and npm's configured global
+    // prefix are not on PATH in a GUI-launched process.
+    dirs.push(project.join("node_modules").join(".bin"));
+    if let Some(npm_bin) = npm_global_bin_dir() {
+        dirs.push(npm_bin);
+    }
     for exe in spec.exes {
-        if let Some(p) = locate(exe) {
+        if let Some(p) = locate_in(exe, &dirs) {
             path = Some(p);
             break;
         }
@@ -1037,6 +1074,13 @@ fn probe(spec: ToolSpec) -> ToolStatus {
         }
         None => {
             status.found = false;
+            // Distinguish "binary missing" from "binary present but broken"
+            // (rustup proxy without component, .cmd shim without node on PATH).
+            status.reason = format!(
+                "{} — found at {} but it failed to run (missing component or runtime?)",
+                spec.reason,
+                p.display()
+            );
         }
     }
     status
@@ -1047,7 +1091,10 @@ pub fn scan_blocking(project: &Path) -> DevEnvReport {
     let specs = specs_for(&detected);
     let handles: Vec<_> = specs
         .into_iter()
-        .map(|s| std::thread::spawn(move || probe(s)))
+        .map(|s| {
+            let project = project.to_path_buf();
+            std::thread::spawn(move || probe(s, &project))
+        })
         .collect();
     let mut tools: Vec<ToolStatus> = handles.into_iter().filter_map(|h| h.join().ok()).collect();
     if detected.stacks.contains("python") {

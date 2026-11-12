@@ -75,6 +75,9 @@ pub struct CoordinatorConfig {
     /// the pool has a `project_dir`. CLI hosts that test prompts
     /// outside a git repo set this to `false`.
     pub use_worktrees: bool,
+    /// Maximum automatic re-dispatches for a todo that failed with a
+    /// transient error (timeout / connection / 5xx). `0` disables retries.
+    pub max_auto_retries: u32,
 }
 
 impl Default for CoordinatorConfig {
@@ -82,6 +85,7 @@ impl Default for CoordinatorConfig {
         Self {
             default_task_timeout_secs: DEFAULT_TASK_TIMEOUT_SECS,
             use_worktrees: true,
+            max_auto_retries: 2,
         }
     }
 }
@@ -330,6 +334,7 @@ async fn execute_todo_turn_inner(
         args.assign_msg_id,
         success,
         &raw_reply,
+        cfg.max_auto_retries,
     )
     .await?;
 
@@ -542,6 +547,7 @@ async fn record_turn_outcome(
     assign_msg_id: Option<i64>,
     run_success: bool,
     raw_reply: &str,
+    max_auto_retries: u32,
 ) -> anyhow::Result<Option<i64>> {
     // Re-read the todo to see if the subagent already called
     // `pool_org(action="complete_todo")` — that tool sets `status="done"`
@@ -729,7 +735,61 @@ async fn record_turn_outcome(
             .unwrap_or(false);
     }
 
-    if !todo_already_done && !todo_already_reconciled {
+    // Transient failures (timeout / connection reset / 5xx) are requeued with
+    // backoff instead of blocking the board forever. Permanent failures
+    // (auth / quota / unknown) still block and wait for Piscis.
+    let retry_scheduled = !run_success
+        && !todo_already_done
+        && !todo_already_reconciled
+        && max_auto_retries > 0
+        && todo.retry_count < max_auto_retries
+        && crate::llm::error_class::classify_error(raw_reply).is_retryable();
+    if retry_scheduled {
+        let backoff_secs = 30u64 * 2u64.saturating_pow(todo.retry_count);
+        let next_retry_at = Utc::now() + chrono::Duration::seconds(backoff_secs as i64);
+        let todo_id = todo.id.clone();
+        let reply_for_retry = raw_reply.to_string();
+        store
+            .write(move |db| {
+                db.schedule_koi_todo_retry(&todo_id, &reply_for_retry, next_retry_at)
+            })
+            .await?;
+        if let Some(psid) = pool_id {
+            let note = format!(
+                "[AutoRetry] {} transient failure on '{}' (attempt {}/{}). Requeued with {}s backoff: {}",
+                koi.name,
+                todo.title,
+                todo.retry_count + 1,
+                max_auto_retries,
+                backoff_secs,
+                truncate_chars(raw_reply, 300),
+            );
+            let meta = json!({
+                "todo_id": todo.id,
+                "auto_retry": true,
+                "retry_count": todo.retry_count + 1,
+            })
+            .to_string();
+            let msg = insert_ext_message(
+                store,
+                psid,
+                "system",
+                &note,
+                "status_update",
+                &meta,
+                Some(&todo.id),
+                assign_msg_id,
+                Some("auto_retry"),
+            )
+            .await?;
+            sink.emit_pool(&PoolEvent::MessageAppended {
+                pool_id: psid.to_string(),
+                message: (&msg).into(),
+            });
+        }
+    }
+
+    if !retry_scheduled && !todo_already_done && !todo_already_reconciled {
         let todo_id = todo.id.clone();
         let reply_for_block = raw_reply.to_string();
         let rmid = result_msg_id;
@@ -752,6 +812,8 @@ async fn record_turn_outcome(
 
     let action = if todo_already_done || completion_recorded {
         TodoChangeAction::Completed
+    } else if retry_scheduled {
+        TodoChangeAction::Resumed
     } else if !run_success
         || current
             .as_ref()
@@ -1313,10 +1375,15 @@ pub async fn activate_pending_todos(
         })
         .await?;
 
+    let now = Utc::now();
     let pending: Vec<&KoiTodo> = todos
         .iter()
         .filter(|t| {
             if t.status != "todo" || t.claimed_by.is_some() {
+                return false;
+            }
+            // Retry backoff: a requeued transient failure waits out its delay.
+            if t.next_retry_at.is_some_and(|at| at > now) {
                 return false;
             }
             match pool_session_id {
@@ -1387,7 +1454,18 @@ pub async fn activate_pending_todos(
 /// the host-provided [`SubagentRuntime`]; this watchdog only restores
 /// durable DB state so the pool can make progress after crashes or
 /// abandoned turns.
+///
+/// `max_busy_secs <= 0` is refused: an unconditional reset would clobber
+/// turns that are legitimately running (e.g. a second app instance sharing
+/// the project DB). Hosts must pass a real staleness threshold.
 pub async fn watchdog_recover(store: &PoolStore, max_busy_secs: i64) -> (u32, u32) {
+    if max_busy_secs <= 0 {
+        tracing::warn!(
+            target: "pool::coordinator",
+            "watchdog_recover refused unconditional reset (max_busy_secs={max_busy_secs}); pass a positive threshold"
+        );
+        return (0, 0);
+    }
     let koi_count = store
         .write(|db| Ok(db.recover_stale_busy_kois(max_busy_secs).unwrap_or(0)))
         .await
@@ -1569,6 +1647,8 @@ mod tests {
             result_message_id: None,
             source_type: "koi".into(),
             task_timeout_secs: 0,
+            retry_count: 0,
+            next_retry_at: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -1721,5 +1801,157 @@ mod tests {
         assert!(is_todo_board_reconciled("needs_review"));
         assert!(!is_todo_board_reconciled("in_progress"));
         assert!(!is_todo_board_reconciled("todo"));
+    }
+
+    // ─── transient-failure auto retry ─────────────────────────────────
+
+    struct NoopSubagent;
+
+    #[async_trait::async_trait]
+    impl SubagentRuntime for NoopSubagent {
+        async fn spawn_koi_turn(
+            &self,
+            _request: KoiTurnRequest,
+        ) -> anyhow::Result<piscis_core::host::KoiTurnHandle> {
+            anyhow::bail!("noop subagent must not be dispatched in this test")
+        }
+        async fn cancel_koi_turn(
+            &self,
+            _handle: &piscis_core::host::KoiTurnHandle,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
+        async fn wait_koi_turn(
+            &self,
+            _handle: &piscis_core::host::KoiTurnHandle,
+        ) -> anyhow::Result<KoiTurnOutcome> {
+            anyhow::bail!("noop subagent must not be dispatched in this test")
+        }
+    }
+
+    fn retry_test_store() -> (PoolStore, KoiDefinition, KoiTodo) {
+        let db = crate::store::db::Database::open_in_memory().unwrap();
+        db.upsert_koi_with_id("koi-r", "RetryKoi").unwrap();
+        let todo = db
+            .create_koi_todo("koi-r", "retry me", "", "medium", "piscis", None, "pool", None, 600)
+            .unwrap();
+        db.claim_koi_todo(&todo.id, "koi-r").unwrap();
+        let koi = db.get_koi("koi-r").unwrap().unwrap();
+        let todo = db.get_koi_todo(&todo.id).unwrap().unwrap();
+        (PoolStore::new(std::sync::Arc::new(tokio::sync::Mutex::new(db))), koi, todo)
+    }
+
+    #[tokio::test]
+    async fn transient_failure_requeues_with_backoff() {
+        let (store, koi, todo) = retry_test_store();
+        record_turn_outcome(
+            &store,
+            &NullPoolEventSink,
+            None,
+            &koi,
+            &todo,
+            None,
+            false,
+            "Koi 'RetryKoi' timed out after 600 seconds on task: retry me",
+            2,
+        )
+        .await
+        .unwrap();
+        let after = store
+            .read(|db| Ok(db.get_koi_todo(&todo.id).unwrap().unwrap()))
+            .await
+            .unwrap();
+        assert_eq!(after.status, "todo");
+        assert_eq!(after.retry_count, 1);
+        assert!(after.claimed_by.is_none());
+        assert!(after.next_retry_at.is_some_and(|at| at > Utc::now()));
+    }
+
+    #[tokio::test]
+    async fn permanent_failure_still_blocks() {
+        let (store, koi, todo) = retry_test_store();
+        record_turn_outcome(
+            &store,
+            &NullPoolEventSink,
+            None,
+            &koi,
+            &todo,
+            None,
+            false,
+            "OpenAI API error 401 Unauthorized: invalid api key",
+            2,
+        )
+        .await
+        .unwrap();
+        let after = store
+            .read(|db| Ok(db.get_koi_todo(&todo.id).unwrap().unwrap()))
+            .await
+            .unwrap();
+        assert_eq!(after.status, "blocked");
+        assert_eq!(after.retry_count, 0);
+    }
+
+    #[tokio::test]
+    async fn retry_budget_exhaustion_blocks() {
+        let (store, koi, mut todo) = retry_test_store();
+        todo.retry_count = 2;
+        record_turn_outcome(
+            &store,
+            &NullPoolEventSink,
+            None,
+            &koi,
+            &todo,
+            None,
+            false,
+            "connection reset by peer",
+            2,
+        )
+        .await
+        .unwrap();
+        let after = store
+            .read(|db| Ok(db.get_koi_todo(&todo.id).unwrap().unwrap()))
+            .await
+            .unwrap();
+        assert_eq!(after.status, "blocked");
+    }
+
+    #[tokio::test]
+    async fn watchdog_refuses_unconditional_reset() {
+        let (store, _koi, todo) = retry_test_store();
+        // todo is in_progress and fresh; a 0-threshold reset must NOT touch it.
+        let (kois, todos) = watchdog_recover(&store, 0).await;
+        assert_eq!((kois, todos), (0, 0));
+        let after = store
+            .read(|db| Ok(db.get_koi_todo(&todo.id).unwrap().unwrap()))
+            .await
+            .unwrap();
+        assert_eq!(after.status, "in_progress");
+    }
+
+    #[tokio::test]
+    async fn backoff_window_delays_redispatch() {
+        let (store, _koi, todo) = retry_test_store();
+        let future = Utc::now() + chrono::Duration::seconds(3600);
+        store
+            .write(|db| Ok(db.schedule_koi_todo_retry(&todo.id, "timeout", future).unwrap()))
+            .await
+            .unwrap();
+        let cfg = CoordinatorConfig::default();
+        let activated = activate_pending_todos(
+            &store,
+            Arc::new(NullPoolEventSink),
+            Arc::new(NoopSubagent),
+            &cfg,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(activated, 0, "todo inside its backoff window must not dispatch");
+        let after = store
+            .read(|db| Ok(db.get_koi_todo(&todo.id).unwrap().unwrap()))
+            .await
+            .unwrap();
+        assert_eq!(after.status, "todo");
+        assert_eq!(after.retry_count, 1);
     }
 }

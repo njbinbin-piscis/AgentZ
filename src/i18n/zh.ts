@@ -326,6 +326,7 @@ const zh = {
     feed: "协作消息",
     col_todo: "待办",
     col_inProgress: "进行中",
+    col_review: "待审核",
     col_done: "已完成",
     cardWaitingDependency: "等待依赖",
     cliWaiting: "等待输出…",
