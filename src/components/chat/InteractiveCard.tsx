@@ -122,6 +122,19 @@ export default function InteractiveCard({
   const [actionSent, setActionSent] = useState(false);
   const [wizardStep, setWizardStep] = useState(0);
 
+  // The chat view re-renders on every streaming chunk and may hand us a fresh
+  // (deep-equal) definition object each time. Re-initializing on reference
+  // identity would wipe the user's in-progress selections, so key the reset on
+  // the definition's content instead.
+  const definitionSignature = useMemo(
+    () => JSON.stringify(uiDefinition),
+    [uiDefinition],
+  );
+  const submittedSignature = useMemo(
+    () => (submittedValues ? JSON.stringify(submittedValues) : ""),
+    [submittedValues],
+  );
+
   const stepCount = wizardStepCount(uiDefinition);
   const isWizard = uiDefinition.mode === "wizard" && stepCount > 1;
 
@@ -138,7 +151,10 @@ export default function InteractiveCard({
     }
     setValues(buildInitialValuesFromDefinition(uiDefinition, wizardStep));
     setErrors({});
-  }, [uiDefinition, submittedValues, wizardStep]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when the
+    // definition/submitted content actually changes, not on every new object
+    // reference produced by streaming re-renders.
+  }, [definitionSignature, submittedSignature, wizardStep]);
 
   // Plan suggest: the backend's deadline starts when it emits the card, not
   // when React eventually renders it. Count down to its absolute deadline so
