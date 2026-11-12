@@ -4,7 +4,7 @@
 
 > 本文是 [RELEASE.md](RELEASE.md) 的中文翻译。两者不一致时以英文版为准。
 
-当前源码版本：**1.0.64**。记录的范围与检查见 [1.0.0 发布决策](docs/upgrade/release-decision-1.0.0.md)、[历史支持基线](docs/upgrade/evidence/AZ-005-support-matrix.md)、[当前升级进度](docs/upgrade/progress.md)、[1.0.64 发布说明](docs/upgrade/release-notes-1.0.64.md) 和 [1.0.64 检查清单](docs/upgrade/release-checklist-1.0.64.md)。
+当前源码版本：**1.0.65**。记录的范围与检查见 [1.0.0 发布决策](docs/upgrade/release-decision-1.0.0.md)、[历史支持基线](docs/upgrade/evidence/AZ-005-support-matrix.md)、[当前升级进度](docs/upgrade/progress.md)、[1.0.65 发布说明](docs/upgrade/release-notes-1.0.65.md) 和 [1.0.65 检查清单](docs/upgrade/release-checklist-1.0.65.md)。
 
 ## 构建与分发边界
 

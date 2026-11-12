@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.65] - 2026-11-12
+
+### Fixed
+
+- **Koi team reliability.** Transient turn failures (timeout / connection / 5xx) auto-retry with backoff (default 2, configurable) instead of blocking the board; the classifier now recognizes "timed out". The patrol watchdog cancels live turns before resetting stale todos (no double dispatch), all dispatchers share one process-wide Koi runtime, and `wait_koi_turn` outcomes are re-readable. The board gains a Needs review column plus 15s reconciliation polling; stale busy member badges heal on read. Patrol now covers every team mode, restarts on pool resume and project restore, uses a real staleness threshold at startup (kernel refuses unconditional resets), and stays alive for paused pools. Workflow nodes default to a 600s task timeout.
+- **Built-in browser recovers from a dead Chromium process** — page acquisition drops the stale handle and relaunches once instead of hanging until IDE restart.
+- **Desktop User-Agent for agent-only browser sessions** — headless sessions no longer leak `HeadlessChrome` and get mobile/bot-gated layouts.
+
+### Changed
+
+- **Agent tooling hardening:** `shell` accepts `timeout_secs`/`timeout_ms` (Windows max 600s) and keeps real exit codes under PowerShell stderr; tool-output spill files are readable; `web_fetch` gains `raw` for long-line payloads; `file_edit` handles mixed-EOL files; `plan_write` aggregates validation errors and points to the Build panel; `file_diff` documents full-replacement semantics; LSP/devenv distinguish missing rustup components and probe npm global/project-local installs.
+
 ## [1.0.64] - 2026-11-11
 
 ### Added
