@@ -26,3 +26,8 @@ test-results/
 .codegraph/
 
 docs/upgrade/.plan.lock
+
+# Local kernel upstream clone + scratch logs (not shipped)
+kernel-upstream/
+*.log
+kernel-push.cjs

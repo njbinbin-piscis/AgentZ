@@ -4,6 +4,7 @@ Release date: 2026-11-12. See the 1.0.65 entry in `CHANGELOG.md`.
 
 ## Fixed
 
+- **Interactive forms keep selections while the agent is streaming.** The chat view re-parses a form's UI definition on every streaming chunk; the card's initialization keyed on object identity and wiped in-progress radio/text selections each time, so options appeared unclickable and submit failed validation. Initialization now keys on the definition's content. Regression tests cover real-DOM clicks and streaming re-renders.
 - **Koi team reliability (state machine audit follow-up).**
   - Transient Koi turn failures (timeout / connection reset / 5xx) are now requeued automatically with exponential backoff (30s·2^n, default 2 retries, configurable via `CoordinatorConfig.max_auto_retries`) instead of blocking the board forever. The error classifier also recognizes "timed out" (with a space) as transient.
   - The patrol watchdog now cancels live turns bound to stale todos *before* resetting the board, so a re-dispatch can no longer race a still-running turn on the same worktree. All dispatchers (chat, patrol, workflows, member tools) share one process-wide Koi runtime, so cancel/wait reach the turn that actually runs.
@@ -16,6 +17,8 @@ Release date: 2026-11-12. See the 1.0.65 entry in `CHANGELOG.md`.
 
 ## Changed
 
+- **Kernel pin advanced to piscis-engine v0.8.74** (authored by AgentZ): carries the Koi reliability and tooling hardening work upstream; AgentZ-only overlays remain in `vendor/piscis-engine`. Provenance recorded in `AGENTZ-BASELINE.md`.
+- **AgentZ added as a contributor** (`.mailmap` + README): the product's own agent improves itself.
 - **Agent tooling hardening (self-hosted friction fixes).**
   - `shell` accepts `timeout_secs` / `timeout_ms` aliases (previously silently ignored, falling back to 120s); Windows max timeout raised 300s → 600s. PowerShell wrappers keep `ErrorActionPreference=Continue` and propagate the real exit code, so native-command stderr (git progress, npm notices) no longer flips success to failure.
   - Tool-output spill files under `.agentz/logs/tool-output/` are readable again (the guard previously blocked the very path the tool result tells the agent to read).

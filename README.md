@@ -185,6 +185,12 @@ English documents are canonical. Chinese translations sit next to them as `*.zh-
 
 Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
+### Contributors
+
+- [@njbinbin-piscis](https://github.com/njbinbin-piscis) — project lead.
+- [Cursor](https://cursor.com) — AI pair programming.
+- **AgentZ** — the product's own agent, improving itself: Koi state-machine reliability, built-in browser recovery, and agent tooling hardening (see `docs/agentz-tool-friction.md`).
+
 ## License
 
 [Apache-2.0](LICENSE). Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

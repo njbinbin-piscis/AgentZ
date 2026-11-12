@@ -187,6 +187,12 @@ npm run tauri build
 
 欢迎提交 issue 和 pull request。请先阅读 [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md)，并遵守[行为准则](CODE_OF_CONDUCT.zh-CN.md)。
 
+### 贡献者
+
+- [@njbinbin-piscis](https://github.com/njbinbin-piscis) — 项目负责人。
+- [Cursor](https://cursor.com) — AI 结对编程。
+- **AgentZ** — 产品自己的智能体，在完善修改它自己：Koi 状态机可靠性、内置浏览器自愈、智能体工具加固（见 `docs/agentz-tool-friction.md`）。
+
 ## 许可证
 
 [Apache-2.0](LICENSE)。第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
