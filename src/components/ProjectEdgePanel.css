@@ -222,6 +222,14 @@
   color: var(--text-dim, #9a9ab0);
   cursor: pointer;
   padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agentz-edge-refresh:hover {
+  color: var(--text-primary, #e8e8f0);
+  border-color: var(--text-dim, #9a9ab0);
 }
 
 .agentz-edge-empty {
@@ -277,11 +285,23 @@
   cursor: pointer;
   padding: 2px 5px;
   border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .agentz-edge-change-act:hover {
   background: var(--bg-elev-2, #1b1b26);
   color: inherit;
+}
+
+.agentz-edge-change-act.keep:hover {
+  color: var(--success, #4ade80);
+}
+
+.agentz-edge-change-act:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .agentz-edge-change {

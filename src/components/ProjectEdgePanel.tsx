@@ -24,6 +24,34 @@ interface ProjectEdgePanelProps {
 
 const STATUS_BADGE: Record<string, string> = { added: "A", modified: "M", deleted: "D" };
 
+/** Inline stroke icons — immune to the font/encoding corruption that once
+ *  turned these buttons' unicode glyphs into literal "?" placeholders. */
+function RefreshIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <path d="M21 3v6h-6" />
+    </svg>
+  );
+}
+
+function UndoIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+    </svg>
+  );
+}
+
+function KeepIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 type EdgeTabId = "changes" | "artifacts";
 
 /** Extract the bare filename from a path (last segment). */
@@ -176,8 +204,9 @@ export default function ProjectEdgePanel({
                 className="agentz-edge-refresh"
                 onClick={() => onRefresh?.()}
                 title={t("agent.refreshChanges")}
+                aria-label={t("agent.refreshChanges")}
               >
-                ?
+                <RefreshIcon />
               </button>
             </div>
             {hasChanges ? (
@@ -204,18 +233,20 @@ export default function ProjectEdgePanel({
                           className="agentz-edge-change-act"
                           disabled={undoing}
                           title={t("chat.undo")}
+                          aria-label={t("chat.undo")}
                           onClick={() => void onUndo?.([c.rel_path])}
                         >
-                          ?
+                          <UndoIcon />
                         </button>
                         <button
                           type="button"
-                          className="agentz-edge-change-act"
+                          className="agentz-edge-change-act keep"
                           disabled={undoing}
                           title={t("chat.keep")}
+                          aria-label={t("chat.keep")}
                           onClick={() => void onKeep?.([c.rel_path])}
                         >
-                          ?
+                          <KeepIcon />
                         </button>
                       </span>
                     </li>

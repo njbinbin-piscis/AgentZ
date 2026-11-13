@@ -152,10 +152,45 @@ describe("ProjectEdgePanel artifacts", () => {
     const rows = root!.root.findAllByProps({ className: "agentz-edge-change" });
     expect(rows.map((r) => r.props.title)).toEqual(["src/a.ts", "old.md (agent.changeDeleted)"]);
     expect(rows[1].props.disabled).toBe(true);
-    const acts = root!.root.findAllByProps({ className: "agentz-edge-change-act" });
+    const acts = root!.root.findAll(
+      (n) => n.type === "button" && typeof n.props.className === "string" && n.props.className.startsWith("agentz-edge-change-act"),
+    );
     await act(async () => acts[0].props.onClick());
     await act(async () => acts[1].props.onClick());
     expect(onUndo).toHaveBeenCalledWith(["src/a.ts"]);
     expect(onKeep).toHaveBeenCalledWith(["src/a.ts"]);
+  });
+
+  it("icon buttons render real glyphs, not '?' placeholders", async () => {
+    await act(async () => {
+      root = create(
+        <ProjectEdgeProvider>
+          <CaptureActions />
+          <ProjectEdgePanel projectDir="/repo" onUndo={vi.fn(async () => {})} onKeep={vi.fn(async () => {})} />
+        </ProjectEdgeProvider>,
+      );
+    });
+    await act(async () => {
+      actionsRef?.setPendingReview({
+        sessionId: "s",
+        changes: [
+          { id: 1, rel_path: "src/a.ts", tool_name: "file_edit", existed: true, applied: true, status: "modified", turn_id: "t" },
+        ],
+      });
+    });
+    const iconButtons = [
+      ...root!.root.findAllByProps({ className: "agentz-edge-refresh" }),
+      ...root!.root.findAll(
+        (n) => n.type === "button" && typeof n.props.className === "string" && n.props.className.startsWith("agentz-edge-change-act"),
+      ),
+    ];
+    expect(iconButtons.length).toBe(3);
+    for (const btn of iconButtons) {
+      const svg = btn.findAllByType("svg");
+      expect(svg.length, "icon button must render an SVG glyph").toBe(1);
+      expect(svg[0].props["aria-hidden"]).toBe(true);
+      const text = btn.children.filter((c) => typeof c === "string").join("").trim();
+      expect(text, "no literal '?' placeholder text").not.toBe("?");
+    }
   });
 });
