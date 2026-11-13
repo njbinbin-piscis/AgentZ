@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Changes-panel icon buttons showed literal "?"** — the toolbar refresh and per-file undo/keep glyphs had been corrupted to ASCII question marks; replaced with inline SVG icons (refresh / undo / keep-check) plus aria-labels and hover/disabled styling, with a regression test.
 - **File-edit card "Open File" works** — the `agentz-open-file` event had no listener; now bridged to the editor's open-file path.
 - **Terminal right-click without a selection** shows a proper menu instead of the browser menu.
 - **Defensive theme storage** — localStorage absent/non-functional no longer crashes the render.

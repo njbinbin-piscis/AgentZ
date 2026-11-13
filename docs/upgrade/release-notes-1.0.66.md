@@ -19,6 +19,7 @@ Release date: 2026-11-13. See the 1.0.66 entry in `CHANGELOG.md`.
 
 ## Fixed
 
+- **Changes-panel icon buttons showed literal "?".** The toolbar refresh button and the per-file undo/keep buttons had their unicode glyphs corrupted to ASCII question marks in an earlier commit. All three are now inline SVG icons (refresh / undo / keep-check) with aria-labels, hover/disabled styling, and a regression test that fails on any "?" placeholder.
 - **File-edit card "Open File" actually opens the file.** The `agentz-open-file` event previously had no listener (clicking the card was a no-op); it is now bridged to the editor's real open-file path.
 - **Terminal right-click without a selection** no longer falls through to the browser menu — a proper menu (paste / select all / clear) is shown.
 - **Theme storage access is defensive** (`readStorage`): when localStorage is absent or non-functional (privacy modes, embedded webviews, minimal test stubs) the app falls back to defaults instead of crashing the render.
