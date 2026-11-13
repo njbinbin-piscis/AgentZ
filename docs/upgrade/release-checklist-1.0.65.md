@@ -12,4 +12,4 @@
 
 ## CI
 
-- [ ] The `v1.0.65` Release workflow produced Linux x86_64, Linux aarch64, macOS aarch64, macOS Universal, and Windows installers.
+- [x] The `v1.0.65` Release workflow (run #162, completed successfully 2026-11-13) produced all installers: Linux x86_64 (.deb/.AppImage/.rpm), Linux aarch64 (.deb/.AppImage/.rpm), macOS aarch64 (.dmg/.app.tar.gz), macOS Universal (.dmg/.app.tar.gz), Windows x64 + ARM64 (NSIS .exe) — 12 assets on the public release, download verified (HTTP 200, 99.4 MB x64 installer).
