@@ -1,0 +1,85 @@
+.agentz-context-menu {
+  background: var(--bg-popup, #242432);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: calc(4px * var(--ui-font-scale, 1)) 0;
+  min-width: calc(180px * var(--ui-font-scale, 1));
+  max-width: calc(320px * var(--ui-font-scale, 1));
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  color: var(--text-primary);
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 100100;
+  outline: none;
+}
+
+.agentz-context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: calc(5px * var(--ui-font-scale, 1)) calc(12px * var(--ui-font-scale, 1));
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.agentz-context-menu-item:hover:not(:disabled),
+.agentz-context-menu-item.is-active:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.agentz-context-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.agentz-context-menu-item.is-danger {
+  color: var(--danger, #e5534b);
+}
+
+.agentz-context-menu-item.is-danger:hover:not(:disabled),
+.agentz-context-menu-item.is-danger.is-active:not(:disabled) {
+  background: color-mix(in srgb, var(--danger, #e5534b) 14%, transparent);
+}
+
+.agentz-context-menu-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agentz-context-menu-hint {
+  opacity: 0.55;
+  font-size: calc(11px * var(--ui-font-scale, 1));
+  flex-shrink: 0;
+}
+
+.agentz-context-menu-sep {
+  height: 1px;
+  margin: calc(4px * var(--ui-font-scale, 1)) calc(8px * var(--ui-font-scale, 1));
+  background: var(--border);
+}
+
+.agentz-context-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.agentz-context-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.agentz-context-menu::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.agentz-context-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted, #8a8aa0);
+}

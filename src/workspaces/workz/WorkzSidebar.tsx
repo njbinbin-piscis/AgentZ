@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { useContextMenu } from "../../components/ContextMenu";
 import type { SessionMeta } from "../../services/tauri/chat";
 import type { WorkzOverview } from "../../services/tauri/workz";
 import { taskDisplayTitle } from "./taskTitle";
@@ -41,6 +42,7 @@ export default function WorkzSidebar({
   onOpenInCodeZ,
 }: Props) {
   const { t } = useTranslation();
+  const menu = useContextMenu();
   const freeDir = overview?.free_dir ?? null;
 
   const sessionsOf = (dir: string): SessionMeta[] =>
@@ -56,6 +58,26 @@ export default function WorkzSidebar({
         key={task.id}
         className={`agentz-workz-task ${task.id === selectedId && dir === activeDir ? "active" : ""} ${runningIds.includes(task.id) ? "running" : ""}`}
         onClick={() => onOpenSession(dir, task.id)}
+        onContextMenu={menu.openWith(() => [
+          {
+            id: "open",
+            label: t("contextMenu.openSession"),
+            onSelect: () => onOpenSession(dir, task.id),
+          },
+          {
+            id: "copy-title",
+            label: t("contextMenu.copyTaskTitle"),
+            onSelect: () =>
+              void navigator.clipboard?.writeText(taskDisplayTitle(task.title, t("agent.untitled"))),
+          },
+          { id: "sep", label: "", separator: true },
+          {
+            id: "delete",
+            label: t("contextMenu.deleteSession"),
+            danger: true,
+            onSelect: () => onDeleteSession(dir, task.id),
+          },
+        ])}
       >
         <span
           className={`agentz-workz-task-dot ${
@@ -118,6 +140,38 @@ export default function WorkzSidebar({
                 className={`agentz-workz-group-row${p.exists ? "" : " missing"}${p.path === activeDir ? " active" : ""}`}
                 onClick={() => onToggle(p.path)}
                 title={p.exists ? p.path : t("workz.projectMissing")}
+                onContextMenu={menu.openWith(() => [
+                  ...(p.exists && onOpenInCodeZ
+                    ? [
+                        {
+                          id: "open-codez",
+                          label: t("workz.openInCodeZ"),
+                          onSelect: () => onOpenInCodeZ(p.path),
+                        },
+                      ]
+                    : []),
+                  ...(p.exists
+                    ? [
+                        {
+                          id: "new-session",
+                          label: t("workz.newInProject"),
+                          onSelect: () => onNewSession(p.path),
+                        },
+                      ]
+                    : []),
+                  {
+                    id: "copy-path",
+                    label: t("contextMenu.copyPath"),
+                    onSelect: () => void navigator.clipboard?.writeText(p.path),
+                  },
+                  { id: "sep", label: "", separator: true },
+                  {
+                    id: "remove",
+                    label: t("workz.removeProject"),
+                    danger: true,
+                    onSelect: () => onRemoveProject(p.path),
+                  },
+                ])}
               >
                 <span className="agentz-workz-group-caret">{isCollapsed ? "▸" : "▾"}</span>
                 <span className="agentz-workz-group-icon">{p.kind === "repo" ? "⎇" : "▤"}</span>
@@ -202,6 +256,7 @@ export default function WorkzSidebar({
           </div>
         )}
       </div>
+      {menu.element}
     </>
   );
 }

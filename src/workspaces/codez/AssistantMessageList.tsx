@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
+import { useContextMenu, type ContextMenuItem } from "../../components/ContextMenu";
 import type { JournalFileDiff } from "../../services/tauri/chat";
 import TaskCard from "../../components/TaskCard";
 import FileDiffCard from "../../components/FileDiffCard";
@@ -146,6 +147,48 @@ function AssistantMessageList({
   onPermissionResolved,
 }: AssistantMessageListProps) {
   const { t } = useTranslation();
+  const msgMenu = useContextMenu();
+
+  const messageMenuItems = useCallback(
+    (m: AssistantChatMessage): ContextMenuItem[] => {
+      const selection = window.getSelection()?.toString() ?? "";
+      const items: ContextMenuItem[] = [
+        {
+          id: "copy-message",
+          label: t("contextMenu.copyMessage"),
+          onSelect: () => void navigator.clipboard?.writeText(m.text),
+        },
+        ...(selection.trim()
+          ? [
+              {
+                id: "copy-selection",
+                label: t("contextMenu.copySelection"),
+                onSelect: () => void navigator.clipboard?.writeText(selection),
+              },
+            ]
+          : []),
+      ];
+      if (m.role === "assistant" && m.id) {
+        items.push(
+          { id: "sep", label: "", separator: true },
+          {
+            id: "fork",
+            label: t("contextMenu.forkFromHere"),
+            onSelect: () => void onForkCheckpoint(m.id!, false),
+          },
+          {
+            id: "restore",
+            label: t("contextMenu.restoreToHere"),
+            danger: true,
+            onSelect: () => void onRestoreCheckpoint(m.id!),
+          },
+        );
+      }
+      return items;
+    },
+    [t, onForkCheckpoint, onRestoreCheckpoint],
+  );
+
   // The mounted window is anchored to the BOTTOM: it always contains the newest
   // message, and only ever grows backwards when the user scrolls up. Bounding it
   // to a count (rather than an absolute start index) makes it impossible for a
@@ -256,7 +299,11 @@ function AssistantMessageList({
         const absoluteIndex = startIndex + i;
         if (m.role === "user") {
           return (
-            <div key={m.id ?? `msg-${absoluteIndex}`} className="agentz-turn-user">
+            <div
+              key={m.id ?? `msg-${absoluteIndex}`}
+              className="agentz-turn-user"
+              onContextMenu={msgMenu.openWith(() => messageMenuItems(m))}
+            >
               <TaskCard text={m.text} sticky={i === lastUserMessageIndex} />
             </div>
           );
@@ -286,7 +333,11 @@ function AssistantMessageList({
           : baseTools;
 
         return (
-          <div key={m.id ?? `msg-${absoluteIndex}`} className="agentz-msg assistant">
+          <div
+            key={m.id ?? `msg-${absoluteIndex}`}
+            className="agentz-msg assistant"
+            onContextMenu={msgMenu.openWith(() => messageMenuItems(m))}
+          >
             {msgTools.length > 0 ? (
               interleaveTools(m.text, msgTools).map((seg, si, all) => (
                 <div key={`seg-${si}`} className="agentz-msg-seg">
@@ -415,6 +466,7 @@ function AssistantMessageList({
       {permissionRequest && (
         <PermissionCard request={permissionRequest} onResolved={onPermissionResolved} />
       )}
+      {msgMenu.element}
     </div>
     </InteractiveCardsContext.Provider>
   );

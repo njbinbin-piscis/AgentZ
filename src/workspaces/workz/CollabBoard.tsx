@@ -12,6 +12,7 @@ import {
   type PoolMessage,
 } from "../../services/tauri/pool";
 import { onChatEvent, type AgentEvent, type ChatEventEnvelope } from "../../services/tauri/chat";
+import { useContextMenu } from "../../components/ContextMenu";
 import "./CollabBoard.css";
 
 /** Live koi-turn output is keyed by this session id (see kernel pool dispatch). */
@@ -60,6 +61,7 @@ const BOARD_POLL_MS = 15_000;
  */
 export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoardProps) {
   const { t } = useTranslation();
+  const menu = useContextMenu();
   const [pool, setPool] = useState<PoolSession | null>(null);
   const [members, setMembers] = useState<PoolMember[]>([]);
   const [todos, setTodos] = useState<KoiTodo[]>([]);
@@ -204,7 +206,31 @@ export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoard
               </div>
               <div className="agentz-collab-col-body">
                 {col.items.map((td) => (
-                  <div key={td.id} className={`agentz-collab-card ${td.status}`}>
+                  <div
+                    key={td.id}
+                    className={`agentz-collab-card ${td.status}`}
+                    onContextMenu={menu.openWith(() => [
+                      {
+                        id: "copy-title",
+                        label: t("contextMenu.copyTodoTitle"),
+                        onSelect: () => void navigator.clipboard?.writeText(td.title),
+                      },
+                      {
+                        id: "copy-id",
+                        label: t("contextMenu.copyTodoId"),
+                        onSelect: () => void navigator.clipboard?.writeText(td.id),
+                      },
+                      ...(td.owner_id
+                        ? [
+                            {
+                              id: "copy-owner",
+                              label: t("contextMenu.copyOwner"),
+                              onSelect: () => void navigator.clipboard?.writeText(memberName(td.owner_id)),
+                            },
+                          ]
+                        : []),
+                    ])}
+                  >
                     <div className="agentz-collab-card-title">{td.title}</div>
                     <div className="agentz-collab-card-meta">
                       <span className={`agentz-collab-prio ${td.priority}`}>{td.priority}</span>
@@ -240,6 +266,7 @@ export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoard
           </div>
         </div>
       </div>
+      {menu.element}
     </div>
   );
 }

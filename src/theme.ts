@@ -13,9 +13,23 @@ const STORAGE_KEY = "agentz-appearance";
 const FONT_SCALE_KEY = "agentz-ui-font-scale";
 const EDITOR_FONT_SIZE_KEY = "agentz-editor-font-size";
 
+/** Safe localStorage read. Returns null when storage is absent OR not a
+ *  functional Storage (minimal test stubs, privacy modes, embedded webviews,
+ *  Node's broken experimental global) — callers fall back to defaults instead
+ *  of crashing the render. */
+function readStorage(key: string): string | null {
+  try {
+    if (typeof localStorage === "undefined" || typeof localStorage.getItem !== "function") {
+      return null;
+    }
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 export function getAppearanceTheme(): AppearanceTheme {
-  if (typeof localStorage === "undefined") return "dark";
-  const saved = localStorage.getItem(STORAGE_KEY);
+  const saved = readStorage(STORAGE_KEY);
   return saved === "light" ? "light" : "dark";
 }
 
@@ -23,8 +37,12 @@ export function applyAppearanceTheme(theme: AppearanceTheme): void {
   if (typeof document !== "undefined") {
     document.documentElement.dataset.theme = theme;
   }
-  if (typeof localStorage !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, theme);
+  try {
+    if (typeof localStorage !== "undefined" && typeof localStorage.setItem === "function") {
+      localStorage.setItem(STORAGE_KEY, theme);
+    }
+  } catch {
+    // storage unavailable (privacy mode / stub) — theme still applies via DOM
   }
 }
 
@@ -41,16 +59,14 @@ export function initAppearanceTheme(): AppearanceTheme {
 }
 
 export function getUiFontScale(): UiFontScale {
-  if (typeof localStorage === "undefined") return 1;
-  const saved = Number(localStorage.getItem(FONT_SCALE_KEY));
+  const saved = Number(readStorage(FONT_SCALE_KEY));
   return (UI_FONT_SCALES as readonly number[]).includes(saved)
     ? (saved as UiFontScale)
     : 1;
 }
 
 export function getEditorBaseFontSize(): number {
-  if (typeof localStorage === "undefined") return DEFAULT_EDITOR_FONT_SIZE;
-  const raw = localStorage.getItem(EDITOR_FONT_SIZE_KEY);
+  const raw = readStorage(EDITOR_FONT_SIZE_KEY);
   if (!raw) return DEFAULT_EDITOR_FONT_SIZE;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return DEFAULT_EDITOR_FONT_SIZE;

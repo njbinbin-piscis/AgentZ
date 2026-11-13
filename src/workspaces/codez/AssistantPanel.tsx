@@ -4,6 +4,7 @@ import ChatComposer from "../../components/ChatComposer";
 import TaskPanel from "../../components/TaskPanel";
 import ContextUsageRing from "../../components/ContextUsageRing";
 import AssistantMessageList from "./AssistantMessageList";
+import { useContextMenu } from "../../components/ContextMenu";
 import { useBackgroundTasks } from "../../hooks/useBackgroundTasks";
 import { useAssistantSession } from "./useAssistantSession";
 import "./AssistantPanel.css";
@@ -27,6 +28,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
   const { projectDir, onOpenFolder } = props;
   const s = useAssistantSession(props);
   const bg = useBackgroundTasks(projectDir);
+  const sessionMenu = useContextMenu();
 
   return (
     <div className="agentz-assistant" ref={s.panelRef}>
@@ -86,6 +88,26 @@ export default function AssistantPanel(props: AssistantPanelProps) {
               key={sess.id}
               className={`agentz-session-row ${sess.id === s.sessionRef.current ? "active" : ""}`}
               onClick={() => void s.switchSession(sess.id, sess.source)}
+              onContextMenu={sessionMenu.openWith(() => [
+                {
+                  id: "open",
+                  label: s.t("contextMenu.openSession"),
+                  onSelect: () => void s.switchSession(sess.id, sess.source),
+                },
+                {
+                  id: "copy-title",
+                  label: s.t("contextMenu.copySessionTitle"),
+                  onSelect: () =>
+                    void navigator.clipboard?.writeText(sess.title || s.t("chat.untitled")),
+                },
+                { id: "sep", label: "", separator: true },
+                {
+                  id: "delete",
+                  label: s.t("contextMenu.deleteSession"),
+                  danger: true,
+                  onSelect: () => void s.removeSession(sess.id),
+                },
+              ])}
             >
               <span
                 className={`agentz-session-dot ${
@@ -115,6 +137,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
           ))}
         </div>
       )}
+      {sessionMenu.element}
 
       <TaskPanel
         planItems={s.planItems}

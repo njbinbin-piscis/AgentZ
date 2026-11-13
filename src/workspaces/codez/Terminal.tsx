@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
 import { Terminal as XTerm } from "@xterm/xterm";
@@ -12,7 +11,7 @@ import { acquireTerminal, terminalBackendId } from "./terminalLifecycle";
 import { cssVar } from "./useAppTheme";
 import { getEffectiveTerminalFontSize } from "../../theme";
 import { perfCounters } from "../../utils/perfCounters";
-import { canPortalToBody, useContextMenuPosition } from "../../utils/popupPosition";
+import { useContextMenu } from "../../components/ContextMenu";
 
 export interface TerminalTab {
   id: string;
@@ -120,15 +119,12 @@ function TerminalSession({
     if (panelVisible && projectDir) setActivatedProject(projectDir);
     else if (changed) setActivatedProject(null);
   }, [panelVisible, projectDir]);
-  const [selectionMenu, setSelectionMenu] = useState<{ x: number; y: number } | null>(null);
-  const selectionMenuRef = useRef<HTMLDivElement>(null);
-  const selectionMenuStyle = useContextMenuPosition(selectionMenu, selectionMenuRef);
+  const termMenu = useContextMenu();
 
   const sendSelection = useCallback(() => {
     const text = termRef.current?.getSelection() ?? "";
     if (!text.trim() || !onSendSelectionToChat) return;
     onSendSelectionToChat(text);
-    setSelectionMenu(null);
   }, [onSendSelectionToChat]);
 
   const fitTerminal = useCallback(() => {
@@ -328,24 +324,54 @@ function TerminalSession({
     };
   }, [active, panelVisible, fitTerminal]);
 
-  useEffect(() => {
-    if (!selectionMenu) return;
-    const close = (e?: Event) => {
-      if (e && selectionMenuRef.current?.contains(e.target as Node)) return;
-      setSelectionMenu(null);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelectionMenu(null);
-    };
-    document.addEventListener("mousedown", close);
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", close, true);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", close, true);
-    };
-  }, [selectionMenu]);
+  const onTerminalContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      const sel = termRef.current?.getSelection() ?? "";
+      const items = [
+        {
+          id: "copy",
+          label: t("contextMenu.terminalCopy"),
+          disabled: !sel.trim(),
+          onSelect: () => void navigator.clipboard?.writeText(sel),
+        },
+        {
+          id: "paste",
+          label: t("contextMenu.terminalPaste"),
+          onSelect: () => {
+            void navigator.clipboard?.readText().then((text) => {
+              if (text && backendIdRef.current) {
+                ideApi.terminalWrite(backendIdRef.current, text).catch(() => {});
+              }
+            }).catch(() => {});
+          },
+        },
+        {
+          id: "select-all",
+          label: t("contextMenu.terminalSelectAll"),
+          onSelect: () => termRef.current?.selectAll(),
+        },
+        ...(sel.trim() && onSendSelectionToChat
+          ? [
+              { id: "sep-send", label: "", separator: true },
+              {
+                id: "send-to-chat",
+                label: t("ide.terminalSendSelectionToChat"),
+                hint: t("ide.terminalSendSelectionShortcut"),
+                onSelect: sendSelection,
+              },
+            ]
+          : []),
+        { id: "sep-clear", label: "", separator: true },
+        {
+          id: "clear",
+          label: t("contextMenu.terminalClear"),
+          onSelect: () => termRef.current?.clear(),
+        },
+      ];
+      termMenu.openWith(() => items)(e);
+    },
+    [t, onSendSelectionToChat, sendSelection, termMenu],
+  );
 
   return (
     <>
@@ -353,33 +379,9 @@ function TerminalSession({
         className="ide-terminal-session"
         ref={containerRef}
         style={{ display: active ? "block" : "none" }}
-        onContextMenu={(e) => {
-          const sel = termRef.current?.getSelection() ?? "";
-          if (!sel.trim() || !onSendSelectionToChat) return;
-          e.preventDefault();
-          setSelectionMenu({ x: e.clientX, y: e.clientY });
-        }}
+        onContextMenu={onTerminalContextMenu}
       />
-      {selectionMenu &&
-        (() => {
-          const menuNode = (
-            <div
-              ref={selectionMenuRef}
-              className="ide-tab-context-menu"
-              style={selectionMenuStyle}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button type="button" onClick={sendSelection}>
-                {t("ide.terminalSendSelectionToChat")}
-                <span style={{ opacity: 0.5, fontSize: 11, marginLeft: 8 }}>
-                  {t("ide.terminalSendSelectionShortcut")}
-                </span>
-              </button>
-            </div>
-          );
-          return canPortalToBody() ? createPortal(menuNode, document.body) : menuNode;
-        })()}
+      {termMenu.element}
     </>
   );
 }

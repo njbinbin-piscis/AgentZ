@@ -31,6 +31,7 @@ import {
 } from "../../services/tauri/browser";
 import "./BrowserPanel.css";
 import { rewriteRemoteBrowserUrl } from "../../extensions/remotePorts";
+import { useContextMenu } from "../../components/ContextMenu";
 
 const SHOT_POLL_MIN_MS = 1200;
 const SHOT_POLL_MAX_MS = 6000;
@@ -95,6 +96,7 @@ export default function BrowserPanel({
   onRequestClose,
 }: BrowserPanelProps) {
   const { t } = useTranslation();
+  const pageMenu = useContextMenu();
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
   const [address, setAddress] = useState("");
@@ -652,6 +654,38 @@ export default function BrowserPanel({
     }
   }, [onScreenshotToChat]);
 
+  const onCanvasContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      const items = [
+        { id: "back", label: t("browser.back", { defaultValue: "Back" }), onSelect: () => historyStep(-1) },
+        { id: "forward", label: t("browser.forward", { defaultValue: "Forward" }), onSelect: () => historyStep(1) },
+        {
+          id: "reload",
+          label: t("contextMenu.reloadPage"),
+          onSelect: () => void syncViewport().then(refreshShot),
+        },
+        { id: "sep", label: "", separator: true },
+        {
+          id: "copy-url",
+          label: t("contextMenu.copyPageUrl"),
+          disabled: !address,
+          onSelect: () => void navigator.clipboard?.writeText(address),
+        },
+        ...(chatEnabled
+          ? [
+              {
+                id: "screenshot",
+                label: t("browser.screenshotToChat"),
+                onSelect: () => void screenshotToChat(),
+              },
+            ]
+          : []),
+      ];
+      pageMenu.openWith(() => items)(e);
+    },
+    [t, historyStep, syncViewport, refreshShot, address, chatEnabled, screenshotToChat, pageMenu],
+  );
+
   const close = useCallback(() => {
     void (async () => {
       if (onRequestClose) {
@@ -819,6 +853,7 @@ export default function BrowserPanel({
             tabIndex={0}
             onKeyDown={handleCanvasKeyDown}
             onPaste={handleCanvasPaste}
+            onContextMenu={onCanvasContextMenu}
             onClick={(e) => {
               e.currentTarget.focus();
               void handleCanvasClick(e);
@@ -939,6 +974,7 @@ export default function BrowserPanel({
           </aside>
         )}
       </div>
+      {pageMenu.element}
     </div>
   );
 }

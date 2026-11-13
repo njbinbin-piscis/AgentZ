@@ -23,6 +23,7 @@ import "../../components/hljs-light.css";
 import "katex/dist/katex.min.css";
 import "./Markdown.css";
 import { loadMermaid, sanitizeMermaidSvg } from "./mermaidSafe";
+import { useContextMenu } from "../../components/ContextMenu";
 
 const sanitizeSchema = {
   ...defaultSchema,
@@ -178,6 +179,7 @@ function CodeBlock({
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const menu = useContextMenu();
   const copy = () => {
     const text = extractText(children);
     void navigator.clipboard?.writeText(text).then(() => {
@@ -185,13 +187,45 @@ function CodeBlock({
       setTimeout(() => setCopied(false), 1200);
     });
   };
+  const onContextMenu = (e: React.MouseEvent) => {
+    const text = extractText(children);
+    const selection = window.getSelection()?.toString() ?? "";
+    const items = [
+      {
+        id: "copy-code",
+        label: t("ide.copyCode"),
+        onSelect: copy,
+      },
+      ...(selection.trim()
+        ? [
+            {
+              id: "copy-selection",
+              label: t("contextMenu.copySelection"),
+              onSelect: () => void navigator.clipboard?.writeText(selection),
+            },
+          ]
+        : []),
+      ...(lang
+        ? [
+            {
+              id: "copy-markdown",
+              label: t("contextMenu.copyAsMarkdown"),
+              onSelect: () =>
+                void navigator.clipboard?.writeText(`\`\`\`${lang}\n${text}\n\`\`\``),
+            },
+          ]
+        : []),
+    ];
+    menu.openWith(items)(e);
+  };
   return (
-    <div className="agentz-codeblock">
+    <div className="agentz-codeblock" onContextMenu={onContextMenu}>
       {lang && <span className="agentz-code-lang">{lang}</span>}
       <pre>{children}</pre>
       <button className="agentz-codeblock-copy" onClick={copy} title={t("ide.copyCode")}>
         {copied ? "✓" : "📋"}
       </button>
+      {menu.element}
     </div>
   );
 }

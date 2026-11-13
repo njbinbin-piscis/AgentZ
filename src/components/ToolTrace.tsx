@@ -1,5 +1,6 @@
 import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useContextMenu } from "./ContextMenu";
 import { toolIcon, toolSummary } from "./toolDisplay";
 import { fileEditDiff, type FileEditDiff } from "./fileEditDiff";
 import {
@@ -139,13 +140,39 @@ function ToolTraceRow({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [showFull, setShowFull] = useState(false);
+  const menu = useContextMenu();
 
   const hint = toolSummary(item.name, item.input) || item.name;
   const result = item.result ?? "";
   const truncated = result.length > RESULT_PREVIEW_CHARS;
+  const inputText =
+    typeof item.input === "string" ? item.input : JSON.stringify(item.input ?? {}, null, 2);
 
   return (
-    <div className={`agentz-tool-trace-row is-${item.status}`}>
+    <div
+      className={`agentz-tool-trace-row is-${item.status}`}
+      onContextMenu={menu.openWith(() => [
+        {
+          id: "copy-name",
+          label: t("contextMenu.copyToolName"),
+          onSelect: () => void navigator.clipboard?.writeText(item.name),
+        },
+        {
+          id: "copy-input",
+          label: t("contextMenu.copyToolInput"),
+          onSelect: () => void navigator.clipboard?.writeText(inputText),
+        },
+        ...(result
+          ? [
+              {
+                id: "copy-output",
+                label: t("contextMenu.copyToolOutput"),
+                onSelect: () => void navigator.clipboard?.writeText(result),
+              },
+            ]
+          : []),
+      ])}
+    >
       <button
         type="button"
         className="agentz-tool-trace-head"
@@ -219,6 +246,7 @@ function ToolTraceRow({
           )}
         </div>
       )}
+      {menu.element}
     </div>
   );
 }
@@ -229,12 +257,38 @@ const MAX_DIFF_ROWS = 400;
 export function FileEditCard({ item, diff }: { item: ToolTraceItem; diff: FileEditDiff }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const menu = useContextMenu();
   const parts = diff.path.split(/[\\/]/);
   const base = parts.pop() ?? diff.path;
   const dir = parts.join("/");
   const rows = diff.ops.slice(0, MAX_DIFF_ROWS);
+  const diffText = diff.ops
+    .map((op) => `${op.type === "add" ? "+" : op.type === "remove" ? "-" : " "}${op.text}`)
+    .join("\n");
   return (
-    <div className={`agentz-edit-card is-${item.status}`}>
+    <div
+      className={`agentz-edit-card is-${item.status}`}
+      onContextMenu={menu.openWith(() => [
+        {
+          id: "open-file",
+          label: t("contextMenu.openFile"),
+          onSelect: () =>
+            window.dispatchEvent(new CustomEvent("agentz-open-file", { detail: { path: diff.path } })),
+        },
+        {
+          id: "copy-path",
+          label: t("contextMenu.copyPath"),
+          onSelect: () => void navigator.clipboard?.writeText(diff.path),
+        },
+        { id: "sep", label: "", separator: true },
+        {
+          id: "copy-diff",
+          label: t("contextMenu.copySelection"),
+          hint: `+${diff.added} -${diff.removed}`,
+          onSelect: () => void navigator.clipboard?.writeText(diffText),
+        },
+      ])}
+    >
       <div className="agentz-edit-card-head">
         <span className="agentz-tool-trace-status">
           {item.status === "running" ? <span className="agentz-tool-trace-spinner" /> : "✓"}
@@ -284,6 +338,7 @@ export function FileEditCard({ item, diff }: { item: ToolTraceItem; diff: FileEd
           )}
         </div>
       )}
+      {menu.element}
     </div>
   );
 }

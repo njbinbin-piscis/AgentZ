@@ -996,6 +996,20 @@ export function useCodezWorkspace({
     });
   }, [openPathRequest?.nonce, openPathRequest?.path, projectDir, onOpenPathRequestHandled]);
 
+  // Bridge the app-wide `agentz-open-file` event (file-edit cards' click and
+  // right-click "Open File") to the real editor open path. Without this the
+  // event had no listener and the action was a no-op.
+  useEffect(() => {
+    const onOpenFileEvent = (e: Event) => {
+      const path = (e as CustomEvent<{ path?: string }>).detail?.path;
+      if (typeof path === "string" && path && projectDir) {
+        void openFileRef.current(path);
+      }
+    };
+    window.addEventListener("agentz-open-file", onOpenFileEvent);
+    return () => window.removeEventListener("agentz-open-file", onOpenFileEvent);
+  }, [projectDir]);
+
   const setTabViewMode = useCallback((path: string, mode: TabViewMode) => {
     setTabs((prev) =>
       prev.map((t) => (t.path === path ? { ...t, viewMode: mode } : t)),

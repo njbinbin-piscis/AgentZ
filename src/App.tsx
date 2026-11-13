@@ -33,6 +33,8 @@ import { getSettings } from "./services/tauri/settings";
 import { setLanguage } from "./i18n";
 import { onSettingsRefresh, notifySettingsRefresh } from "./services/settingsRefresh";
 import { OPEN_LINK_EVENT, installLinkInterceptor, openExternal } from "./services/linkRouter";
+import { installNativeContextMenuGuard } from "./services/contextMenuGuard";
+import ContextMenu, { type ContextMenuState } from "./components/ContextMenu";
 import { appLaunchFresh, openNewInstance, openPath } from "./services/tauri";
 import {
   getAppearanceTheme,
@@ -896,9 +898,20 @@ export default function App() {
     localStorage.setItem("agentz-chat-width", String(chatWidth));
   }, [chatWidth]);
 
+  // Desktop-app behaviour: no Chromium context menu anywhere. Components with
+  // their own menus preventDefault first; Monaco keeps its native editor menu;
+  // everything else gets the generic Copy/Paste/Select-All menu.
+  const [defaultMenu, setDefaultMenu] = useState<ContextMenuState | null>(null);
+  useEffect(
+    () =>
+      installNativeContextMenuGuard((x, y, items) => setDefaultMenu({ x, y, items })),
+    [],
+  );
+
   return (
     <ProjectEdgeProvider>
     <div className="agentz-app">
+      <ContextMenu state={defaultMenu} onClose={() => setDefaultMenu(null)} />
       <header className="agentz-titlebar">
         <div className="agentz-brand" aria-label={`AgentZ v${__APP_VERSION__}`}>
           <span className="agentz-brand-text">Agent</span>
