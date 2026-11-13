@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.66] - 2026-11-13
+
+### Added
+
+- **App-wide right-click menus; the browser context menu is suppressed.** Shared `ContextMenu` (viewport-clamped, keyboard navigation, danger styling) with semantic menus for chat messages (copy / fork / restore), code blocks (copy / copy-as-Markdown), tool calls & edit cards (copy / open file), session lists & project groups (open / copy / delete), collaboration board cards, terminal (copy / paste / select-all / send-to-chat / clear), and the embedded browser canvas (back / forward / reload / copy URL / screenshot). Inputs, links and images get cut/copy/paste/select-all, open/copy-link and copy-image (data-URI images copied as PNG). Monaco keeps its native menu. Menus build lazily at right-click time. Full audit: `docs/context-menu-audit.md`.
+
+### Fixed
+
+- **File-edit card "Open File" works** — the `agentz-open-file` event had no listener; now bridged to the editor's open-file path.
+- **Terminal right-click without a selection** shows a proper menu instead of the browser menu.
+- **Defensive theme storage** — localStorage absent/non-functional no longer crashes the render.
+
 ## [1.0.65] - 2026-11-12
 
 ### Fixed
