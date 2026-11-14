@@ -13,4 +13,4 @@
 
 ## CI
 
-- [ ] The `v1.0.67` Release workflow produced all installers: Linux x86_64/aarch64 (.deb/.AppImage/.rpm), macOS aarch64/Universal (.dmg/.app.tar.gz), Windows x64 + ARM64 (NSIS .exe); assets verified on the public release.
+- [x] The `v1.0.67` Release workflow produced all installers: Linux x86_64/aarch64 (.deb/.AppImage/.rpm), macOS aarch64/Universal (.dmg/.app.tar.gz), Windows x64 + ARM64 (NSIS .exe); assets verified on the public release (run #165 / 43535142238, all 6 bundle jobs success, release 444899253 with 12 assets, 2026-11-14).
