@@ -149,6 +149,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
 
       <AssistantMessageList
         messages={s.messages}
+        sessionId={s.sessionRef.current}
         toolSteps={s.toolSteps}
         turnDiffsByTurnId={s.turnDiffsByTurnId}
         busy={s.busy}

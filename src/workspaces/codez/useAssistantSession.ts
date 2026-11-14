@@ -452,7 +452,10 @@ export function useAssistantSession({
   /** Newest-first history cursor: raw DB rows loaded so far + whether older ones exist. */
   const historyCursorRef = useRef({ sessionId: "", offset: 0 });
   const [hasMoreOlder, setHasMoreOlder] = useState(false);
-  const { stickRef: stickToBottomRef } = useStickToBottom(scrollRef);
+  const { stickRef: stickToBottomRef, pinToBottom } = useStickToBottom(
+    scrollRef,
+    sessionRef.current ?? draftSessionIdRef.current,
+  );
   const taRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const { slash, slashMatches, pickSlash, slashLabel, detectSlash, handleSlashKeyDown } =
@@ -1608,12 +1611,7 @@ export function useAssistantSession({
             })
             .catch(() => {});
         }
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            const el = scrollRef.current;
-            if (el) el.scrollTop = el.scrollHeight;
-          }),
-        );
+        if (sessionRef.current === id) pinToBottom();
         if (!turnBookRef.current.isRunning(id)) setToolSteps([]);
         setError(null);
         setShowSessions(false);
@@ -1635,6 +1633,7 @@ export function useAssistantSession({
       syncBusyView,
       syncQueuedView,
       parkQueueEdit,
+      pinToBottom,
     ],
   );
 
@@ -1796,8 +1795,15 @@ export function useAssistantSession({
   const stopCurrent = useCallback(() => {
     const sid = sessionRef.current;
     if (!sid) return;
+    // Respond to the click immediately: flip the UI out of the running state and
+    // drop unflushed stream deltas now, instead of waiting for the backend to
+    // unwind (tool teardown + drain can take seconds). The authoritative
+    // agent_final / chatSend resolution still reconciles state afterwards.
+    markRunning(sid, false);
+    syncBusyView();
+    discardStreamDelta();
     void chatCancel(taskKeyBySessionRef.current.get(sid) ?? null, sid);
-  }, []);
+  }, [markRunning, syncBusyView, discardStreamDelta]);
 
   const removeSession = useCallback(
     async (id: string) => {

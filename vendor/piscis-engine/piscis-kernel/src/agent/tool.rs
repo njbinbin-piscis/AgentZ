@@ -256,6 +256,14 @@ pub trait Tool: Send + Sync {
         false
     }
 
+    /// Whether the tool watches `ctx.cancel` and tears itself down (e.g. a shell
+    /// terminating its process tree). Such tools get the full cancel grace so
+    /// their own teardown can finish; tools that ignore cancel are dropped after
+    /// a short grace so a user Stop is not held hostage by a blocked tool.
+    fn observes_cancel(&self) -> bool {
+        false
+    }
+
     /// Execute the tool
     async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult>;
 }

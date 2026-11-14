@@ -27,6 +27,9 @@ export interface AssistantChatMessage {
 
 interface AssistantMessageListProps {
   messages: AssistantChatMessage[];
+  /** Identifies the conversation on screen; a change resets the lazy window
+   *  so a newly opened session starts at its newest messages. */
+  sessionId?: string | null;
   /** Tool calls for the in-flight turn — rendered inline under the last reply. */
   toolSteps: ToolTraceItem[];
   turnDiffsByTurnId: Record<string, JournalFileDiff[]>;
@@ -121,6 +124,7 @@ export function ForkMenu({ onFork }: { onFork: (fullHistory: boolean) => void })
 /** Isolated from composer input state so keystrokes do not re-render markdown. */
 function AssistantMessageList({
   messages,
+  sessionId,
   toolSteps,
   turnDiffsByTurnId,
   busy,
@@ -196,6 +200,15 @@ function AssistantMessageList({
   // in multi-hour sessions.
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const loadLockRef = useRef(false);
+
+  // A different conversation must start from its newest messages: collapse the
+  // window back to INITIAL_VISIBLE so a long session never opens on row #1
+  // just because the previous session had loaded its full history.
+  const windowSessionRef = useRef(sessionId);
+  if (windowSessionRef.current !== sessionId) {
+    windowSessionRef.current = sessionId;
+    if (visibleCount !== INITIAL_VISIBLE) setVisibleCount(INITIAL_VISIBLE);
+  }
 
   const startIndex = Math.max(0, messages.length - visibleCount);
   const hasHiddenOlder = startIndex > 0 || hasMoreOlder;

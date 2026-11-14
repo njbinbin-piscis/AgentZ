@@ -243,6 +243,10 @@ impl Tool for ShellTool {
         true
     }
 
+    fn observes_cancel(&self) -> bool {
+        true
+    }
+
     async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult> {
         let command = match input["command"].as_str() {
             Some(command) if !command.trim().is_empty() => command,

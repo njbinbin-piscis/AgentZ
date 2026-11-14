@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
 import { confirmDialog } from "../../services/tauri/confirm";
 import { CloseIcon } from "../../components/TitleBarIcons";
+import { useStickToBottom } from "../../hooks/useStickToBottom";
 import {
   clearImSessions,
   connectGatewayChannels,
@@ -79,6 +80,9 @@ export default function AssistantMessagesPanel({ onClose }: AssistantMessagesPan
   const [messages, setMessages] = useState<ImMessageDto[]>([]);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Opening or switching an IM session lands on the newest message; live
+  // inbound/outbound messages keep following only while not scrolled up.
+  useStickToBottom(scrollRef, activeSession);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -161,11 +165,6 @@ export default function AssistantMessagesPanel({ onClose }: AssistantMessagesPan
       void un.then((f) => f());
     };
   }, [active, activeSession, refreshSessions, refreshMessages, refreshStatus]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
 
   const activeStatus = useMemo(() => statusMap[active ?? ""], [statusMap, active]);
 

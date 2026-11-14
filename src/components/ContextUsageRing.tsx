@@ -72,7 +72,7 @@ export default function ContextUsageRing({ usage }: { usage: ContextUsageSnapsho
           transform="rotate(-90 9 9)"
         />
       </svg>
-      <span className="agentz-context-ring-label">{budgetPct}%</span>
+      <span className="agentz-context-ring-label">{pct}%</span>
     </span>
   );
 }

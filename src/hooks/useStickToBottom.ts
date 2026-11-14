@@ -8,11 +8,21 @@ const NEAR_BOTTOM_PX = 48;
  * that grow outside React state changes (tool-call cards, streamed output,
  * expanding blocks) still keep the bottom in view. Growth-induced scroll
  * events are not mistaken for the user scrolling up.
+ *
+ * `resetKey` identifies the conversation currently shown (session / task /
+ * pool / bot id). When it changes the follow state re-arms and the container
+ * pins to the bottom, so opening or switching a conversation always lands on
+ * the newest message — never on a stale scroll position or the first row.
  */
-export function useStickToBottom(scrollRef: RefObject<HTMLElement | null>) {
+export function useStickToBottom(
+  scrollRef: RefObject<HTMLElement | null>,
+  resetKey?: string | null,
+) {
   const stickRef = useRef(true);
   const attachedRef = useRef<HTMLElement | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const pinRef = useRef<(() => void) | null>(null);
+  const lastKeyRef = useRef(resetKey);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -20,6 +30,7 @@ export function useStickToBottom(scrollRef: RefObject<HTMLElement | null>) {
     cleanupRef.current?.();
     cleanupRef.current = null;
     attachedRef.current = el;
+    pinRef.current = null;
     if (!el) return;
 
     let lastHeight = el.scrollHeight;
@@ -34,6 +45,7 @@ export function useStickToBottom(scrollRef: RefObject<HTMLElement | null>) {
       if (!stickRef.current || raf) return;
       raf = requestAnimationFrame(pin);
     };
+    pinRef.current = schedulePin;
 
     const onScroll = () => {
       const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -60,11 +72,26 @@ export function useStickToBottom(scrollRef: RefObject<HTMLElement | null>) {
     };
   });
 
+  // Conversation switch: re-arm follow and pin once the new content commits.
+  // Runs after the attach effect above so a freshly mounted container is
+  // already wired; the MutationObserver keeps the pin honest while markdown /
+  // images finish laying out.
+  useEffect(() => {
+    if (resetKey === lastKeyRef.current) return;
+    lastKeyRef.current = resetKey;
+    stickRef.current = true;
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    pinRef.current?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scrollRef is stable
+  }, [resetKey]);
+
   useEffect(
     () => () => {
       cleanupRef.current?.();
       cleanupRef.current = null;
       attachedRef.current = null;
+      pinRef.current = null;
     },
     [],
   );

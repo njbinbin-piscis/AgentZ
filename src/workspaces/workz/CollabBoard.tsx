@@ -13,6 +13,7 @@ import {
 } from "../../services/tauri/pool";
 import { onChatEvent, type AgentEvent, type ChatEventEnvelope } from "../../services/tauri/chat";
 import { useContextMenu } from "../../components/ContextMenu";
+import { useStickToBottom } from "../../hooks/useStickToBottom";
 import "./CollabBoard.css";
 
 /** Live koi-turn output is keyed by this session id (see kernel pool dispatch). */
@@ -62,6 +63,10 @@ const BOARD_POLL_MS = 15_000;
 export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoardProps) {
   const { t } = useTranslation();
   const menu = useContextMenu();
+  const feedRef = useRef<HTMLDivElement>(null);
+  // The feed opens on the newest pool message and follows live updates only
+  // while the user has not scrolled up; switching pools re-pins.
+  useStickToBottom(feedRef, poolId);
   const [pool, setPool] = useState<PoolSession | null>(null);
   const [members, setMembers] = useState<PoolMember[]>([]);
   const [todos, setTodos] = useState<KoiTodo[]>([]);
@@ -255,7 +260,7 @@ export default function CollabBoard({ projectDir, poolId, onClose }: CollabBoard
 
         <div className="agentz-collab-feed">
           <div className="agentz-collab-feed-head">{t("collab.feed")}</div>
-          <div className="agentz-collab-feed-body">
+          <div className="agentz-collab-feed-body" ref={feedRef}>
             {messages.length === 0 && <div className="agentz-collab-empty">{t("collab.noMessages")}</div>}
             {messages.map((msg) => (
               <div key={msg.id} className={`agentz-collab-msg ${msg.msg_type}`}>

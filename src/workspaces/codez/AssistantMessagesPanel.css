@@ -230,6 +230,9 @@
   min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* The stick-to-bottom hook owns scroll anchoring; native anchoring would
+     fight it when rows are prepended or replaced on session switch. */
+  overflow-anchor: none;
   padding: 14px 18px;
   display: flex;
   flex-direction: column;

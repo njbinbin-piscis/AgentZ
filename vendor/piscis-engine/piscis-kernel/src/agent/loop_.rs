@@ -56,6 +56,10 @@ const TOOL_TIMEOUT_SECS: u64 = 120;
 /// After a cancel request, a running tool gets this long to finish its own teardown
 /// (for example a sandboxed shell terminating its Job Object) before its future is dropped.
 const CANCEL_GRACE_SECS: u64 = 8;
+/// Tools that do NOT observe `ctx.cancel` have no teardown of their own, so they
+/// are dropped after this short grace instead of holding a user Stop for the full
+/// cooperative-teardown window.
+const CANCEL_GRACE_UNCOOPERATIVE_SECS: u64 = 1;
 /// Slack over a tool's own timeout so it can finish its timeout handling
 /// (e.g. moving a shell command to the background) before the loop gives up.
 const TOOL_TIMEOUT_SLACK_SECS: u64 = 30;
@@ -2852,6 +2856,13 @@ impl AgentLoop {
                     } else {
                         tool_timeout_for(&input)
                     };
+                    // Only tools that tear themselves down deserve the long grace;
+                    // a tool that ignores cancel is dropped quickly so Stop is prompt.
+                    let cancel_grace_secs = if tool.observes_cancel() {
+                        CANCEL_GRACE_SECS
+                    } else {
+                        CANCEL_GRACE_UNCOOPERATIVE_SECS
+                    };
                     let mut tool_future = Box::pin(tokio::time::timeout(
                         std::time::Duration::from_secs(tool_timeout_secs),
                         call_with_completion(tool, input.clone(), &tool_ctx),
@@ -2862,10 +2873,10 @@ impl AgentLoop {
                         _ = cancel_watcher => {
                             warn!(
                                 "Tool '{}' cancel requested; allowing {}s for its own teardown",
-                                name, CANCEL_GRACE_SECS
+                                name, cancel_grace_secs
                             );
                             tokio::time::timeout(
-                                std::time::Duration::from_secs(CANCEL_GRACE_SECS),
+                                std::time::Duration::from_secs(cancel_grace_secs),
                                 &mut tool_future,
                             )
                             .await
@@ -3329,6 +3340,12 @@ impl AgentLoop {
         let _enter = span.enter();
         drop(_enter); // Don't hold across awaits — use span for structured correlation only
         info!(parent: &span, "agent loop starting");
+        // A Stop clicked during startup (before the first LLM call) must take
+        // effect immediately: bail out before any model call or DB work.
+        if cancel.load(Ordering::Relaxed) {
+            info!(parent: &span, "agent loop cancelled before start");
+            return Ok((Vec::new(), 0, 0));
+        }
         let mut total_input = 0u32;
         let mut total_output = 0u32;
         // Accumulate new messages produced during this run in a separate buffer.
@@ -3494,12 +3511,6 @@ impl AgentLoop {
             // The loop retains orchestration: token accounting, DB persistence
             // of the rolling summary / state frame, and the UI usage event.
             {
-                let total_budget = self.budget.total as usize;
-                let static_overhead_tokens = crate::llm::estimate_request_overhead_tokens(
-                    Some(&effective_system_prompt),
-                    &tool_defs,
-                );
-                let message_budget = total_budget.saturating_sub(static_overhead_tokens);
                 let outcome = self
                     .compaction_strategy
                     .compact(CompactionRequest {
@@ -3573,72 +3584,19 @@ impl AgentLoop {
                     }
                 }
 
-                // Build the (post-compaction) request view + estimate purely
-                // for the UI usage event, so the ring reflects what we're about
-                // to send. This mirrors the view the LLM-call path rebuilds.
-                let demoted = build_request_view_messages(
+                self.emit_context_usage(
+                    &event_tx,
+                    &ctx.session_id,
                     &messages,
                     &tool_minimals,
-                    CTX_PRESERVE_RECENT_TURNS,
-                    CTX_KEEP_RECENT_TOOL_CARRIERS,
-                    message_budget,
-                    self.budget.max_tool_result_tokens,
-                );
-                let req_view = vision::inject_selected_context(&demoted, &ctx.session_id).await;
-                let estimated = crate::llm::estimate_request_input_tokens(
-                    &req_view,
-                    Some(&effective_system_prompt),
+                    &effective_system_prompt,
                     &tool_defs,
-                );
-                let trigger_threshold = self.budget.trigger_micro as usize;
-
-                // p8 — best-effort per-layer breakdown for the ring indicator.
-                let breakdown_snapshot = {
-                    let rolling_tokens = if rolling_summary.trim().is_empty() {
-                        0
-                    } else {
-                        crate::llm::estimate_tokens(&rolling_summary) as u32
-                    };
-                    let bd = crate::agent::harness::context_builder::compute_layered_breakdown(
-                        &req_view,
-                        Some(&effective_system_prompt),
-                        &tool_defs,
-                        &tool_minimals,
-                        rolling_tokens,
-                        0,
-                    );
-                    crate::agent::messages::LayeredTokenBreakdownSnapshot {
-                        persona: bd.prompt.persona,
-                        scene: bd.prompt.scene,
-                        memory: bd.prompt.memory,
-                        project: bd.prompt.project,
-                        platform_hint: bd.prompt.platform_hint,
-                        tool_defs: bd.tool_def_tokens,
-                        history_text: bd.history_text_tokens,
-                        history_tool_result_full: bd.history_tool_result_full_tokens,
-                        history_tool_result_receipt: bd.history_tool_result_receipt_tokens,
-                        rolling_summary: bd.rolling_summary_tokens,
-                        state_frame: bd.state_frame_tokens,
-                        vision: bd.vision_tokens,
-                        request_overhead: bd.request_overhead_tokens,
-                    }
-                };
-
-                let _ = event_tx
-                    .send(AgentEvent::ContextUsage {
-                        estimated_input_tokens: estimated.min(u32::MAX as usize) as u32,
-                        total_input_budget: total_budget.min(u32::MAX as usize) as u32,
-                        trigger_threshold: trigger_threshold.min(u32::MAX as usize) as u32,
-                        cumulative_input_tokens: cumulative_input_tokens.clamp(0, u32::MAX as i64)
-                            as u32,
-                        cumulative_output_tokens: cumulative_output_tokens.clamp(0, u32::MAX as i64)
-                            as u32,
-                        rolling_summary_version: rolling_summary_version.clamp(0, u32::MAX as i64)
-                            as u32,
-                        auto_compact_threshold: self.auto_compact_input_tokens_threshold,
-                        layered_breakdown: Some(breakdown_snapshot),
-                    })
-                    .await;
+                    &rolling_summary,
+                    cumulative_input_tokens,
+                    cumulative_output_tokens,
+                    rolling_summary_version,
+                )
+                .await;
             }
 
             info!(
@@ -4534,6 +4492,23 @@ impl AgentLoop {
             new_messages =
                 crate::agent::message_utils::strip_ephemeral_tool_exchanges(new_messages);
 
+            // Refresh the context ring after the tool batch so the indicator
+            // tracks growth during a long tool run instead of freezing at the
+            // iteration-start snapshot until the next LLM call.
+            self.emit_context_usage(
+                &event_tx,
+                &ctx.session_id,
+                &messages,
+                &tool_minimals,
+                &effective_system_prompt,
+                &tool_defs,
+                &rolling_summary,
+                cumulative_input_tokens,
+                cumulative_output_tokens,
+                rolling_summary_version,
+            )
+            .await;
+
             if cancel.load(Ordering::Relaxed) {
                 info!("agent loop cancelled after tool-result persistence");
                 break;
@@ -4627,6 +4602,90 @@ impl AgentLoop {
         // appended during the run, regardless of how many times the context was compacted.
         // The caller (persist_agent_turn) saves exactly these messages to the DB.
         Ok((new_messages, total_input, total_output))
+    }
+
+    /// Emit a best-effort `ContextUsage` snapshot reflecting the current
+    /// (post-compaction / post-tool-batch) request view, so the frontend ring
+    /// tracks context growth during a long tool run instead of freezing at the
+    /// iteration-start value until the next LLM call.
+    #[allow(clippy::too_many_arguments)]
+    async fn emit_context_usage(
+        &self,
+        event_tx: &mpsc::Sender<AgentEvent>,
+        session_id: &str,
+        messages: &[LlmMessage],
+        tool_minimals: &HashMap<String, String>,
+        effective_system_prompt: &str,
+        tool_defs: &[crate::llm::ToolDef],
+        rolling_summary: &str,
+        cumulative_input_tokens: i64,
+        cumulative_output_tokens: i64,
+        rolling_summary_version: i64,
+    ) {
+        let total_budget = self.budget.total as usize;
+        let static_overhead_tokens = crate::llm::estimate_request_overhead_tokens(
+            Some(effective_system_prompt),
+            tool_defs,
+        );
+        let message_budget = total_budget.saturating_sub(static_overhead_tokens);
+
+        let demoted = build_request_view_messages(
+            messages,
+            tool_minimals,
+            CTX_PRESERVE_RECENT_TURNS,
+            CTX_KEEP_RECENT_TOOL_CARRIERS,
+            message_budget,
+            self.budget.max_tool_result_tokens,
+        );
+        let req_view = vision::inject_selected_context(&demoted, session_id).await;
+        let estimated = crate::llm::estimate_request_input_tokens(
+            &req_view,
+            Some(effective_system_prompt),
+            tool_defs,
+        );
+        let trigger_threshold = self.budget.trigger_micro as usize;
+
+        let rolling_tokens = if rolling_summary.trim().is_empty() {
+            0
+        } else {
+            crate::llm::estimate_tokens(rolling_summary) as u32
+        };
+        let bd = crate::agent::harness::context_builder::compute_layered_breakdown(
+            &req_view,
+            Some(effective_system_prompt),
+            tool_defs,
+            tool_minimals,
+            rolling_tokens,
+            0,
+        );
+        let breakdown_snapshot = crate::agent::messages::LayeredTokenBreakdownSnapshot {
+            persona: bd.prompt.persona,
+            scene: bd.prompt.scene,
+            memory: bd.prompt.memory,
+            project: bd.prompt.project,
+            platform_hint: bd.prompt.platform_hint,
+            tool_defs: bd.tool_def_tokens,
+            history_text: bd.history_text_tokens,
+            history_tool_result_full: bd.history_tool_result_full_tokens,
+            history_tool_result_receipt: bd.history_tool_result_receipt_tokens,
+            rolling_summary: bd.rolling_summary_tokens,
+            state_frame: bd.state_frame_tokens,
+            vision: bd.vision_tokens,
+            request_overhead: bd.request_overhead_tokens,
+        };
+
+        let _ = event_tx
+            .send(AgentEvent::ContextUsage {
+                estimated_input_tokens: estimated.min(u32::MAX as usize) as u32,
+                total_input_budget: total_budget.min(u32::MAX as usize) as u32,
+                trigger_threshold: trigger_threshold.min(u32::MAX as usize) as u32,
+                cumulative_input_tokens: cumulative_input_tokens.clamp(0, u32::MAX as i64) as u32,
+                cumulative_output_tokens: cumulative_output_tokens.clamp(0, u32::MAX as i64) as u32,
+                rolling_summary_version: rolling_summary_version.clamp(0, u32::MAX as i64) as u32,
+                auto_compact_threshold: self.auto_compact_input_tokens_threshold,
+                layered_breakdown: Some(breakdown_snapshot),
+            })
+            .await;
     }
 }
 
@@ -5531,6 +5590,9 @@ mod tests {
         fn input_schema(&self) -> Value {
             json!({"type":"object"})
         }
+        fn observes_cancel(&self) -> bool {
+            true
+        }
         async fn call(&self, _: Value, ctx: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
             while !ctx.cancel.load(Ordering::SeqCst) {
                 tokio::time::sleep(std::time::Duration::from_millis(10)).await;
@@ -5600,6 +5662,79 @@ mod tests {
             Ok(crate::agent::tool::ToolResult::ok("never"))
         }
     }
+
+    /// A read-only tool returning a sizeable payload so the post-tool-batch
+    /// ContextUsage estimate is measurably larger than the iteration-start one.
+    struct BigResultTool;
+    #[async_trait]
+    impl Tool for BigResultTool {
+        fn name(&self) -> &str {
+            "big_result"
+        }
+        fn description(&self) -> &str {
+            "fixture returning a large read-only payload"
+        }
+        fn input_schema(&self) -> Value {
+            json!({"type":"object"})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        async fn call(&self, _: Value, _ctx: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
+            Ok(crate::agent::tool::ToolResult::ok("x".repeat(4000)))
+        }
+    }
+
+    #[tokio::test]
+    async fn context_usage_reemitted_after_tool_batch() {
+        let mut agent = tier_agent(
+            ToolThenTextClient {
+                calls: Arc::new(AtomicUsize::new(0)),
+                tool_name: "big_result",
+            },
+            None,
+            crate::agent::harness::LayeredBudget::from_context_window(
+                TIER_TEST_CONTEXT_WINDOW,
+                TIER_TEST_MAX_TOKENS,
+            ),
+        );
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(BigResultTool));
+        agent.registry = Arc::new(registry);
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut ctx = tier_tool_context("usage-after-tools".into());
+        ctx.cancel = cancel.clone();
+        ctx.bypass_permissions = true;
+        ctx.max_iterations = Some(3);
+        let (tx, mut rx) = mpsc::channel(256);
+        let drain = tokio::spawn(async move {
+            let mut usages = Vec::new();
+            while let Some(evt) = rx.recv().await {
+                if let AgentEvent::ContextUsage {
+                    estimated_input_tokens,
+                    ..
+                } = evt
+                {
+                    usages.push(estimated_input_tokens);
+                }
+            }
+            usages
+        });
+        let result = agent
+            .run(vec![make_text_msg("user", "run a tool then answer")], tx, cancel, ctx)
+            .await;
+        assert!(result.is_ok());
+        let usages = drain.await.unwrap();
+        assert!(
+            usages.len() >= 2,
+            "expected a ContextUsage after the tool batch in addition to the iteration-start one, got {usages:?}"
+        );
+        assert!(
+            usages[1] > usages[0],
+            "post-tool-batch estimate must reflect the appended tool result: {usages:?}"
+        );
+    }
     #[tokio::test]
     async fn uncooperative_tool_is_interrupted_after_grace() {
         let mut agent = tier_agent(
@@ -5634,12 +5769,14 @@ mod tests {
         let elapsed = started.elapsed();
         let text = format!("{blocks:?}");
         assert!(text.contains("已被用户取消"), "uncooperative tool must be interrupted: {text}");
+        // A tool with no teardown of its own is dropped after the SHORT grace,
+        // not the full cooperative-teardown window, so a user Stop is prompt.
         assert!(
-            elapsed >= std::time::Duration::from_secs(super::CANCEL_GRACE_SECS),
-            "grace period must actually be waited before interrupting: {elapsed:?}"
+            elapsed >= std::time::Duration::from_secs(super::CANCEL_GRACE_UNCOOPERATIVE_SECS),
+            "short grace period must actually be waited before interrupting: {elapsed:?}"
         );
         assert!(
-            elapsed < std::time::Duration::from_secs(super::CANCEL_GRACE_SECS + 5),
+            elapsed < std::time::Duration::from_secs(super::CANCEL_GRACE_UNCOOPERATIVE_SECS + 5),
             "interrupt took {elapsed:?}: {text}"
         );
     }
@@ -5797,6 +5934,186 @@ mod tests {
         ) -> Result<crate::agent::tool::ToolResult> {
             unreachable!("schema helper tool should not be executed in unit tests");
         }
+    }
+
+    // ── Stop-responsiveness regression tests ─────────────────────────────────
+    // A user Stop must take effect promptly: before the first LLM call when it
+    // arrives during startup, and without an 8-second grace for tools that have
+    // no teardown of their own.
+
+    /// LLM client that records whether it was ever called.
+    struct StopProbeClient {
+        calls: Arc<AtomicUsize>,
+    }
+    #[async_trait]
+    impl crate::llm::LlmClient for StopProbeClient {
+        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
+            unreachable!("stop probe uses complete")
+        }
+        async fn complete(&self, _req: LlmRequest) -> Result<LlmResponse> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(LlmResponse {
+                content: "ok".into(),
+                tool_calls: vec![],
+                input_tokens: 1,
+                output_tokens: 1,
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn stop_before_start_never_calls_the_model() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let agent = tier_agent(
+            StopProbeClient { calls: calls.clone() },
+            None,
+            crate::agent::harness::LayeredBudget::from_context_window(
+                TIER_TEST_CONTEXT_WINDOW,
+                TIER_TEST_MAX_TOKENS,
+            ),
+        );
+        let cancel = Arc::new(AtomicBool::new(true)); // Stop clicked during startup
+        let (tx, mut rx) = mpsc::channel(64);
+        let drain = tokio::spawn(async move { while rx.recv().await.is_some() {} });
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            agent.run(
+                vec![make_text_msg("user", "stop me before the first call")],
+                tx,
+                cancel,
+                tier_tool_context("stop-before-start".into()),
+            ),
+        )
+        .await
+        .expect("pre-cancelled run must return promptly");
+        drain.await.unwrap();
+        assert!(result.is_ok(), "pre-cancelled run should unwind cleanly: {result:?}");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "a Stop requested before the first LLM call must prevent that call"
+        );
+    }
+
+    /// Returns a tool call on the first completion, plain text afterwards.
+    struct ToolThenTextClient {
+        calls: Arc<AtomicUsize>,
+        tool_name: &'static str,
+    }
+    #[async_trait]
+    impl crate::llm::LlmClient for ToolThenTextClient {
+        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
+            unreachable!("tool fixture uses complete")
+        }
+        async fn complete(&self, _req: LlmRequest) -> Result<LlmResponse> {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+            if call == 1 {
+                Ok(LlmResponse {
+                    content: String::new(),
+                    tool_calls: vec![crate::llm::ToolCall {
+                        id: "t-stop".into(),
+                        name: self.tool_name.into(),
+                        input: json!({}),
+                    }],
+                    input_tokens: 1,
+                    output_tokens: 1,
+                })
+            } else {
+                Ok(LlmResponse {
+                    content: "done".into(),
+                    tool_calls: vec![],
+                    input_tokens: 1,
+                    output_tokens: 1,
+                })
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn uncooperative_tool_stops_promptly_without_the_long_grace() {
+        let mut agent = tier_agent(
+            ToolThenTextClient {
+                calls: Arc::new(AtomicUsize::new(0)),
+                tool_name: "non_terminating",
+            },
+            None,
+            crate::agent::harness::LayeredBudget::from_context_window(
+                TIER_TEST_CONTEXT_WINDOW,
+                TIER_TEST_MAX_TOKENS,
+            ),
+        );
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(NonTerminatingTool));
+        agent.registry = Arc::new(registry);
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut ctx = tier_tool_context("stop-fast".into());
+        ctx.cancel = cancel.clone();
+        ctx.bypass_permissions = true;
+        ctx.max_iterations = Some(3);
+        let (tx, mut rx) = mpsc::channel(64);
+        let drain = tokio::spawn(async move { while rx.recv().await.is_some() {} });
+
+        let trigger = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            trigger.store(true, Ordering::SeqCst);
+        });
+        let started = std::time::Instant::now();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            agent.run(vec![make_text_msg("user", "run a tool then stop")], tx, cancel, ctx),
+        )
+        .await
+        .expect("cancelled tool run must terminate");
+        let elapsed = started.elapsed();
+        drain.await.unwrap();
+        assert!(result.is_ok());
+        // 200ms watcher + short grace, NOT the 8s cooperative-teardown grace.
+        assert!(
+            elapsed < std::time::Duration::from_secs(3),
+            "a tool with no teardown of its own must stop promptly, took {elapsed:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn cooperative_teardown_tool_still_gets_the_full_grace() {
+        let mut agent = tier_agent(
+            ToolThenTextClient {
+                calls: Arc::new(AtomicUsize::new(0)),
+                tool_name: "cooperative_teardown",
+            },
+            None,
+            crate::agent::harness::LayeredBudget::from_context_window(
+                TIER_TEST_CONTEXT_WINDOW,
+                TIER_TEST_MAX_TOKENS,
+            ),
+        );
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(CooperativeTeardownTool));
+        agent.registry = Arc::new(registry);
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut ctx = tier_tool_context("stop-grace".into());
+        ctx.cancel = cancel.clone();
+        ctx.bypass_permissions = true;
+        ctx.max_iterations = Some(3);
+        let (tx, mut rx) = mpsc::channel(64);
+
+        let trigger = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            trigger.store(true, Ordering::SeqCst);
+        });
+        let blocks = agent
+            .execute_single_tool("t-grace", "cooperative_teardown", &json!({}), &ctx, &tx, &cancel)
+            .await;
+        let _ = rx.try_recv();
+        let text = format!("{blocks:?}");
+        assert!(
+            text.contains("torn down"),
+            "a tool that tears down after cancel must keep its own result: {text}"
+        );
     }
 
     // ── Test data helpers ─────────────────────────────────────────────────────

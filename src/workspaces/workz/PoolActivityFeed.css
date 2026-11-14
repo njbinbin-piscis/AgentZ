@@ -11,6 +11,7 @@
   flex-direction: column;
   gap: 0.35rem;
   overflow: auto;
+  overflow-anchor: none;
   min-height: 0;
 }
 
@@ -100,6 +101,7 @@
 
 .agentz-pool-feed-detail-body {
   overflow: auto;
+  overflow-anchor: none;
   padding: 0.65rem;
   font-size: 0.85rem;
 }

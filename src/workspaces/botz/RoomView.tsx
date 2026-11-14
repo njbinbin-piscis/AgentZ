@@ -32,6 +32,7 @@ import {
 import "../../components/ChatComposer.css";
 import Markdown from "../codez/Markdown";
 import ToolTrace, { interleaveTools, upsertToolStep, truncateToolResultForUi, type ToolTraceItem } from "../../components/ToolTrace";
+import { useStickToBottom } from "../../hooks/useStickToBottom";
 import Avatar from "./Avatar";
 import BotPicker from "./BotPicker";
 import ReviewPanel from "./ReviewPanel";
@@ -95,12 +96,11 @@ function Segments({ text, tools }: { text: string; tools: ToolTraceItem[] }) {
   );
 }
 
-function SessionTranscript({ messages, live }: { messages: MessageDto[]; live?: LiveTurn }) {
+function SessionTranscript({ messages, live, sessionKey }: { messages: MessageDto[]; live?: LiveTurn; sessionKey?: string | null }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, live]);
+  // Opens / switches on the newest message; streamed tokens keep following
+  // only while the user has not scrolled up to read history.
+  useStickToBottom(ref, sessionKey);
   return (
     <div className="botz-transcript" ref={ref}>
       {messages.map((m) => (
@@ -326,6 +326,10 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
   const [boardHeight, setBoardHeight] = useState(220);
   const [drawerWidth, setDrawerWidth] = useState(420);
   const [drawerTab, setDrawerTab] = useState<"chat" | "observe">("chat");
+  const observeRef = useRef<HTMLDivElement>(null);
+  // The observe feed opens on the newest handoff and follows new ones only
+  // while the user has not scrolled up.
+  useStickToBottom(observeRef, `${room.id}:${drawerTab}`);
   const [watchOpen, setWatchOpen] = useState(false);
   const [reviewing, setReviewing] = useState<KoiTodo | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -969,7 +973,7 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
               </button>
             </div>
             {drawerTab === "observe" ? (
-              <div className="botz-observe">
+              <div className="botz-observe" ref={observeRef}>
                 <div className="botz-observe-hint">{t("botz.observeHint")}</div>
                 {handoffs.length === 0 && <div className="botz-empty">{t("botz.observeEmpty")}</div>}
                 {handoffs.map((msg) => {
@@ -1010,7 +1014,7 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
                     ))}
                   </div>
                 )}
-                <SessionTranscript messages={transcript} live={openSessionId ? live[openSessionId] : undefined} />
+                <SessionTranscript messages={transcript} live={openSessionId ? live[openSessionId] : undefined} sessionKey={openSessionId} />
                 {desk === COORDINATOR ? (
                   <BotzComposer
                     value={input}
@@ -1020,6 +1024,10 @@ export default function RoomView({ room, agents, active, onRoomChange, onRoomSyn
                     onStop={() => {
                       const key = taskKeyRef.current;
                       taskKeyRef.current = null;
+                      // Respond to the click immediately; the send's finally block
+                      // still reconciles state when the backend unwinds.
+                      setBusy(false);
+                      setActivity((prev) => ({ ...prev, [COORDINATOR]: "idle" }));
                       if (key) void chatCancel(key);
                     }}
                     placeholder={t("botz.composerPlaceholder")}

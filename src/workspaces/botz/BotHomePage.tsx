@@ -5,6 +5,7 @@ import type { AgentInfo } from "../../services/tauri/agents";
 import { botzGetBot, botzHomeDir, botzSaveBot, type BotProfile, type BotRoutine } from "../../services/tauri/botz";
 import Markdown from "../codez/Markdown";
 import Avatar from "./Avatar";
+import { useStickToBottom } from "../../hooks/useStickToBottom";
 import { budgetLevel, localDate, sendToBot, usageMonth, usageToday } from "./botRuntime";
 import type { Activity } from "./activity";
 
@@ -26,6 +27,9 @@ export default function BotHome({ agent, activity, onBack }: { agent: AgentInfo;
   const homeDirRef = useRef<string | null>(null);
   const taskKeyRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Opening a bot lands on its newest home message; live output keeps
+  // following only while the user has not scrolled up.
+  useStickToBottom(scrollRef, agent.id);
 
   const reload = useCallback(async () => {
     const p = await botzGetBot(agent.id);
@@ -38,6 +42,10 @@ export default function BotHome({ agent, activity, onBack }: { agent: AgentInfo;
       } catch {
         setMessages([]);
       }
+    } else {
+      // A bot without a home session must not keep showing the previous
+      // bot's transcript.
+      setMessages([]);
     }
   }, [agent.id]);
 
@@ -66,11 +74,6 @@ export default function BotHome({ agent, activity, onBack }: { agent: AgentInfo;
       unlisten?.();
     };
   }, [sessionId, reload]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, live]);
 
   const save = useCallback(async (next: BotProfile) => {
     setProfile(await botzSaveBot(next));

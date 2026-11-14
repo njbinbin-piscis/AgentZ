@@ -5,6 +5,23 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.67] - 2026-11-13
+
+### Added
+
+- **Context-usage ring updates during tool execution.** The kernel now re-emits `ContextUsage` after each tool batch (shared `emit_context_usage` helper, post-compaction request view), so the ring tracks context growth inside a long tool run instead of freezing at the iteration-start snapshot until the next LLM call. Regression test: `context_usage_reemitted_after_tool_batch`.
+
+### Fixed
+
+- **Stop responds immediately.** Clicking Stop in CodeZ / WorkZ / BotZ now flips the UI out of the running state and drops unflushed stream deltas at once, instead of waiting seconds-to-tens-of-seconds for the backend to unwind; authoritative `agent_final` / send-resolution still reconciles state.
+- **Stop during startup is honored before the first model call.** The kernel agent loop checks the cancel flag on entry, so a Stop clicked right after sending no longer triggers the first LLM request.
+- **Cancel grace is tiered per tool.** New `Tool::observes_cancel()`: tools that tear themselves down (shell) keep the 8s cooperative grace; tools that ignore cancel are dropped after 1s, so a blocked tool can no longer hold a user Stop for the full 8s window.
+- **Queued-message editing can remove image chips.** The chip remove button was gated on `!busy`, but editing a queued message happens exactly while a turn is running, so images could not be deleted (pasting replaced them instead). Chips belong to the next draft; removal now works while busy. Regression tests in `ChatComposer.test.tsx`.
+- **Context ring label never exceeds 100%.** The stroke was capped at 100% but the label printed the uncapped estimate (e.g. 123%), desynchronizing ring and label. The label now uses the capped percentage; the true estimate stays in the tooltip. Regression tests in `ContextUsageRing.test.tsx`.
+- **Opening or switching a conversation lands on the newest message.** `useStickToBottom` accepts a `resetKey` (session / task / pool / bot id) and re-pins on change; the CodeZ message list resets its lazy window per session; IM panel, collab board feed, pool activity feed and bot home adopt the same behavior. A bot without a home session no longer shows the previous bot's transcript.
+
+---
+
 ## [1.0.66] - 2026-11-13
 
 ### Added

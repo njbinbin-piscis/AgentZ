@@ -222,6 +222,7 @@
 
 .agentz-collab-feed-body {
   overflow: auto;
+  overflow-anchor: none;
   padding: 0 16px 12px;
   display: flex;
   flex-direction: column;

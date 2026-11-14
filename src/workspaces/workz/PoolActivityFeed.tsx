@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   poolMembers,
@@ -8,6 +8,7 @@ import {
   type PoolMessage,
 } from "../../services/tauri/pool";
 import { getMessages, type MessageDto } from "../../services/tauri/chat";
+import { useStickToBottom } from "../../hooks/useStickToBottom";
 import Markdown from "../codez/Markdown";
 import "./PoolActivityFeed.css";
 
@@ -65,6 +66,12 @@ export default function PoolActivityFeed({ projectDir, poolId, filter = "all" }:
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
   const [detailSteps, setDetailSteps] = useState<MessageDto[]>([]);
   const [detailBusy, setDetailBusy] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Opening or switching a pool lands on the newest activity; live events
+  // keep following only while the user has not scrolled up.
+  useStickToBottom(listRef, `${poolId}:${filter}`);
+  const detailRef = useRef<HTMLDivElement>(null);
+  useStickToBottom(detailRef, detailSessionId ?? String(detailId));
 
   const refresh = useCallback(async () => {
     try {
@@ -155,7 +162,7 @@ export default function PoolActivityFeed({ projectDir, poolId, filter = "all" }:
 
   return (
     <div className="agentz-pool-feed">
-      <div className="agentz-pool-feed-list">
+      <div className="agentz-pool-feed-list" ref={listRef}>
         {visibleMessages.length === 0 && (
           <div className="agentz-workz-empty">
             <div className="agentz-workz-title">{t("agent.title")}</div>
@@ -188,7 +195,7 @@ export default function PoolActivityFeed({ projectDir, poolId, filter = "all" }:
               ✕
             </button>
           </div>
-          <div className="agentz-pool-feed-detail-body">
+          <div className="agentz-pool-feed-detail-body" ref={detailRef}>
             <div className="agentz-pool-feed-detail-msg">
               <Markdown content={activeMsg.content} />
             </div>

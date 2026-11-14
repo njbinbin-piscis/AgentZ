@@ -921,7 +921,10 @@ export function useWorkzSessionStore({
     };
   }, [applyEvent]);
 
-  useStickToBottom(scrollRef);
+  // Opening or switching a task always lands on its newest step: the reset
+  // key re-arms follow-bottom even if the user had scrolled up in the
+  // previous task.
+  const { pinToBottom } = useStickToBottom(scrollRef, selectedId);
 
   const autoResumeRef = useRef(0);
   const pendingResumeRef = useRef(false);
@@ -1359,6 +1362,9 @@ export function useWorkzSessionStore({
           })),
         );
         setPlanItems([]);
+        // History commits below; pin once the rows are in the DOM so the
+        // newest message is visible instead of a stale scroll position.
+        pinToBottom();
         const scope = planProject?.selected === projectDir ? getProjectScope(planProject.canonical) : null;
         if (scope?.handle) {
           void queryTaskPlan(scope.handle, id)
@@ -1375,7 +1381,7 @@ export function useWorkzSessionStore({
         setError(String(e));
       }
     },
-    [projectDir, isFree, refreshGitChanges, tasks, applyTaskModeBinding, clearCards, planProject, applyPersistedPlan, syncQueuedView],
+    [projectDir, isFree, refreshGitChanges, tasks, applyTaskModeBinding, clearCards, planProject, applyPersistedPlan, syncQueuedView, pinToBottom],
   );
 
   // After a restart, reopen the task that was active when the app closed.
@@ -1481,8 +1487,15 @@ export function useWorkzSessionStore({
     const sid = sessionRef.current;
     const key =
       foregroundTaskKeyRef.current ?? (sid ? (taskKeyBySessionRef.current.get(sid) ?? null) : null);
+    // Respond to the click immediately rather than waiting for the backend to
+    // unwind (tool teardown + drain can take seconds). The authoritative
+    // agent_final / chatSend resolution still reconciles state afterwards.
+    if (sid) markRunning(sid, false);
+    liveRef.current = false;
+    setBusy(false);
+    discardStreamDelta();
     void chatCancel(key, sid);
-  }, []);
+  }, [markRunning, discardStreamDelta]);
 
   const removeTask = useCallback(
     async (id: string) => {

@@ -273,7 +273,7 @@ export default function ChatComposer({
                 >
                   <img src={chip.preview} alt="" className="agentz-composer-chip-thumb" />
                   <span className="agentz-composer-chip-label">{chipDisplayLabel(chip, t)}</span>
-                  {onRemoveChip && !busy && !locked && (
+                  {onRemoveChip && !locked && (
                     <button
                       type="button"
                       className="agentz-composer-chip-remove"
@@ -292,7 +292,7 @@ export default function ChatComposer({
                 >
                   <ChipGlyph chip={chip} />
                   <span className="agentz-composer-chip-label">{chipDisplayLabel(chip, t)}</span>
-                  {onRemoveChip && !busy && !locked && (
+                  {onRemoveChip && !locked && (
                     <button
                       type="button"
                       className="agentz-composer-chip-remove"
