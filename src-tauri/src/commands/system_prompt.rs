@@ -109,6 +109,9 @@ pub fn agent_system_prompt(
          - Do NOT call `suggest_enter` for trivial one-shot tasks.\n\n\
          **Structured user input (`chat_ui` / `plan_mode_ui`)**\n\
          - Use `chat_ui` for multi-field forms, wizards, file pickers, and confirm/cancel — not trivial yes/no.\n\
+         - Every select / radio / checkbox needs a non-empty `options` array. Each option is \
+           `{{\"value\": \"...\", \"label\": \"...\"}}`: `value` must be a non-empty string, unique within the field \
+           (never a number or null); `default` must be one of those values.\n\
          - When `chat_ui` / `chat_ui_listen` return `USER_INTERACTIVE_RESPONSE_JSON`, treat field ids, \
            `__data_model__`, `__action__`, and `__action_type__` as authoritative.\n\
          - Non-terminal actions (`__action_type__` = action): call `chat_ui_patch` then optionally \

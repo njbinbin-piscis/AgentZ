@@ -464,6 +464,173 @@ pub(super) fn spawn_turn_event_collector(
     )
 }
 
+/// Facts about how a turn ended, as far as recording it is concerned.
+#[derive(Debug, Clone, Copy, Default)]
+pub(super) struct TurnEnd {
+    /// The agent run or its event stream reported an error.
+    pub errored: bool,
+    /// The run's terminal state could not be recorded or its cancellation
+    /// could not be requested.
+    pub terminal_error: bool,
+    pub cancellation_requested: bool,
+    /// Cancellation was requested and some worker did not acknowledge cleanup
+    /// in time.
+    pub cancellation_unconfirmed: bool,
+    pub timed_out: bool,
+    pub durability_failed: bool,
+    pub tool_calls: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct TurnOutcome {
+    /// `agent_lifecycle` state reported for the turn.
+    pub lifecycle_state: &'static str,
+    /// The turn did not complete: skip post-turn processing and report the
+    /// response as not ok.
+    pub turn_failed: bool,
+    /// Whether the session row is left in `error` rather than `idle`.
+    pub session_failed: bool,
+}
+
+/// Decide how a finished turn is recorded.
+///
+/// A user stop is never a session error. With every worker's cleanup
+/// acknowledged the turn is `cancelled` and is treated like a completed one
+/// (title, post-turn hooks). Without that acknowledgement the turn is
+/// `interrupted` and its post-turn processing is skipped, but the session still
+/// returns to `idle`: the user asked for the stop, the transcript up to that
+/// point is saved, and an `error` session made a deliberate stop look like a
+/// crash and blocked the normal follow-up flow.
+pub(super) fn classify_turn_outcome(end: TurnEnd) -> TurnOutcome {
+    let turn_failed =
+        end.errored || end.cancellation_unconfirmed || end.terminal_error;
+    let lifecycle_state = if end.cancellation_unconfirmed {
+        "interrupted"
+    } else if end.timed_out {
+        "timed_out"
+    } else if end.cancellation_requested && !end.durability_failed {
+        "cancelled"
+    } else if turn_failed {
+        "failed"
+    } else if end.tool_calls == 0 {
+        "completed_text_only"
+    } else {
+        "completed"
+    };
+    // An unconfirmed stop alone does not fail the session. A turn limit also
+    // sets the cancel flag, so it is told apart by `timed_out`.
+    let user_stop = end.cancellation_requested && !end.timed_out && !end.durability_failed;
+    let session_failed = end.errored
+        || end.terminal_error
+        || (end.cancellation_unconfirmed && !user_stop);
+    TurnOutcome {
+        lifecycle_state,
+        turn_failed,
+        session_failed,
+    }
+}
+
+#[cfg(test)]
+mod turn_outcome_tests {
+    use super::{classify_turn_outcome, TurnEnd};
+
+    #[test]
+    fn confirmed_user_stop_is_cancelled_and_treated_as_a_finished_turn() {
+        let outcome = classify_turn_outcome(TurnEnd {
+            cancellation_requested: true,
+            tool_calls: 3,
+            ..TurnEnd::default()
+        });
+        assert_eq!(outcome.lifecycle_state, "cancelled");
+        // Post-turn processing (title, hooks) runs, and the session is idle.
+        assert!(!outcome.turn_failed);
+        assert!(!outcome.session_failed);
+    }
+
+    #[test]
+    fn unconfirmed_user_stop_is_interrupted_but_the_session_is_not_an_error() {
+        let outcome = classify_turn_outcome(TurnEnd {
+            cancellation_requested: true,
+            cancellation_unconfirmed: true,
+            tool_calls: 3,
+            ..TurnEnd::default()
+        });
+        assert_eq!(outcome.lifecycle_state, "interrupted");
+        // Cleanup was not confirmed: do not run post-turn work on this turn.
+        assert!(outcome.turn_failed);
+        assert!(!outcome.session_failed);
+    }
+
+    #[test]
+    fn a_stop_that_could_not_be_recorded_is_still_an_error() {
+        let outcome = classify_turn_outcome(TurnEnd {
+            cancellation_requested: true,
+            cancellation_unconfirmed: true,
+            terminal_error: true,
+            ..TurnEnd::default()
+        });
+        assert_eq!(outcome.lifecycle_state, "interrupted");
+        assert!(outcome.turn_failed);
+        assert!(outcome.session_failed);
+    }
+
+    #[test]
+    fn turn_limit_and_lost_history_keep_their_error_status() {
+        // The turn limit sets the cancel flag itself and reports an error.
+        let timed_out = classify_turn_outcome(TurnEnd {
+            errored: true,
+            cancellation_requested: true,
+            cancellation_unconfirmed: true,
+            timed_out: true,
+            ..TurnEnd::default()
+        });
+        assert_eq!(timed_out.lifecycle_state, "interrupted");
+        assert!(timed_out.session_failed);
+
+        let timed_out_clean = classify_turn_outcome(TurnEnd {
+            errored: true,
+            cancellation_requested: true,
+            timed_out: true,
+            ..TurnEnd::default()
+        });
+        assert_eq!(timed_out_clean.lifecycle_state, "timed_out");
+        assert!(timed_out_clean.session_failed);
+
+        // The event collector stops the run when history cannot be saved.
+        let durability = classify_turn_outcome(TurnEnd {
+            errored: true,
+            cancellation_requested: true,
+            cancellation_unconfirmed: true,
+            durability_failed: true,
+            ..TurnEnd::default()
+        });
+        assert!(durability.session_failed);
+        assert!(durability.turn_failed);
+    }
+
+    #[test]
+    fn ordinary_turns_are_unchanged() {
+        let text_only = classify_turn_outcome(TurnEnd::default());
+        assert_eq!(text_only.lifecycle_state, "completed_text_only");
+        assert!(!text_only.turn_failed && !text_only.session_failed);
+
+        let with_tools = classify_turn_outcome(TurnEnd {
+            tool_calls: 2,
+            ..TurnEnd::default()
+        });
+        assert_eq!(with_tools.lifecycle_state, "completed");
+        assert!(!with_tools.turn_failed && !with_tools.session_failed);
+
+        let failed = classify_turn_outcome(TurnEnd {
+            errored: true,
+            tool_calls: 2,
+            ..TurnEnd::default()
+        });
+        assert_eq!(failed.lifecycle_state, "failed");
+        assert!(failed.turn_failed && failed.session_failed);
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn finalize_turn_and_spawn_background(
     app: tauri::AppHandle,
@@ -539,11 +706,17 @@ pub(super) async fn finalize_turn_and_spawn_background(
     } else {
         false
     };
-    let turn_failed = error_msg.is_some()
-        || stream_error.is_some()
-        || cancellation_unconfirmed
-        || terminal_err.is_some();
     let effective_timeout = turn_timeout_secs.filter(|_| !durability_failed);
+    let outcome = classify_turn_outcome(TurnEnd {
+        errored: error_msg.is_some() || stream_error.is_some(),
+        terminal_error: terminal_err.is_some(),
+        cancellation_requested,
+        cancellation_unconfirmed,
+        timed_out: effective_timeout.is_some(),
+        durability_failed,
+        tool_calls,
+    });
+    let turn_failed = outcome.turn_failed;
 
     if (turn_failed || cancel.load(Ordering::SeqCst)) && !unsaved_tail.trim().is_empty() {
         let db = db.lock().await;
@@ -576,19 +749,7 @@ pub(super) async fn finalize_turn_and_spawn_background(
             }
         }
     }
-    let lifecycle_state = if cancellation_unconfirmed {
-        "interrupted"
-    } else if effective_timeout.is_some() {
-        "timed_out"
-    } else if cancellation_requested && !durability_failed {
-        "cancelled"
-    } else if turn_failed {
-        "failed"
-    } else if tool_calls == 0 {
-        "completed_text_only"
-    } else {
-        "completed"
-    };
+    let lifecycle_state = outcome.lifecycle_state;
     tracing::info!(
         session_id = %session_id,
         lifecycle_state,
@@ -653,8 +814,9 @@ pub(super) async fn finalize_turn_and_spawn_background(
         );
     }
 
+    // `terminal_err` may also have been set while recording the run above.
     status_guard
-        .finish(turn_failed || terminal_err.is_some())
+        .finish(outcome.session_failed || terminal_err.is_some())
         .await;
     if let Some(err) = terminal_err {
         return Err(err);

@@ -160,6 +160,7 @@
 
 .plan-status-pending { color: var(--text-dim, #9a9ab0); background: rgba(255,255,255,0.05); }
 .plan-status-in_progress { color: #60a5fa; background: rgba(96,165,250,0.12); }
+.plan-status-paused { color: #fbbf24; background: rgba(251,191,36,0.12); }
 .plan-status-completed { color: #4ade80; background: rgba(74,222,128,0.12); }
 .plan-status-cancelled { color: #f87171; background: rgba(248,113,113,0.12); }
 

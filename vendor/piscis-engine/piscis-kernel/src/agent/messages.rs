@@ -25,6 +25,22 @@ pub struct LayeredTokenBreakdownSnapshot {
     pub request_overhead: u32,
 }
 
+/// How the run's most recent compaction attempt ended, for the context
+/// indicator.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct CompactionStatusSnapshot {
+    /// `ok`, `noop`, `fallback` or `failed`.
+    pub outcome: String,
+    /// Tier that triggered the attempt (`auto`, `full`) or `overflow`.
+    pub tier: String,
+    /// Estimated request tokens before and after the attempt.
+    pub before_tokens: u32,
+    pub after_tokens: u32,
+    /// Compactions applied so far in this run.
+    pub count: u32,
+}
+
 /// Events streamed to the frontend during agent execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -85,6 +101,10 @@ pub enum AgentEvent {
         /// the breakdown.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         layered_breakdown: Option<LayeredTokenBreakdownSnapshot>,
+        /// How the most recent compaction attempt of this run ended. Absent
+        /// until one was attempted.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        last_compaction: Option<CompactionStatusSnapshot>,
     },
     /// Agent loop complete
     Done {

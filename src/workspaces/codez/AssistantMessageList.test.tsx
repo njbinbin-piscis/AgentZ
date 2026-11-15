@@ -123,6 +123,116 @@ describe("AssistantMessageList per-turn undo (R10-11)", () => {
   });
 });
 
+describe("checkpoint row", () => {
+  let root: ReactTestRenderer | null = null;
+
+  afterEach(async () => {
+    if (root) {
+      await act(async () => {
+        root?.unmount();
+      });
+      root = null;
+    }
+  });
+
+  const cancelledRead = {
+    id: "t1",
+    name: "file_read",
+    input: { path: "docs/a.md" },
+    result: "已被用户取消",
+    status: "cancelled" as const,
+  };
+
+  const renderList = async (
+    messages: Array<Record<string, unknown>>,
+    extra: { busy?: boolean; stopping?: boolean } = {},
+  ) => {
+    await act(async () => {
+      root = create(
+        <AssistantMessageList
+          messages={messages as never}
+          toolSteps={[]}
+          turnDiffsByTurnId={{}}
+          busy={extra.busy ?? false}
+          stopping={extra.stopping}
+          queuedView={[]}
+          pendingCards={[]}
+          scrollRef={createRef<HTMLDivElement>()}
+          onForkCheckpoint={() => {}}
+          onRestoreCheckpoint={() => {}}
+          onCardSubmitted={() => {}}
+          onCardActionSent={() => {}}
+          permissionRequest={null}
+          onPermissionResolved={() => {}}
+        />,
+      );
+    });
+    return root!.root.findAll((n) => n.props.className === "agentz-checkpoint");
+  };
+
+  it("is shown for a stopped turn that only made tool calls", async () => {
+    const rows = await renderList([
+      { id: "u1", role: "user", text: "read the docs" },
+      { id: "a1", role: "assistant", text: "", tools: [cancelledRead] },
+    ]);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("is shown for a turn with text, as before", async () => {
+    const rows = await renderList([
+      { id: "u1", role: "user", text: "hi" },
+      { id: "a1", role: "assistant", text: "hello" },
+    ]);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("is not shown for an empty row, an unsaved row, or the turn still running", async () => {
+    expect(
+      await renderList([
+        { id: "u1", role: "user", text: "hi" },
+        { id: "a1", role: "assistant", text: "" },
+      ]),
+    ).toHaveLength(0);
+    await act(async () => root?.unmount());
+    expect(
+      await renderList([
+        { id: "u1", role: "user", text: "hi" },
+        { role: "assistant", text: "", tools: [cancelledRead] },
+      ]),
+    ).toHaveLength(0);
+    await act(async () => root?.unmount());
+    expect(
+      await renderList(
+        [
+          { id: "u1", role: "user", text: "hi" },
+          { id: "a1", role: "assistant", text: "", tools: [cancelledRead] },
+        ],
+        { busy: true, stopping: true },
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("says the turn is stopping instead of thinking once Stop was clicked", async () => {
+    const texts = async (stopping: boolean) => {
+      await renderList(
+        [
+          { id: "u1", role: "user", text: "hi" },
+          { role: "assistant", text: "" },
+        ],
+        { busy: true, stopping },
+      );
+      const found = root!.root
+        .findAll((n) => n.props.className === "agentz-msg-text agentz-thinking")
+        .map((n) => n.children.join(""));
+      await act(async () => root?.unmount());
+      root = null;
+      return found;
+    };
+    expect(await texts(false)).toEqual(["chat.thinking"]);
+    expect(await texts(true)).toEqual(["chat.stopping"]);
+  });
+});
+
 describe("queued follow-ups", () => {
   let root: ReactTestRenderer | null = null;
 

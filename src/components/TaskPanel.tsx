@@ -44,25 +44,35 @@ function planStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: stri
   }
 }
 
-export function PlanPanel({ items }: { items: PlanTodoItem[] }) {
+/**
+ * `busy` tells whether the task is running. An `in_progress` item of a task
+ * that is not running is work left unfinished by an earlier turn: it is shown
+ * as such, without the spinner that would claim something is happening.
+ */
+export function PlanPanel({ items, busy = true }: { items: PlanTodoItem[]; busy?: boolean }) {
   const { t } = useTranslation();
   return (
     <div className="agentz-plan-panel-inner">
-      {items.map((item, index) => (
-        <div key={item.id} className={`agentz-plan-item plan-${item.status}`}>
-          <div className="agentz-plan-item-left">
-            <span className="agentz-plan-item-index">{index + 1}</span>
-            <span className="agentz-plan-item-content">{item.content}</span>
+      {items.map((item, index) => {
+        const paused = item.status === "in_progress" && !busy;
+        return (
+          <div key={item.id} className={`agentz-plan-item plan-${item.status}`}>
+            <div className="agentz-plan-item-left">
+              <span className="agentz-plan-item-index">{index + 1}</span>
+              <span className="agentz-plan-item-content">{item.content}</span>
+            </div>
+            <div className="agentz-plan-item-right">
+              <span className="agentz-plan-item-id">{item.id}</span>
+              <span
+                className={`agentz-plan-item-status plan-status-${paused ? "paused" : item.status}`}
+              >
+                {item.status === "in_progress" && !paused && <span className="agentz-step-spinner" />}
+                {paused ? t("chat.planPaused") : planStatusLabel(t, item.status)}
+              </span>
+            </div>
           </div>
-          <div className="agentz-plan-item-right">
-            <span className="agentz-plan-item-id">{item.id}</span>
-            <span className={`agentz-plan-item-status plan-status-${item.status}`}>
-              {item.status === "in_progress" && <span className="agentz-step-spinner" />}
-              {planStatusLabel(t, item.status)}
-            </span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -120,7 +130,7 @@ function TaskPanel({ planItems, busy, open, onOpenChange, onClearPlan, className
       </div>
       {open && (
         <div className="agentz-task-panel-body">
-          <PlanPanel items={planItems} />
+          <PlanPanel items={planItems} busy={busy} />
         </div>
       )}
     </div>

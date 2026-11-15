@@ -304,7 +304,12 @@
   z-index: 1;
 }
 
-.agentz-composer-stop-icon:hover {
+.agentz-composer-stop-icon.is-stopping {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.agentz-composer-stop-icon:not(.is-stopping):hover {
   background: color-mix(in srgb, #f87171 18%, var(--bg-elev-2, #1b1b26));
   color: #f87171;
   box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.35);

@@ -58,4 +58,34 @@ describe("TaskPanel", () => {
     });
     expect(onClearPlan).toHaveBeenCalledTimes(1);
   });
+
+  const renderPanel = (busy: boolean) => {
+    let renderer: ReactTestRenderer | undefined;
+    act(() => {
+      renderer = create(
+        <TaskPanel
+          planItems={[{ id: "2", content: "Second step", status: "in_progress" }]}
+          busy={busy}
+          open={true}
+          onOpenChange={() => {}}
+        />,
+      );
+    });
+    return renderer as ReactTestRenderer;
+  };
+
+  it("shows an in-progress item of a running task with a spinner", () => {
+    const renderer = renderPanel(true);
+    expect(renderer.root.findAllByProps({ className: "agentz-step-spinner" })).toHaveLength(1);
+    expect(JSON.stringify(renderer.toJSON())).toContain("chat.planInProgress");
+  });
+
+  it("shows an in-progress item of a task that is not running as unfinished, without a spinner", () => {
+    const renderer = renderPanel(false);
+    expect(renderer.root.findAllByProps({ className: "agentz-step-spinner" })).toHaveLength(0);
+    const text = JSON.stringify(renderer.toJSON());
+    expect(text).toContain("chat.planPaused");
+    expect(text).not.toContain("chat.planInProgress");
+    expect(text).toContain("plan-status-paused");
+  });
 });

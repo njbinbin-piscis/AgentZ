@@ -12,6 +12,8 @@ use std::{
 struct State {
     active: usize,
     failures: usize,
+    /// Invocations given up on purpose (see [`OwnedReceipt::abandon_on_drop`]).
+    abandoned: usize,
     sealed: bool,
 }
 #[derive(Debug)]
@@ -64,7 +66,13 @@ impl OwnedCompletionRegistry {
         Ok(OwnedReceipt {
             registry: self.clone(),
             finished: false,
+            abandon_on_drop: false,
         })
+    }
+    /// Number of invocations that were dropped unfinished and deliberately not
+    /// counted as failures. Diagnostic only; it does not affect [`Self::drain`].
+    pub fn abandoned(&self) -> usize {
+        self.state.lock().map(|s| s.abandoned).unwrap_or(0)
     }
     /// Seal against further starts, then wait for actual worker receipts. Dropping this
     /// future does not release workers. No automatic cancellation/retry is performed.
@@ -126,8 +134,20 @@ impl OwnedCompletionRegistry {
 pub struct OwnedReceipt {
     registry: Arc<OwnedCompletionRegistry>,
     finished: bool,
+    abandon_on_drop: bool,
 }
 impl OwnedReceipt {
+    /// Dropping this receipt unfinished records the invocation as abandoned
+    /// instead of as a failure.
+    ///
+    /// Only for work that leaves nothing behind when its future is dropped: a
+    /// read-only tool call has no partial write to confirm and no process of
+    /// its own. A tool that does start a worker registers a separate receipt
+    /// for it, and that one still has to complete.
+    pub fn abandon_on_drop(mut self) -> Self {
+        self.abandon_on_drop = true;
+        self
+    }
     /// Only call after process/descendants, pipes and temporary ACL cleanup completed.
     /// An error marks unconfirmed cleanup; error text is deliberately not retained.
     pub fn complete(mut self, result: Result<(), String>) {
@@ -152,7 +172,17 @@ impl OwnedReceipt {
 }
 impl Drop for OwnedReceipt {
     fn drop(&mut self) {
-        self.finish(false);
+        if self.finished {
+            return;
+        }
+        if self.abandon_on_drop {
+            if let Ok(mut state) = self.registry.state.lock() {
+                state.abandoned = state.abandoned.saturating_add(1);
+            }
+            self.finish(true);
+        } else {
+            self.finish(false);
+        }
     }
 }
 
@@ -201,6 +231,44 @@ mod tests {
                 }
             );
         }
+    }
+    #[tokio::test]
+    async fn abandoned_receipt_releases_the_drain_without_a_failure() {
+        let cancel = Arc::new(AtomicBool::new(false));
+        let registry = for_cancel(&cancel);
+        let receipt = registry.register().unwrap().abandon_on_drop();
+        assert_eq!(
+            registry.drain(Duration::ZERO).await,
+            DrainOutcome::Pending { active: 1 }
+        );
+        assert_eq!(registry.abandoned(), 0);
+        drop(receipt);
+        assert_eq!(registry.drain(Duration::ZERO).await, DrainOutcome::Complete);
+        assert_eq!(registry.abandoned(), 1);
+    }
+    #[tokio::test]
+    async fn abandon_mode_does_not_hide_an_explicit_failure_or_count_a_completion() {
+        let cancel = Arc::new(AtomicBool::new(false));
+        let registry = for_cancel(&cancel);
+        registry
+            .register()
+            .unwrap()
+            .abandon_on_drop()
+            .complete(Ok(()));
+        assert_eq!(registry.abandoned(), 0);
+        registry
+            .register()
+            .unwrap()
+            .abandon_on_drop()
+            .complete(Err("cleanup failed".into()));
+        assert_eq!(registry.abandoned(), 0);
+        assert_eq!(
+            registry.drain(Duration::ZERO).await,
+            DrainOutcome::Failed {
+                active: 0,
+                failures: 1
+            }
+        );
     }
     #[tokio::test]
     async fn exact_cancel_identity_shares_receipts_and_other_attempt_is_independent() {

@@ -37,6 +37,63 @@ pub enum CompactionTrigger {
     Overflow,
 }
 
+/// How one compaction attempt ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompactionOutcomeKind {
+    /// The summariser ran and the request shrank.
+    Ok,
+    /// Nothing could be compacted, or the result would not have been smaller.
+    Noop,
+    /// The summariser was unavailable; history was cut by rule instead.
+    Fallback,
+    /// The summariser failed and the history was left as it was.
+    Failed,
+}
+
+impl CompactionOutcomeKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CompactionOutcomeKind::Ok => "ok",
+            CompactionOutcomeKind::Noop => "noop",
+            CompactionOutcomeKind::Fallback => "fallback",
+            CompactionOutcomeKind::Failed => "failed",
+        }
+    }
+}
+
+/// Result of one compaction attempt, for the log and the context indicator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompactionReport {
+    pub outcome: CompactionOutcomeKind,
+    /// Tier that triggered the attempt (`auto`, `full`) or `overflow`.
+    pub tier: &'static str,
+    /// Estimated request tokens before and after the attempt.
+    pub before_tokens: usize,
+    pub after_tokens: usize,
+}
+
+/// State a strategy carries from one attempt to the next within a run. The
+/// loop hands back whatever the previous attempt returned.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CompactionGuard {
+    /// Summariser failures in a row.
+    pub consecutive_summary_failures: u32,
+    /// After an attempt that achieved nothing: do not try again until the
+    /// request estimate reaches this value.
+    pub retry_at_estimate: Option<usize>,
+}
+
+/// Facts about the current turn that must survive compaction word for word.
+#[derive(Debug, Clone, Default)]
+pub struct CompactionPins {
+    /// The user's request for this turn.
+    pub user_request: String,
+    /// Todo items, one line each.
+    pub todos: Vec<String>,
+    /// Files read in this run, one line each (path, ranges, count).
+    pub files_read: Vec<String>,
+}
+
 /// Inputs handed to a [`CompactionStrategy`] before each LLM call.
 ///
 /// Borrows from the loop's call frame except `messages`, which is moved in (the
@@ -72,6 +129,10 @@ pub struct CompactionRequest<'a> {
     pub threshold_step: i64,
     /// LLM client the strategy may use for summarisation.
     pub client: &'a dyn LlmClient,
+    /// State returned by the previous attempt in this run.
+    pub guard: CompactionGuard,
+    /// Turn facts to keep verbatim next to the summary.
+    pub pins: &'a CompactionPins,
 }
 
 /// What a [`CompactionStrategy`] decided. When `changed` is false the loop
@@ -94,6 +155,12 @@ pub struct CompactionResult {
     pub structured_plan_items: Vec<String>,
     /// p7 next-step hint extracted by the summariser (for state frame).
     pub structured_next_step_hint: Option<String>,
+    /// State to hand to the next attempt. A strategy that keeps none returns
+    /// the default.
+    pub guard: CompactionGuard,
+    /// Set when the strategy attempted a compaction, whether or not it
+    /// changed anything. `None` when the request simply fit.
+    pub report: Option<CompactionReport>,
 }
 
 /// Host-pluggable proactive compaction policy.

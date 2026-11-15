@@ -5,6 +5,21 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.68] - 2026-11-16
+
+### Fixed
+
+- **chat_ui choices can be selected (#23).** Option lists are normalized on both sides (malformed options no longer render as dead rows), `options` is required in the schema, and switching wizard steps keeps values already entered.
+- **Fork menu is no longer clipped (#24).** The menu renders in a portal with fixed positioning and flips when there is no room below.
+- **Immediate Stop winds down cleanly (#25).** Read-only tools are abandoned without counting as failures, write tools get an 8 s grace, a checkpoint is written before cancelling, the session returns to idle, and the UI shows a "stopping" state and a `cancelled` tool state.
+- **Context compaction no longer loops or loses the goal (#26).** The compaction target is tied to the trigger line, idle compaction is guarded with a cooldown, a failed summary falls back to a deterministic one that pins the user's request and the files already read, previews and summary limits are larger, repeated re-reads of unchanged files are detected and paused, and the host history budget subtracts the measured static overhead.
+- **Todo panel "Clear" now sticks (#8).** It cancels the unfinished items in the stored plan (`cancel_open_items`; the plan stays writable), so they no longer return next turn. An `in_progress` item of a task that is not running shows "Not finished" without a spinner.
+- **Kernel notices are shown.** `notice` events (static-overhead warning, fallback model, paused read loop, corrected tool call) were dropped by CodeZ and WorkZ; they now appear as a toast, localized by code.
+
+### Changed
+
+- Context ring can show above 100% and reports how the last compaction ended.
+
 ## [1.0.67] - 2026-11-13
 
 ### Added

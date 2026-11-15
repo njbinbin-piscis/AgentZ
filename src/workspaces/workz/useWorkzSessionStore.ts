@@ -50,7 +50,8 @@ import {
   dataUrlToBase64,
 } from "../../components/chatComposerUtils";
 import { visionCapable } from "../../components/visionUtils";
-import { queryTaskPlan, type DurablePlan } from "../../services/tauri/chatPlan";
+import { cancelOpenPlanItems, queryTaskPlan, type DurablePlan } from "../../services/tauri/chatPlan";
+import { agentNoticeText, toastDurationMs } from "../../services/tauri/agentNotice";
 import { createProjectlessSession, lookupProjectlessSession, getProjectScope, pickProjectScope, restoreProjectScope } from "../../services/tauri/projectScope";
 import { useInteractiveCards } from "../../hooks/useInteractiveCards";
 import type { PermissionRequestCard } from "../../components/chat/PermissionCard";
@@ -66,9 +67,10 @@ import {
 } from "../../services/tauri/workflow";
 import { collectArtifacts, type AgentStep } from "./agentArtifacts";
 import { applySubagentProgress } from "../../components/subagentCard";
-import { applyToolEnd, applyToolStart, finalizeTools } from "./agentTools";
+import { applyToolEnd, applyToolStart, cancelRunningTools, finalizeTools } from "./agentTools";
+import { settledToolStatus } from "../../components/toolCancel";
 import { isChatSendResult, isTaskGateBusy, taskGateHoldSeconds } from "./taskGate";
-import { queueRestoreIndex, SessionTurnBookkeeping } from "../codez/sessionTurnBookkeeping";
+import { queueRestoreIndex, SessionTurnBookkeeping, STOP_WATCHDOG_MS } from "../codez/sessionTurnBookkeeping";
 import { workzGoalFromText } from "./taskTitle";
 import {
   chatSetSessionCwd,
@@ -399,9 +401,27 @@ export function useWorkzSessionStore({
   // timeout can never dismiss (or leave stuck) a later message.
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 4500);
+    const timer = window.setTimeout(() => setToast(null), toastDurationMs(toast));
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  // The Todo panel's "clear". The plan is stored per task, so clearing only
+  // the view brought the same unfinished items back with the next turn.
+  const clearPlan = useCallback(() => {
+    const id = sessionRef.current;
+    const scope = planProject?.selected === projectDir ? getProjectScope(planProject.canonical) : null;
+    if (!id || !scope?.handle) {
+      setPlanItems([]);
+      return;
+    }
+    cancelOpenPlanItems(scope.handle, id)
+      .then(() => {
+        if (sessionRef.current === id) setPlanItems([]);
+      })
+      .catch((e) => {
+        if (sessionRef.current === id) showToast(t("chat.planClearFailed", { error: String(e) }));
+      });
+  }, [planProject, projectDir, showToast, t]);
 
   const { cards, pendingCards, handleAgentEvent, markSubmitted, markActionSent, clearCards, dismissPlanBuilds, restoreCard } =
     useInteractiveCards();
@@ -454,13 +474,35 @@ export function useWorkzSessionStore({
   }, []);
   const openTaskRequestRef = useRef(0);
 
+  // Sessions whose Stop was clicked but whose turn has not finished unwinding,
+  // each with the timer that releases it if the backend never confirms.
+  const stopTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [stoppingIds, setStoppingIds] = useState<string[]>([]);
+  const clearStop = useCallback((id: string) => {
+    const timer = stopTimersRef.current.get(id);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    stopTimersRef.current.delete(id);
+    setStoppingIds(Array.from(stopTimersRef.current.keys()));
+  }, []);
+  useEffect(
+    () => () => {
+      for (const timer of stopTimersRef.current.values()) clearTimeout(timer);
+      stopTimersRef.current.clear();
+    },
+    [],
+  );
+
   const markRunning = useCallback((id: string | null, on: boolean) => {
     if (!id) return;
     const set = runningSessionsRef.current;
     if (on) set.add(id);
-    else set.delete(id);
+    else {
+      set.delete(id);
+      clearStop(id);
+    }
     setRunningIds(Array.from(set));
-  }, []);
+  }, [clearStop]);
 
   useEffect(() => {
     saveScopedModelId("workz", modelId);
@@ -622,6 +664,8 @@ export function useWorkzSessionStore({
 
   /** True once a task session (or workflow run) is bound — mode pickers lock. */
   const taskBound = selectedId !== null || workflowRunId !== null;
+  /** Stop was requested for the task on screen and its turn is still winding down. */
+  const stopping = busy && selectedId !== null && stoppingIds.includes(selectedId);
 
   const applyTaskModeBinding = useCallback((meta: SessionMeta | undefined) => {
     const boundTeam = meta?.team_id?.trim() ?? "";
@@ -776,7 +820,9 @@ export function useWorkzSessionStore({
                       name: tool.name,
                       input: tool.input,
                       result: tool.result ?? undefined,
-                      status: tool.is_error || tool.result == null ? ("error" as const) : ("done" as const),
+                      ...(tool.result == null
+                        ? { status: "error" as const }
+                        : settledToolStatus(tool.result, tool.is_error)),
                       textOffset: tool.text_offset,
                     })),
                   })),
@@ -797,6 +843,12 @@ export function useWorkzSessionStore({
       if (env.channel !== "agent_event") return;
       const evt = env.payload as AgentEvent;
 
+      if (evt.type === "notice") {
+        // The run goes on; a notice only informs.
+        const text = agentNoticeText(t, evt);
+        if (text) setToast(text);
+        return;
+      }
       if (evt.type === "permission_request") {
         setPermissionRequest({
           requestId: evt.request_id,
@@ -1356,7 +1408,9 @@ export function useWorkzSessionStore({
               name: t.name,
               input: t.input,
               result: t.result ?? undefined,
-              status: t.is_error || t.result == null ? ("error" as const) : ("done" as const),
+              ...(t.result == null
+                ? { status: "error" as const }
+                : settledToolStatus(t.result, t.is_error)),
               textOffset: t.text_offset,
             })),
           })),
@@ -1487,15 +1541,46 @@ export function useWorkzSessionStore({
     const sid = sessionRef.current;
     const key =
       foregroundTaskKeyRef.current ?? (sid ? (taskKeyBySessionRef.current.get(sid) ?? null) : null);
-    // Respond to the click immediately rather than waiting for the backend to
-    // unwind (tool teardown + drain can take seconds). The authoritative
-    // agent_final / chatSend resolution still reconciles state afterwards.
-    if (sid) markRunning(sid, false);
-    liveRef.current = false;
-    setBusy(false);
-    discardStreamDelta();
+    if (!sid || !runningSessionsRef.current.has(sid)) {
+      // Nothing tracked as running here (e.g. the view only mirrors a stale
+      // "running" row): just clear the indicator.
+      liveRef.current = false;
+      setBusy(false);
+      discardStreamDelta();
+      void chatCancel(key, sid);
+      return;
+    }
+    // The click is acknowledged at once (the composer shows "stopping"), but
+    // the task stays running and live until the backend reports the turn
+    // finished: tool results still arrive while it unwinds, and a message sent
+    // now must queue behind it. Detaching here dropped those results and let a
+    // second turn start underneath the first.
+    if (!stopTimersRef.current.has(sid)) {
+      flushStreamDelta();
+      const timer = setTimeout(() => {
+        if (stopTimersRef.current.get(sid) !== timer) return;
+        // The backend never confirmed: release the task so the user is not
+        // locked out. The late `agent_final` reloads the transcript.
+        if (taskKeyBySessionRef.current.get(sid) === key) taskKeyBySessionRef.current.delete(sid);
+        markRunning(sid, false);
+        if (foregroundSessionRef.current !== sid || foregroundTaskKeyRef.current !== key) return;
+        liveRef.current = false;
+        foregroundTaskKeyRef.current = null;
+        setBusy(false);
+        setSteps((s) =>
+          s.map((step) =>
+            step.role === "assistant" ? { ...step, tools: cancelRunningTools(step.tools) } : step,
+          ),
+        );
+        const next = queueBookRef.current.shiftNext(sid);
+        syncQueuedView(sid);
+        if (next) void runRef.current(next.text, next.attachment);
+      }, STOP_WATCHDOG_MS);
+      stopTimersRef.current.set(sid, timer);
+      setStoppingIds(Array.from(stopTimersRef.current.keys()));
+    }
     void chatCancel(key, sid);
-  }, [markRunning, discardStreamDelta]);
+  }, [markRunning, discardStreamDelta, flushStreamDelta, syncQueuedView]);
 
   const removeTask = useCallback(
     async (id: string) => {
@@ -1969,6 +2054,6 @@ export function useWorkzSessionStore({
   }, [agents, t]);
 
   return {
-    t, i18n, panelRef, dragOver, toast, overview, projectDir, tasks, groups, groupErrors, collapsed, selectedId, runningIds, toggleGroup, openSession, forkFromCheckpoint, restoreToCheckpoint, newSessionIn, deleteSessionIn, addProject, removeProject, previewPath, isFree, freeTaskWorkspace, isSwarmTeam, swarmMainTab, setSwarmMainTab, activePoolId, scrollRef, steps, busy, sessionRef, pendingCards, permissionRequest, setPermissionRequest, markSubmitted, markActionSent, cards, restoreCard, setGoal, taskBound, setIsolate, taRef, refreshGitChanges, showToast, setError, worktree, setPreviewPath, error, planItems, setPlanItems, taskPanelOpen, setTaskPanelOpen, managedWorkspace, cwdOptions, changeCwd, isolate, startMode, setStartMode, startBase, setStartBase, teams, activeTeam, selectedTeam, teamOptions, handleTeamChange, agents, activeAgentId, agentOptions, handleAgentChange, setBoardOpen, isWorkflowTeam, workflowRunId, setWorkflowRunId, workflowStatus, setWorkflowStatus, setWorkflowOpen, setRunsOpen, setReviewTask, goal, detectAtMention, detectSlash, run, stopActive, canSend, queuedView, removeQueued, interruptQueued, steerQueued, editQueued, onKeyDown, handlePaste, modelId, modelOptions, setModelId, showModelSelector, showGenericComposerTools, installedSkills, enabledSkills, setEnabledSkills, connectors, enabledConnectors, setEnabledConnectors, mention, mentionMatches, pickMention, slash, slashMatches, pickSlash, slashLabel, composerModeNotice, attachment, attachmentPreview, handleAttach, clearAttachment, boardOpen, workflowOpen, runsOpen, reviewTask, refreshTasks,
+    t, i18n, panelRef, dragOver, toast, overview, projectDir, tasks, groups, groupErrors, collapsed, selectedId, runningIds, toggleGroup, openSession, forkFromCheckpoint, restoreToCheckpoint, newSessionIn, deleteSessionIn, addProject, removeProject, previewPath, isFree, freeTaskWorkspace, isSwarmTeam, swarmMainTab, setSwarmMainTab, activePoolId, scrollRef, steps, busy, stopping, sessionRef, pendingCards, permissionRequest, setPermissionRequest, markSubmitted, markActionSent, cards, restoreCard, setGoal, taskBound, setIsolate, taRef, refreshGitChanges, showToast, setError, worktree, setPreviewPath, error, planItems, setPlanItems, clearPlan, taskPanelOpen, setTaskPanelOpen, managedWorkspace, cwdOptions, changeCwd, isolate, startMode, setStartMode, startBase, setStartBase, teams, activeTeam, selectedTeam, teamOptions, handleTeamChange, agents, activeAgentId, agentOptions, handleAgentChange, setBoardOpen, isWorkflowTeam, workflowRunId, setWorkflowRunId, workflowStatus, setWorkflowStatus, setWorkflowOpen, setRunsOpen, setReviewTask, goal, detectAtMention, detectSlash, run, stopActive, canSend, queuedView, removeQueued, interruptQueued, steerQueued, editQueued, onKeyDown, handlePaste, modelId, modelOptions, setModelId, showModelSelector, showGenericComposerTools, installedSkills, enabledSkills, setEnabledSkills, connectors, enabledConnectors, setEnabledConnectors, mention, mentionMatches, pickMention, slash, slashMatches, pickSlash, slashLabel, composerModeNotice, attachment, attachmentPreview, handleAttach, clearAttachment, boardOpen, workflowOpen, runsOpen, reviewTask, refreshTasks,
   };
 }

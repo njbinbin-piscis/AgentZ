@@ -13,14 +13,16 @@ import ProjectEdgePanel from "./ProjectEdgePanel";
 
 interface ProjectEdgeShellProps {
   projectDir: string | null;
+  /** Show the floating orb + drawer. State/refresh wiring stays mounted either way. */
+  visible?: boolean;
 }
 
 /**
- * Agent review drawer shared by CodeZ and WorkZ.
+ * Agent review drawer shown in CodeZ only.
  * Changes = journaled agent edits awaiting Keep/Undo (not git status);
  * Artifacts = files the agent wrote that still exist on disk.
  */
-export default function ProjectEdgeShell({ projectDir }: ProjectEdgeShellProps) {
+export default function ProjectEdgeShell({ projectDir, visible = true }: ProjectEdgeShellProps) {
   const { t } = useTranslation();
   const { setGitChanges, registerWorkspaceRefresh, scheduleWorkspaceRefresh, setPendingReview } =
     useProjectEdgeActions();
@@ -111,6 +113,8 @@ export default function ProjectEdgeShell({ projectDir }: ProjectEdgeShellProps) 
     },
     [projectDir, pendingReview, reloadReview],
   );
+
+  if (!visible) return null;
 
   return (
     <ProjectEdgePanel

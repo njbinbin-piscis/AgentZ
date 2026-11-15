@@ -1,4 +1,5 @@
 import { settleSubagentActivity } from "../../components/subagentCard";
+import { settledToolStatus } from "../../components/toolCancel";
 import type { AgentEvent } from "../../services/tauri/chat";
 import { pathFromToolEvent, type AgentToolEvent } from "./agentArtifacts";
 
@@ -18,14 +19,15 @@ export function applyToolStart(tools: AgentToolEvent[], evt: Extract<AgentEvent,
 }
 
 export function applyToolEnd(tools: AgentToolEvent[], evt: Extract<AgentEvent, { type: "tool_end" }>): AgentToolEvent[] {
-  const status = evt.is_error ? "error" : "done";
+  // A call cut short by Stop reports an error result, but it is not a failure.
+  const settled = settledToolStatus(evt.result, evt.is_error);
   const path = pathFromToolEvent(evt.name, undefined, evt.result);
 
   const patch = (t: AgentToolEvent): AgentToolEvent => ({
     ...t,
     id: evt.id,
     name: evt.name,
-    status,
+    ...settled,
     result: evt.result,
     path: path ?? t.path,
     activity: settleSubagentActivity(t.activity, evt.is_error),
@@ -48,7 +50,7 @@ export function applyToolEnd(tools: AgentToolEvent[], evt: Extract<AgentEvent, {
     {
       id: evt.id,
       name: evt.name,
-      status,
+      ...settled,
       result: evt.result,
       path,
     },
@@ -58,4 +60,9 @@ export function applyToolEnd(tools: AgentToolEvent[], evt: Extract<AgentEvent, {
 /** Clear stale in-flight markers when the turn finishes. */
 export function finalizeTools(tools: AgentToolEvent[]): AgentToolEvent[] {
   return tools.map((t) => (t.status === "running" ? { ...t, status: "done" as const } : t));
+}
+
+/** A stop the backend never confirmed: calls still in flight did not complete. */
+export function cancelRunningTools(tools: AgentToolEvent[]): AgentToolEvent[] {
+  return tools.map((t) => (t.status === "running" ? { ...t, status: "cancelled" as const } : t));
 }

@@ -21,14 +21,14 @@
 | 4 | UAC 提示不得导致硬失败 | **已解决（内核）。** 权限等待上限为 60 秒，超时按“拒绝”处理；无人响应的提权对话框以工具错误（`Elevated command timed out ...`）结束，而不是整轮失败 | `loop_.rs`（权限 `tokio::time::timeout(60s)`）、`piscis-kernel/src/tools/elevate.rs` |
 | 5 | CRLF 多行 `file_edit` | **已解决**（修复批次 5；现已在 vendored 内核中） | `piscis-kernel/src/tools/file_write.rs`（`adapt_eol`、`eol_tests`） |
 | 6 | 本环境的验证缺口 | 对构建机**已解决**：2026-09-30 的审计用 node/cargo/MSVC 构建并运行了应用 | 见*工具验证审计* |
-| 7 | 中止的轮次丢失计划连续性 | **部分未解决。** 宿主部分已修复；计划存储（`state.rs` 中的 `new_plan_store()`）仍在内存中，未完成的 todo 无法跨重启保留 | `src-tauri/src/state.rs` |
-| 8 | `plan_todo` 卡在 `in_progress` | **未解决。** 会统计未完成 todo（`open_todos`）并自动续跑，但从不自动标记为 `cancelled`/`pending` | `chat_turn/post_turn.rs` |
+| 7 | 中止的轮次丢失计划连续性 | **已解决。** 计划已持久化到 SQLite（`.agentz/plans.db`），每轮开始时重新发布并在提示词中要求先核对未完成项 | `runtime/durable_plan.rs`、`tools/durable_plan_todo.rs` |
+| 8 | `plan_todo` 卡在 `in_progress` | **已修复（自动化测试通过，未在运行中的应用里手工验证）。** 任务未运行时 `in_progress` 显示为“未完成”且不再转圈；面板“清除”现在通过 `cancel_open_items` 把未完成项在持久化计划中标为 `cancelled`（计划保持可写），不再下一轮又冒出来 | `runtime/plan_intent.rs`、`TaskPanel.tsx`、`chatPlan.ts` |
 | 21 | DeepSeek 工具调用配对 | **已解决（内核）。** `convert_messages` 跟踪 `pending_tool_ids` | `piscis-kernel/src/llm/openai.rs` |
 | 22 | DeepSeek / “think” 兼容性 | **部分解决。** `is_deepseek_thinking_model` 不区分大小写，并匹配带网关前缀、`think` 和 `-r1` 的名称；推理过程仍未在 UI 中显示 | `piscis-kernel/src/llm/openai.rs` |
-| 23 | `chat_ui` 必选项无法选中，表单无法提交 | **未解决**（2026-11-15，用户报告） | `src/components/chat/interactiveUi/`、`src/contexts/InteractiveCardsContext.tsx` |
-| 24 | 任务面板遮挡 checkpoint“从此处分叉”弹出菜单 | **未解决**（2026-11-15，用户报告） | `src/workspaces/codez/AssistantPanel.css`（层叠上下文）、`src/components/TaskPanel.css` |
-| 25 | 立即停止跳过了轮次收尾：工具计数漂移、无 checkpoint banner | **未解决**（2026-11-15，用户报告） | `src-tauri/src/commands/chat.rs`（`chat_cancel`）、`chat_turn/post_turn.rs` |
-| 26 | 上下文管理/压缩：重复调用工具不推进；压缩后丢失任务目标 | **未解决**（2026-11-15，用户报告） | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`、`bench_compact.rs` |
+| 23 | `chat_ui` 必选项无法选中，表单无法提交 | **已修复，待另一台机器确认**（2026-11-15）。选项在前后端统一规范化；向导切步不再清空已填的值 | `src/components/chat/interactiveUi/normalize.ts`、`src-tauri/src/tools/chat_ui_schema.rs` |
+| 24 | checkpoint“从此处分叉”弹出菜单被任务面板挡住 | **已修复**（2026-11-15；自动化测试通过，尚未在运行中的应用里手工验证）。原因是滚动容器裁剪，不是 z-index | `src/workspaces/codez/AssistantMessageList.tsx`（`ForkMenu`） |
+| 25 | 立即停止跳过了轮次收尾：工具计数漂移、无 checkpoint banner | **已修复**（2026-11-15；自动化测试通过，尚未在运行中的应用里手工验证） | `loop_.rs`（`cancel_grace_secs_for`）、`chat_turn/post_turn.rs`（`classify_turn_outcome`）、`src/workspaces/codez/useAssistantSession.ts` |
+| 26 | 上下文管理/压缩：重复调用工具不推进；压缩后丢失任务目标 | **已修复，待另一台机器确认**（2026-11-15）。压缩一直在轮内运行，但压不下来 | `loop_.rs`（`compact_proactive`）、`piscis-kernel/src/agent/read_guard.rs`、`src-tauri/src/context_assembly.rs` |
 
 Windows 打包目标：见 README。已验证的产物是 `.github/workflows/release.yml` 上传的 NSIS `.exe` 文件。
 
@@ -490,39 +490,96 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 
 ## 23. `chat_ui` 生成的选择卡片：任何选项都无法选中；必选题导致无法提交
 
-**状态（2026-11-15）。** **未解决。** 用户报告（附截图）。包含必选单选题的 `chat_ui` 表单能正常渲染，但点击任何选项都无法选中，必选校验永远不通过，卡片无法提交。
+**状态（2026-11-15）。** **已修复，待另一台机器确认。** 用户报告（附截图）：包含必选单选题的 `chat_ui` 表单能正常渲染，但点击任何选项都无法选中，必选校验永远不通过，卡片无法提交。问题出在另一台机器上，本机没有复现；下面的根因由代码确定，修复由回归测试覆盖。
 
-**已有调查（不完整）。** `InteractiveCard` 的隔离 DOM/流式测试通过（`InteractiveCard.dom.test.tsx`、`InteractiveCard.streaming.test.tsx`），说明选择处理逻辑在隔离环境下正常；故障只出现在真实聊天渲染路径。未验证的假设：流式重渲染或 `chat_ui_patch` 数据更新重置了本地选择状态；消息流中存在遮挡层 / `pointer-events` 问题；轮次结束后卡片被渲染为禁用/只读。根因未确认；未做代码修改。
+**根因。** `ChoiceField` 用 `stringValue === opt.value` 判断选中，而 `chat_ui` 的 schema 没有要求选项带 `value`。模型给出数字 value、只有 label、用 `id`/`key` 代替 value、字符串数组或重复 value 时，选项能显示，但比较永远不成立，必选校验因此无法通过。另有一个独立缺陷：向导切步时，`InteractiveCard` 的重置 effect 会清空前面步骤已填的值。此前列出的三个假设（流式重渲染重置状态、遮挡层、卡片被渲染为只读）没有被证实，也没有逐一排除。
 
-**排查位置。** `src/components/chat/interactiveUi/`（`InteractiveCard.tsx`、`InteractiveUiRenderer.tsx`、`protocol.ts`、`patch.ts`、`visibility.ts`）、`src/contexts/InteractiveCardsContext.tsx`。
+**修复。**
 
-**期望行为。** 活跃卡片上的选项可点击且有可见的选中态；选中后必选校验通过；提交能送达所选值。补充能复现真实路径故障的回归测试，而不仅是隔离组件测试。
+- 前端 `src/components/chat/interactiveUi/normalize.ts`（`normalizeUiDefinition`、`normalizeOptions`）：定义进入 `InteractiveCard` 时统一规范化。选项接受字符串、数字或对象（`value|id|key|name` 与 `label|text|title`）；value 一律转成字符串，缺失时用 label，再缺失用 `opt-{index}`；重复的 value 加后缀；`default` 同步转成字符串。
+- 后端 `src-tauri/src/tools/chat_ui_schema.rs`（`normalize_ui_definition`、`normalize_ui_patch`）在发事件前做同样的规范化，由 `chat_ui` 与 `chat_ui_patch` 调用。选择类字段没有任何选项时返回工具错误。schema 的选项项增加 `required: ["value","label"]`。
+- `src-tauri/src/commands/system_prompt.rs` 的 `chat_ui` 指引补充：option 的 value 必须是唯一的非空字符串。
+- 向导：切步时只给还没出现过的字段补初值；定义变化时才整体重置（`InteractiveCard.tsx`、`initValues.ts`）。
+
+**验证。** `InteractiveCard.options.test.tsx` 覆盖五种畸形选项（数字 value、仅 label、`id` 代替 value、字符串数组、重复 value）的点击、必选校验与提交值，以及向导前进再后退后值仍在；`normalize.test.ts` 与 `chat_ui_schema.rs` 的单测覆盖规范化函数和空选项错误。**尚未完成：** 在出问题的机器上重做当时的提问，确认卡片可选、可提交。如果那里仍然选不中，从上面三个未排除的假设继续查。
 
 ---
 
-## 24. 任务（Todo）面板遮挡 checkpoint“从此处分叉”弹出菜单
+## 24. checkpoint“从此处分叉”弹出菜单被任务（Todo）面板挡住
 
-**状态（2026-11-15）。** **未解决。** 用户报告：分叉弹出菜单与 Todo 面板重叠时，面板绘制在上层，菜单不可用。
+**状态（2026-11-15）。** **已修复；自动化测试通过，尚未在运行中的应用里手工验证。** 用户报告：分叉弹出菜单与 Todo 面板重叠时，菜单的上半部分看不到、点不到。
 
-**证据 / 根因假设（未验证）。** 弹出层 `.agentz-fork-popover` 设置了 `z-index: 100100`（`src/workspaces/codez/AssistantPanel.css:661-665`），但它位于 `.agentz-assistant-messages` 内部，而后者设置了 `position: relative; z-index: 0`（`AssistantPanel.css:422-434`）——这会创建层叠上下文，弹出层再大的 z-index 也被困在这个 0 级上下文里，无法压过绘制在其上的兄弟面板。滚动容器的 `overflow-y: auto` 还可能裁剪弹出层。`ForkMenu` 定义在 `src/workspaces/codez/AssistantMessageList.tsx:70`。
+**根因。** 不是 z-index。`.agentz-fork-popover` 向上弹出，而它位于 `.agentz-assistant-messages` 内部，后者是 `overflow-y: auto` 的滚动容器，超出容器的部分被裁剪。裁剪线正好是 Todo 面板的下沿，所以看起来像是被面板盖住。本条最初记录的“层叠上下文困住 z-index”是未验证的假设，并不成立：提高 z-index 或调整层叠上下文都不会让菜单露出来。
 
-**期望行为。** 分叉弹出菜单始终绘制在 Todo 面板及任何兄弟元素之上。候选修复：用 portal 渲染弹出层并配合 `src/utils/popupPosition.ts` 定位，或移除/提升消息容器的层叠上下文。需在运行中的应用里打开面板并制造重叠来验证。
+**修复。** `src/workspaces/codez/AssistantMessageList.tsx` 的 `ForkMenu` 把弹出层用 `createPortal` 渲染到 `document.body`，用 `src/utils/popupPosition.ts` 做 fixed 定位；上方空间不够时向下翻转；滚动、窗口 resize、点击外部或按 Esc 时关闭。`AssistantPanel.css` 中 `.agentz-fork-popover` 去掉了 `position: absolute; bottom`，保留 `z-index: 100100`。WorkZ 的消息流复用同一个 `ForkMenu`，一并生效。翻转以窗口为参照，不再以消息容器为参照。
+
+**验证。** `src/workspaces/codez/ForkMenu.test.tsx`：弹出层节点不在 `.agentz-assistant-messages` 内；锚点靠近顶部时向下翻转。**尚未完成：** 在 CodeZ 与 WorkZ 中各做一次手工验证（展开 Todo 面板，对最顶部一条消息点“从此处分叉”，菜单完整可见、可点）。
 
 ---
 
 ## 25. 立即停止跳过了轮次收尾：工具计数漂移、缺少 checkpoint banner
 
-**状态（2026-11-15）。** **未解决。** 用户报告。此前一次优化让停止按钮立即响应，但进行中的轮次不再被正常收尾：显示的工具调用计数与实际运行不一致（可能丢失了部分信息），中断后也没有生成 CHECKPOINT 分叉 banner——看起来像异常崩溃而非正常停止。
+**状态（2026-11-15）。** **已修复；自动化测试通过，尚未在运行中的应用里手工验证。** 用户报告。此前一次优化（1.0.67）让停止按钮立即响应，但进行中的轮次不再被正常收尾：显示的工具调用计数与实际运行不一致，中断后有一定概率没有 CHECKPOINT 分叉 banner——看起来像异常崩溃而非正常停止。
 
-**排查位置。** `chat_cancel`（`src-tauri/src/commands/chat.rs:726`）只设置取消标志就返回；收尾逻辑（持久化流式尾部、调和工具行、创建 checkpoint）在 `chat_turn/post_turn.rs`。修复批次 6 明确在用户停止时持久化部分输出——立即停止的改动似乎绕过或竞态破坏了该路径。前端入口：`src/services/tauri/chat.ts:400` 的 `chatCancel`。
+**根因。** 三处，都来自立即停止的改动：
 
-**期望行为。** 停止保持快速（UI 立即确认，如“正在停止…”状态），但轮次仍执行有界收尾：被中断的工具调用标记为中断态、计数与运行时对齐、部分文本持久化、发出 checkpoint/分叉 banner。历史记录中用户停止必须与崩溃可区分。
+1. **内核。** 取消后，非 shell 工具只有 1 秒宽限，超时后它的 future 被丢弃，`OwnedReceipt` 的 `Drop` 把这次调用记为失败。宿主据此把整轮判为 `interrupted`、会话置为 `error`，并跳过回合后处理。
+2. **前端。** `stopCurrent` 立刻把会话标为“未运行”，此后到达的 `tool_start` / `tool_end` / `context_usage` 事件全被丢弃；随后从数据库重载又多出没有启动过的调用，计数前后不一致。会话过早变成“未运行”，还让新一轮与旧一轮的 `finally` 竞争并被覆盖。
+3. **分叉行。** 显示条件要求消息有非空文本，只有工具调用的被停止回合不显示。
+
+**修复。**
+
+- 内核 `loop_.rs`（`cancel_grace_secs_for`）与 `tool_completion.rs`（`abandon_on_drop`）：会写入的工具取消后有 8 秒宽限，超时仍记为失败；不响应取消的只读工具 1 秒后被放弃，记为“已放弃”而不是失败。跳出循环前先为本批工具结果写检查点，持久化的消息里每个 tool_use 都有配对的结果。没来得及运行的调用按情况写入 `TOOL_RESULT_NOT_STARTED`、`TOOL_RESULT_CANCELLED_BEFORE_RUN`、`TOOL_RESULT_INTERRUPTED`。
+- 宿主 `chat_turn/post_turn.rs`（`classify_turn_outcome`）：用户主动停止且清理已确认时，回合记为 `cancelled`、会话回到 `idle`，照常做回合后处理；清理未确认时回合仍是 `interrupted`、跳过回合后处理，但会话回到 `idle` 而不是 `error`。
+- 前端 `useAssistantSession.ts`、`useWorkzSessionStore.ts`、`sessionTurnBookkeeping.ts`：新增“停止中”状态。按钮立即响应，但会话保持运行标记并继续处理工具与上下文事件，直到回合结束（`STOP_WATCHDOG_MS` 看门狗兜底）；期间发送的新消息进入已有的队列；结束后只做一次数据库同步。
+- 工具步骤新增 `cancelled` 状态（`src/components/toolCancel.ts`、`ToolTrace.tsx`）：没有启动就被取消的调用显示为“已取消”，不计入工具调用数，也不显示为错误。
+- 分叉行的条件改为“有 id，且有文本或有工具调用，且不在流式输出中”。
+
+**验证。** 内核测试覆盖：只读工具运行中取消不产生失败回执、写工具超过宽限才记失败、取消后 tool_use 与结果配对。宿主测试 `turn_outcome_tests`。前端测试 `useAssistantSession.stop.test.tsx`、`sessionTurnBookkeeping.test.ts`、`ToolTrace.cancelled.test.tsx`、`toolCancel.test.ts`、`agentTools.test.ts`、`AssistantMessageList.test.tsx`。**尚未完成：** 在运行中的应用里，分别在 `file_read`、`shell`、流式输出中各停止几次，确认会话不显示错误态、计数不跳变、分叉行出现、紧接着发送的新消息正常执行。
+
+**已知限制。** 取消发生在等待权限确认期间时，该调用显示为“未启动”。
 
 ---
 
 ## 26. 上下文管理/压缩：重复调用工具不推进；压缩后丢失任务目标
 
-**状态（2026-11-15）。** **未解决。** 用户报告，实际观察到：agent 循环调用约 250 次 `file_read` 反复重读同一批文档而不推进任务；上下文指示器在轮内一路升到 100%，期间没有触发压缩。直到用户中断并发送新消息才执行压缩——而压缩后的上下文丢失了任务目标（agent 无法说出自己在做什么，直到被要求盘点上下文）。随后一次记录本清单的尝试又复现了同类模式：连续约 28 次 `file_search`。
+**状态（2026-11-15）。** **已修复，待另一台机器确认。** 用户报告，实际观察到：agent 循环调用约 250 次 `file_read` 反复重读同一批文档而不推进任务；上下文指示器在轮内一路升到 100%，看不出压缩起过作用。直到用户中断并发送新消息，上下文才降下来——而压缩后的上下文丢失了任务目标（agent 无法说出自己在做什么，直到被要求盘点上下文）。随后一次记录本清单的尝试又复现了同类模式：连续约 28 次 `file_search`。问题出在另一台机器上，本机没有复现；下面的根因由代码和本机日志确定，修复由回归测试覆盖。
+
+**根因（更正）。** 本条最初写的是“压缩似乎只在轮间运行”，这不对。内核在每次迭代调用模型之前都会运行主动压缩，另外在 provider 报上下文溢出时再运行一次。它一直在运行，只是压不下来：
+
+- **压缩目标与触发线脱钩。** `compact_proactive` 按整个请求（含系统提示词和工具定义）估算档位，保留量却固定为消息预算的 60%（full 档 30%）。静态开销超过预算一半时，auto 档压完仍然是 auto 档，于是每次迭代都白做一次摘要调用。本机日志里有连续 271 次触发、消息数 `199 → 199` 的实例。
+- **空转不被识别。** 只剩滚动摘要可压时仍然调用模型并返回“已变化”，摘要被反复重新摘要。
+- **`summary_split_index` 的默认值错了。** 消息总量小于保留量时切在 `len - 6`，与注释相反。
+- **摘要失败没有兜底。** 摘要调用失败时直接放弃，溢出恢复同样依赖它。
+- **摘要保真度低。** 只保留 200 字的工具结果预览，上限 1024 token，不固定用户的原始请求；读过的文档被压掉以后只能重读——这是重读循环的直接来源。
+- **循环检测太窄。** 只匹配参数完全相同的调用，阈值 64/128；轮换着读几个文件不会触发。
+- **宿主的 `history_budget` 只扣固定的 3,000 token。** 本机 99 次运行里有 29 次首个请求就在预算的 95% 以上。
+- **指示器封顶 100%**，看不出压缩有没有生效。
+
+**修复（内核，`vendor/piscis-engine/piscis-kernel/src/agent/`）。**
+
+- `loop_.rs`（`compaction_keep_tokens`）：保留量取“消息预算 × 比例”与“`trigger_micro` − 静态开销 − 摘要预留”中较小的一个，并保留最近 6 条消息，一次压缩后落在触发线以下。
+- 空转保护与冷却：没有可压的非摘要消息时不调用模型；压缩后估算下降不足 5% 的结果不采用；两种情况都进入冷却，估算再增长总预算的 5% 才重试。`summary_split_index` 在全部放得下时返回 0。
+- 静态开销本身达到 `trigger_micro` 时，每个会话发一次 `context_static_overhead` 提示，说明系统提示词与工具定义占了预算的百分之几，请停用部分 MCP 工具或技能。
+- 摘要失败的兜底（`compact_by_rule`、`rule_based_summary`）：连续 2 次失败或处于 full 档时，按规则裁掉较早的消息，并附一条本地生成的记录（用户请求原文、工具调用清单）。溢出恢复走同一兜底。
+- 摘要保真（`pin_turn_facts`）：摘要消息里固定当前回合的用户请求原文、todo 快照和“已读文件清单”（路径、范围、次数）；读取类工具的结果预览提到 800 字；摘要上限改为 `clamp(1024, 4096)`。
+- `read_guard.rs`（新增，仅针对只读工具）：同一路径且内容未变，第 3 次重读警告，第 6 次拦截；连续 25 次、50 次只读调用且期间没有写入或计划更新时注入提醒并重述用户请求；最近 40 次读取中过半是重读未变内容时暂停回合，并向用户说明（`read_loop_paused`）。只是读新文件不会被拦截或暂停。
+- 可观测性：每次压缩输出一行 `compaction outcome=ok|noop|fallback|failed tier=… before=… after=…`；`ContextUsage` 事件带上最近一次压缩的状态（`last_compaction`）。
+
+**修复（宿主与界面）。**
+
+- `src-tauri/src/context_assembly.rs`（`turn_history_budget`）与 `chat_turn/mod.rs`：历史预算改为“总预算 − 实测静态开销 − 5% 余量”，状态帧的开销也提前扣除。
+- `src/components/ContextUsageRing.tsx`：估算超过预算时显示 `100%+`，悬浮提示给出真实百分比、压缩次数和最近一次压缩的状态。
+
+**验证。** 内核测试覆盖：静态开销占预算 63% 时一次压缩后低于 auto 档、连续 10 轮只摘要一次；只剩滚动摘要时不调用模型；全部放得下时不摘要；摘要客户端始终报错时两轮内完成规则裁剪且用户请求原文仍在；摘要消息含用户请求、todo 与已读文件清单；轮换重读 4 个未变文件时出现警告、拦截并在 60 次调用内暂停，读 60 个不同文件不被拦截。宿主测试 `context_assembly::tests`（实测开销 5 万 token 的夹具）。前端测试 `ContextUsageRing.test.tsx`、`runEventProjection.test.ts`。**尚未完成：** 在出问题的机器上重做当时的文档任务，确认日志里没有连续的 `outcome=noop`、指示器不长期停在 100%、`file_read` 不再出现几十次重读。
+
+**已知限制。**
+
+- 宿主组装的历史只保证不超过总预算。新回合的首个请求低于 `trigger_micro`，靠的是内核在首次调用模型前的那次压缩，它在请求达到 auto 档时才运行；组装结果落在 60%–80% 之间时会原样发出。没有把宿主历史直接压到 `trigger_micro` 以下，是因为宿主放不下的旧回合是直接丢弃的，不带摘要。
+- 本次没有改动回执降级的时机、记忆机制、MCP 工具定义的体积和 `max_iterations` 默认值。
+- 下降不足 5% 而未被采用的那次压缩，其摘要调用仍会计费。
+
+以下是最初记录的子问题，保留以供溯源。
 
 **子问题。**
 

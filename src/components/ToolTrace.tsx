@@ -16,6 +16,7 @@ import {
   parseInteractiveResponse,
 } from "./chat/InteractiveCardsContext";
 import type { UiDefinition } from "./chat/interactiveUi/protocol";
+import { countRunTools } from "./toolCancel";
 import "./ToolTrace.css";
 import "./SubagentCard.css";
 
@@ -25,7 +26,10 @@ export interface ToolTraceItem {
   name: string;
   input?: unknown;
   result?: string;
-  status: "running" | "done" | "error";
+  /** `cancelled`: a user Stop cut the call short. Not a failure. */
+  status: "running" | "done" | "error" | "cancelled";
+  /** Cancelled before it was dispatched: it never ran and is not counted as a call. */
+  skipped?: boolean;
   /** Length of the assistant text already streamed when this call started. */
   textOffset?: number;
   /** Live sub-agent iterations, present only for delegate / task / call_fish. */
@@ -116,12 +120,22 @@ export function ensureChatUiStep(
 
 const RESULT_PREVIEW_CHARS = 400;
 
-/** Latest in-flight call, otherwise the last one in this batch. */
+/** Latest in-flight call, otherwise the last one that ran, otherwise the last one. */
 function currentTool(items: ToolTraceItem[]): ToolTraceItem {
   for (let i = items.length - 1; i >= 0; i--) {
     if (items[i].status === "running") return items[i];
   }
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (!items[i].skipped) return items[i];
+  }
   return items[items.length - 1];
+}
+
+function statusMark(status: ToolTraceItem["status"]): ReactNode {
+  if (status === "running") return <span className="agentz-tool-trace-spinner" />;
+  if (status === "error") return "✕";
+  if (status === "cancelled") return "⊘";
+  return "✓";
 }
 
 function ToolTraceRow({
@@ -183,20 +197,15 @@ function ToolTraceRow({
         aria-expanded={onOpenGroup ? false : expanded}
         title={hint}
       >
-        <span className="agentz-tool-trace-status">
-          {item.status === "running" ? (
-            <span className="agentz-tool-trace-spinner" />
-          ) : item.status === "error" ? (
-            "✕"
-          ) : (
-            "✓"
-          )}
-        </span>
+        <span className="agentz-tool-trace-status">{statusMark(item.status)}</span>
         <span className="agentz-tool-trace-icon" aria-hidden>
           {toolIcon(item.name)}
         </span>
         <span className="agentz-tool-trace-name">{item.name}</span>
         <span className="agentz-tool-trace-hint">{hint}</span>
+        {item.status === "cancelled" && (
+          <span className="agentz-tool-trace-cancelled">{t("chat.toolStepCancelled")}</span>
+        )}
         {badge && <span className="agentz-tool-trace-badge">{badge}</span>}
         <span
           className="agentz-tool-trace-chevron"
@@ -223,7 +232,7 @@ function ToolTraceRow({
                 : JSON.stringify(item.input ?? {}, null, 2)}
             </pre>
           </div>
-          {item.status !== "running" && result && (
+          {item.status !== "running" && item.status !== "cancelled" && result && (
             <div className="agentz-tool-trace-section">
               <span
                 className={`agentz-tool-trace-label${item.status === "error" ? " is-error" : ""}`}
@@ -366,7 +375,9 @@ export function SubagentCard({ item }: { item: ToolTraceItem }) {
       ? t("chat.subagentRunning")
       : item.status === "error"
         ? t("chat.subagentFailed")
-        : t("chat.subagentDone");
+        : item.status === "cancelled"
+          ? t("chat.toolStepCancelled")
+          : t("chat.subagentDone");
   return (
     <div className={`agentz-subagent-card is-${item.status}`} data-testid="subagent-card">
       <button
@@ -375,15 +386,7 @@ export function SubagentCard({ item }: { item: ToolTraceItem }) {
         aria-expanded={expanded}
         onClick={() => setExpanded((v) => !v)}
       >
-        <span className="agentz-tool-trace-status">
-          {item.status === "running" ? (
-            <span className="agentz-tool-trace-spinner" />
-          ) : item.status === "error" ? (
-            "✕"
-          ) : (
-            "✓"
-          )}
-        </span>
+        <span className="agentz-tool-trace-status">{statusMark(item.status)}</span>
         <span className="agentz-subagent-name">{view.agent || item.name}</span>
         <span className="agentz-subagent-brief" title={view.brief}>
           {view.brief}
@@ -521,13 +524,15 @@ export default function ToolTrace({ items, hideEdits = false }: { items: ToolTra
       nodes.push(<SubagentCard key={item.id} item={item} />);
       continue;
     }
-    const diff = item.status === "error" || hideEdits ? null : fileEditDiff(item.name, item.input);
+    // A failed or cancelled edit changed nothing: it stays a plain row.
+    const applied = item.status !== "error" && item.status !== "cancelled";
+    const diff = !applied || hideEdits ? null : fileEditDiff(item.name, item.input);
     if (diff) {
       flush();
       nodes.push(<FileEditCard key={item.id} item={item} diff={diff} />);
       continue;
     }
-    if (hideEdits && item.status !== "error" && fileEditDiff(item.name, item.input)) continue;
+    if (hideEdits && applied && fileEditDiff(item.name, item.input)) continue;
     batch.push(item);
   }
   flush();
@@ -548,12 +553,15 @@ function ToolBatch({ items }: { items: ToolTraceItem[] }) {
 
   if (items.length === 0) return null;
   if (!open) {
+    // Calls the stop arrived before never ran; counting them made the number
+    // jump after a stopped turn was reloaded.
+    const ran = countRunTools(items);
     return (
       <div className="agentz-tool-trace">
         <ToolTraceRow
           item={currentTool(items)}
           onOpenGroup={() => setOpen(true)}
-          badge={items.length > 1 ? String(items.length) : undefined}
+          badge={ran > 1 ? String(ran) : undefined}
         />
       </div>
     );

@@ -42,11 +42,24 @@ export function buildInitialValues(
   return coerceFieldValues(blocks, values);
 }
 
-export function buildInitialValuesFromDefinition(
-  def: UiDefinition,
-  wizardStep = 0,
-): Record<string, unknown> {
-  const blocks = collectValueBlocks(def, wizardStep);
+/**
+ * Defaults for the whole form. A wizard gets the fields of every step at once:
+ * initialising one step at a time meant each step change rebuilt the values
+ * and dropped the answers given on the steps before it.
+ */
+export function buildInitialValuesFromDefinition(def: UiDefinition): Record<string, unknown> {
+  const stepCount = def.mode === "wizard" && Array.isArray(def.steps) ? def.steps.length : 0;
+  if (stepCount === 0) return buildInitialValues(collectValueBlocks(def, 0), def.data);
+  const blocks: UiBlock[] = [];
+  const seen = new Set<UiBlock>();
+  for (let step = 0; step < stepCount; step += 1) {
+    for (const block of collectValueBlocks(def, step)) {
+      // The footer blocks are returned with every step.
+      if (seen.has(block)) continue;
+      seen.add(block);
+      blocks.push(block);
+    }
+  }
   return buildInitialValues(blocks, def.data);
 }
 

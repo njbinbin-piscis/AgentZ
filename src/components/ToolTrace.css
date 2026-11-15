@@ -51,6 +51,22 @@
   color: #f87171;
 }
 
+/* Cut short by a user Stop: neutral, not a failure. */
+.agentz-tool-trace-row.is-cancelled .agentz-tool-trace-status,
+.agentz-tool-trace-cancelled {
+  color: var(--text-dim, #9a9ab0);
+}
+
+.agentz-tool-trace-row.is-cancelled .agentz-tool-trace-name,
+.agentz-tool-trace-row.is-cancelled .agentz-tool-trace-hint {
+  opacity: 0.65;
+}
+
+.agentz-tool-trace-cancelled {
+  flex-shrink: 0;
+  font-size: calc(11px * var(--ui-font-scale, 1));
+}
+
 .agentz-tool-trace-spinner {
   width: 10px;
   height: 10px;

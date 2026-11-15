@@ -25,6 +25,7 @@ import {
 import { collectValueBlocks, wizardStepCount, wizardStepLabel } from "./interactiveUi/flatten";
 import { asBlockList, asString, asStringList } from "./interactiveUi/initValues";
 import { buildInitialValuesFromDefinition, normalizeSubmittedValues } from "./interactiveUi/initValues";
+import { normalizeUiDefinition } from "./interactiveUi/normalize";
 import { mergeDataModel } from "./interactiveUi/patch";
 import {
   ACTION_BLOCK_TYPES,
@@ -85,7 +86,7 @@ function buildPayload(
 
 export default function InteractiveCard({
   requestId,
-  uiDefinition,
+  uiDefinition: rawDefinition,
   submittedValues,
   listenOpen = false,
   wizardStepHint,
@@ -97,6 +98,18 @@ export default function InteractiveCard({
   onPlanBuild,
 }: InteractiveCardProps) {
   const { t } = useTranslation();
+  // The chat view re-renders on every streaming chunk and may hand us a fresh
+  // (deep-equal) definition object each time. Re-initializing on reference
+  // identity would wipe the user's in-progress selections, so key everything
+  // on the definition's content instead.
+  const definitionSignature = useMemo(() => JSON.stringify(rawDefinition), [rawDefinition]);
+  // Agent-written option lists are repaired once here; rendering, defaults,
+  // validation and the submitted payload all read this normalized definition.
+  const uiDefinition = useMemo(
+    () => normalizeUiDefinition(rawDefinition),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- content-keyed, see above.
+    [definitionSignature],
+  );
   const cardKind = uiDefinition.kind;
   const planPath =
     typeof uiDefinition.data?.plan_path === "string" ? uiDefinition.data.plan_path : "";
@@ -122,14 +135,6 @@ export default function InteractiveCard({
   const [actionSent, setActionSent] = useState(false);
   const [wizardStep, setWizardStep] = useState(0);
 
-  // The chat view re-renders on every streaming chunk and may hand us a fresh
-  // (deep-equal) definition object each time. Re-initializing on reference
-  // identity would wipe the user's in-progress selections, so key the reset on
-  // the definition's content instead.
-  const definitionSignature = useMemo(
-    () => JSON.stringify(uiDefinition),
-    [uiDefinition],
-  );
   const submittedSignature = useMemo(
     () => (submittedValues ? JSON.stringify(submittedValues) : ""),
     [submittedValues],
@@ -149,12 +154,14 @@ export default function InteractiveCard({
       setValues(normalizeSubmittedValues(uiDefinition, submittedValues));
       return;
     }
-    setValues(buildInitialValuesFromDefinition(uiDefinition, wizardStep));
+    setValues(buildInitialValuesFromDefinition(uiDefinition));
     setErrors({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when the
-    // definition/submitted content actually changes, not on every new object
-    // reference produced by streaming re-renders.
-  }, [definitionSignature, submittedSignature, wizardStep]);
+    // Reset only when the definition/submitted content actually changes, not on
+    // every new object reference produced by streaming re-renders. Moving between
+    // wizard steps is deliberately not a reset: answers from earlier steps must
+    // survive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- content-keyed, see above.
+  }, [definitionSignature, submittedSignature]);
 
   // Plan suggest: the backend's deadline starts when it emits the card, not
   // when React eventually renders it. Count down to its absolute deadline so
@@ -526,6 +533,7 @@ export default function InteractiveCard({
       return;
     }
     setSubmitError(null);
+    setErrors({});
     setWizardStep(next);
   };
 

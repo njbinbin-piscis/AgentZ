@@ -211,7 +211,7 @@ export function projectRunAgentEvents(
               "rolling_summary_version",
               "auto_compact_threshold",
             ],
-            ["layered_breakdown"],
+            ["layered_breakdown", "last_compaction"],
           ],
           fish_progress: [
             ["fish_id", "fish_name", "iteration", "tool_name", "status"],
@@ -262,6 +262,13 @@ export function projectRunAgentEvents(
           fields(layered, names);
           names.forEach((name) => count(layered[name]));
         }
+        if (type === "context_usage" && payload.last_compaction != null) {
+          const compaction = object(payload.last_compaction);
+          fields(compaction, ["outcome", "tier", "before_tokens", "after_tokens", "count"]);
+          string(compaction.outcome);
+          string(compaction.tier);
+          for (const name of ["before_tokens", "after_tokens", "count"]) count(compaction[name]);
+        }
         if (type === "fish_progress") {
           string(payload.fish_id);
           string(payload.fish_name);
@@ -278,6 +285,17 @@ export function projectRunAgentEvents(
   return result;
 }
 
+const COMPACTION_OUTCOMES = ["ok", "noop", "fallback", "failed"] as const;
+export type StreamCompactionOutcome = (typeof COMPACTION_OUTCOMES)[number];
+
+export interface StreamCompactionStatus {
+  outcome: StreamCompactionOutcome;
+  tier: string;
+  beforeTokens: number;
+  afterTokens: number;
+  count: number;
+}
+
 export interface StreamContextUsageSnapshot {
   estimatedInputTokens: number;
   totalInputBudget: number;
@@ -286,6 +304,24 @@ export interface StreamContextUsageSnapshot {
   cumulativeOutputTokens: number;
   rollingSummaryVersion: number;
   autoCompactThreshold: number;
+  lastCompaction: StreamCompactionStatus | null;
+}
+
+/** The compaction status of a `context_usage` event, or null when absent or not understood. */
+export function normalizeCompactionStatus(raw: unknown): StreamCompactionStatus | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const status = raw as Record<string, unknown>;
+  const outcome = COMPACTION_OUTCOMES.find((name) => name === status.outcome);
+  if (!outcome) return null;
+  const tokens = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+  return {
+    outcome,
+    tier: typeof status.tier === "string" ? status.tier : "",
+    beforeTokens: tokens(status.before_tokens),
+    afterTokens: tokens(status.after_tokens),
+    count: tokens(status.count),
+  };
 }
 
 /** Normalize a raw `context_usage` agent event into the shared UI snapshot used by CodeZ & WorkZ. */
@@ -297,6 +333,7 @@ export function normalizeStreamContextUsage(evt: {
   cumulative_output_tokens: number;
   rolling_summary_version: number;
   auto_compact_threshold: number;
+  last_compaction?: unknown;
 }): StreamContextUsageSnapshot {
   return {
     estimatedInputTokens: evt.estimated_input_tokens,
@@ -306,6 +343,7 @@ export function normalizeStreamContextUsage(evt: {
     cumulativeOutputTokens: evt.cumulative_output_tokens,
     rollingSummaryVersion: evt.rolling_summary_version,
     autoCompactThreshold: evt.auto_compact_threshold,
+    lastCompaction: normalizeCompactionStatus(evt.last_compaction),
   };
 }
 

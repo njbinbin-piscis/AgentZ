@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectRunAgentEvents } from "./runEventProjection";
+import { normalizeStreamContextUsage, projectRunAgentEvents } from "./runEventProjection";
 import type { DurableRunEvent, RunEventStream } from "./runEvents";
 const stream: RunEventStream = {
   task_id: "task",
@@ -176,5 +176,70 @@ describe("passive Attempt display projection", () => {
         events([{ type: "plan_update", items: [{ id: "step", content: 1, status: "pending" }] }]),
       ),
     ).toThrow();
+  });
+  it("accepts context usage that reports the last compaction, and rejects a malformed report", () => {
+    const usage = {
+      type: "context_usage",
+      estimated_input_tokens: 150,
+      total_input_budget: 200,
+      trigger_threshold: 120,
+      cumulative_input_tokens: 1,
+      cumulative_output_tokens: 1,
+      rolling_summary_version: 1,
+      auto_compact_threshold: 0,
+    };
+    const ok = projectRunAgentEvents(
+      stream,
+      events([
+        {
+          ...usage,
+          last_compaction: { outcome: "fallback", tier: "auto", before_tokens: 190, after_tokens: 150, count: 2 },
+        },
+        { ...usage, last_compaction: null },
+      ]),
+    );
+    expect(ok.ignoredCount).toBe(2);
+    for (const bad of [
+      { outcome: "ok", tier: "auto", before_tokens: -1, after_tokens: 1, count: 1 },
+      { outcome: "ok", tier: "auto", before_tokens: 1, after_tokens: 1 },
+      { outcome: 1, tier: "auto", before_tokens: 1, after_tokens: 1, count: 1 },
+      { outcome: "ok", tier: "auto", before_tokens: 1, after_tokens: 1, count: 1, extra: true },
+      "ok",
+    ]) {
+      expect(() =>
+        projectRunAgentEvents(stream, events([{ ...usage, last_compaction: bad }])),
+      ).toThrow();
+    }
+  });
+});
+
+describe("normalizeStreamContextUsage", () => {
+  const raw = {
+    estimated_input_tokens: 150,
+    total_input_budget: 200,
+    trigger_threshold: 120,
+    cumulative_input_tokens: 10,
+    cumulative_output_tokens: 20,
+    rolling_summary_version: 3,
+    auto_compact_threshold: 0,
+  };
+  it("maps the compaction status when present", () => {
+    expect(
+      normalizeStreamContextUsage({
+        ...raw,
+        last_compaction: { outcome: "noop", tier: "micro", before_tokens: 150, after_tokens: 150, count: 0 },
+      }).lastCompaction,
+    ).toEqual({ outcome: "noop", tier: "micro", beforeTokens: 150, afterTokens: 150, count: 0 });
+  });
+  it("treats a missing or unknown status as absent (older kernels, newer outcomes)", () => {
+    expect(normalizeStreamContextUsage(raw).lastCompaction).toBeNull();
+    expect(normalizeStreamContextUsage({ ...raw, last_compaction: null }).lastCompaction).toBeNull();
+    expect(
+      normalizeStreamContextUsage({
+        ...raw,
+        last_compaction: { outcome: "something_new", tier: "auto", before_tokens: 1, after_tokens: 1, count: 1 },
+      }).lastCompaction,
+    ).toBeNull();
+    expect(normalizeStreamContextUsage({ ...raw, last_compaction: "ok" }).lastCompaction).toBeNull();
   });
 });

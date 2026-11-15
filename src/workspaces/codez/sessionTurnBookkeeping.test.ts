@@ -32,6 +32,30 @@ describe("SessionTurnBookkeeping", () => {
     expect(book.runningIds()).toEqual(["b"]);
   });
 
+  it("keeps a session running while its stop is pending", () => {
+    const book = new SessionTurnBookkeeping<Turn>();
+    // Nothing to stop on an idle session.
+    expect(book.beginStop("a")).toBe(false);
+    expect(book.beginStop(null)).toBe(false);
+
+    book.markRunning("a", true);
+    book.markRunning("b", true);
+    expect(book.beginStop("a")).toBe(true);
+    // A repeated click does not start a second stop.
+    expect(book.beginStop("a")).toBe(false);
+    expect(book.isStopping("a")).toBe(true);
+    expect(book.isStopping("b")).toBe(false);
+    // Still running: follow-ups keep queueing behind it.
+    expect(book.isRunning("a")).toBe(true);
+
+    book.markRunning("a", false);
+    expect(book.isStopping("a")).toBe(false);
+    // The next turn of the same session starts clean.
+    book.markRunning("a", true);
+    expect(book.isStopping("a")).toBe(false);
+    expect(book.beginStop("a")).toBe(true);
+  });
+
   it("queues follow-ups on their own session only", () => {
     const book = new SessionTurnBookkeeping<Turn>();
     book.enqueue(turn("a", "a1"));

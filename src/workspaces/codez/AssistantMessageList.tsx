@@ -1,5 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { canPortalToBody, useFixedPopupPosition, type FixedPopupOptions } from "../../utils/popupPosition";
 import { useContextMenu, type ContextMenuItem } from "../../components/ContextMenu";
 import type { JournalFileDiff } from "../../services/tauri/chat";
 import TaskCard from "../../components/TaskCard";
@@ -34,6 +36,8 @@ interface AssistantMessageListProps {
   toolSteps: ToolTraceItem[];
   turnDiffsByTurnId: Record<string, JournalFileDiff[]>;
   busy: boolean;
+  /** Stop was requested; the turn is still running until the backend confirms. */
+  stopping?: boolean;
   queuedView: string[];
   onRemoveQueued?: (index: number) => void;
   onInterruptQueued?: (index: number) => void;
@@ -67,24 +71,46 @@ const LOAD_MORE = 10;
 /** Distance from the top (px) that trips the lazy-load of older messages. */
 const LOAD_AT_TOP_PX = 40;
 
+const FORK_POPUP_OPTIONS: FixedPopupOptions = { minWidth: 220, maxWidth: 360 };
+
 export function ForkMenu({ onFork }: { onFork: (fullHistory: boolean) => void }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  // The message list is a scroll container, so a popover rendered inside it is
+  // cut off at the list's top edge (right under the task panel). Rendering it
+  // on <body> with fixed coordinates keeps it whole; it opens upward and flips
+  // below the button when the window has no room above.
+  const popupStyle = useFixedPopupPosition(open, triggerRef, popupRef, "up", "text", FORK_POPUP_OPTIONS);
 
   useEffect(() => {
     if (!open) return;
+    const inside = (target: EventTarget | null) =>
+      target instanceof Node &&
+      (!!rootRef.current?.contains(target) || !!popupRef.current?.contains(target));
     const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!inside(e.target)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+    // The button scrolls with the conversation; a menu left floating over
+    // other rows would point at the wrong message.
+    const onScroll = (e: Event) => {
+      if (!popupRef.current?.contains(e.target as Node | null)) setOpen(false);
+    };
+    const onResize = () => setOpen(false);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
     };
   }, [open]);
 
@@ -93,6 +119,19 @@ export function ForkMenu({ onFork }: { onFork: (fullHistory: boolean) => void })
     onFork(fullHistory);
   };
 
+  const popupNode = open ? (
+    <div className="agentz-fork-popover" role="menu" ref={popupRef} style={popupStyle}>
+      <button type="button" role="menuitem" onClick={() => pick(false)}>
+        {t("chat.forkContextOnly")}
+        <span>{t("chat.forkContextOnlyHint")}</span>
+      </button>
+      <button type="button" role="menuitem" onClick={() => pick(true)}>
+        {t("chat.forkFullHistory")}
+        <span>{t("chat.forkFullHistoryHint")}</span>
+      </button>
+    </div>
+  ) : null;
+
   return (
     <div className="agentz-fork-menu" ref={rootRef}>
       <button
@@ -100,23 +139,13 @@ export function ForkMenu({ onFork }: { onFork: (fullHistory: boolean) => void })
         className="agentz-checkpoint-btn"
         aria-haspopup="menu"
         aria-expanded={open}
+        ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
         title={t("chat.checkpointFork")}
       >
         {t("chat.checkpointFork")} ▾
       </button>
-      {open && (
-        <div className="agentz-fork-popover" role="menu">
-          <button type="button" role="menuitem" onClick={() => pick(false)}>
-            {t("chat.forkContextOnly")}
-            <span>{t("chat.forkContextOnlyHint")}</span>
-          </button>
-          <button type="button" role="menuitem" onClick={() => pick(true)}>
-            {t("chat.forkFullHistory")}
-            <span>{t("chat.forkFullHistoryHint")}</span>
-          </button>
-        </div>
-      )}
+      {popupNode && canPortalToBody() ? createPortal(popupNode, document.body) : popupNode}
     </div>
   );
 }
@@ -128,6 +157,7 @@ function AssistantMessageList({
   toolSteps,
   turnDiffsByTurnId,
   busy,
+  stopping = false,
   queuedView,
   onRemoveQueued,
   onInterruptQueued,
@@ -324,7 +354,11 @@ function AssistantMessageList({
 
         const isLastMessage = absoluteIndex === messages.length - 1;
         const isStreamingLast = busy && isLastMessage;
-        const showCheckpoint = m.id && m.text.trim() && !isStreamingLast;
+        // A turn that was stopped before the model wrote any text still has a
+        // persisted row with its tool calls; it is a valid point to fork from.
+        const showCheckpoint =
+          !!m.id && (!!m.text.trim() || (m.tools?.length ?? 0) > 0) && !isStreamingLast;
+        const waitingLabel = stopping ? t("chat.stopping") : t("chat.thinking");
         // Edit diffs are process info: only the newest turn of this run shows them.
         // Earlier turns and restored history drop them (no turnId once reloaded).
         const showEdits = isLastMessage && (busy || !!m.turnId);
@@ -357,14 +391,14 @@ function AssistantMessageList({
                   {seg.text ? <Markdown content={seg.text} /> : null}
                   {seg.tools.length > 0 && <ToolTrace items={seg.tools} hideEdits={!showEdits} />}
                   {isStreamingLast && si === all.length - 1 && !seg.text && seg.tools.length === 0 && (
-                    <div className="agentz-msg-text agentz-thinking">{t("chat.thinking")}</div>
+                    <div className="agentz-msg-text agentz-thinking">{waitingLabel}</div>
                   )}
                 </div>
               ))
             ) : m.text ? (
               <Markdown content={m.text} />
             ) : isStreamingLast ? (
-              <div className="agentz-msg-text agentz-thinking">{t("chat.thinking")}</div>
+              <div className="agentz-msg-text agentz-thinking">{waitingLabel}</div>
             ) : null}
             {diffs && diffs.length > 0 && (
               <div className="agentz-turn-diffs">

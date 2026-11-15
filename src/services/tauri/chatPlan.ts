@@ -20,7 +20,11 @@ export interface DurablePlanQuery {
   binding: DurablePlanBinding;
   current: DurablePlan | null;
 }
-export type ExplicitPlanIntent = { kind: "replace"; objective: string } | { kind: "cancel" };
+export type ExplicitPlanIntent =
+  | { kind: "replace"; objective: string }
+  | { kind: "cancel" }
+  /** Mark every unfinished item cancelled; the plan stays open for later steps. */
+  | { kind: "cancel_open_items" };
 
 /** Query persisted state; rendering it never implies replacing a task goal. */
 export function queryTaskPlan(scopeHandle: string, sessionId: string): Promise<DurablePlanQuery> {
@@ -41,4 +45,35 @@ export function applyTaskPlanIntent(
     return Promise.reject(new Error("Explicit objective required"));
   }
   return invoke("chat_plan_apply", { scopeHandle, sessionId, expected, intent });
+}
+
+/**
+ * The Todo panel's "clear": cancel what is still unfinished in the task's
+ * stored plan, so the items do not come back with the next turn.
+ *
+ * Resolves to the stored plan after the change, or to null when the task has
+ * no stored plan with unfinished items (nothing to change). Rejects when the
+ * plan could not be changed, for example while the task is running.
+ */
+export async function cancelOpenPlanItems(
+  scopeHandle: string,
+  sessionId: string,
+): Promise<DurablePlan | null> {
+  let current: DurablePlan | null;
+  try {
+    current = (await queryTaskPlan(scopeHandle, sessionId)).current;
+  } catch {
+    // Sessions without a stored plan (team, pool, remote) have nothing to cancel.
+    return null;
+  }
+  if (!current || current.status !== "active") return null;
+  if (!current.items.some((item) => item.state === "pending" || item.state === "in_progress")) {
+    return null;
+  }
+  return applyTaskPlanIntent(
+    scopeHandle,
+    sessionId,
+    { id: current.id, revision: current.revision },
+    { kind: "cancel_open_items" },
+  );
 }

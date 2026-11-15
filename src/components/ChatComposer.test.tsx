@@ -46,6 +46,78 @@ function renderComposer(busy: boolean, onRemoveChip: (id: string) => void) {
   );
 }
 
+describe("ChatComposer stop button", () => {
+  let root: ReactTestRenderer | null = null;
+  afterEach(async () => {
+    if (root) {
+      await act(async () => {
+        root?.unmount();
+      });
+      root = null;
+    }
+  });
+
+  const renderBusy = async (props: { value: string; stopping: boolean; onStop: () => void; onSubmit: () => void }) => {
+    await act(async () => {
+      root = create(
+        <ChatComposer
+          value={props.value}
+          onChange={() => {}}
+          onSubmit={props.onSubmit}
+          onStop={props.onStop}
+          busy
+          stopping={props.stopping}
+          stopTitle="stop"
+          stoppingTitle="stopping"
+          sendWhileBusy
+          placeholder="type"
+          modelId="m"
+          modelOptions={[]}
+          onModelChange={() => {}}
+          attachment={null}
+          attachmentPreview={null}
+          onAttach={() => {}}
+          onClearAttachment={() => {}}
+        />,
+      );
+    });
+    const byClass = (cls: string) =>
+      root!.root.findAll((n) => n.type === "button" && String(n.props.className ?? "").split(" ").includes(cls));
+    return { stop: byClass("agentz-composer-stop-icon"), send: byClass("agentz-composer-send-busy") };
+  };
+
+  it("is clickable while the turn runs", async () => {
+    const onStop = vi.fn();
+    const { stop } = await renderBusy({ value: "", stopping: false, onStop, onSubmit: () => {} });
+    expect(stop).toHaveLength(1);
+    expect(stop[0].props.disabled).toBe(false);
+    expect(stop[0].props.title).toBe("stop");
+    await act(async () => {
+      stop[0].props.onClick();
+    });
+    expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays visible but inert once a stop is pending", async () => {
+    const { stop } = await renderBusy({ value: "", stopping: true, onStop: () => {}, onSubmit: () => {} });
+    expect(stop).toHaveLength(1);
+    expect(stop[0].props.disabled).toBe(true);
+    expect(stop[0].props.title).toBe("stopping");
+  });
+
+  it("still lets a typed message be queued while stopping", async () => {
+    const onSubmit = vi.fn();
+    const { stop, send } = await renderBusy({ value: "next", stopping: true, onStop: () => {}, onSubmit });
+    expect(stop).toHaveLength(0);
+    expect(send).toHaveLength(1);
+    expect(send[0].props.disabled).toBeFalsy();
+    await act(async () => {
+      send[0].props.onClick();
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("ChatComposer image chip removal while editing a queued message", () => {
   let root: ReactTestRenderer | null = null;
   afterEach(async () => {

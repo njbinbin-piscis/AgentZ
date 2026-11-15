@@ -81,6 +81,10 @@ pub struct ExpectedPlan {
 pub enum PlanIntent {
     Replace { objective: String },
     Cancel,
+    /// The user dismisses the unfinished work: every pending or in-progress
+    /// item becomes cancelled. Unlike `Cancel`, the plan stays open for later
+    /// `plan_todo` writes, so the task can go on with new steps.
+    CancelOpenItems,
 }
 
 /// Implement only with a host-owned exclusive task mutation guard. The guard must
@@ -137,6 +141,25 @@ fn apply(
             )
         }
         PlanIntent::Cancel => store.cancel(&binding, &expected.id, expected.revision, now),
+        PlanIntent::CancelOpenItems => {
+            use agentz_task_state::plan::{ItemState, PlanStatus};
+            if matches!(current.status, PlanStatus::Cancelled | PlanStatus::Replaced) {
+                return Err("plan already closed".into());
+            }
+            let is_open =
+                |state: &ItemState| matches!(state, ItemState::Pending | ItemState::InProgress);
+            if !current.items.iter().any(|item| is_open(&item.state)) {
+                // Nothing unfinished: the stored plan is already what was asked for.
+                return Ok(current);
+            }
+            let mut items = current.items;
+            for item in &mut items {
+                if is_open(&item.state) {
+                    item.state = ItemState::Cancelled;
+                }
+            }
+            store.update(&binding, &expected.id, expected.revision, items, now)
+        }
     }
 }
 
@@ -430,6 +453,147 @@ mod tests {
         assert_eq!(closed.items, unchanged.items);
         assert_eq!(closed.revision, 2);
     }
+    #[test]
+    fn cancelling_open_items_keeps_finished_ones_and_leaves_the_plan_writable() {
+        let (_directory, b, mut store, expected) = fixture();
+        let mut gate = OwnedFixtureGate {
+            active: false,
+            checks: 0,
+        };
+        let item = |id: &str, state: ItemState| PlanItem {
+            id: id.into(),
+            description: format!("step {id}"),
+            state,
+        };
+        let seeded = store
+            .update(
+                &b,
+                &expected.id,
+                expected.revision,
+                vec![
+                    item("one", ItemState::Done),
+                    item("two", ItemState::InProgress),
+                    item("three", ItemState::Pending),
+                ],
+                2,
+            )
+            .unwrap();
+        let shown = ExpectedPlan {
+            id: seeded.id.clone(),
+            revision: seeded.revision,
+        };
+
+        // A running task keeps its plan.
+        gate.active = true;
+        assert!(apply(
+            &mut store,
+            &mut gate,
+            || Ok(b.clone()),
+            &shown,
+            PlanIntent::CancelOpenItems,
+            3
+        )
+        .is_err());
+        gate.active = false;
+
+        let cleared = apply(
+            &mut store,
+            &mut gate,
+            || Ok(b.clone()),
+            &shown,
+            PlanIntent::CancelOpenItems,
+            3,
+        )
+        .unwrap();
+        assert_eq!(cleared.id, seeded.id);
+        assert_eq!(cleared.revision, seeded.revision + 1);
+        assert_eq!(cleared.status, PlanStatus::Completed);
+        assert_eq!(
+            cleared
+                .items
+                .iter()
+                .map(|item| item.state)
+                .collect::<Vec<_>>(),
+            vec![ItemState::Done, ItemState::Cancelled, ItemState::Cancelled]
+        );
+
+        // The revision the panel showed is stale now.
+        assert!(apply(
+            &mut store,
+            &mut gate,
+            || Ok(b.clone()),
+            &shown,
+            PlanIntent::CancelOpenItems,
+            4
+        )
+        .is_err());
+        // With nothing unfinished the plan is returned as stored.
+        let current = ExpectedPlan {
+            id: cleared.id.clone(),
+            revision: cleared.revision,
+        };
+        let again = apply(
+            &mut store,
+            &mut gate,
+            || Ok(b.clone()),
+            &current,
+            PlanIntent::CancelOpenItems,
+            4,
+        )
+        .unwrap();
+        assert_eq!(again, cleared);
+
+        // The next turn's plan_todo can add steps: the plan was not closed.
+        let mut items = cleared.items.clone();
+        items.push(item("four", ItemState::Pending));
+        let extended = store
+            .update(&b, &cleared.id, cleared.revision, items, 5)
+            .unwrap();
+        assert_eq!(extended.status, PlanStatus::Active);
+    }
+
+    #[test]
+    fn cancelling_open_items_of_a_closed_plan_is_refused() {
+        let (_directory, b, mut store, expected) = fixture();
+        let mut gate = OwnedFixtureGate {
+            active: false,
+            checks: 0,
+        };
+        let closed = apply(
+            &mut store,
+            &mut gate,
+            || Ok(b.clone()),
+            &expected,
+            PlanIntent::Cancel,
+            2,
+        )
+        .unwrap();
+        let current = ExpectedPlan {
+            id: closed.id.clone(),
+            revision: closed.revision,
+        };
+        assert!(apply(
+            &mut store,
+            &mut gate,
+            || Ok(b),
+            &current,
+            PlanIntent::CancelOpenItems,
+            3
+        )
+        .unwrap_err()
+        .contains("already closed"));
+    }
+
+    #[test]
+    fn plan_intents_use_snake_case_kinds_on_the_wire() {
+        let intent: PlanIntent =
+            serde_json::from_value(serde_json::json!({ "kind": "cancel_open_items" })).unwrap();
+        assert_eq!(intent, PlanIntent::CancelOpenItems);
+        let intent: PlanIntent =
+            serde_json::from_value(serde_json::json!({ "kind": "cancel" })).unwrap();
+        assert_eq!(intent, PlanIntent::Cancel);
+    }
+
     #[test]
     fn explicit_replace_has_new_identity_and_retains_old_history() {
         let (_directory, b, mut store, expected) = fixture();

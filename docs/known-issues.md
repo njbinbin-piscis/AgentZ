@@ -28,14 +28,14 @@ issue here does not change that matrix.
 | 4 | UAC prompt must not hard-fail | **Resolved (kernel).** The permission wait is bounded to 60 s and resolves as "denied"; an unanswered elevation dialog ends in a tool error (`Elevated command timed out ...`), not a turn failure | `loop_.rs` (permission `tokio::time::timeout(60s)`), `piscis-kernel/src/tools/elevate.rs` |
 | 5 | CRLF multi-line `file_edit` | **Resolved** (Fix batch 5; now in the vendored kernel) | `piscis-kernel/src/tools/file_write.rs` (`adapt_eol`, `eol_tests`) |
 | 6 | Verification gap in this environment | **Resolved** for the build machine: the 2026-09-30 audit built and ran the app with node/cargo/MSVC | See *Tool verification audit* |
-| 7 | Aborted turn drops plan continuity | **Partly open.** Host part fixed; the plan store (`new_plan_store()` in `state.rs`) is still in-memory, so open todos do not survive a restart | `src-tauri/src/state.rs` |
-| 8 | `plan_todo` stuck `in_progress` | **Open.** Open todos are counted (`open_todos`) and auto-continued, but never auto-marked `cancelled`/`pending` | `chat_turn/post_turn.rs` |
+| 7 | Aborted turn drops plan continuity | **Fixed.** The plan is persisted in SQLite (`.agentz/plans.db`), republished at every turn start, and the prompt requires reconciling unfinished items first | `runtime/durable_plan.rs`, `tools/durable_plan_todo.rs` |
+| 8 | `plan_todo` stuck `in_progress` | **Fixed (automated tests pass; not verified by hand in a running app).** An `in_progress` item of a task that is not running shows as "Not finished" with no spinner; the panel's "Clear" now marks unfinished items `cancelled` in the stored plan via `cancel_open_items` (the plan stays writable), so they no longer return next turn | `runtime/plan_intent.rs`, `TaskPanel.tsx`, `chatPlan.ts` |
 | 21 | DeepSeek tool-call pairing | **Resolved (kernel).** `convert_messages` tracks `pending_tool_ids` | `piscis-kernel/src/llm/openai.rs` |
 | 22 | DeepSeek / "think" compatibility | **Partly resolved.** `is_deepseek_thinking_model` is case-insensitive and matches gateway-prefixed, `think` and `-r1` names; reasoning is still not shown in the UI | `piscis-kernel/src/llm/openai.rs` |
-| 23 | `chat_ui` required choice cannot be selected; form cannot submit | **Open** (2026-11-15, user report) | `src/components/chat/interactiveUi/`, `src/contexts/InteractiveCardsContext.tsx` |
-| 24 | Task panel covers the checkpoint "fork from here" popover | **Open** (2026-11-15, user report) | `src/workspaces/codez/AssistantPanel.css` (stacking context), `src/components/TaskPanel.css` |
-| 25 | Immediate stop skips turn wind-down: tool counts drift, no checkpoint banner | **Open** (2026-11-15, user report) | `src-tauri/src/commands/chat.rs` (`chat_cancel`), `chat_turn/post_turn.rs` |
-| 26 | Context/compaction: repeated tool calls without progress; post-compaction goal loss | **Open** (2026-11-15, user report) | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`, `bench_compact.rs` |
+| 23 | `chat_ui` required choice cannot be selected; form cannot submit | **Fixed, awaiting confirmation on the other machine** (2026-11-15). Options are normalized in the frontend and the backend; changing wizard steps no longer clears entered values | `src/components/chat/interactiveUi/normalize.ts`, `src-tauri/src/tools/chat_ui_schema.rs` |
+| 24 | Checkpoint "fork from here" popover hidden behind the Task panel | **Fixed** (2026-11-15; automated tests pass, not yet checked by hand in the running app). The cause was clipping by the scroll container, not z-index | `src/workspaces/codez/AssistantMessageList.tsx` (`ForkMenu`) |
+| 25 | Immediate stop skips turn wind-down: tool counts drift, no checkpoint banner | **Fixed** (2026-11-15; automated tests pass, not yet checked by hand in the running app) | `loop_.rs` (`cancel_grace_secs_for`), `chat_turn/post_turn.rs` (`classify_turn_outcome`), `src/workspaces/codez/useAssistantSession.ts` |
+| 26 | Context/compaction: repeated tool calls without progress; post-compaction goal loss | **Fixed, awaiting confirmation on the other machine** (2026-11-15). Compaction always ran inside the turn but did not reduce the request | `loop_.rs` (`compact_proactive`), `piscis-kernel/src/agent/read_guard.rs`, `src-tauri/src/context_assembly.rs` |
 
 Windows packaging target: see the README. Verified outputs are the NSIS `.exe`
 files uploaded by `.github/workflows/release.yml`.
@@ -886,39 +886,96 @@ Fixed in the local `piscis-engine` clone (`C:\Projects\piscis-engine`, commit `a
 
 ## 23. `chat_ui` generated choice cards: no option can be selected; required question blocks submit
 
-**Status (2026-11-15).** **Open.** User report with screenshot. A `chat_ui` form containing a required single-choice question renders, but clicking any option does not select it, so required validation never passes and the card cannot be submitted.
+**Status (2026-11-15).** **Fixed, awaiting confirmation on the other machine.** User report with screenshot: a `chat_ui` form containing a required single-choice question renders, but clicking any option does not select it, so required validation never passes and the card cannot be submitted. The problem occurred on another machine and was not reproduced here; the root cause below was established from the code, and the fix is covered by regression tests.
 
-**Investigation so far (incomplete).** Isolated DOM/streaming tests for `InteractiveCard` pass (`InteractiveCard.dom.test.tsx`, `InteractiveCard.streaming.test.tsx`), so the selection handler works in isolation; the failure is specific to the live chat rendering path. Unverified hypotheses: streaming re-renders or `chat_ui_patch` data updates resetting local selection state; an overlay / `pointer-events` issue in the message stream; the card rendered disabled/read-only after the turn ends. Root cause not identified; no code change made.
+**Root cause.** `ChoiceField` decides whether an option is selected with `stringValue === opt.value`, and the `chat_ui` schema did not require options to carry a `value`. When the model sends a numeric value, a label only, `id`/`key` in place of value, an array of strings, or duplicate values, the options render but the comparison never holds, so required validation cannot pass. A separate defect: when the wizard changes step, the reset effect in `InteractiveCard` cleared the values entered in earlier steps. The three hypotheses recorded earlier (streaming re-renders resetting state, an overlay, the card rendered read-only) were neither confirmed nor ruled out one by one.
 
-**Where to look.** `src/components/chat/interactiveUi/` (`InteractiveCard.tsx`, `InteractiveUiRenderer.tsx`, `protocol.ts`, `patch.ts`, `visibility.ts`), `src/contexts/InteractiveCardsContext.tsx`.
+**Fix.**
 
-**Expected behavior.** Options on a live card are clickable and visibly selected; required validation passes once an option is chosen; submit delivers the selection. Add a regression test reproducing the live-path failure, not just the isolated component.
+- Frontend `src/components/chat/interactiveUi/normalize.ts` (`normalizeUiDefinition`, `normalizeOptions`): the definition is normalized when it enters `InteractiveCard`. An option may be a string, a number or an object (`value|id|key|name` and `label|text|title`); the value is always converted to a string, falling back to the label and then to `opt-{index}`; duplicate values get a suffix; `default` is converted to a string as well.
+- Backend `src-tauri/src/tools/chat_ui_schema.rs` (`normalize_ui_definition`, `normalize_ui_patch`) applies the same normalization before the event is emitted, called from `chat_ui` and `chat_ui_patch`. A choice field with no options at all returns a tool error. Option items in the schema now have `required: ["value","label"]`.
+- The `chat_ui` guidance in `src-tauri/src/commands/system_prompt.rs` adds: an option's value must be a unique, non-empty string.
+- Wizard: a step change only fills initial values for fields not seen before; a full reset happens only when the definition changes (`InteractiveCard.tsx`, `initValues.ts`).
+
+**Verification.** `InteractiveCard.options.test.tsx` covers clicking, required validation and the submitted value for the five malformed option shapes (numeric value, label only, `id` in place of value, array of strings, duplicate values), and that values survive going forward and back in a wizard; `normalize.test.ts` and the unit tests in `chat_ui_schema.rs` cover the normalization functions and the empty-options error. **Not done yet:** repeating the original question on the affected machine and confirming the card can be selected and submitted. If it still cannot, continue from the three hypotheses above.
 
 ---
 
-## 24. Task (Todo) panel covers the checkpoint "fork from here" popover
+## 24. Checkpoint "fork from here" popover hidden behind the Task (Todo) panel
 
-**Status (2026-11-15).** **Open.** User report: when the fork popover overlaps the Todo panel, the panel paints on top and the menu is unusable.
+**Status (2026-11-15).** **Fixed; automated tests pass, not yet checked by hand in the running app.** User report: when the fork popover overlaps the Todo panel, the upper part of the menu cannot be seen or clicked.
 
-**Evidence / root-cause hypothesis (unverified).** The popover `.agentz-fork-popover` sets `z-index: 100100` (`src/workspaces/codez/AssistantPanel.css:661-665`), but it lives inside `.agentz-assistant-messages`, which sets `position: relative; z-index: 0` (`AssistantPanel.css:422-434`) — that creates a stacking context, so the popover's large z-index is trapped inside a level-0 context and cannot outrank a sibling panel painted above it. The scroll container's `overflow-y: auto` may also clip the popover. `ForkMenu` is defined in `src/workspaces/codez/AssistantMessageList.tsx:70`.
+**Root cause.** Not z-index. `.agentz-fork-popover` opens upwards and lives inside `.agentz-assistant-messages`, a scroll container with `overflow-y: auto`, which clips whatever extends beyond it. The clip line is exactly the lower edge of the Todo panel, so the menu looks as if the panel covered it. The "stacking context traps the z-index" explanation first recorded here was an unverified hypothesis and does not hold: raising the z-index or changing the stacking context would not reveal the menu.
 
-**Expected behavior.** The fork popover always paints above the Todo panel and any other sibling. Candidate fixes: render the popover through a portal positioned with `src/utils/popupPosition.ts`, or remove/raise the stacking context on the messages container. Verify in the running app with the panel open and overlapping.
+**Fix.** `ForkMenu` in `src/workspaces/codez/AssistantMessageList.tsx` renders the popover into `document.body` with `createPortal` and positions it as fixed with `src/utils/popupPosition.ts`; it flips downwards when there is not enough room above, and closes on scroll, window resize, an outside click or Esc. In `AssistantPanel.css`, `.agentz-fork-popover` lost `position: absolute; bottom` and keeps `z-index: 100100`. The WorkZ message stream uses the same `ForkMenu`, so it is fixed there too. The flip is now relative to the window, not to the messages container.
+
+**Verification.** `src/workspaces/codez/ForkMenu.test.tsx`: the popover node is not inside `.agentz-assistant-messages`; it flips downwards when the anchor is near the top. **Not done yet:** one check by hand in CodeZ and one in WorkZ (Todo panel expanded, "fork from here" on the topmost message, menu fully visible and clickable).
 
 ---
 
 ## 25. Immediate stop skips turn wind-down: tool counts drift, checkpoint banner missing
 
-**Status (2026-11-15).** **Open.** User report. A recent optimization made the stop button respond immediately, but the in-flight turn is no longer finalized properly: the displayed tool-call count diverges from what actually ran (some information may be lost), and no CHECKPOINT fork banner is produced after the interrupt — it looks like an abnormal crash rather than a clean stop.
+**Status (2026-11-15).** **Fixed; automated tests pass, not yet checked by hand in the running app.** User report. An optimization in 1.0.67 made the stop button respond immediately, but the in-flight turn was no longer finalized properly: the displayed tool-call count diverged from what actually ran, and sometimes no CHECKPOINT fork banner appeared after the interrupt — it looked like an abnormal crash rather than a clean stop.
 
-**Where to look.** `chat_cancel` (`src-tauri/src/commands/chat.rs:726`) only sets the cancel flag and returns; wind-down (persisting the streamed tail, reconciling tool rows, checkpoint creation) lives in `chat_turn/post_turn.rs`. Fix batch 6 explicitly persisted partial output on user stop — the immediate-stop change appears to have bypassed or raced that path. Frontend entry: `chatCancel` in `src/services/tauri/chat.ts:400`.
+**Root cause.** Three places, all from the immediate-stop change:
 
-**Expected behavior.** Stop stays fast (UI acknowledges immediately, e.g. a "stopping…" state) but the turn still runs a bounded wind-down: interrupted tool calls are marked as such, counts reconcile with the runtime, partial text is persisted, and the checkpoint/fork banner is emitted. A user stop must be distinguishable from a crash in the history.
+1. **Kernel.** After a cancel, a non-shell tool had a 1-second grace period; when it ran out, the tool's future was dropped and the `Drop` of `OwnedReceipt` recorded the call as failed. The host then classified the whole turn as `interrupted`, set the session to `error`, and skipped post-turn processing.
+2. **Frontend.** `stopCurrent` marked the session as not running at once, so every `tool_start` / `tool_end` / `context_usage` event arriving afterwards was discarded; the reload from the database then added calls that had never started, and the counts disagreed. Marking the session as not running too early also let a new turn race the old turn's `finally` and be overwritten.
+3. **Fork row.** Its condition required non-empty message text, so a stopped turn that contained only tool calls showed none.
+
+**Fix.**
+
+- Kernel `loop_.rs` (`cancel_grace_secs_for`) and `tool_completion.rs` (`abandon_on_drop`): a tool that writes gets 8 seconds after a cancel, and is still recorded as failed if it runs out; a read-only tool that ignores the cancel is abandoned after 1 second and recorded as abandoned, not failed. A checkpoint for the current batch of tool results is written before the loop exits, so every tool_use in the persisted messages has a paired result. Calls that did not get to run are recorded with `TOOL_RESULT_NOT_STARTED`, `TOOL_RESULT_CANCELLED_BEFORE_RUN` or `TOOL_RESULT_INTERRUPTED`.
+- Host `chat_turn/post_turn.rs` (`classify_turn_outcome`): a user stop with confirmed cleanup is recorded as `cancelled`, the session returns to `idle`, and post-turn processing runs as usual; with unconfirmed cleanup the turn stays `interrupted` and post-turn processing is skipped, but the session returns to `idle` rather than `error`.
+- Frontend `useAssistantSession.ts`, `useWorkzSessionStore.ts`, `sessionTurnBookkeeping.ts`: a new "stopping" state. The button responds at once, but the session keeps its running mark and keeps handling tool and context events until the turn ends (with the `STOP_WATCHDOG_MS` watchdog as a backstop); messages sent meanwhile go into the existing queue; one database sync happens at the end.
+- Tool steps have a new `cancelled` status (`src/components/toolCancel.ts`, `ToolTrace.tsx`): a call cancelled before it started is shown as cancelled, is not counted as a tool call, and is not shown as an error.
+- The fork row condition is now "has an id, has text or tool calls, and is not streaming".
+
+**Verification.** Kernel tests cover: cancelling a running read-only tool leaves no failed receipt; a writing tool is only recorded as failed after its grace period; tool_use and results are paired after a cancel. Host tests `turn_outcome_tests`. Frontend tests `useAssistantSession.stop.test.tsx`, `sessionTurnBookkeeping.test.ts`, `ToolTrace.cancelled.test.tsx`, `toolCancel.test.ts`, `agentTools.test.ts`, `AssistantMessageList.test.tsx`. **Not done yet:** in the running app, stopping a few times each during `file_read`, during `shell` and during streamed output, and confirming that the session shows no error state, the counts do not jump, the fork row appears, and a message sent right afterwards runs normally.
+
+**Known limitation.** A call cancelled while it was waiting for a permission decision is shown as not started.
 
 ---
 
 ## 26. Context management/compaction: repeated tool calls without progress; compaction loses the task goal
 
-**Status (2026-11-15).** **Open.** User report, observed live: the agent looped ~250 `file_read` calls re-reading the same documents without advancing the task; the context indicator climbed to 100% with no compaction during the turn. Only after the user interrupted and sent a new message did compaction run — and the resulting context had lost the task goal (the agent could not state what it was doing until asked to inventory its context). A later attempt to record these issues repeated the pattern with ~28 consecutive `file_search` calls.
+**Status (2026-11-15).** **Fixed, awaiting confirmation on the other machine.** User report, observed live: the agent looped ~250 `file_read` calls re-reading the same documents without advancing the task; the context indicator climbed to 100% inside the turn with no sign that compaction had any effect. Only after the user interrupted and sent a new message did the context come down — and the resulting context had lost the task goal (the agent could not state what it was doing until asked to inventory its context). A later attempt to record these issues repeated the pattern with ~28 consecutive `file_search` calls. The problem occurred on another machine and was not reproduced here; the root cause below was established from the code and from this machine's logs, and the fix is covered by regression tests.
+
+**Root cause (corrected).** This entry first said that compaction "apparently only runs between turns". That is wrong. The kernel runs proactive compaction before every model call in the loop, and once more when the provider reports a context overflow. It ran all along; it just did not reduce the request:
+
+- **The compaction target was not tied to the trigger.** `compact_proactive` classifies the tier on the whole request (system prompt and tool definitions included), but the amount kept was fixed at 60% of the message budget (30% in the full tier). With static overhead above half of the budget, an auto-tier pass ended in the auto tier again, so every iteration spent one summary call for nothing. This machine's logs contain a run of 271 consecutive triggers with the message count going `199 → 199`.
+- **Idle passes were not recognized.** With only the rolling summary left to compact, the model was still called and the result reported as changed, so the summary was summarized again and again.
+- **`summary_split_index` had the wrong default.** When all messages fit within the amount to keep, it split at `len - 6`, the opposite of its comment.
+- **No fallback when the summary fails.** A failed summary call simply gave up, and overflow recovery depended on the same call.
+- **Low summary fidelity.** Tool results were kept as 200-character previews, the summary was capped at 1024 tokens, and the user's original request was not pinned; documents that had been read and compacted away could only be read again — the direct source of the re-read loop.
+- **Loop detection was too narrow.** It only matched calls with identical arguments, at thresholds of 64/128; rotating through a few files never triggered it.
+- **The host's `history_budget` subtracted a fixed 3,000 tokens.** In 29 of 99 runs on this machine, the first request was already above 95% of the budget.
+- **The indicator was capped at 100%**, so it could not show whether compaction worked.
+
+**Fix (kernel, `vendor/piscis-engine/piscis-kernel/src/agent/`).**
+
+- `loop_.rs` (`compaction_keep_tokens`): the amount kept is the smaller of "message budget × ratio" and "`trigger_micro` − static overhead − a reserve for the summary", with the 6 most recent messages always kept, so one pass ends below the trigger.
+- Idle protection and cooldown: the model is not called when there is no non-summary message to compact; a pass that lowers the estimate by less than 5% is not applied; both cases start a cooldown, and the next attempt waits until the estimate has grown by 5% of the total budget. `summary_split_index` returns 0 when everything fits.
+- When the static overhead alone reaches `trigger_micro`, a `context_static_overhead` notice is sent once per session, stating what share of the budget the system prompt and tool definitions take and asking the user to disable some MCP tools or skills.
+- Fallback for a failed summary (`compact_by_rule`, `rule_based_summary`): after 2 consecutive failures, or in the full tier, older messages are cut by rule and replaced by a locally generated record (the user's requests verbatim, a list of tool calls). Overflow recovery uses the same fallback.
+- Summary fidelity (`pin_turn_facts`): the summary message pins the current turn's user request verbatim, a snapshot of the todos, and a list of files read (path, range, count); previews of read-type tool results are 800 characters; the summary cap is `clamp(1024, 4096)`.
+- `read_guard.rs` (new, read-only tools only): the same path with unchanged content is warned about on the 3rd re-read and blocked on the 6th; after 25 and 50 consecutive read-only calls with no write and no plan update, a reminder restating the user's request is injected; when more than half of the last 40 reads were re-reads of unchanged content, the turn is paused and the user is told why (`read_loop_paused`). Merely reading new files is never blocked or paused.
+- Observability: each pass logs one line `compaction outcome=ok|noop|fallback|failed tier=… before=… after=…`; the `ContextUsage` event carries the state of the most recent pass (`last_compaction`).
+
+**Fix (host and UI).**
+
+- `src-tauri/src/context_assembly.rs` (`turn_history_budget`) and `chat_turn/mod.rs`: the history budget is now "total budget − measured static overhead − 5% headroom", and the state frame's cost is reserved up front as well.
+- `src/components/ContextUsageRing.tsx`: when the estimate exceeds the budget the label is `100%+`, and the tooltip gives the real percentage, the number of compactions and the state of the most recent one.
+
+**Verification.** Kernel tests cover: with static overhead at 63% of the budget, one pass ends below the auto tier and ten rounds summarize once; no model call when only the rolling summary is left; no summary when everything fits; with a summary client that always fails, the rule-based cut happens within two rounds and the user's request is still present; the summary message contains the user's request, the todos and the list of files read; rotating re-reads of 4 unchanged files produce the warning, the block and a pause within 60 calls, while reading 60 different files is never blocked. Host tests `context_assembly::tests` (a fixture with 50k tokens of measured overhead). Frontend tests `ContextUsageRing.test.tsx`, `runEventProjection.test.ts`. **Not done yet:** repeating the original document task on the affected machine and confirming that the log has no run of consecutive `outcome=noop`, the indicator does not stay at 100%, and `file_read` no longer shows dozens of re-reads.
+
+**Known limitations.**
+
+- The history assembled by the host is only guaranteed to fit the total budget. That the first request of a new turn is below `trigger_micro` depends on the kernel's pass before the first model call, which runs only when the request reaches the auto tier; a request assembled between 60% and 80% is sent as is. The host history was not capped below `trigger_micro` because older turns that do not fit the host budget are dropped outright, without a summary.
+- Not changed here: when receipts are demoted, the memory mechanism, the size of MCP tool definitions, and the `max_iterations` default.
+- A pass that is not applied because it gained less than 5% is still billed for its summary call.
+
+The sub-problems as first recorded follow, kept for traceability.
 
 **Sub-problems.**
 

@@ -1284,7 +1284,7 @@ export default function App() {
         </div>
       )}
 
-      <ProjectEdgeShell projectDir={projectDir} />
+      <ProjectEdgeShell projectDir={projectDir} visible={mode === "codez"} />
     </div>
     </ProjectEdgeProvider>
   );

@@ -144,7 +144,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         busy={s.busy}
         open={s.taskPanelOpen}
         onOpenChange={s.setTaskPanelOpen}
-        onClearPlan={() => s.setPlanItems([])}
+        onClearPlan={s.clearPlan}
       />
 
       <AssistantMessageList
@@ -153,6 +153,7 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         toolSteps={s.toolSteps}
         turnDiffsByTurnId={s.turnDiffsByTurnId}
         busy={s.busy}
+        stopping={s.stopping}
         queuedView={s.queuedView}
         onRemoveQueued={s.removeQueued}
         onInterruptQueued={s.interruptQueued}
@@ -236,6 +237,8 @@ export default function AssistantPanel(props: AssistantPanelProps) {
         onSubmit={s.submit}
         onStop={s.stopCurrent}
         busy={s.busy}
+        stopping={s.stopping}
+        stoppingTitle={s.t("chat.stopping")}
         sendWhileBusy
         placeholder={s.inputPlaceholder}
         canSend={s.canSend}

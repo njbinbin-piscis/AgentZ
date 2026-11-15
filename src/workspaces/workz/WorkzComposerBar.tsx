@@ -25,6 +25,8 @@ export interface WorkzComposerBarProps {
   onChangeIsolate: (isolate: boolean) => void;
   taskBound: boolean;
   busy: boolean;
+  /** Stop was requested; the turn is still running until the backend confirms. */
+  stopping?: boolean;
   startMode: "commit" | "working";
   onChangeStartMode: (mode: "commit" | "working") => void;
   startBase: string;
@@ -97,6 +99,7 @@ export default function WorkzComposerBar({
   onChangeIsolate,
   taskBound,
   busy,
+  stopping = false,
   startMode,
   onChangeStartMode,
   startBase,
@@ -375,6 +378,8 @@ export default function WorkzComposerBar({
         onSubmit={onRun}
         onStop={onStop}
         busy={busy}
+        stopping={stopping}
+        stoppingTitle={t("chat.stopping")}
         sendWhileBusy
         placeholder={
           !projectDir

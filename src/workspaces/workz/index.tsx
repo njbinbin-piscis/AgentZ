@@ -208,7 +208,7 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
           busy={s.busy}
           open={s.taskPanelOpen}
           onOpenChange={s.setTaskPanelOpen}
-          onClearPlan={() => s.setPlanItems([])}
+          onClearPlan={s.clearPlan}
         />
 
         <WorkzComposerBar
@@ -222,6 +222,7 @@ export default function WorkZWorkspace(props: WorkZWorkspaceProps) {
           onChangeIsolate={s.setIsolate}
           taskBound={s.taskBound}
           busy={s.busy}
+          stopping={s.stopping}
           startMode={s.startMode}
           onChangeStartMode={s.setStartMode}
           startBase={s.startBase}

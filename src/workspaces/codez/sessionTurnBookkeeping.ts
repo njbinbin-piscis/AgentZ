@@ -11,18 +11,47 @@ export interface SessionTurnLike {
   sessionId: string;
 }
 
+/**
+ * How long a stopped turn may take to report that it finished before the
+ * session is released anyway. The backend allows a running tool up to 8s to
+ * tear itself down and then confirms; this only covers a backend that never
+ * answers.
+ */
+export const STOP_WATCHDOG_MS = 12_000;
+
 export class SessionTurnBookkeeping<T extends SessionTurnLike> {
   private running = new Set<string>();
+  private stopping = new Set<string>();
   private queues = new Map<string, T[]>();
 
   markRunning(id: string | null, on: boolean): void {
     if (!id) return;
     if (on) this.running.add(id);
-    else this.running.delete(id);
+    else {
+      this.running.delete(id);
+      this.stopping.delete(id);
+    }
   }
 
   isRunning(id: string | null | undefined): boolean {
     return !!id && this.running.has(id);
+  }
+
+  /**
+   * The user asked to stop this session's turn. The session stays *running*
+   * until the backend reports the turn finished: its remaining events still
+   * belong on screen, and a message sent meanwhile must queue behind it rather
+   * than start a second turn that the unwinding one would then overwrite.
+   * Returns false when there is nothing to stop or a stop is already pending.
+   */
+  beginStop(id: string | null | undefined): boolean {
+    if (!id || !this.running.has(id) || this.stopping.has(id)) return false;
+    this.stopping.add(id);
+    return true;
+  }
+
+  isStopping(id: string | null | undefined): boolean {
+    return !!id && this.stopping.has(id);
   }
 
   runningIds(): string[] {

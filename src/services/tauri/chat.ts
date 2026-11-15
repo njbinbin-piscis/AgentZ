@@ -48,6 +48,14 @@ export type AgentEvent =
       cumulative_output_tokens: number;
       rolling_summary_version: number;
       auto_compact_threshold: number;
+      /** How the run's most recent compaction ended; absent until one was attempted. */
+      last_compaction?: {
+        outcome: string;
+        tier: string;
+        before_tokens: number;
+        after_tokens: number;
+        count: number;
+      } | null;
     }
   | { type: "interactive_ui"; request_id: string; ui_definition: unknown }
   | { type: "interactive_ui_patch"; request_id: string; patch: unknown }
@@ -55,6 +63,11 @@ export type AgentEvent =
   | { type: "done"; total_input_tokens: number; total_output_tokens: number }
   | { type: "cancelled" }
   | { type: "error"; message: string }
+  /**
+   * Informational: the run goes on (fallback model, corrected tool call,
+   * paused read loop, oversized static context). Never ends the running state.
+   */
+  | { type: "notice"; message: string; code?: string | null; details?: unknown }
   | { type: "other" };
 
 /** Envelope emitted by the backend `TauriEventSink`. */

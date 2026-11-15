@@ -5,7 +5,10 @@ import { relativizeArtifactPath } from "./artifactPaths";
 export interface AgentToolEvent {
   id: string;
   name: string;
-  status: "running" | "done" | "error";
+  /** `cancelled`: a user Stop cut the call short. Not a failure. */
+  status: "running" | "done" | "error" | "cancelled";
+  /** Cancelled before it was dispatched: it never ran and is not counted as a call. */
+  skipped?: boolean;
   result?: string;
   path?: string;
   input?: unknown;

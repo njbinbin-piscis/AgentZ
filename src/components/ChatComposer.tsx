@@ -142,6 +142,13 @@ export interface ChatComposerProps {
    * composer is empty again.
    */
   sendWhileBusy?: boolean;
+  /**
+   * Stop was requested and the running turn is still winding down. The stop
+   * button stays visible but inert (a second click has nothing more to do);
+   * sending still queues behind the turn.
+   */
+  stopping?: boolean;
+  stoppingTitle?: string;
   placeholder: string;
   canSend?: boolean;
   textareaRef?: RefObject<HTMLTextAreaElement>;
@@ -192,6 +199,8 @@ export default function ChatComposer({
   onStop,
   busy,
   sendWhileBusy = false,
+  stopping = false,
+  stoppingTitle = "Stopping…",
   placeholder,
   canSend: canSendProp,
   textareaRef,
@@ -443,7 +452,14 @@ export default function ChatComposer({
                     </svg>
                   </button>
                 ) : (
-                  <button type="button" className="agentz-composer-stop-icon" onClick={onStop} title={stopTitle}>
+                  <button
+                    type="button"
+                    className={`agentz-composer-stop-icon${stopping ? " is-stopping" : ""}`}
+                    onClick={onStop}
+                    disabled={stopping}
+                    aria-busy={stopping || undefined}
+                    title={stopping ? stoppingTitle : stopTitle}
+                  >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                       <rect x="6" y="6" width="12" height="12" rx="1" />
                     </svg>

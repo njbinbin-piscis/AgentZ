@@ -643,8 +643,36 @@ pub async fn run_agentz_turn(
         )
     };
 
-    let history_budget =
-        piscis_kernel::llm::compute_context_budget(context_window, runtime.max_tokens);
+    let system_prompt = build_turn_system_prompt(
+        &app,
+        &config_dir,
+        &workspace_root,
+        &session_id,
+        chat_mode,
+        prefer_zh,
+        allow_outside_workspace,
+        &policy_mode,
+        request.extra_system_context.as_deref(),
+        agent.as_ref(),
+        &enabled_skills,
+        enabled_connectors.as_ref(),
+        durable_plan_enabled,
+        &plan_store,
+        workz_team_id.as_deref(),
+        workz_pool_id.as_deref(),
+    )
+    .await;
+
+    // History is sized against the budget left once the system prompt and
+    // the tool definitions of this turn are counted.
+    let static_overhead_tokens = piscis_kernel::llm::estimate_request_overhead_tokens(
+        Some(&system_prompt),
+        &registry.to_tool_defs(piscis_kernel::agent::tool::ToolDefMode::Minimal),
+    );
+    let history_budget = crate::context_assembly::turn_history_budget(
+        piscis_kernel::llm::compute_total_input_budget(context_window, runtime.max_tokens),
+        static_overhead_tokens,
+    );
     let mut llm_messages: Vec<LlmMessage> = {
         let db = db.lock().await;
         let history = db
@@ -695,26 +723,6 @@ pub async fn run_agentz_turn(
         read_timeout,
         runtime.options.clone().with_session(&session_id),
     );
-
-    let system_prompt = build_turn_system_prompt(
-        &app,
-        &config_dir,
-        &workspace_root,
-        &session_id,
-        chat_mode,
-        prefer_zh,
-        allow_outside_workspace,
-        &policy_mode,
-        request.extra_system_context.as_deref(),
-        agent.as_ref(),
-        &enabled_skills,
-        enabled_connectors.as_ref(),
-        durable_plan_enabled,
-        &plan_store,
-        workz_team_id.as_deref(),
-        workz_pool_id.as_deref(),
-    )
-    .await;
 
     let policy = Arc::new(PolicyGate::with_profile_and_flags(
         &workspace_root,

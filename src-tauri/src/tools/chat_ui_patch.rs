@@ -51,9 +51,16 @@ impl Tool for ChatUiPatchTool {
         if request_id.is_empty() {
             return Ok(ToolResult::err("request_id is required."));
         }
-        let patch = input.get("patch").cloned().unwrap_or(Value::Null);
+        let mut patch = input.get("patch").cloned().unwrap_or(Value::Null);
         if patch.is_null() {
             return Ok(ToolResult::err("patch object is required."));
+        }
+        // Blocks replaced by a patch get the same option repair as a new card.
+        let unanswerable = chat_ui_schema::normalize_ui_patch(&mut patch);
+        if !unanswerable.is_empty() {
+            return Ok(ToolResult::err(chat_ui_schema::unanswerable_fields_error(
+                &unanswerable,
+            )));
         }
 
         chat_ui::emit_interactive_event(

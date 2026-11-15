@@ -23,6 +23,13 @@ function label(root: ReactTestRenderer): string {
   return String(node.children.join(""));
 }
 
+function tooltip(root: ReactTestRenderer): string {
+  const ring = root.root.find(
+    (n) => n.type === "span" && String(n.props.className ?? "").split(" ")[0] === "agentz-context-ring",
+  );
+  return String(ring.props.title);
+}
+
 describe("ContextUsageRing percentage calculation", () => {
   let root: ReactTestRenderer | null = null;
   afterEach(async () => {
@@ -34,11 +41,21 @@ describe("ContextUsageRing percentage calculation", () => {
     }
   });
 
-  it("caps the label at 100% when the estimate exceeds the budget (ring and label stay in sync)", async () => {
+  it("marks an over-budget estimate as 100%+ instead of a plain 100%", async () => {
     await act(async () => {
       root = create(<ContextUsageRing usage={usage(1230, 1000)} />);
     });
+    expect(label(root!)).toBe("100%+");
+    // The real figure is in the tooltip.
+    expect(tooltip(root!)).toContain('chat.contextRingOver:{"pct":123}');
+  });
+
+  it("shows exactly 100% without the marker when the estimate just fills the budget", async () => {
+    await act(async () => {
+      root = create(<ContextUsageRing usage={usage(1000, 1000)} />);
+    });
     expect(label(root!)).toBe("100%");
+    expect(tooltip(root!)).not.toContain("chat.contextRingOver");
   });
 
   it("shows the true percentage when within budget", async () => {
@@ -52,7 +69,38 @@ describe("ContextUsageRing percentage calculation", () => {
     await act(async () => {
       root = create(<ContextUsageRing usage={usage(1230, 1000)} />);
     });
-    const ring = root!.root.find((n) => n.type === "span" && n.props.className === "agentz-context-ring");
-    expect(String(ring.props.title)).toContain("1.2k");
+    expect(tooltip(root!)).toContain("1.2k");
+  });
+
+  it("says nothing about compaction until one was attempted", async () => {
+    await act(async () => {
+      root = create(<ContextUsageRing usage={usage(500, 1000)} />);
+    });
+    expect(tooltip(root!)).not.toContain("chat.contextRingCompactions");
+    expect(tooltip(root!)).not.toContain("chat.contextRingLastCompaction");
+  });
+
+  it("reports how many compactions ran and how the last one ended", async () => {
+    await act(async () => {
+      root = create(
+        <ContextUsageRing
+          usage={{
+            ...usage(98_000, 204_000),
+            lastCompaction: {
+              outcome: "fallback",
+              tier: "auto",
+              beforeTokens: 176_205,
+              afterTokens: 98_000,
+              count: 2,
+            },
+          }}
+        />,
+      );
+    });
+    const text = tooltip(root!);
+    expect(text).toContain('chat.contextRingCompactions:{"count":2}');
+    expect(text).toContain(
+      'chat.contextRingLastCompaction:{"status":"chat.contextCompactionFallback","before":"176.2k","after":"98.0k"}',
+    );
   });
 });

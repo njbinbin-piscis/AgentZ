@@ -7,8 +7,10 @@
 /// - In-memory message compaction for long-running tasks
 /// - Checkpoint size guard for DB persistence
 use super::compaction_strategy::{
-    CompactionRequest, CompactionResult, CompactionStrategy, CompactionTrigger,
+    CompactionGuard, CompactionOutcomeKind, CompactionPins, CompactionReport, CompactionRequest,
+    CompactionResult, CompactionStrategy, CompactionTrigger,
 };
+use super::read_guard::{ReadGuard, ReadVerdict};
 use super::harness::CompactionTier;
 use super::messages::AgentEvent;
 use super::tool::{ToolContext, ToolRegistry};
@@ -41,6 +43,13 @@ async fn call_with_completion(
         .owned_completion()
         .register()
         .map_err(anyhow::Error::msg)?;
+    // A read-only call that is dropped (cancel grace expired) leaves nothing to
+    // clean up, so it is recorded as abandoned, not as an unconfirmed failure.
+    let receipt = if tool.is_read_only() {
+        receipt.abandon_on_drop()
+    } else {
+        receipt
+    };
     let result = tool.call(input, ctx).await;
     receipt.complete(Ok(()));
     result.map(|mut r| {
@@ -56,10 +65,36 @@ const TOOL_TIMEOUT_SECS: u64 = 120;
 /// After a cancel request, a running tool gets this long to finish its own teardown
 /// (for example a sandboxed shell terminating its Job Object) before its future is dropped.
 const CANCEL_GRACE_SECS: u64 = 8;
-/// Tools that do NOT observe `ctx.cancel` have no teardown of their own, so they
-/// are dropped after this short grace instead of holding a user Stop for the full
-/// cooperative-teardown window.
+/// Read-only tools that do NOT observe `ctx.cancel` have no teardown of their own
+/// and nothing half-written to protect, so they are dropped after this short grace
+/// instead of holding a user Stop for the full window.
 const CANCEL_GRACE_UNCOOPERATIVE_SECS: u64 = 1;
+
+/// How long a running tool may keep going after a cancel request.
+///
+/// - A tool that tears itself down (`observes_cancel`) gets the full window.
+/// - So does any tool that is not read-only: dropping it after one second cut
+///   ordinary writes short and left the outcome unknown, which the host then
+///   reported as an abnormal interruption.
+/// - A read-only tool that ignores cancel is dropped quickly; nothing is lost.
+fn cancel_grace_secs_for(tool: &dyn super::tool::Tool) -> u64 {
+    if tool.observes_cancel() || !tool.is_read_only() {
+        CANCEL_GRACE_SECS
+    } else {
+        CANCEL_GRACE_UNCOOPERATIVE_SECS
+    }
+}
+
+/// Result of a tool call the model requested but the loop never dispatched,
+/// because the run was cancelled first. No `ToolStart` was emitted for it.
+pub const TOOL_RESULT_NOT_STARTED: &str =
+    "Tool execution was cancelled or interrupted before completion.";
+/// Result of a tool call that was announced (`ToolStart`) but not run, because
+/// the cancel request arrived just before it started.
+pub const TOOL_RESULT_CANCELLED_BEFORE_RUN: &str = "已取消";
+/// Result of a tool call that was running when the user stopped the turn and
+/// did not finish within its grace period.
+pub const TOOL_RESULT_INTERRUPTED: &str = "已被用户取消";
 /// Slack over a tool's own timeout so it can finish its timeout handling
 /// (e.g. moving a shell command to the background) before the loop gives up.
 const TOOL_TIMEOUT_SLACK_SECS: u64 = 30;
@@ -1106,6 +1141,29 @@ pub use super::compaction::{
     CTX_TRIM_HEAD, CTX_TRIM_TAIL,
 };
 const SUMMARY_KEEP_RECENT_RATIO: f64 = 0.60; // keep newest 60% of budget intact
+/// Fewest newest messages a compaction pass leaves verbatim.
+const SUMMARY_MIN_KEEP_MESSAGES: usize = 6;
+/// Room left for the summary message when sizing the verbatim tail.
+const SUMMARY_RESERVE_TOKENS: usize = 8_000;
+/// A pass must cut the request estimate by at least this share to count.
+const COMPACTION_MIN_GAIN_PERCENT: usize = 5;
+/// After a pass that achieved nothing, the next one waits until the estimate
+/// has grown by this share of the total budget.
+const COMPACTION_COOLDOWN_PERCENT: usize = 5;
+/// Summariser failures in a row after which history is cut by rule instead.
+const SUMMARY_FAILURES_BEFORE_FALLBACK: u32 = 2;
+/// Characters of a read-type tool result shown to the summariser.
+const SUMMARY_READ_RESULT_PREVIEW_CHARS: usize = 800;
+/// Characters of any other tool call or result shown to the summariser.
+const SUMMARY_TOOL_PREVIEW_CHARS: usize = 200;
+/// Characters of one plain message shown to the summariser.
+const SUMMARY_MESSAGE_SNIPPET_CHARS: usize = 500;
+/// Above this size the history is rendered again with short previews only.
+const SUMMARY_HISTORY_MAX_CHARS: usize = 60_000;
+/// Longest user request pinned next to the summary.
+const PINNED_REQUEST_MAX_CHARS: usize = 6_000;
+/// Longest summary the rule-based fallback keeps.
+const RULE_SUMMARY_MAX_CHARS: usize = 12_000;
 
 /// Level-1 compaction: trim oversized individual tool results (head + tail).
 ///
@@ -1210,14 +1268,258 @@ pub struct CompactionOutcome {
 
 /// The kernel's built-in proactive compaction policy.
 ///
-/// Reproduces the previously-inline behavior: build a demoted request view,
-/// estimate tokens, and run up to two Level-2 (rolling-summary) passes —
-/// keeping the newest 60% then 30% of the message budget — until the estimate
-/// drops under the 60% safety line. Lives in this module so it can reach the
-/// private structured fields of [`CompactionOutcome`] and the in-module
-/// helpers / constants.
+/// Builds the demoted request view, estimates its tokens and, from the auto
+/// tier up, replaces older history with a rolling summary. The verbatim tail
+/// is sized so the request ends below the micro trigger. A pass that cannot
+/// shrink the request is not repeated until the request has grown, and a
+/// summariser that keeps failing is replaced by a rule-based cut. Lives in
+/// this module so it can reach the private structured fields of
+/// [`CompactionOutcome`] and the in-module helpers / constants.
 #[derive(Default)]
 pub struct DefaultCompaction;
+
+/// What is needed to estimate the request a set of messages would produce.
+struct RequestScale<'a> {
+    tool_minimals: &'a HashMap<String, String>,
+    session_id: &'a str,
+    system_prompt: &'a str,
+    tool_defs: &'a [crate::llm::ToolDef],
+    message_budget: usize,
+    max_tool_result_tokens: u32,
+}
+
+impl RequestScale<'_> {
+    /// Estimated tokens of the request view built from `messages`.
+    async fn estimate(&self, messages: &[LlmMessage]) -> usize {
+        let demoted = build_request_view_messages(
+            messages,
+            self.tool_minimals,
+            CTX_PRESERVE_RECENT_TURNS,
+            CTX_KEEP_RECENT_TOOL_CARRIERS,
+            self.message_budget,
+            self.max_tool_result_tokens,
+        );
+        let request_messages = vision::inject_selected_context(&demoted, self.session_id).await;
+        crate::llm::estimate_request_input_tokens(
+            &request_messages,
+            Some(self.system_prompt),
+            self.tool_defs,
+        )
+    }
+}
+
+/// Tokens of recent history a pass may leave verbatim: the tier's share of
+/// the message budget, capped so that the request, with the summary added
+/// back, ends below the micro trigger.
+fn compaction_keep_tokens(
+    budget: &crate::agent::harness::LayeredBudget,
+    static_overhead_tokens: usize,
+    keep_ratio: f64,
+) -> usize {
+    let message_budget = (budget.total as usize).saturating_sub(static_overhead_tokens);
+    let by_ratio = (message_budget as f64 * keep_ratio) as usize;
+    let below_trigger = (budget.trigger_micro as usize).saturating_sub(static_overhead_tokens);
+    let summary_reserve = (below_trigger / 3).min(SUMMARY_RESERVE_TOKENS);
+    by_ratio.min(below_trigger.saturating_sub(summary_reserve))
+}
+
+/// Share of the input budget, in percent, taken by the system prompt and the
+/// tool definitions when that alone reaches the micro trigger. Compaction
+/// cannot bring such a request below the trigger.
+pub fn static_overhead_over_trigger(
+    budget: &crate::agent::harness::LayeredBudget,
+    static_overhead_tokens: usize,
+) -> Option<u32> {
+    if budget.total == 0 || static_overhead_tokens < budget.trigger_micro as usize {
+        return None;
+    }
+    Some((static_overhead_tokens.saturating_mul(100) / budget.total as usize) as u32)
+}
+
+fn truncate_chars(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    let head: String = text.chars().take(max_chars).collect();
+    format!("{}…（过长，已截断）", head)
+}
+
+/// Turn facts placed next to the summary. They are rebuilt on every pass and
+/// are not part of the stored rolling summary, so a later pass cannot
+/// summarise them away.
+fn pinned_facts_block(pins: &CompactionPins, kept: &[LlmMessage]) -> String {
+    let mut sections: Vec<String> = Vec::new();
+    let request = pins.user_request.trim();
+    if !request.is_empty() {
+        let still_in_history = kept.iter().any(|message| {
+            message.role == "user"
+                && is_plain_text_message(message)
+                && message.content.as_text().trim() == request
+        });
+        if !still_in_history {
+            sections.push(format!(
+                "当前用户请求（原文）：\n{}",
+                truncate_chars(request, PINNED_REQUEST_MAX_CHARS)
+            ));
+        }
+    }
+    if !pins.todos.is_empty() {
+        sections.push(format!("待办快照：\n{}", pins.todos.join("\n")));
+    }
+    if !pins.files_read.is_empty() {
+        let lines: Vec<String> = pins
+            .files_read
+            .iter()
+            .map(|line| format!("- {}", line))
+            .collect();
+        sections.push(format!(
+            "已读文件清单（路径；范围；次数）。这些文件本轮已经读过，内容没有变化就不要重读：\n{}",
+            lines.join("\n")
+        ));
+    }
+    sections.join("\n\n")
+}
+
+/// Rewrite the leading summary message of a compacted history so it also
+/// carries the pinned turn facts.
+fn pin_turn_facts(messages: &mut [LlmMessage], summary: &str, pins: &CompactionPins) {
+    let Some((first, kept)) = messages.split_first_mut() else {
+        return;
+    };
+    let block = pinned_facts_block(pins, kept);
+    if block.is_empty() {
+        return;
+    }
+    *first = crate::agent::message_utils::rolling_summary_message(&format!(
+        "{}\n\n{}",
+        summary.trim(),
+        block
+    ));
+}
+
+/// A user text the kernel injected (reminders, loop warnings), as opposed to
+/// something the user wrote.
+fn is_injected_user_text(text: &str) -> bool {
+    is_compaction_summary_text(text) || text.starts_with("[系统") || text.starts_with("[循环检测]")
+}
+
+/// Summary of dropped messages assembled without a model: what the user
+/// asked for, word for word, and which tools were called on what.
+fn rule_based_summary(existing_summary: &str, dropped: &[LlmMessage]) -> String {
+    const MAX_REQUESTS: usize = 5;
+    const MAX_REQUEST_CHARS: usize = 2_000;
+    const MAX_TARGETS_PER_TOOL: usize = 6;
+
+    let mut requests: Vec<String> = Vec::new();
+    let mut calls: Vec<(String, usize, Vec<String>)> = Vec::new();
+    for message in dropped {
+        if message.role == "user" && is_plain_text_message(message) {
+            let text = message.content.as_text();
+            let text = text.trim();
+            if !text.is_empty() && !is_injected_user_text(text) {
+                requests.push(truncate_chars(text, MAX_REQUEST_CHARS));
+            }
+            continue;
+        }
+        let MessageContent::Blocks(blocks) = &message.content else {
+            continue;
+        };
+        for block in blocks {
+            let ContentBlock::ToolUse { name, input, .. } = block else {
+                continue;
+            };
+            let target = super::read_guard::read_target(input)
+                .unwrap_or_else(|| input.to_string().chars().take(80).collect());
+            let index = match calls.iter().position(|(seen, _, _)| seen == name) {
+                Some(index) => index,
+                None => {
+                    calls.push((name.clone(), 0, Vec::new()));
+                    calls.len() - 1
+                }
+            };
+            let entry = &mut calls[index];
+            entry.1 += 1;
+            if !entry.2.contains(&target) && entry.2.len() < MAX_TARGETS_PER_TOOL {
+                entry.2.push(target);
+            }
+        }
+    }
+
+    let mut out = String::new();
+    let existing = existing_summary.trim();
+    if !existing.is_empty() {
+        out.push_str(existing);
+        out.push_str("\n\n");
+    }
+    out.push_str(&format!(
+        "[规则裁剪记录] 摘要模型不可用，系统按规则移除了较早的 {} 条消息，只保留以下要点。",
+        dropped.len()
+    ));
+    if !requests.is_empty() {
+        // The oldest request usually states the task; the newest ones say
+        // where it stands.
+        let omitted = requests.len().saturating_sub(MAX_REQUESTS);
+        out.push_str("\n用户请求（原文）：");
+        for (index, request) in requests.iter().enumerate() {
+            if index == 0 || index > omitted {
+                out.push_str("\n- ");
+                out.push_str(request);
+            } else if index == 1 {
+                out.push_str(&format!("\n- （中间 {} 条已省略）", omitted));
+            }
+        }
+    }
+    if !calls.is_empty() {
+        out.push_str("\n已执行的工具调用：");
+        for (name, count, targets) in &calls {
+            out.push_str(&format!("\n- {} ×{}（{}）", name, count, targets.join("、")));
+        }
+    }
+
+    let total = out.chars().count();
+    if total <= RULE_SUMMARY_MAX_CHARS {
+        return out;
+    }
+    // Keep the start (the oldest goal) and the end (the latest record).
+    let head: String = out.chars().take(RULE_SUMMARY_MAX_CHARS / 3).collect();
+    let tail: String = out
+        .chars()
+        .skip(total - RULE_SUMMARY_MAX_CHARS * 2 / 3)
+        .collect();
+    format!("{}\n…（中间部分已省略）…\n{}", head, tail)
+}
+
+/// Cut history without a model: keep the newest messages that fit in
+/// `keep_tokens` and replace the rest with [`rule_based_summary`]. `None`
+/// when there is nothing to drop.
+fn compact_by_rule(
+    messages: &[LlmMessage],
+    keep_tokens: usize,
+    floor: TailFloor,
+    existing_summary: &str,
+) -> Option<CompactionOutcome> {
+    let cut = select_recent_window(messages, keep_tokens).min(max_summary_split(messages, floor));
+    let cut = snap_to_pair_boundary(messages, cut);
+    let dropped = &messages[..cut];
+    let only_summaries = dropped.iter().all(|message| {
+        matches!(&message.content, MessageContent::Text(text) if is_compaction_summary_text(text))
+    });
+    if only_summaries {
+        return None;
+    }
+    let summary = rule_based_summary(existing_summary, dropped);
+    let mut new_messages = vec![crate::agent::message_utils::rolling_summary_message(&summary)];
+    new_messages.extend_from_slice(&messages[cut..]);
+    Some(CompactionOutcome {
+        messages: new_messages,
+        summary,
+        input_tokens: 0,
+        output_tokens: 0,
+        structured_plan_items: Vec::new(),
+        structured_next_step_hint: None,
+        structured_rolling: None,
+    })
+}
 
 #[async_trait::async_trait]
 impl CompactionStrategy for DefaultCompaction {
@@ -1236,26 +1538,24 @@ impl DefaultCompaction {
         let static_overhead_tokens =
             crate::llm::estimate_request_overhead_tokens(Some(req.system_prompt), req.tool_defs);
         let message_budget = total_budget.saturating_sub(static_overhead_tokens);
+        let scale = RequestScale {
+            tool_minimals: req.tool_minimals,
+            session_id: req.session_id,
+            system_prompt: req.system_prompt,
+            tool_defs: req.tool_defs,
+            message_budget,
+            max_tool_result_tokens: req.budget.max_tool_result_tokens,
+        };
+        let mut guard = req.guard;
+        let rolling_summary = req.rolling_summary;
+        let threshold = req.next_auto_compact_threshold;
 
         let messages = req.messages;
 
-        // Build the demoted request view (minimal receipts for older turns)
-        // before classifying the request. Micro keeps this request-view-only
-        // demotion and never creates a persisted semantic summary.
-        let demoted = build_request_view_messages(
-            &messages,
-            req.tool_minimals,
-            CTX_PRESERVE_RECENT_TURNS,
-            CTX_KEEP_RECENT_TOOL_CARRIERS,
-            message_budget,
-            req.budget.max_tool_result_tokens,
-        );
-        let req_messages = vision::inject_selected_context(&demoted, req.session_id).await;
-        let estimated = crate::llm::estimate_request_input_tokens(
-            &req_messages,
-            Some(req.system_prompt),
-            req.tool_defs,
-        );
+        // Classify the demoted request view (minimal receipts for older
+        // turns). Micro keeps this request-view-only demotion and never
+        // creates a persisted semantic summary.
+        let estimated = scale.estimate(&messages).await;
         let tier = req.budget.classify(estimated.min(u32::MAX as usize) as u32);
         info!(
             "context check: {} messages, ~{} estimated request tokens (total_budget={}, message_budget={}, threshold={}, tier={})",
@@ -1267,144 +1567,288 @@ impl DefaultCompaction {
             tier.as_str(),
         );
 
+        let report = |outcome: CompactionOutcomeKind, after_tokens: usize| {
+            Some(CompactionReport {
+                outcome,
+                tier: tier.as_str(),
+                before_tokens: estimated,
+                after_tokens,
+            })
+        };
         let keep_ratio = match tier {
             CompactionTier::None | CompactionTier::Micro => {
-                return CompactionResult {
-                    changed: false,
-                    messages,
-                    rolling_summary: req.rolling_summary.to_string(),
-                    next_auto_compact_threshold: req.next_auto_compact_threshold,
-                    ..Default::default()
-                };
+                return unchanged_compaction(messages, rolling_summary, threshold, guard, None);
             }
             CompactionTier::Auto => SUMMARY_KEEP_RECENT_RATIO,
             CompactionTier::Full => SUMMARY_KEEP_RECENT_RATIO * 0.5,
         };
 
+        // The last pass achieved nothing. Repeating it on the same history
+        // would spend a summariser call for the same result.
+        if let Some(retry_at) = guard.retry_at_estimate {
+            if estimated < retry_at {
+                debug!(
+                    "compaction skipped tier={} estimated_tokens={} retry_at={}",
+                    tier.as_str(),
+                    estimated,
+                    retry_at
+                );
+                return unchanged_compaction(messages, rolling_summary, threshold, guard, None);
+            }
+            guard.retry_at_estimate = None;
+        }
+        let retry_after_growth = Some(
+            estimated.saturating_add(total_budget.saturating_mul(COMPACTION_COOLDOWN_PERCENT) / 100),
+        );
+
         let min_threshold_estimate = (total_budget as f64 * 0.35) as usize;
         let threshold_reached = req.threshold_step > 0
             && req.cumulative_input_tokens >= req.next_auto_compact_threshold
             && estimated >= min_threshold_estimate;
-        let keep_tokens = (message_budget as f64 * keep_ratio) as usize;
+        let keep_tokens = compaction_keep_tokens(&req.budget, static_overhead_tokens, keep_ratio);
         warn!(
             "proactive compaction tier={} estimated_tokens={} total_budget={} message_budget={} keep_tokens={} cumulative_input_tokens={} threshold_reached={} min_threshold_estimate={}",
             tier.as_str(), estimated, total_budget, message_budget, keep_tokens, req.cumulative_input_tokens, threshold_reached, min_threshold_estimate
         );
-        match compact_summarise(
-            messages.clone(),
+        let attempt = summarise_older_messages(
+            &messages,
             keep_tokens,
+            TailFloor::Fixed,
             req.client,
             req.model,
             req.max_tokens,
-            (!req.rolling_summary.trim().is_empty()).then_some(req.rolling_summary),
+            (!rolling_summary.trim().is_empty()).then_some(rolling_summary),
         )
-        .await
-        {
-            Some(compacted) => {
-                let compacted_demoted = build_request_view_messages(
-                    &compacted.messages,
-                    req.tool_minimals,
-                    CTX_PRESERVE_RECENT_TURNS,
-                    CTX_KEEP_RECENT_TOOL_CARRIERS,
-                    message_budget,
-                    req.budget.max_tool_result_tokens,
-                );
-                let compacted_req_messages =
-                    vision::inject_selected_context(&compacted_demoted, req.session_id).await;
-                let new_estimated = crate::llm::estimate_request_input_tokens(
-                    &compacted_req_messages,
-                    Some(req.system_prompt),
-                    req.tool_defs,
-                );
-                info!(
-                    "proactive summarisation tier={} complete: {} → {} messages, tokens {} → {}",
-                    tier.as_str(),
-                    messages.len(),
-                    compacted.messages.len(),
-                    estimated,
-                    new_estimated,
-                );
-                let mut next_auto_compact_threshold = req.next_auto_compact_threshold;
-                if threshold_reached {
-                    let step = req.threshold_step.max(1);
-                    let cumulative_input_tokens = req
-                        .cumulative_input_tokens
-                        .saturating_add(i64::from(compacted.input_tokens));
-                    let from_old = next_auto_compact_threshold.saturating_add(step);
-                    let from_now = cumulative_input_tokens.saturating_add(step);
-                    next_auto_compact_threshold = from_old.max(from_now);
-                }
-                CompactionResult {
-                    changed: true,
-                    messages: compacted.messages,
-                    rolling_summary: compacted.summary,
-                    summary_input_tokens: compacted.input_tokens,
-                    summary_output_tokens: compacted.output_tokens,
-                    next_auto_compact_threshold,
-                    structured_plan_items: compacted.structured_plan_items,
-                    structured_next_step_hint: compacted.structured_next_step_hint,
-                }
+        .await;
+        let (compacted, outcome) = match attempt {
+            SummariseAttempt::Done(compacted) => {
+                guard.consecutive_summary_failures = 0;
+                (*compacted, CompactionOutcomeKind::Ok)
             }
-            None => {
-                warn!(
-                    "proactive summarisation tier={} failed, proceeding with current context",
-                    tier.as_str()
-                );
-                CompactionResult {
-                    changed: false,
+            SummariseAttempt::NothingToSummarise => {
+                guard.retry_at_estimate = retry_after_growth;
+                return unchanged_compaction(
                     messages,
-                    rolling_summary: req.rolling_summary.to_string(),
-                    next_auto_compact_threshold: req.next_auto_compact_threshold,
-                    ..Default::default()
+                    rolling_summary,
+                    threshold,
+                    guard,
+                    report(CompactionOutcomeKind::Noop, estimated),
+                );
+            }
+            SummariseAttempt::Failed => {
+                guard.consecutive_summary_failures =
+                    guard.consecutive_summary_failures.saturating_add(1);
+                let cut_by_rule = matches!(tier, CompactionTier::Full)
+                    || guard.consecutive_summary_failures >= SUMMARY_FAILURES_BEFORE_FALLBACK;
+                if !cut_by_rule {
+                    warn!(
+                        "proactive summarisation tier={} failed, proceeding with current context",
+                        tier.as_str()
+                    );
+                    return unchanged_compaction(
+                        messages,
+                        rolling_summary,
+                        threshold,
+                        guard,
+                        report(CompactionOutcomeKind::Failed, estimated),
+                    );
+                }
+                warn!(
+                    "proactive summarisation tier={} failed {} time(s), cutting history by rule",
+                    tier.as_str(),
+                    guard.consecutive_summary_failures
+                );
+                match compact_by_rule(&messages, keep_tokens, TailFloor::Fixed, rolling_summary) {
+                    Some(compacted) => (compacted, CompactionOutcomeKind::Fallback),
+                    None => {
+                        guard.retry_at_estimate = retry_after_growth;
+                        return unchanged_compaction(
+                            messages,
+                            rolling_summary,
+                            threshold,
+                            guard,
+                            report(CompactionOutcomeKind::Noop, estimated),
+                        );
+                    }
                 }
             }
+        };
+
+        let mut compacted_messages = compacted.messages;
+        pin_turn_facts(&mut compacted_messages, &compacted.summary, req.pins);
+        let new_estimated = scale.estimate(&compacted_messages).await;
+        info!(
+            "proactive compaction tier={} outcome={}: {} → {} messages, tokens {} → {}",
+            tier.as_str(),
+            outcome.as_str(),
+            messages.len(),
+            compacted_messages.len(),
+            estimated,
+            new_estimated,
+        );
+        let worthwhile = new_estimated.saturating_mul(100)
+            <= estimated.saturating_mul(100 - COMPACTION_MIN_GAIN_PERCENT);
+        if !worthwhile {
+            // Keep the history as it was. The summariser call is still billed.
+            guard.retry_at_estimate = retry_after_growth;
+            return CompactionResult {
+                summary_input_tokens: compacted.input_tokens,
+                summary_output_tokens: compacted.output_tokens,
+                ..unchanged_compaction(
+                    messages,
+                    rolling_summary,
+                    threshold,
+                    guard,
+                    report(CompactionOutcomeKind::Noop, estimated),
+                )
+            };
+        }
+
+        let mut next_auto_compact_threshold = req.next_auto_compact_threshold;
+        if threshold_reached {
+            let step = req.threshold_step.max(1);
+            let cumulative_input_tokens = req
+                .cumulative_input_tokens
+                .saturating_add(i64::from(compacted.input_tokens));
+            let from_old = next_auto_compact_threshold.saturating_add(step);
+            let from_now = cumulative_input_tokens.saturating_add(step);
+            next_auto_compact_threshold = from_old.max(from_now);
+        }
+        CompactionResult {
+            changed: true,
+            messages: compacted_messages,
+            rolling_summary: compacted.summary,
+            summary_input_tokens: compacted.input_tokens,
+            summary_output_tokens: compacted.output_tokens,
+            next_auto_compact_threshold,
+            structured_plan_items: compacted.structured_plan_items,
+            structured_next_step_hint: compacted.structured_next_step_hint,
+            guard,
+            report: report(outcome, new_estimated),
         }
     }
 
     /// Forced single-pass recovery after the provider rejected an oversized
     /// request. Unlike the proactive path this never gates on the local
     /// estimate (which under-counts — that's why the provider overflowed); it
-    /// always summarises, keeping the newest 60% of the message budget. The
-    /// cumulative-token threshold is left untouched (this is error recovery,
-    /// not threshold-driven compaction). `changed = false` ⇒ unrecoverable.
+    /// always shrinks: by summary when the summariser answers, by rule when it
+    /// does not. The cumulative-token threshold is left untouched (this is
+    /// error recovery, not threshold-driven compaction). `changed = false` ⇒
+    /// unrecoverable.
     async fn compact_overflow(&self, req: CompactionRequest<'_>) -> CompactionResult {
         let total_budget = req.budget.total as usize;
         let static_overhead_tokens =
             crate::llm::estimate_request_overhead_tokens(Some(req.system_prompt), req.tool_defs);
-        let message_budget = total_budget.saturating_sub(static_overhead_tokens);
-        let keep_tokens = (message_budget as f64 * SUMMARY_KEEP_RECENT_RATIO) as usize;
+        let scale = RequestScale {
+            tool_minimals: req.tool_minimals,
+            session_id: req.session_id,
+            system_prompt: req.system_prompt,
+            tool_defs: req.tool_defs,
+            message_budget: total_budget.saturating_sub(static_overhead_tokens),
+            max_tool_result_tokens: req.budget.max_tool_result_tokens,
+        };
+        let mut guard = req.guard;
+        // The provider counted more tokens than the local estimate did, so
+        // "it all fits" proves nothing here: at most half of what is in the
+        // history stays verbatim.
+        let history_tokens: usize = req
+            .messages
+            .iter()
+            .map(crate::llm::estimate_message_tokens)
+            .sum();
+        let keep_tokens =
+            compaction_keep_tokens(&req.budget, static_overhead_tokens, SUMMARY_KEEP_RECENT_RATIO)
+                .min(history_tokens / 2);
+        let before_tokens = scale.estimate(&req.messages).await;
+        let report = |outcome: CompactionOutcomeKind, after_tokens: usize| {
+            Some(CompactionReport {
+                outcome,
+                tier: "overflow",
+                before_tokens,
+                after_tokens,
+            })
+        };
         warn!(
             "context overflow — attempting LLM summarisation (keep_tokens={})",
             keep_tokens
         );
-        match compact_summarise(
-            req.messages.clone(),
+        let attempt = summarise_older_messages(
+            &req.messages,
             keep_tokens,
+            TailFloor::Shrinking,
             req.client,
             req.model,
             req.max_tokens,
             (!req.rolling_summary.trim().is_empty()).then_some(req.rolling_summary),
         )
-        .await
-        {
-            Some(c) => CompactionResult {
-                changed: true,
-                messages: c.messages,
-                rolling_summary: c.summary,
-                summary_input_tokens: c.input_tokens,
-                summary_output_tokens: c.output_tokens,
-                next_auto_compact_threshold: req.next_auto_compact_threshold,
-                structured_plan_items: c.structured_plan_items.clone(),
-                structured_next_step_hint: c.structured_next_step_hint.clone(),
-            },
-            None => CompactionResult {
-                changed: false,
-                messages: req.messages,
-                rolling_summary: req.rolling_summary.to_string(),
-                next_auto_compact_threshold: req.next_auto_compact_threshold,
-                ..Default::default()
-            },
+        .await;
+        let (compacted, outcome) = match attempt {
+            SummariseAttempt::Done(compacted) => {
+                guard.consecutive_summary_failures = 0;
+                (*compacted, CompactionOutcomeKind::Ok)
+            }
+            other => {
+                if matches!(other, SummariseAttempt::Failed) {
+                    guard.consecutive_summary_failures =
+                        guard.consecutive_summary_failures.saturating_add(1);
+                }
+                // The provider already refused this request, so waiting for
+                // a later attempt is not an option. Cut harder, by rule.
+                warn!("context overflow — no summary available, cutting history by rule");
+                match compact_by_rule(
+                    &req.messages,
+                    keep_tokens / 2,
+                    TailFloor::Shrinking,
+                    req.rolling_summary,
+                ) {
+                    Some(compacted) => (compacted, CompactionOutcomeKind::Fallback),
+                    None => {
+                        return unchanged_compaction(
+                            req.messages,
+                            req.rolling_summary,
+                            req.next_auto_compact_threshold,
+                            guard,
+                            report(CompactionOutcomeKind::Failed, before_tokens),
+                        );
+                    }
+                }
+            }
+        };
+        let mut messages = compacted.messages;
+        pin_turn_facts(&mut messages, &compacted.summary, req.pins);
+        let after_tokens = scale.estimate(&messages).await;
+        guard.retry_at_estimate = None;
+        CompactionResult {
+            changed: true,
+            messages,
+            rolling_summary: compacted.summary,
+            summary_input_tokens: compacted.input_tokens,
+            summary_output_tokens: compacted.output_tokens,
+            next_auto_compact_threshold: req.next_auto_compact_threshold,
+            structured_plan_items: compacted.structured_plan_items,
+            structured_next_step_hint: compacted.structured_next_step_hint,
+            guard,
+            report: report(outcome, after_tokens),
         }
+    }
+}
+
+/// The result of a pass that leaves the history as it was.
+fn unchanged_compaction(
+    messages: Vec<LlmMessage>,
+    rolling_summary: &str,
+    next_auto_compact_threshold: i64,
+    guard: CompactionGuard,
+    report: Option<CompactionReport>,
+) -> CompactionResult {
+    CompactionResult {
+        changed: false,
+        messages,
+        rolling_summary: rolling_summary.to_string(),
+        next_auto_compact_threshold,
+        guard,
+        report,
+        ..Default::default()
     }
 }
 
@@ -2042,19 +2486,149 @@ fn is_tool_result_carrier(message: &LlmMessage) -> bool {
         )
 }
 
+/// How many of the newest messages a pass leaves verbatim whatever their size.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TailFloor {
+    /// [`SUMMARY_MIN_KEEP_MESSAGES`]. A history no longer than that is left
+    /// alone. Used before a request is sent, when leaving it alone is safe.
+    Fixed,
+    /// The same, but half the history when it is shorter than twice that.
+    /// Used where leaving a short history alone means the turn fails.
+    Shrinking,
+}
+
+/// The highest split that still leaves the floor's messages verbatim.
+fn max_summary_split(messages: &[LlmMessage], floor: TailFloor) -> usize {
+    let keep = match floor {
+        TailFloor::Fixed => SUMMARY_MIN_KEEP_MESSAGES,
+        TailFloor::Shrinking => SUMMARY_MIN_KEEP_MESSAGES.min(messages.len() / 2).max(1),
+    };
+    messages.len().saturating_sub(keep)
+}
+
 /// Pick the semantic-summary boundary while preserving an atomic
 /// ToolUse/ToolResult pair in the recent tail.
-fn summary_split_index(messages: &[LlmMessage], keep_tokens: usize) -> usize {
+///
+/// Messages before the returned index are summarised. The newest messages
+/// are kept while they fit in `keep_tokens`; the message that would exceed it
+/// goes to the summary. Returns 0 — nothing to summarise — when the whole
+/// history fits.
+fn summary_split_index(messages: &[LlmMessage], keep_tokens: usize, floor: TailFloor) -> usize {
     let mut accumulated = 0usize;
-    let mut split_idx = messages.len().saturating_sub(6);
+    let mut split_idx = 0usize;
     for (index, message) in messages.iter().enumerate().rev() {
         accumulated += crate::llm::estimate_message_tokens(message);
-        if accumulated >= keep_tokens && index > 0 {
-            split_idx = index;
+        if accumulated > keep_tokens {
+            split_idx = index + 1;
             break;
         }
     }
-    snap_to_pair_boundary(messages, split_idx)
+    snap_to_pair_boundary(messages, split_idx.min(max_summary_split(messages, floor)))
+}
+
+/// Whether a tool's result is file or page content the model asked to read,
+/// which the summary must be able to quote from.
+fn is_read_tool_name(name: &str) -> bool {
+    name.contains("read")
+        || name.contains("search")
+        || name.contains("fetch")
+        || matches!(name, "pdf" | "file_list" | "file_diff")
+}
+
+/// Render the messages to be summarised as text for the summariser prompt.
+/// `read_result_chars` is the preview length for results of read-type tools.
+fn render_history_for_summary(
+    old_messages: &[LlmMessage],
+    tool_names: &HashMap<&str, &str>,
+    read_result_chars: usize,
+) -> String {
+    old_messages
+        .iter()
+        .map(|m| {
+            let role = if m.role == "user" {
+                "用户/工具结果"
+            } else {
+                "智能体"
+            };
+            let mut snippet_chars = SUMMARY_MESSAGE_SNIPPET_CHARS;
+            // as_text() returns empty for Blocks(ToolUse/ToolResult) — extract manually.
+            let text = match &m.content {
+                MessageContent::Text(t) => t.clone(),
+                MessageContent::Blocks(blocks) => {
+                    let mut parts: Vec<String> = Vec::new();
+                    let mut block_chars = 0usize;
+                    for block in blocks {
+                        let part = match block {
+                            ContentBlock::Text { text } if !text.is_empty() => {
+                                if text.chars().count() > SUMMARY_MESSAGE_SNIPPET_CHARS {
+                                    let head: String =
+                                        text.chars().take(SUMMARY_MESSAGE_SNIPPET_CHARS).collect();
+                                    format!("{}...", head)
+                                } else {
+                                    text.clone()
+                                }
+                            }
+                            ContentBlock::ToolUse { name, input, .. } => {
+                                let input_str = input.to_string();
+                                let preview: String = input_str
+                                    .chars()
+                                    .take(SUMMARY_TOOL_PREVIEW_CHARS)
+                                    .collect();
+                                format!("调用工具 {}: {}", name, preview)
+                            }
+                            ContentBlock::ToolResult {
+                                tool_use_id,
+                                content,
+                                ..
+                            } => {
+                                let is_read = tool_names
+                                    .get(tool_use_id.as_str())
+                                    .is_some_and(|name| is_read_tool_name(name));
+                                let limit = if is_read {
+                                    read_result_chars
+                                } else {
+                                    SUMMARY_TOOL_PREVIEW_CHARS
+                                };
+                                let preview: String = content.chars().take(limit).collect();
+                                format!("工具结果: {}", preview)
+                            }
+                            _ => continue,
+                        };
+                        block_chars += part.chars().count() + 1;
+                        parts.push(part);
+                    }
+                    // With long read previews every block is already cut to
+                    // its own length; the short rendering keeps the overall
+                    // per-message cut as well.
+                    if read_result_chars > SUMMARY_TOOL_PREVIEW_CHARS {
+                        snippet_chars = snippet_chars.max(block_chars);
+                    }
+                    parts.join("\n")
+                }
+            };
+            if text.is_empty() || is_compaction_summary_text(&text) {
+                return String::new();
+            }
+            let snippet = if text.chars().count() > snippet_chars {
+                format!("{}...", text.chars().take(snippet_chars).collect::<String>())
+            } else {
+                text
+            };
+            format!("[{}]: {}", role, snippet)
+        })
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// How a summariser pass ended.
+enum SummariseAttempt {
+    Done(Box<CompactionOutcome>),
+    /// Nothing older than the verbatim tail holds content to summarise. The
+    /// model was not called.
+    NothingToSummarise,
+    /// The model was called and gave no usable summary.
+    Failed,
 }
 
 /// Level-2 compaction: call LLM to summarise old messages, optionally merging
@@ -2073,77 +2647,70 @@ pub async fn compact_summarise(
     max_tokens: u32,
     existing_summary: Option<&str>,
 ) -> Option<CompactionOutcome> {
+    match summarise_older_messages(
+        &messages,
+        keep_tokens,
+        TailFloor::Shrinking,
+        client,
+        model,
+        max_tokens,
+        existing_summary,
+    )
+    .await
+    {
+        SummariseAttempt::Done(outcome) => Some(*outcome),
+        SummariseAttempt::NothingToSummarise | SummariseAttempt::Failed => None,
+    }
+}
+
+/// [`compact_summarise`], telling "nothing to do" apart from "the model
+/// failed" so the caller can react to each.
+async fn summarise_older_messages(
+    messages: &[LlmMessage],
+    keep_tokens: usize,
+    floor: TailFloor,
+    client: &dyn crate::llm::LlmClient,
+    model: &str,
+    max_tokens: u32,
+    existing_summary: Option<&str>,
+) -> SummariseAttempt {
     if messages.len() < 2 {
         // Nothing meaningful to summarise if there are fewer than 2 messages.
-        return None;
+        return SummariseAttempt::NothingToSummarise;
     }
 
-    // Walk from the end, accumulating estimated tokens until we exceed
-    // keep_tokens. Everything before the boundary index gets summarised.
-    // We always keep at least the last 2 messages intact so the LLM has
-    // immediate context regardless of how large they are.
-    let split_idx = summary_split_index(&messages, keep_tokens);
+    // Everything before the boundary index gets summarised; the newest
+    // messages that fit in `keep_tokens` stay verbatim.
+    let split_idx = summary_split_index(messages, keep_tokens, floor);
 
     if split_idx == 0 {
-        // All messages fit within keep_chars — nothing to summarise.
-        return None;
+        // All messages fit within keep_tokens — nothing to summarise.
+        return SummariseAttempt::NothingToSummarise;
     }
 
     let old_msgs = &messages[..split_idx];
-    if old_msgs.is_empty() {
-        return None;
-    }
-
-    let history_text: String = old_msgs
+    let tool_names: HashMap<&str, &str> = messages
         .iter()
-        .map(|m| {
-            let role = if m.role == "user" {
-                "用户/工具结果"
-            } else {
-                "智能体"
-            };
-            // as_text() returns empty for Blocks(ToolUse/ToolResult) — extract manually.
-            let text = match &m.content {
-                crate::llm::MessageContent::Text(t) => t.clone(),
-                crate::llm::MessageContent::Blocks(blocks) => blocks
-                    .iter()
-                    .filter_map(|b| match b {
-                        crate::llm::ContentBlock::Text { text } => {
-                            if text.is_empty() {
-                                None
-                            } else {
-                                Some(text.clone())
-                            }
-                        }
-                        crate::llm::ContentBlock::ToolUse { name, input, .. } => {
-                            let input_str = input.to_string();
-                            let preview: String = input_str.chars().take(200).collect();
-                            Some(format!("调用工具 {}: {}", name, preview))
-                        }
-                        crate::llm::ContentBlock::ToolResult { content, .. } => {
-                            let preview: String = content.chars().take(200).collect();
-                            Some(format!("工具结果: {}", preview))
-                        }
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-            };
-            if text.is_empty() || is_compaction_summary_text(&text) {
-                return String::new();
-            }
-            let snippet = if text.chars().count() > 500 {
-                format!("{}...", text.chars().take(500).collect::<String>())
-            } else {
-                text
-            };
-            format!("[{}]: {}", role, snippet)
+        .filter_map(|m| match &m.content {
+            MessageContent::Blocks(blocks) => Some(blocks),
+            _ => None,
         })
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n\n");
-    if history_text.trim().is_empty() && existing_summary.unwrap_or("").trim().is_empty() {
-        return None;
+        .flatten()
+        .filter_map(|block| match block {
+            ContentBlock::ToolUse { id, name, .. } => Some((id.as_str(), name.as_str())),
+            _ => None,
+        })
+        .collect();
+    let mut history_text =
+        render_history_for_summary(old_msgs, &tool_names, SUMMARY_READ_RESULT_PREVIEW_CHARS);
+    if history_text.chars().count() > SUMMARY_HISTORY_MAX_CHARS {
+        history_text =
+            render_history_for_summary(old_msgs, &tool_names, SUMMARY_TOOL_PREVIEW_CHARS);
+    }
+    if history_text.trim().is_empty() {
+        // Only an earlier summary is older than the tail. Asking the model
+        // to summarise its own summary again changes nothing.
+        return SummariseAttempt::NothingToSummarise;
     }
 
     let existing_summary_block = existing_summary
@@ -2170,15 +2737,16 @@ pub async fn compact_summarise(
         system: None,
         tools: vec![],
         model: model.to_string(),
-        // Use at least 512 tokens for the summary regardless of the main model's
-        // max_tokens setting, capped at 1024 to avoid wasting quota on a summary.
-        max_tokens: max_tokens.clamp(512, 1024),
+        // The summary replaces everything older than the tail, so it gets
+        // room for paths, commands and conclusions: at least 1024 tokens
+        // regardless of the main model's max_tokens, at most 4096.
+        max_tokens: max_tokens.clamp(1024, 4096),
         stream: false,
         vision_override: Some(false),
     };
 
     match client.complete(req).await {
-        Ok(resp) if !resp.content.is_empty() => {
+        Ok(resp) if !resp.content.trim().is_empty() => {
             // p7: attempt structured JSON parse first; fall back to prose.
             let structured = crate::agent::summary_worker::parse_structured_summary(&resp.content);
             let merged_summary = if structured.summary.is_empty() {
@@ -2189,7 +2757,7 @@ pub async fn compact_summarise(
             let summary_msg = crate::agent::message_utils::rolling_summary_message(&merged_summary);
             let mut new_messages = vec![summary_msg];
             new_messages.extend_from_slice(&messages[split_idx..]);
-            Some(CompactionOutcome {
+            SummariseAttempt::Done(Box::new(CompactionOutcome {
                 messages: new_messages,
                 summary: merged_summary,
                 input_tokens: resp.input_tokens,
@@ -2197,9 +2765,16 @@ pub async fn compact_summarise(
                 structured_plan_items: structured.active_plan_items,
                 structured_next_step_hint: structured.next_step_hint,
                 structured_rolling: None,
-            })
+            }))
         }
-        Ok(_) | Err(_) => None,
+        Ok(_) => {
+            warn!("summariser returned an empty summary");
+            SummariseAttempt::Failed
+        }
+        Err(error) => {
+            warn!("summariser call failed: {}", error);
+            SummariseAttempt::Failed
+        }
     }
 }
 
@@ -2251,7 +2826,7 @@ pub async fn compact_summarise_incremental(
         return None;
     }
 
-    let split_idx = summary_split_index(&messages, keep_tokens);
+    let split_idx = summary_split_index(&messages, keep_tokens, TailFloor::Shrinking);
     if split_idx == 0 {
         return None;
     }
@@ -2692,8 +3267,11 @@ impl AgentLoop {
                         if approved {
                             debug!("User approved tool '{}' execution", name);
                         } else {
+                            // Cancelled while waiting for approval: the call was
+                            // never announced with `ToolStart`, so it is reported
+                            // as not started rather than as an interrupted run.
                             let reason = if cancel.load(Ordering::Relaxed) {
-                                "已被用户取消"
+                                TOOL_RESULT_NOT_STARTED
                             } else {
                                 "User denied this operation"
                             };
@@ -2822,13 +3400,13 @@ impl AgentLoop {
                             .send(AgentEvent::ToolEnd {
                                 id: id.to_string(),
                                 name: name.to_string(),
-                                result: "已取消".into(),
+                                result: TOOL_RESULT_CANCELLED_BEFORE_RUN.into(),
                                 is_error: true,
                             })
                             .await;
                         blocks.push(ContentBlock::ToolResult {
                             tool_use_id: id.to_string(),
-                            content: "已取消".into(),
+                            content: TOOL_RESULT_CANCELLED_BEFORE_RUN.into(),
                             is_error: true,
                         });
                         return blocks;
@@ -2856,13 +3434,7 @@ impl AgentLoop {
                     } else {
                         tool_timeout_for(&input)
                     };
-                    // Only tools that tear themselves down deserve the long grace;
-                    // a tool that ignores cancel is dropped quickly so Stop is prompt.
-                    let cancel_grace_secs = if tool.observes_cancel() {
-                        CANCEL_GRACE_SECS
-                    } else {
-                        CANCEL_GRACE_UNCOOPERATIVE_SECS
-                    };
+                    let cancel_grace_secs = cancel_grace_secs_for(tool);
                     let mut tool_future = Box::pin(tokio::time::timeout(
                         std::time::Duration::from_secs(tool_timeout_secs),
                         call_with_completion(tool, input.clone(), &tool_ctx),
@@ -2904,8 +3476,18 @@ impl AgentLoop {
                             ))
                         }
                         None => {
-                            warn!("Tool '{}' interrupted by user cancel", name);
-                            super::tool::ToolResult::err("已被用户取消".to_string())
+                            if tool.is_read_only() {
+                                info!(
+                                    "Tool '{}' abandoned after user cancel (read-only, nothing to clean up)",
+                                    name
+                                );
+                            } else {
+                                warn!(
+                                    "Tool '{}' interrupted by user cancel after {}s; its outcome is unconfirmed",
+                                    name, cancel_grace_secs
+                                );
+                            }
+                            super::tool::ToolResult::err(TOOL_RESULT_INTERRUPTED.to_string())
                         }
                     }
                 }
@@ -3373,6 +3955,9 @@ impl AgentLoop {
         };
         let base_context_hash = stable_hash_messages(&messages);
         let base_message_count = messages.len();
+        // The request this turn answers. Taken before a checkpoint restore
+        // can replace `messages` with a history that ends in tool results.
+        let turn_user_request = current_turn_user_request(&messages);
         let mut restored_loop_history: Option<Vec<ToolCallRecord>> = None;
         let mut restored_seen_notifications: Option<HashSet<String>> = None;
 
@@ -3437,6 +4022,14 @@ impl AgentLoop {
         if restored_loop_history.is_none() {
             loop_detector.seed_from_messages(&messages);
         }
+        // Per-run progress guard for read-only calls, and the list of files
+        // read that compaction pins next to the summary.
+        let mut read_guard = ReadGuard::default();
+        // Compaction state for this run: what the strategy asked to carry
+        // over, how the last attempt ended, and how many were applied.
+        let mut compaction_guard = CompactionGuard::default();
+        let mut last_compaction: Option<CompactionReport> = None;
+        let mut compactions_applied: u32 = 0;
         let mut rolling_summary = String::new();
         let mut seen_notifications: HashSet<String> =
             restored_seen_notifications.unwrap_or_default();
@@ -3506,11 +4099,47 @@ impl AgentLoop {
                 }
             }
 
+            // When the system prompt and tool definitions alone reach the
+            // compaction trigger, no amount of compaction helps. Say so once.
+            if _iteration == 0 {
+                let static_overhead_tokens = crate::llm::estimate_request_overhead_tokens(
+                    Some(&effective_system_prompt),
+                    &tool_defs,
+                );
+                if let Some(percent) =
+                    static_overhead_over_trigger(&self.budget, static_overhead_tokens)
+                {
+                    if first_static_overhead_notice(&ctx.session_id) {
+                        warn!(
+                            "static request overhead is {}% of the input budget ({} of {} tokens)",
+                            percent, static_overhead_tokens, self.budget.total
+                        );
+                        let _ = event_tx
+                            .send(AgentEvent::Notice {
+                                message: format!(
+                                    "系统提示词与工具定义已占上下文预算的 {}%，留给对话的空间不足，压缩无法缓解。请停用部分 MCP 工具或技能后重试。",
+                                    percent
+                                ),
+                                code: Some("context_static_overhead".to_string()),
+                                details: Some(serde_json::json!({
+                                    "percent": percent,
+                                    "static_overhead_tokens": static_overhead_tokens,
+                                    "total_input_budget": self.budget.total,
+                                })),
+                            })
+                            .await;
+                    }
+                }
+            }
+
             // Proactive context compaction, delegated to the configured
-            // strategy (default reproduces the built-in Level-2 behavior).
-            // The loop retains orchestration: token accounting, DB persistence
-            // of the rolling summary / state frame, and the UI usage event.
+            // strategy. The loop retains orchestration: token accounting, DB
+            // persistence of the rolling summary / state frame, and the UI
+            // usage event.
             {
+                let pins = self
+                    .compaction_pins(&ctx.session_id, &turn_user_request, &read_guard)
+                    .await;
                 let outcome = self
                     .compaction_strategy
                     .compact(CompactionRequest {
@@ -3529,10 +4158,28 @@ impl AgentLoop {
                         next_auto_compact_threshold,
                         threshold_step,
                         client: self.client.as_ref(),
+                        guard: compaction_guard,
+                        pins: &pins,
                     })
                     .await;
 
+                compaction_guard = outcome.guard;
+                if let Some(report) = outcome.report {
+                    log_compaction(&ctx.session_id, &report);
+                    last_compaction = Some(report);
+                }
+                // Account for summariser billing, also when the summary was
+                // not used.
+                total_input = total_input.saturating_add(outcome.summary_input_tokens);
+                total_output = total_output.saturating_add(outcome.summary_output_tokens);
+                cumulative_input_tokens =
+                    cumulative_input_tokens.saturating_add(i64::from(outcome.summary_input_tokens));
+                cumulative_output_tokens = cumulative_output_tokens
+                    .saturating_add(i64::from(outcome.summary_output_tokens));
+
                 if outcome.changed {
+                    compactions_applied = compactions_applied.saturating_add(1);
+                    read_guard.on_context_compacted();
                     if let Some(hooks) = &self.hooks {
                         hooks
                             .on_context_event(
@@ -3543,13 +4190,6 @@ impl AgentLoop {
                             )
                             .await;
                     }
-                    // Account for summariser billing.
-                    total_input = total_input.saturating_add(outcome.summary_input_tokens);
-                    total_output = total_output.saturating_add(outcome.summary_output_tokens);
-                    cumulative_input_tokens = cumulative_input_tokens
-                        .saturating_add(i64::from(outcome.summary_input_tokens));
-                    cumulative_output_tokens = cumulative_output_tokens
-                        .saturating_add(i64::from(outcome.summary_output_tokens));
                     next_auto_compact_threshold = outcome.next_auto_compact_threshold;
                     rolling_summary = outcome.rolling_summary;
                     rolling_summary_version += 1;
@@ -3595,6 +4235,7 @@ impl AgentLoop {
                     cumulative_input_tokens,
                     cumulative_output_tokens,
                     rolling_summary_version,
+                    compaction_status(last_compaction, compactions_applied),
                 )
                 .await;
             }
@@ -3840,6 +4481,13 @@ impl AgentLoop {
                                     // host policy is never bypassed. Uses the
                                     // candidate model — possibly a fallback —
                                     // as the summariser.
+                                    let pins = self
+                                        .compaction_pins(
+                                            &ctx.session_id,
+                                            &turn_user_request,
+                                            &read_guard,
+                                        )
+                                        .await;
                                     let outcome = self
                                         .compaction_strategy
                                         .compact(CompactionRequest {
@@ -3858,9 +4506,26 @@ impl AgentLoop {
                                             next_auto_compact_threshold,
                                             threshold_step,
                                             client: self.client.as_ref(),
+                                            guard: compaction_guard,
+                                            pins: &pins,
                                         })
                                         .await;
+                                    compaction_guard = outcome.guard;
+                                    if let Some(report) = outcome.report {
+                                        log_compaction(&ctx.session_id, &report);
+                                        last_compaction = Some(report);
+                                    }
+                                    total_input =
+                                        total_input.saturating_add(outcome.summary_input_tokens);
+                                    total_output =
+                                        total_output.saturating_add(outcome.summary_output_tokens);
+                                    cumulative_input_tokens = cumulative_input_tokens
+                                        .saturating_add(i64::from(outcome.summary_input_tokens));
+                                    cumulative_output_tokens = cumulative_output_tokens
+                                        .saturating_add(i64::from(outcome.summary_output_tokens));
                                     if outcome.changed {
+                                        compactions_applied = compactions_applied.saturating_add(1);
+                                        read_guard.on_context_compacted();
                                         if let Some(hooks) = &self.hooks {
                                             hooks
                                                 .on_context_event(
@@ -3871,18 +4536,6 @@ impl AgentLoop {
                                                 )
                                                 .await;
                                         }
-                                        total_input = total_input
-                                            .saturating_add(outcome.summary_input_tokens);
-                                        total_output = total_output
-                                            .saturating_add(outcome.summary_output_tokens);
-                                        cumulative_input_tokens = cumulative_input_tokens
-                                            .saturating_add(i64::from(
-                                                outcome.summary_input_tokens,
-                                            ));
-                                        cumulative_output_tokens = cumulative_output_tokens
-                                            .saturating_add(i64::from(
-                                                outcome.summary_output_tokens,
-                                            ));
                                         next_auto_compact_threshold =
                                             outcome.next_auto_compact_threshold;
                                         rolling_summary = outcome.rolling_summary;
@@ -4275,6 +4928,34 @@ impl AgentLoop {
                 }
             }
 
+            // Re-reads of content that has not changed. The detector above
+            // compares exact arguments over a long window; this one follows
+            // each file, so rotating through a few files is caught as well.
+            let mut block_reasons: HashMap<String, String> = HashMap::new();
+            for (id, name, input) in &tool_calls {
+                if blocked_tool_ids.contains(id) {
+                    continue;
+                }
+                let read_only = self
+                    .registry
+                    .get(name)
+                    .map(|t| t.is_read_only())
+                    .unwrap_or(false);
+                match read_guard.check(name, input, read_only) {
+                    ReadVerdict::Allow => {}
+                    ReadVerdict::Warn(message) => {
+                        warn!("Read WARNING [{}]: {}", ctx.session_id, message);
+                        warning_messages.push(message);
+                    }
+                    ReadVerdict::Block(message) => {
+                        warn!("Read BLOCKED [{}]: {}", ctx.session_id, message);
+                        blocked_tool_ids.push(id.clone());
+                        block_reasons.insert(id.clone(), message.clone());
+                        warning_messages.push(message);
+                    }
+                }
+            }
+
             let all_tools_blocked =
                 !blocked_tool_ids.is_empty() && blocked_tool_ids.len() == tool_calls.len();
 
@@ -4353,9 +5034,9 @@ impl AgentLoop {
             // Inject synthetic error results for blocked tools
             for (id, name, _) in &tool_calls {
                 if blocked_tool_ids.contains(id) {
-                    let msg = warning_messages
-                        .iter()
-                        .find(|m| m.contains(name.as_str()))
+                    let msg = block_reasons
+                        .get(id)
+                        .or_else(|| warning_messages.iter().find(|m| m.contains(name.as_str())))
                         .cloned()
                         .unwrap_or_else(|| format!("工具 '{}' 被循环检测器阻断。", name));
                     tool_result_blocks.push(ContentBlock::ToolResult {
@@ -4410,7 +5091,7 @@ impl AgentLoop {
             crate::agent::message_utils::ensure_tool_results_complete(
                 &tool_calls,
                 &mut tool_result_blocks,
-                "Tool execution was cancelled or interrupted before completion.",
+                TOOL_RESULT_NOT_STARTED,
             );
 
             // ── Record results into loop detector + compute minimal receipts ─
@@ -4430,6 +5111,14 @@ impl AgentLoop {
                         }
                         let rh = stable_hash_result(content);
                         loop_detector.record(name, input, rh, stable_hash_normalized(content));
+                        if !blocked_tool_ids.contains(tool_use_id) {
+                            let read_only = self
+                                .registry
+                                .get(name)
+                                .map(|t| t.is_read_only())
+                                .unwrap_or(false);
+                            read_guard.record(name, input, read_only, content, *is_error);
+                        }
                         let receipt = super::tool_receipt::render_receipt(
                             name, input, content, *is_error, None,
                         );
@@ -4464,6 +5153,25 @@ impl AgentLoop {
             } else {
                 None
             };
+            // A long run of read-only calls with no write and no plan update:
+            // restate what the user asked for.
+            let warning_reminder = match read_guard.take_streak_reminder() {
+                Some(streak) => {
+                    warn!(
+                        "Read-only streak [{}]: {} calls without a write or plan update",
+                        ctx.session_id, streak
+                    );
+                    let restated = read_only_streak_reminder(streak, &turn_user_request);
+                    Some(match warning_reminder {
+                        Some(existing) => format!("{}\n\n{}", existing, restated),
+                        None => restated,
+                    })
+                }
+                None => warning_reminder,
+            };
+            // Most of the recent reads returned what the model already had.
+            // The turn ends after this batch is stored.
+            let read_pause = read_guard.pause_reason();
 
             // Add tool results as user message
             let tool_result_msg = LlmMessage {
@@ -4506,24 +5214,28 @@ impl AgentLoop {
                 cumulative_input_tokens,
                 cumulative_output_tokens,
                 rolling_summary_version,
+                compaction_status(last_compaction, compactions_applied),
             )
             .await;
 
-            if cancel.load(Ordering::Relaxed) {
-                info!("agent loop cancelled after tool-result persistence");
-                break;
-            }
+            // A user Stop ends the run here, but only after this batch's
+            // checkpoint is written: breaking first left the checkpoint one
+            // batch behind the persisted messages.
+            let cancelled_after_batch = cancel.load(Ordering::Relaxed);
 
-            if ctx
-                .loop_halt
-                .as_ref()
-                .is_some_and(|h| h.load(Ordering::Relaxed))
+            if !cancelled_after_batch
+                && ctx
+                    .loop_halt
+                    .as_ref()
+                    .is_some_and(|h| h.load(Ordering::Relaxed))
             {
                 info!("agent loop halted by host (plan ready / await user build)");
                 break;
             }
 
-            if let Some(reminder) = warning_reminder {
+            if let Some(reminder) =
+                warning_reminder.filter(|_| !cancelled_after_batch && read_pause.is_none())
+            {
                 let reminder_msg = LlmMessage {
                     role: "user".into(),
                     content: MessageContent::text(&reminder),
@@ -4566,6 +5278,49 @@ impl AgentLoop {
                     }
                     Err(e) => warn!("Failed to serialise checkpoint messages: {}", e),
                 }
+            }
+
+            if cancelled_after_batch {
+                info!("agent loop cancelled after tool-result persistence and checkpoint");
+                break;
+            }
+
+            if let Some(pause) = read_pause {
+                warn!(
+                    "Read loop PAUSE [{}]: {} of the last {} reads returned unchanged content",
+                    ctx.session_id, pause.rereads, pause.window
+                );
+                let text = read_pause_message(&pause);
+                let _ = event_tx
+                    .send(AgentEvent::TextSegmentStart {
+                        iteration: _iteration as u32 + 2,
+                    })
+                    .await;
+                let _ = event_tx
+                    .send(AgentEvent::TextDelta {
+                        delta: text.clone(),
+                    })
+                    .await;
+                let _ = event_tx
+                    .send(AgentEvent::Notice {
+                        message: "检测到重复读取未变化的文件，本轮已暂停。".to_string(),
+                        code: Some("read_loop_paused".to_string()),
+                        details: Some(serde_json::json!({
+                            "rereads": pause.rereads,
+                            "window": pause.window,
+                            "paths": pause.paths,
+                        })),
+                    })
+                    .await;
+                let pause_msg = LlmMessage {
+                    role: "assistant".into(),
+                    content: MessageContent::text(&text),
+                };
+                new_messages.push(pause_msg.clone());
+                messages.push(pause_msg.clone());
+                self.persist_message(&ctx.session_id, &pause_msg, turn_index)
+                    .await;
+                break;
             }
 
             // Loop-strategy turn boundary: record turn state for the next-turn
@@ -4621,6 +5376,7 @@ impl AgentLoop {
         cumulative_input_tokens: i64,
         cumulative_output_tokens: i64,
         rolling_summary_version: i64,
+        last_compaction: Option<crate::agent::messages::CompactionStatusSnapshot>,
     ) {
         let total_budget = self.budget.total as usize;
         let static_overhead_tokens = crate::llm::estimate_request_overhead_tokens(
@@ -4684,9 +5440,122 @@ impl AgentLoop {
                 rolling_summary_version: rolling_summary_version.clamp(0, u32::MAX as i64) as u32,
                 auto_compact_threshold: self.auto_compact_input_tokens_threshold,
                 layered_breakdown: Some(breakdown_snapshot),
+                last_compaction,
             })
             .await;
     }
+
+    /// The turn facts compaction keeps verbatim: the user's request, the
+    /// todo list as it stands, and the files read so far.
+    async fn compaction_pins(
+        &self,
+        session_id: &str,
+        user_request: &str,
+        read_guard: &ReadGuard,
+    ) -> CompactionPins {
+        const MAX_TODOS: usize = 30;
+        const MAX_FILES: usize = 40;
+        let todos = match &self.plan_state {
+            Some(plan_state) => plan_state
+                .lock()
+                .await
+                .get(session_id)
+                .map(|todos| {
+                    todos
+                        .iter()
+                        .take(MAX_TODOS)
+                        .map(|todo| format!("- [{}] {}", todo.status, todo.content))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            None => Vec::new(),
+        };
+        CompactionPins {
+            user_request: user_request.to_string(),
+            todos,
+            files_read: read_guard.files_read(MAX_FILES),
+        }
+    }
+}
+
+/// The newest message the user wrote, as opposed to tool results and the
+/// reminders the kernel injects in the user role.
+fn current_turn_user_request(messages: &[LlmMessage]) -> String {
+    messages
+        .iter()
+        .rev()
+        .filter(|message| message.role == "user" && is_plain_text_message(message))
+        .map(|message| message.content.as_text().trim().to_string())
+        .find(|text| !text.is_empty() && !is_injected_user_text(text))
+        .unwrap_or_default()
+}
+
+/// True the first time a session is seen in this process. The static-overhead
+/// notice repeats on every turn otherwise.
+fn first_static_overhead_notice(session_id: &str) -> bool {
+    static NOTIFIED: Lazy<std::sync::Mutex<HashSet<String>>> =
+        Lazy::new(|| std::sync::Mutex::new(HashSet::new()));
+    let Ok(mut notified) = NOTIFIED.lock() else {
+        return true;
+    };
+    if notified.len() >= 4_096 {
+        notified.clear();
+    }
+    notified.insert(session_id.to_string())
+}
+
+/// One line per compaction attempt, greppable in the host log.
+fn log_compaction(session_id: &str, report: &CompactionReport) {
+    info!(
+        "compaction outcome={} tier={} before={} after={} session={}",
+        report.outcome.as_str(),
+        report.tier,
+        report.before_tokens,
+        report.after_tokens,
+        session_id
+    );
+}
+
+fn compaction_status(
+    last: Option<CompactionReport>,
+    applied: u32,
+) -> Option<crate::agent::messages::CompactionStatusSnapshot> {
+    last.map(|report| crate::agent::messages::CompactionStatusSnapshot {
+        outcome: report.outcome.as_str().to_string(),
+        tier: report.tier.to_string(),
+        before_tokens: report.before_tokens.min(u32::MAX as usize) as u32,
+        after_tokens: report.after_tokens.min(u32::MAX as usize) as u32,
+        count: applied,
+    })
+}
+
+fn read_only_streak_reminder(streak: usize, user_request: &str) -> String {
+    let request = user_request.trim();
+    let restated = if request.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n用户的请求是：\n{}",
+            truncate_chars(request, PINNED_REQUEST_MAX_CHARS)
+        )
+    };
+    format!(
+        "[系统提醒]\n已连续进行 {} 次只读调用，期间没有写入文件，也没有更新计划。{}\n请判断已读到的内容是否足以完成请求：足够就开始动手或直接回答；不够就说明还缺什么，只读取尚未读过的内容。",
+        streak, restated
+    )
+}
+
+fn read_pause_message(pause: &super::read_guard::ReadPause) -> String {
+    let files = if pause.paths.is_empty() {
+        String::new()
+    } else {
+        let lines: Vec<String> = pause.paths.iter().map(|path| format!("- {}", path)).collect();
+        format!("\n\n被反复读取的文件：\n{}", lines.join("\n"))
+    };
+    format!(
+        "我暂停了这一轮：最近 {} 次读取中有 {} 次读到的是没有变化的内容，继续读下去不会有新的进展。{}\n\n已读到的内容都还在。请告诉我接下来希望我做什么，例如直接基于现有内容完成任务，或者指出我还缺少哪部分信息。",
+        pause.window, pause.rereads, files
+    )
 }
 
 /// Convert low-level tool errors into actionable, user-friendly messages.
@@ -5080,13 +5949,20 @@ fn audit_action_label(tool_name: &str, input: &serde_json::Value) -> String {
 mod tests {
     use super::{
         build_request_messages, build_request_view_messages, compact_summarise,
-        compact_trim_tool_results, confirm_flags_handle, is_structural_schema_error,
-        maybe_schema_correction_envelope, serialize_tool_results_with_receipts, AgentEvent,
-        AgentLoop, CTX_KEEP_RECENT_TOOL_CARRIERS, CTX_PRESERVE_RECENT_TURNS, CTX_TRIM_HEAD,
-        CTX_TRIM_TAIL, SUMMARY_KEEP_RECENT_RATIO,
+        compact_trim_tool_results, compaction_keep_tokens, confirm_flags_handle,
+        is_structural_schema_error, maybe_schema_correction_envelope,
+        serialize_tool_results_with_receipts, static_overhead_over_trigger, summary_split_index,
+        AgentEvent, AgentLoop, CompactionGuard, CompactionOutcomeKind, CompactionPins,
+        CompactionRequest, CompactionResult, CompactionStrategy, CompactionTier,
+        CompactionTrigger, DefaultCompaction, RequestScale, TailFloor,
+        CTX_KEEP_RECENT_TOOL_CARRIERS, CTX_PRESERVE_RECENT_TURNS, CTX_TRIM_HEAD, CTX_TRIM_TAIL,
+        SUMMARY_KEEP_RECENT_RATIO,
     };
     use crate::agent::tool::{Tool, ToolContext, ToolRegistry, ToolSettings};
-    use crate::llm::{ContentBlock, LlmChunk, LlmMessage, LlmRequest, LlmResponse, MessageContent};
+    use crate::llm::{
+        estimate_message_tokens, ContentBlock, LlmChunk, LlmMessage, LlmRequest, LlmResponse,
+        MessageContent,
+    };
     use crate::policy::PolicyGate;
     use anyhow::Result;
     use async_trait::async_trait;
@@ -5645,11 +6521,18 @@ mod tests {
 
     /// A tool that ignores cancel entirely (no teardown). The loop must still stop
     /// waiting after the grace period and report the generic user-cancel result.
-    struct NonTerminatingTool;
+    /// Registered as `non_terminating` (read-only) or `non_terminating_write`.
+    struct NonTerminatingTool {
+        read_only: bool,
+    }
     #[async_trait]
     impl Tool for NonTerminatingTool {
         fn name(&self) -> &str {
-            "non_terminating"
+            if self.read_only {
+                "non_terminating"
+            } else {
+                "non_terminating_write"
+            }
         }
         fn description(&self) -> &str {
             "fixture that never observes cancel"
@@ -5657,10 +6540,329 @@ mod tests {
         fn input_schema(&self) -> Value {
             json!({"type":"object"})
         }
+        fn is_read_only(&self) -> bool {
+            self.read_only
+        }
         async fn call(&self, _: Value, _ctx: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
             tokio::time::sleep(std::time::Duration::from_secs(600)).await;
             Ok(crate::agent::tool::ToolResult::ok("never"))
         }
+    }
+
+    /// A write that ignores cancel but finishes on its own a little later.
+    struct SlowWriteTool;
+    #[async_trait]
+    impl Tool for SlowWriteTool {
+        fn name(&self) -> &str {
+            "slow_write"
+        }
+        fn description(&self) -> &str {
+            "fixture write that takes 2.5s and ignores cancel"
+        }
+        fn input_schema(&self) -> Value {
+            json!({"type":"object"})
+        }
+        async fn call(&self, _: Value, _ctx: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
+            tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+            Ok(crate::agent::tool::ToolResult::ok("written"))
+        }
+    }
+
+    /// Requests several tool calls in the first completion, plain text afterwards.
+    struct BatchToolClient {
+        calls: Arc<AtomicUsize>,
+        batch: Vec<(&'static str, &'static str)>,
+    }
+    #[async_trait]
+    impl crate::llm::LlmClient for BatchToolClient {
+        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
+            unreachable!("batch fixture uses complete")
+        }
+        async fn complete(&self, _req: LlmRequest) -> Result<LlmResponse> {
+            let first = self.calls.fetch_add(1, Ordering::SeqCst) == 0;
+            Ok(LlmResponse {
+                content: if first { String::new() } else { "done".into() },
+                tool_calls: if first {
+                    self.batch
+                        .iter()
+                        .map(|(id, name)| crate::llm::ToolCall {
+                            id: (*id).into(),
+                            name: (*name).into(),
+                            input: json!({}),
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                },
+                input_tokens: 1,
+                output_tokens: 1,
+            })
+        }
+    }
+
+    #[test]
+    fn cancel_grace_is_short_only_for_read_only_tools_without_teardown() {
+        assert_eq!(
+            super::cancel_grace_secs_for(&NonTerminatingTool { read_only: true }),
+            super::CANCEL_GRACE_UNCOOPERATIVE_SECS
+        );
+        assert_eq!(
+            super::cancel_grace_secs_for(&NonTerminatingTool { read_only: false }),
+            super::CANCEL_GRACE_SECS
+        );
+        assert_eq!(super::cancel_grace_secs_for(&SlowWriteTool), super::CANCEL_GRACE_SECS);
+        assert_eq!(
+            super::cancel_grace_secs_for(&CooperativeTeardownTool),
+            super::CANCEL_GRACE_SECS
+        );
+    }
+
+    /// Stop while a read-only tool is running and a second call is still queued:
+    /// the turn ends as a confirmed cancel, every requested call has a result,
+    /// and the checkpoint covers the cancelled batch.
+    #[tokio::test]
+    async fn read_only_tool_cancelled_mid_run_ends_as_confirmed_cancel() {
+        let db = Arc::new(tokio::sync::Mutex::new(
+            crate::store::Database::open_in_memory().expect("in-memory db"),
+        ));
+        let session_id = db
+            .lock()
+            .await
+            .create_session(Some("cancel read-only"))
+            .expect("session")
+            .id;
+        let mut agent = tier_agent(
+            BatchToolClient {
+                calls: Arc::new(AtomicUsize::new(0)),
+                batch: vec![("t-read", "non_terminating"), ("t-write", "slow_write")],
+            },
+            Some(db.clone()),
+            crate::agent::harness::LayeredBudget::from_context_window(
+                TIER_TEST_CONTEXT_WINDOW,
+                TIER_TEST_MAX_TOKENS,
+            ),
+        );
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(NonTerminatingTool { read_only: true }));
+        registry.register(Box::new(SlowWriteTool));
+        agent.registry = Arc::new(registry);
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut ctx = tier_tool_context(session_id.clone());
+        ctx.cancel = cancel.clone();
+        ctx.bypass_permissions = true;
+        ctx.max_iterations = Some(3);
+        let completion = ctx.owned_completion();
+        let (tx, mut rx) = mpsc::channel(256);
+        let events = tokio::spawn(async move {
+            let mut ends = Vec::new();
+            while let Some(evt) = rx.recv().await {
+                if let AgentEvent::ToolEnd { id, result, is_error, .. } = evt {
+                    ends.push((id, result, is_error));
+                }
+            }
+            ends
+        });
+
+        let trigger = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            trigger.store(true, Ordering::SeqCst);
+        });
+        let started = std::time::Instant::now();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            agent.run(vec![make_text_msg("user", "read then write")], tx, cancel, ctx),
+        )
+        .await
+        .expect("cancelled run must terminate");
+        let elapsed = started.elapsed();
+        let (new_messages, _, _) = result.expect("a user stop is not a run error");
+        assert!(
+            elapsed < std::time::Duration::from_secs(4),
+            "read-only tool must be given up after the short grace, took {elapsed:?}"
+        );
+
+        // Confirmed cancel: nothing left running, no failed receipt.
+        assert_eq!(
+            completion.drain(std::time::Duration::ZERO).await,
+            crate::agent::tool_completion::DrainOutcome::Complete
+        );
+        assert_eq!(completion.abandoned(), 1);
+
+        // The running call reports the interrupt; the queued one was never started.
+        let ends = events.await.unwrap();
+        assert_eq!(ends.len(), 1, "only the started call emits ToolEnd: {ends:?}");
+        assert_eq!(ends[0].0, "t-read");
+        assert!(ends[0].1.ends_with(super::TOOL_RESULT_INTERRUPTED), "{ends:?}");
+        assert!(ends[0].2);
+
+        // Every tool_use has a paired result, in the returned and the stored messages.
+        let results_of = |blocks: &[ContentBlock]| -> Vec<(String, String)> {
+            blocks
+                .iter()
+                .filter_map(|b| match b {
+                    ContentBlock::ToolResult { tool_use_id, content, .. } => {
+                        Some((tool_use_id.clone(), content.clone()))
+                    }
+                    _ => None,
+                })
+                .collect()
+        };
+        let returned: Vec<(String, String)> = new_messages
+            .iter()
+            .filter_map(|m| match &m.content {
+                MessageContent::Blocks(blocks) => Some(results_of(blocks)),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        assert_eq!(
+            returned,
+            vec![
+                ("t-read".to_string(), super::TOOL_RESULT_INTERRUPTED.to_string()),
+                ("t-write".to_string(), super::TOOL_RESULT_NOT_STARTED.to_string()),
+            ]
+        );
+        let stored = db
+            .lock()
+            .await
+            .get_messages(&session_id, 100, 0)
+            .expect("stored messages");
+        let stored_calls: String = stored.iter().filter_map(|m| m.tool_calls_json.clone()).collect();
+        let stored_results: String =
+            stored.iter().filter_map(|m| m.tool_results_json.clone()).collect();
+        for id in ["t-read", "t-write"] {
+            assert!(stored_calls.contains(id), "tool_use {id} not stored: {stored_calls}");
+            assert!(stored_results.contains(id), "result for {id} not stored: {stored_results}");
+        }
+
+        // The checkpoint was written for this batch before the loop stopped.
+        let (status, checkpoint): (String, String) = db
+            .lock()
+            .await
+            .conn
+            .query_row(
+                "SELECT status, messages_json FROM agent_checkpoints WHERE session_id = ?1",
+                [&session_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .expect("a checkpoint row for the cancelled batch");
+        assert_eq!(status, "completed");
+        assert!(checkpoint.contains("t-write"), "checkpoint must include the batch results");
+        assert!(checkpoint.contains(super::TOOL_RESULT_NOT_STARTED));
+    }
+
+    /// A write that is still running when Stop arrives is allowed to finish
+    /// (it used to be dropped after one second and reported as unconfirmed).
+    #[tokio::test]
+    async fn write_tool_finishing_within_the_grace_keeps_its_result() {
+        let mut agent = tier_agent(
+            CorrectionBudgetClient {
+                calls: Arc::new(AtomicUsize::new(0)),
+            },
+            None,
+            crate::agent::harness::LayeredBudget::from_context_window(
+                TIER_TEST_CONTEXT_WINDOW,
+                TIER_TEST_MAX_TOKENS,
+            ),
+        );
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(SlowWriteTool));
+        agent.registry = Arc::new(registry);
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut ctx = tier_tool_context("cancel-write-finishes".into());
+        ctx.cancel = cancel.clone();
+        ctx.bypass_permissions = true;
+        let completion = ctx.owned_completion();
+        let (event_tx, _event_rx) = mpsc::channel(64);
+
+        let trigger = cancel.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            trigger.store(true, Ordering::SeqCst);
+        });
+        let blocks = agent
+            .execute_single_tool("t-write", "slow_write", &json!({}), &ctx, &event_tx, &cancel)
+            .await;
+        let text = format!("{blocks:?}");
+        assert!(text.contains("written"), "the write's own result must survive: {text}");
+        assert!(!text.contains(super::TOOL_RESULT_INTERRUPTED), "{text}");
+        assert_eq!(
+            completion.drain(std::time::Duration::ZERO).await,
+            crate::agent::tool_completion::DrainOutcome::Complete
+        );
+    }
+
+    /// A write that never returns is dropped only after the full grace, and
+    /// only then does it count as an unconfirmed failure.
+    #[tokio::test]
+    async fn write_tool_counts_as_failure_only_after_the_full_grace() {
+        let mut agent = tier_agent(
+            CorrectionBudgetClient {
+                calls: Arc::new(AtomicUsize::new(0)),
+            },
+            None,
+            crate::agent::harness::LayeredBudget::from_context_window(
+                TIER_TEST_CONTEXT_WINDOW,
+                TIER_TEST_MAX_TOKENS,
+            ),
+        );
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(NonTerminatingTool { read_only: false }));
+        agent.registry = Arc::new(registry);
+
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut ctx = tier_tool_context("cancel-write-hangs".into());
+        ctx.cancel = cancel.clone();
+        ctx.bypass_permissions = true;
+        let completion = ctx.owned_completion();
+        let (event_tx, _event_rx) = mpsc::channel(64);
+
+        let trigger = cancel.clone();
+        let probe = completion.clone();
+        let midway = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            trigger.store(true, Ordering::SeqCst);
+            // Well past the old one-second grace: still running, not failed.
+            tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+            probe.drain(std::time::Duration::ZERO).await
+        });
+        let started = std::time::Instant::now();
+        let blocks = agent
+            .execute_single_tool(
+                "t-hang",
+                "non_terminating_write",
+                &json!({}),
+                &ctx,
+                &event_tx,
+                &cancel,
+            )
+            .await;
+        let elapsed = started.elapsed();
+        let text = format!("{blocks:?}");
+        assert_eq!(
+            midway.await.unwrap(),
+            crate::agent::tool_completion::DrainOutcome::Pending { active: 1 }
+        );
+        assert!(text.contains(super::TOOL_RESULT_INTERRUPTED), "{text}");
+        assert!(
+            elapsed >= std::time::Duration::from_secs(super::CANCEL_GRACE_SECS),
+            "the full grace must be waited before giving up on a write: {elapsed:?}"
+        );
+        assert!(
+            elapsed < std::time::Duration::from_secs(super::CANCEL_GRACE_SECS + 5),
+            "interrupt took {elapsed:?}"
+        );
+        assert_eq!(
+            completion.drain(std::time::Duration::ZERO).await,
+            crate::agent::tool_completion::DrainOutcome::Failed {
+                active: 0,
+                failures: 1
+            }
+        );
+        assert_eq!(completion.abandoned(), 0);
     }
 
     /// A read-only tool returning a sizeable payload so the post-tool-batch
@@ -5748,13 +6950,14 @@ mod tests {
             ),
         );
         let mut registry = ToolRegistry::new();
-        registry.register(Box::new(NonTerminatingTool));
+        registry.register(Box::new(NonTerminatingTool { read_only: true }));
         agent.registry = Arc::new(registry);
 
         let cancel = Arc::new(AtomicBool::new(false));
         let mut ctx = tier_tool_context("cancel-interrupt".into());
         ctx.cancel = cancel.clone();
         ctx.bypass_permissions = true;
+        let completion = ctx.owned_completion();
         let (event_tx, _event_rx) = mpsc::channel(64);
 
         let trigger = cancel.clone();
@@ -5769,8 +6972,14 @@ mod tests {
         let elapsed = started.elapsed();
         let text = format!("{blocks:?}");
         assert!(text.contains("已被用户取消"), "uncooperative tool must be interrupted: {text}");
-        // A tool with no teardown of its own is dropped after the SHORT grace,
-        // not the full cooperative-teardown window, so a user Stop is prompt.
+        // Giving up on a read-only call is not an unconfirmed cleanup.
+        assert_eq!(
+            completion.drain(std::time::Duration::ZERO).await,
+            crate::agent::tool_completion::DrainOutcome::Complete
+        );
+        assert_eq!(completion.abandoned(), 1);
+        // A read-only tool with no teardown of its own is dropped after the SHORT
+        // grace, not the full window, so a user Stop is prompt.
         assert!(
             elapsed >= std::time::Duration::from_secs(super::CANCEL_GRACE_UNCOOPERATIVE_SECS),
             "short grace period must actually be waited before interrupting: {elapsed:?}"
@@ -6043,7 +7252,7 @@ mod tests {
             ),
         );
         let mut registry = ToolRegistry::new();
-        registry.register(Box::new(NonTerminatingTool));
+        registry.register(Box::new(NonTerminatingTool { read_only: true }));
         agent.registry = Arc::new(registry);
 
         let cancel = Arc::new(AtomicBool::new(false));
@@ -7656,13 +8865,13 @@ mod tests {
             "用户要求[监控路径合规性]，智能体已完成[检查前端和后端代码]，当前状态[待完成报告生成]",
         );
 
-        // Reproduce the exact crash scenario from the logs:
-        // deepseek-chat, max_tokens=4096 → budget=49000, keep_tokens=29400
+        // The crash scenario from the logs: deepseek-chat, 76 tool rounds.
         let msgs = make_realistic_session(76); // 76 rounds ≈ 154 messages
         let original_len = msgs.len();
 
-        // keep_tokens matching the real crash: budget(49000) × 0.60 = 29400
-        let keep_tokens = 29_400usize;
+        // The tail may hold 60% of the session, so the older part is summarised.
+        let session_tokens: usize = msgs.iter().map(estimate_message_tokens).sum();
+        let keep_tokens = session_tokens * 6 / 10;
         let result =
             compact_summarise(msgs, keep_tokens, &client, "deepseek-chat", 4096, None).await;
 
@@ -8142,5 +9351,889 @@ mod tests {
             prompt.contains(unique_marker),
             "summariser prompt should include the full tool-result content"
         );
+    }
+
+    // ── Compaction target, idle guard, rule-based fallback, pinned facts ─────
+
+    const PINNED_USER_REQUEST: &str = "请把 docs 目录下的设计文档整理成一份迁移清单 REQUEST_MARKER_7f3a";
+
+    /// Summariser double: counts calls, records prompts, optionally fails.
+    struct CountingSummariser {
+        calls: Arc<AtomicUsize>,
+        prompts: Arc<std::sync::Mutex<Vec<String>>>,
+        fail: bool,
+    }
+
+    impl CountingSummariser {
+        fn new(fail: bool) -> Self {
+            Self {
+                calls: Arc::new(AtomicUsize::new(0)),
+                prompts: Arc::new(std::sync::Mutex::new(Vec::new())),
+                fail,
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.load(Ordering::SeqCst)
+        }
+    }
+
+    #[async_trait]
+    impl crate::llm::LlmClient for CountingSummariser {
+        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
+            unreachable!("summariser fixture uses complete")
+        }
+
+        async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.prompts.lock().unwrap().push(
+                req.messages
+                    .iter()
+                    .map(|message| message.content.as_text())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            );
+            if self.fail {
+                return Err(anyhow::anyhow!("summariser unavailable"));
+            }
+            Ok(LlmResponse {
+                content: "SUMMARY_OF_OLDER_HISTORY".into(),
+                tool_calls: vec![],
+                input_tokens: 40,
+                output_tokens: 12,
+            })
+        }
+    }
+
+    /// A 100k-token input budget (micro 60k, auto 80k, full 95k) with a
+    /// system prompt of a chosen size and no tools.
+    struct CompactionFixture {
+        budget: crate::agent::harness::LayeredBudget,
+        system_prompt: String,
+        tool_minimals: HashMap<String, String>,
+        pins: CompactionPins,
+    }
+
+    impl CompactionFixture {
+        fn with_static_overhead_percent(percent: usize) -> Self {
+            Self {
+                budget: crate::agent::harness::LayeredBudget::with_total(100_000),
+                // Non-CJK text is estimated at four characters per token.
+                system_prompt: "s".repeat(percent * 1_000 * 4),
+                tool_minimals: HashMap::new(),
+                pins: CompactionPins {
+                    user_request: PINNED_USER_REQUEST.to_string(),
+                    ..Default::default()
+                },
+            }
+        }
+
+        async fn estimate(&self, messages: &[LlmMessage]) -> usize {
+            let overhead =
+                crate::llm::estimate_request_overhead_tokens(Some(&self.system_prompt), &[]);
+            RequestScale {
+                tool_minimals: &self.tool_minimals,
+                session_id: "compaction-fixture",
+                system_prompt: &self.system_prompt,
+                tool_defs: &[],
+                message_budget: (self.budget.total as usize).saturating_sub(overhead),
+                max_tool_result_tokens: self.budget.max_tool_result_tokens,
+            }
+            .estimate(messages)
+            .await
+        }
+
+        async fn tier(&self, messages: &[LlmMessage]) -> CompactionTier {
+            self.budget.classify(self.estimate(messages).await as u32)
+        }
+
+        async fn compact(
+            &self,
+            trigger: CompactionTrigger,
+            client: &dyn crate::llm::LlmClient,
+            messages: &[LlmMessage],
+            rolling_summary: &str,
+            guard: CompactionGuard,
+        ) -> CompactionResult {
+            DefaultCompaction
+                .compact(CompactionRequest {
+                    trigger,
+                    budget: self.budget,
+                    messages: messages.to_vec(),
+                    rolling_summary,
+                    system_prompt: &self.system_prompt,
+                    model: "test-model",
+                    max_tokens: 4_096,
+                    context_window: 0,
+                    tool_defs: &[],
+                    tool_minimals: &self.tool_minimals,
+                    session_id: "compaction-fixture",
+                    cumulative_input_tokens: 0,
+                    next_auto_compact_threshold: i64::MAX,
+                    threshold_step: 0,
+                    client,
+                    guard,
+                    pins: &self.pins,
+                })
+                .await
+        }
+    }
+
+    /// A text message of about `tokens` estimated tokens.
+    fn sized_msg(role: &str, label: &str, tokens: usize) -> LlmMessage {
+        make_text_msg(role, &format!("{label} {}", "w".repeat(tokens * 4)))
+    }
+
+    /// The user's request followed by `count` alternating messages of
+    /// `tokens` each.
+    fn sized_history(count: usize, tokens: usize) -> Vec<LlmMessage> {
+        let mut messages = vec![make_text_msg("user", PINNED_USER_REQUEST)];
+        for index in 0..count {
+            let role = if index % 2 == 0 { "assistant" } else { "user" };
+            messages.push(sized_msg(role, &format!("history-{index}"), tokens));
+        }
+        messages
+    }
+
+    fn all_text(messages: &[LlmMessage]) -> String {
+        messages
+            .iter()
+            .map(|message| message.content.as_text())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn keep_tokens_follow_the_micro_trigger_not_only_the_message_budget() {
+        let budget = crate::agent::harness::LayeredBudget::with_total(100_000);
+        // Light overhead: the ratio would keep 54k, which with 10k overhead
+        // and a summary lands above the 60k trigger. The trigger caps it.
+        assert_eq!(compaction_keep_tokens(&budget, 10_000, 0.60), 42_000);
+        // Tiny overhead and a low ratio: the ratio is the smaller bound.
+        assert_eq!(compaction_keep_tokens(&budget, 1_000, 0.25), 24_750);
+        // Overhead at or above the trigger: nothing but the floor is kept.
+        assert_eq!(compaction_keep_tokens(&budget, 63_000, 0.60), 0);
+        assert_eq!(static_overhead_over_trigger(&budget, 63_000), Some(63));
+        assert_eq!(static_overhead_over_trigger(&budget, 59_999), None);
+    }
+
+    #[test]
+    fn split_index_is_zero_when_the_history_fits_and_respects_the_tail_floor() {
+        let messages = sized_history(20, 100);
+        let total: usize = messages.iter().map(estimate_message_tokens).sum();
+        // Fits: nothing to summarise. The old default summarised all but six.
+        assert_eq!(summary_split_index(&messages, total, TailFloor::Fixed), 0);
+        assert_eq!(summary_split_index(&messages, total, TailFloor::Shrinking), 0);
+        // Does not fit at all: the floor decides.
+        assert_eq!(summary_split_index(&messages, 0, TailFloor::Fixed), 21 - 6);
+        assert_eq!(summary_split_index(&messages, 0, TailFloor::Shrinking), 21 - 6);
+        // The message that crosses the budget is summarised, not kept.
+        let three = 3 * estimate_message_tokens(&messages[20]);
+        assert_eq!(summary_split_index(&messages, three, TailFloor::Shrinking), 21 - 6);
+        let ten = 10 * estimate_message_tokens(&messages[20]);
+        assert_eq!(summary_split_index(&messages, ten, TailFloor::Fixed), 21 - 10);
+        assert_eq!(summary_split_index(&messages, ten + 1, TailFloor::Fixed), 21 - 10);
+        // A short history is left alone before a request, halved in recovery.
+        let short = sized_history(3, 100);
+        assert_eq!(summary_split_index(&short, 0, TailFloor::Fixed), 0);
+        assert_eq!(summary_split_index(&short, 0, TailFloor::Shrinking), 2);
+    }
+
+    #[tokio::test]
+    async fn summariser_is_not_called_when_everything_fits() {
+        let client = CountingSummariser::new(false);
+        let messages = sized_history(20, 100);
+        let result = compact_summarise(messages, 100_000, &client, "test-model", 4_096, None).await;
+        assert!(result.is_none());
+        assert_eq!(client.calls(), 0);
+    }
+
+    /// Static overhead at 63% of the budget, above the 60% trigger. The old
+    /// target kept 60% of the message budget, which left the request in the
+    /// auto tier, so every iteration summarised again.
+    #[tokio::test]
+    async fn heavy_static_overhead_one_pass_ends_below_auto_and_ten_rounds_summarise_once() {
+        let fixture = CompactionFixture::with_static_overhead_percent(63);
+        let client = CountingSummariser::new(false);
+        let mut messages = sized_history(22, 1_000);
+        assert_eq!(fixture.tier(&messages).await, CompactionTier::Auto);
+
+        let mut guard = CompactionGuard::default();
+        let mut rolling_summary = String::new();
+        let mut applied = 0;
+        for round in 0..10 {
+            let result = fixture
+                .compact(
+                    CompactionTrigger::Proactive,
+                    &client,
+                    &messages,
+                    &rolling_summary,
+                    guard,
+                )
+                .await;
+            guard = result.guard;
+            if result.changed {
+                applied += 1;
+                messages = result.messages;
+                rolling_summary = result.rolling_summary;
+                let report = result.report.expect("an applied pass reports");
+                assert_eq!(report.outcome, CompactionOutcomeKind::Ok);
+                assert_eq!(report.tier, "auto");
+                assert!(report.after_tokens < report.before_tokens);
+            }
+            if round == 0 {
+                assert_eq!(applied, 1, "the first round must compact");
+                let tier = fixture.tier(&messages).await;
+                assert!(
+                    matches!(tier, CompactionTier::None | CompactionTier::Micro),
+                    "one pass must leave the auto tier, got {tier:?}"
+                );
+            }
+            // The turn goes on with a small tool round.
+            messages.push(sized_msg("assistant", &format!("step-{round}"), 60));
+            messages.push(sized_msg("user", &format!("result-{round}"), 60));
+        }
+        assert_eq!(applied, 1);
+        assert_eq!(client.calls(), 1, "ten rounds may summarise once");
+    }
+
+    /// Only the earlier summary is older than the tail: there is nothing to
+    /// summarise, so the model is not asked, and the pass is not retried
+    /// until the request has grown.
+    #[tokio::test]
+    async fn nothing_but_the_rolling_summary_to_compact_calls_no_model_and_cools_down() {
+        let fixture = CompactionFixture::with_static_overhead_percent(63);
+        let client = CountingSummariser::new(false);
+        let mut messages =
+            vec![crate::agent::message_utils::rolling_summary_message("EARLIER_SUMMARY")];
+        for index in 0..6 {
+            let role = if index % 2 == 0 { "assistant" } else { "user" };
+            messages.push(sized_msg(role, &format!("tail-{index}"), 3_500));
+        }
+        assert_eq!(fixture.tier(&messages).await, CompactionTier::Auto);
+        let before = fixture.estimate(&messages).await;
+
+        let first = fixture
+            .compact(
+                CompactionTrigger::Proactive,
+                &client,
+                &messages,
+                "EARLIER_SUMMARY",
+                CompactionGuard::default(),
+            )
+            .await;
+        assert!(!first.changed);
+        assert_eq!(client.calls(), 0);
+        let report = first.report.expect("the attempt is reported");
+        assert_eq!(report.outcome, CompactionOutcomeKind::Noop);
+        assert_eq!((report.before_tokens, report.after_tokens), (before, before));
+        assert_eq!(first.guard.retry_at_estimate, Some(before + 5_000));
+
+        // Same history again: skipped without a report.
+        let second = fixture
+            .compact(
+                CompactionTrigger::Proactive,
+                &client,
+                &messages,
+                "EARLIER_SUMMARY",
+                first.guard,
+            )
+            .await;
+        assert!(!second.changed);
+        assert!(second.report.is_none());
+        assert_eq!(second.guard, first.guard);
+        assert_eq!(client.calls(), 0);
+
+        // Grown by more than 5% of the budget: tried again, and now two
+        // real messages are older than the six-message tail.
+        messages.push(sized_msg("assistant", "growth-a", 3_000));
+        messages.push(sized_msg("user", "growth-b", 3_000));
+        let third = fixture
+            .compact(
+                CompactionTrigger::Proactive,
+                &client,
+                &messages,
+                "EARLIER_SUMMARY",
+                second.guard,
+            )
+            .await;
+        assert_eq!(client.calls(), 1);
+        assert!(third.changed);
+        assert_eq!(third.report.unwrap().outcome, CompactionOutcomeKind::Ok);
+        assert_eq!(third.guard.retry_at_estimate, None);
+        assert_eq!(third.messages.len(), 7, "summary plus the six newest");
+    }
+
+    /// A summary that does not shrink the request by 5% is not applied.
+    #[tokio::test]
+    async fn a_pass_that_gains_less_than_five_percent_is_dropped_and_cools_down() {
+        let fixture = CompactionFixture::with_static_overhead_percent(63);
+        let client = CountingSummariser::new(false);
+        // Six large tail messages and one small older one: summarising the
+        // small one cannot move the estimate.
+        let mut messages = vec![sized_msg("user", "small-old", 50)];
+        for index in 0..6 {
+            let role = if index % 2 == 0 { "assistant" } else { "user" };
+            messages.push(sized_msg(role, &format!("tail-{index}"), 3_500));
+        }
+        assert_eq!(fixture.tier(&messages).await, CompactionTier::Auto);
+        let result = fixture
+            .compact(
+                CompactionTrigger::Proactive,
+                &client,
+                &messages,
+                "",
+                CompactionGuard::default(),
+            )
+            .await;
+        assert_eq!(client.calls(), 1);
+        assert!(!result.changed);
+        assert_eq!(result.messages.len(), messages.len());
+        assert_eq!(result.report.unwrap().outcome, CompactionOutcomeKind::Noop);
+        assert!(result.guard.retry_at_estimate.is_some());
+        // The call was made, so it is billed.
+        assert_eq!((result.summary_input_tokens, result.summary_output_tokens), (40, 12));
+    }
+
+    /// The summariser always fails. The first failure in the auto tier leaves
+    /// the history alone; the second cuts it by rule.
+    #[tokio::test]
+    async fn failing_summariser_is_replaced_by_a_rule_based_cut_within_two_rounds() {
+        let fixture = CompactionFixture::with_static_overhead_percent(10);
+        let client = CountingSummariser::new(true);
+        let mut messages = sized_history(72, 1_000);
+        // Tool calls in the part that will be dropped.
+        messages.insert(
+            1,
+            make_tool_call_msg("file_read", r#"{"path":"docs/design.md"}"#),
+        );
+        messages.insert(2, make_tool_result_msg("call_file_read", "design text"));
+        assert_eq!(fixture.tier(&messages).await, CompactionTier::Auto);
+
+        let first = fixture
+            .compact(
+                CompactionTrigger::Proactive,
+                &client,
+                &messages,
+                "",
+                CompactionGuard::default(),
+            )
+            .await;
+        assert!(!first.changed);
+        assert_eq!(first.report.unwrap().outcome, CompactionOutcomeKind::Failed);
+        assert_eq!(first.guard.consecutive_summary_failures, 1);
+        assert_eq!(first.guard.retry_at_estimate, None, "a failure is retried at once");
+
+        let second = fixture
+            .compact(
+                CompactionTrigger::Proactive,
+                &client,
+                &messages,
+                "",
+                first.guard,
+            )
+            .await;
+        assert_eq!(client.calls(), 2);
+        assert!(second.changed);
+        let report = second.report.unwrap();
+        assert_eq!(report.outcome, CompactionOutcomeKind::Fallback);
+        assert_eq!((second.summary_input_tokens, second.summary_output_tokens), (0, 0));
+
+        let tier = fixture.tier(&second.messages).await;
+        assert!(
+            matches!(tier, CompactionTier::None | CompactionTier::Micro),
+            "the cut must end below the auto line, got {tier:?}"
+        );
+        assert_eq!(report.after_tokens, fixture.estimate(&second.messages).await);
+        assert!(second.messages.len() < messages.len());
+        // The request survives word for word, and the dropped calls are listed.
+        let text = all_text(&second.messages);
+        assert!(text.contains(PINNED_USER_REQUEST), "{text}");
+        assert!(second.rolling_summary.contains("[规则裁剪记录]"));
+        assert!(second.rolling_summary.contains(PINNED_USER_REQUEST));
+        assert!(second.rolling_summary.contains("file_read ×1（docs/design.md）"));
+        // The tail is intact and still pairs tool calls with results.
+        assert_eq!(
+            all_text(&second.messages[second.messages.len() - 6..]),
+            all_text(&messages[messages.len() - 6..])
+        );
+    }
+
+    /// In the full tier there is no second round to wait for.
+    #[tokio::test]
+    async fn failing_summariser_in_the_full_tier_is_cut_by_rule_at_once() {
+        let fixture = CompactionFixture::with_static_overhead_percent(10);
+        let client = CountingSummariser::new(true);
+        let messages = sized_history(87, 1_000);
+        assert_eq!(fixture.tier(&messages).await, CompactionTier::Full);
+        let result = fixture
+            .compact(
+                CompactionTrigger::Proactive,
+                &client,
+                &messages,
+                "",
+                CompactionGuard::default(),
+            )
+            .await;
+        assert_eq!(client.calls(), 1);
+        assert!(result.changed);
+        let report = result.report.unwrap();
+        assert_eq!(report.outcome, CompactionOutcomeKind::Fallback);
+        assert_eq!(report.tier, "full");
+        assert!(all_text(&result.messages).contains(PINNED_USER_REQUEST));
+    }
+
+    /// Overflow recovery uses the same rule-based cut when no summary comes.
+    #[tokio::test]
+    async fn overflow_recovery_cuts_by_rule_when_the_summariser_fails() {
+        let fixture = CompactionFixture::with_static_overhead_percent(10);
+        let client = CountingSummariser::new(true);
+        // Far below every tier by the local estimate: the provider disagreed.
+        let messages = sized_history(8, 200);
+        assert_eq!(fixture.tier(&messages).await, CompactionTier::None);
+        let result = fixture
+            .compact(
+                CompactionTrigger::Overflow,
+                &client,
+                &messages,
+                "",
+                CompactionGuard::default(),
+            )
+            .await;
+        assert_eq!(client.calls(), 1);
+        assert!(result.changed, "overflow must shrink the history");
+        let report = result.report.unwrap();
+        assert_eq!(report.outcome, CompactionOutcomeKind::Fallback);
+        assert_eq!(report.tier, "overflow");
+        assert!(result.messages.len() < messages.len());
+        assert!(all_text(&result.messages).contains(PINNED_USER_REQUEST));
+    }
+
+    /// After a summary the model still has the request word for word and the
+    /// list of files it already read. Neither is stored in the rolling
+    /// summary, where the next pass would summarise it away.
+    #[tokio::test]
+    async fn summary_message_pins_the_user_request_todos_and_files_read() {
+        let mut fixture = CompactionFixture::with_static_overhead_percent(10);
+        fixture.pins.todos = vec!["- [in_progress] 整理迁移清单".to_string()];
+        fixture.pins.files_read = vec![
+            "docs/design.md（全文；3 次）".to_string(),
+            "docs/api.md（L1-200、L201-400；2 次）".to_string(),
+        ];
+        let client = CountingSummariser::new(false);
+        let messages = sized_history(72, 1_000);
+        let result = fixture
+            .compact(
+                CompactionTrigger::Proactive,
+                &client,
+                &messages,
+                "",
+                CompactionGuard::default(),
+            )
+            .await;
+        assert!(result.changed);
+        let summary_message = result.messages[0].content.as_text();
+        assert!(summary_message.starts_with("[会话滚动摘要]"));
+        assert!(summary_message.contains("SUMMARY_OF_OLDER_HISTORY"));
+        assert!(summary_message.contains(&format!(
+            "当前用户请求（原文）：\n{PINNED_USER_REQUEST}"
+        )));
+        assert!(summary_message.contains("待办快照：\n- [in_progress] 整理迁移清单"));
+        assert!(summary_message.contains("已读文件清单"));
+        assert!(summary_message.contains("- docs/design.md（全文；3 次）"));
+        assert!(summary_message.contains("- docs/api.md（L1-200、L201-400；2 次）"));
+        assert_eq!(result.rolling_summary, "SUMMARY_OF_OLDER_HISTORY");
+
+        // While the request is still in the verbatim tail it is not repeated.
+        let mut recent = sized_history(72, 1_000);
+        recent.push(make_text_msg("user", PINNED_USER_REQUEST));
+        let result = fixture
+            .compact(
+                CompactionTrigger::Proactive,
+                &client,
+                &recent,
+                "",
+                CompactionGuard::default(),
+            )
+            .await;
+        assert!(result.changed);
+        let summary_message = result.messages[0].content.as_text();
+        assert!(!summary_message.contains("当前用户请求（原文）"));
+        assert!(summary_message.contains("已读文件清单"));
+    }
+
+    /// Results of read-type tools reach the summariser with 800 characters,
+    /// other results with 200, and the summary may be up to 4096 tokens.
+    #[tokio::test]
+    async fn summariser_sees_long_previews_of_read_results_only() {
+        let read_body = format!("{}READ_TAIL_MARKER", "r".repeat(780));
+        let shell_body = format!("{}SHELL_TAIL_MARKER", "x".repeat(780));
+        let mut messages = vec![make_text_msg("user", PINNED_USER_REQUEST)];
+        messages.push(make_tool_call_msg("file_read", r#"{"path":"docs/a.md"}"#));
+        messages.push(make_tool_result_msg("call_file_read", &read_body));
+        messages.push(make_tool_call_msg("shell", r#"{"command":"ls"}"#));
+        messages.push(make_tool_result_msg("call_shell", &shell_body));
+        for index in 0..8 {
+            messages.push(sized_msg("assistant", &format!("later-{index}"), 500));
+        }
+
+        struct MaxTokensSpy {
+            inner: CountingSummariser,
+            max_tokens: Arc<std::sync::Mutex<Vec<u32>>>,
+        }
+        #[async_trait]
+        impl crate::llm::LlmClient for MaxTokensSpy {
+            async fn stream(&self, req: LlmRequest, tx: mpsc::Sender<LlmChunk>) -> Result<()> {
+                self.inner.stream(req, tx).await
+            }
+            async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
+                self.max_tokens.lock().unwrap().push(req.max_tokens);
+                self.inner.complete(req).await
+            }
+        }
+        let client = MaxTokensSpy {
+            inner: CountingSummariser::new(false),
+            max_tokens: Arc::new(std::sync::Mutex::new(Vec::new())),
+        };
+
+        for (configured, expected) in [(512, 1_024), (2_000, 2_000), (16_000, 4_096)] {
+            let result =
+                compact_summarise(messages.clone(), 2_000, &client, "test-model", configured, None)
+                    .await;
+            assert!(result.is_some());
+            assert_eq!(client.max_tokens.lock().unwrap().last(), Some(&expected));
+        }
+        let prompt = client.inner.prompts.lock().unwrap()[0].clone();
+        assert!(prompt.contains("READ_TAIL_MARKER"), "read results keep 800 characters");
+        assert!(!prompt.contains("SHELL_TAIL_MARKER"), "other results keep 200 characters");
+    }
+
+    fn tier_spy() -> (TierRoutingSpyClient, Arc<AtomicUsize>) {
+        let semantic_calls = Arc::new(AtomicUsize::new(0));
+        (
+            TierRoutingSpyClient {
+                semantic_calls: semantic_calls.clone(),
+                main_calls: Arc::new(AtomicUsize::new(0)),
+                semantic_prompts: Arc::new(std::sync::Mutex::new(Vec::new())),
+            },
+            semantic_calls,
+        )
+    }
+
+    /// The context indicator learns how the run's last compaction ended, in
+    /// the field names the frontend validates.
+    #[tokio::test]
+    async fn context_usage_reports_the_last_compaction() {
+        let budget = crate::agent::harness::LayeredBudget::from_context_window(
+            TIER_TEST_CONTEXT_WINDOW,
+            TIER_TEST_MAX_TOKENS,
+        );
+        let (client, semantic_calls) = tier_spy();
+        let events = run_tier_agent(
+            tier_agent(client, None, budget),
+            tier_history(budget, 85, CompactionTier::Auto),
+            "context-usage-compaction".into(),
+        )
+        .await;
+        assert_eq!(semantic_calls.load(Ordering::SeqCst), 1);
+
+        let usage = events
+            .iter()
+            .find(|event| matches!(event, AgentEvent::ContextUsage { .. }))
+            .expect("ContextUsage event");
+        let AgentEvent::ContextUsage {
+            estimated_input_tokens,
+            last_compaction: Some(status),
+            ..
+        } = usage
+        else {
+            panic!("the compaction must be reported: {usage:?}");
+        };
+        assert_eq!(status.outcome, "ok");
+        assert_eq!(status.tier, "auto");
+        assert_eq!(status.count, 1);
+        assert!(status.after_tokens < status.before_tokens);
+        assert_eq!(status.after_tokens, *estimated_input_tokens);
+        assert!(status.after_tokens < budget.trigger_auto);
+
+        let wire = serde_json::to_value(usage).expect("serialise");
+        let mut keys: Vec<&str> = wire["last_compaction"]
+            .as_object()
+            .expect("last_compaction object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["after_tokens", "before_tokens", "count", "outcome", "tier"]);
+
+        // A run that never compacts sends no status at all.
+        let (client, _) = tier_spy();
+        let events = run_tier_agent(
+            tier_agent(client, None, budget),
+            vec![make_text_msg("user", "short request")],
+            "context-usage-no-compaction".into(),
+        )
+        .await;
+        let usage = events
+            .iter()
+            .find(|event| matches!(event, AgentEvent::ContextUsage { .. }))
+            .expect("ContextUsage event");
+        assert!(serde_json::to_value(usage).unwrap().get("last_compaction").is_none());
+    }
+
+    /// A system prompt that alone reaches the compaction trigger is reported
+    /// to the user, once per session.
+    #[tokio::test]
+    async fn static_overhead_above_the_trigger_is_announced_once_per_session() {
+        let budget = crate::agent::harness::LayeredBudget::from_context_window(
+            TIER_TEST_CONTEXT_WINDOW,
+            TIER_TEST_MAX_TOKENS,
+        );
+        let heavy_prompt = "p".repeat(budget.trigger_micro as usize * 4 + 400);
+        let notices = |events: &[AgentEvent]| -> Vec<(String, Value)> {
+            events
+                .iter()
+                .filter_map(|event| match event {
+                    AgentEvent::Notice {
+                        message,
+                        code: Some(code),
+                        details: Some(details),
+                    } if code == "context_static_overhead" => {
+                        Some((message.clone(), details.clone()))
+                    }
+                    _ => None,
+                })
+                .collect()
+        };
+
+        let run = |session: &'static str, prompt: String| async move {
+            let (client, _) = tier_spy();
+            let mut agent = tier_agent(client, None, budget);
+            agent.system_prompt = prompt;
+            run_tier_agent(agent, vec![make_text_msg("user", "hello")], session.into()).await
+        };
+
+        let first = notices(&run("static-overhead-session", heavy_prompt.clone()).await);
+        assert_eq!(first.len(), 1);
+        let percent = first[0].1["percent"].as_u64().expect("percent");
+        assert!((60..100).contains(&percent), "{percent}");
+        assert!(first[0].0.contains(&format!("{percent}%")));
+        assert!(first[0].0.contains("MCP"));
+
+        let again = notices(&run("static-overhead-session", heavy_prompt).await);
+        assert!(again.is_empty(), "the notice must not repeat for the same session");
+
+        let light = notices(&run("static-overhead-light-session", "short prompt".into()).await);
+        assert!(light.is_empty());
+    }
+
+    // ── Read-only progress guard, through the loop ───────────────────────────
+
+    /// Read-only fixture: a path always returns the same content.
+    struct FixedDocTool {
+        calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl Tool for FixedDocTool {
+        fn name(&self) -> &str {
+            "doc_read"
+        }
+        fn description(&self) -> &str {
+            "fixture read whose content never changes"
+        }
+        fn input_schema(&self) -> Value {
+            json!({"type":"object","properties":{"path":{"type":"string"}}})
+        }
+        fn is_read_only(&self) -> bool {
+            true
+        }
+        async fn call(&self, input: Value, _ctx: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            let path = input.get("path").and_then(Value::as_str).unwrap_or("?");
+            Ok(crate::agent::tool::ToolResult::ok(format!("content of {path}")))
+        }
+    }
+
+    /// Asks for one file per completion, cycling through `paths`, and answers
+    /// in text once `limit` files were requested.
+    struct ReadingClient {
+        calls: Arc<AtomicUsize>,
+        paths: Vec<String>,
+        limit: usize,
+    }
+
+    #[async_trait]
+    impl crate::llm::LlmClient for ReadingClient {
+        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
+            unreachable!("reading fixture uses complete")
+        }
+
+        async fn complete(&self, _req: LlmRequest) -> Result<LlmResponse> {
+            let call = self.calls.fetch_add(1, Ordering::SeqCst);
+            let done = call >= self.limit;
+            Ok(LlmResponse {
+                content: if done { "done".into() } else { String::new() },
+                tool_calls: if done {
+                    vec![]
+                } else {
+                    vec![crate::llm::ToolCall {
+                        id: format!("read-{call}"),
+                        name: "doc_read".into(),
+                        input: json!({ "path": self.paths[call % self.paths.len()] }),
+                    }]
+                },
+                input_tokens: 1,
+                output_tokens: 1,
+            })
+        }
+    }
+
+    struct ReadingRun {
+        new_messages: Vec<LlmMessage>,
+        events: Vec<AgentEvent>,
+        model_calls: usize,
+        tool_calls: usize,
+    }
+
+    async fn run_reading_agent(paths: Vec<String>, limit: usize) -> ReadingRun {
+        let model_calls = Arc::new(AtomicUsize::new(0));
+        let tool_calls = Arc::new(AtomicUsize::new(0));
+        let mut agent = tier_agent(
+            ReadingClient {
+                calls: model_calls.clone(),
+                paths,
+                limit,
+            },
+            None,
+            crate::agent::harness::LayeredBudget::with_total(1_000_000),
+        );
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(FixedDocTool {
+            calls: tool_calls.clone(),
+        }));
+        agent.registry = Arc::new(registry);
+
+        let mut ctx = tier_tool_context("reading-run".into());
+        ctx.bypass_permissions = true;
+        ctx.max_iterations = Some(300);
+        let (event_tx, mut event_rx) = mpsc::channel(64);
+        let collector = tokio::spawn(async move {
+            let mut events = Vec::new();
+            while let Some(event) = event_rx.recv().await {
+                events.push(event);
+            }
+            events
+        });
+        let (new_messages, _, _) = agent
+            .run(
+                vec![make_text_msg("user", PINNED_USER_REQUEST)],
+                event_tx,
+                Arc::new(AtomicBool::new(false)),
+                ctx,
+            )
+            .await
+            .expect("reading run");
+        ReadingRun {
+            new_messages,
+            events: collector.await.expect("event collector"),
+            model_calls: model_calls.load(Ordering::SeqCst),
+            tool_calls: tool_calls.load(Ordering::SeqCst),
+        }
+    }
+
+    fn is_tool_result_message(message: &LlmMessage) -> bool {
+        matches!(
+            &message.content,
+            MessageContent::Blocks(blocks)
+                if blocks.iter().any(|block| matches!(block, ContentBlock::ToolResult { .. }))
+        )
+    }
+
+    /// Four files whose content never changes, read in rotation. The third
+    /// re-read draws a warning, the sixth is refused, and the turn stops.
+    #[tokio::test]
+    async fn rotating_rereads_of_unchanged_files_warn_block_and_pause_the_turn() {
+        let paths: Vec<String> = ["a", "b", "c", "d"]
+            .iter()
+            .map(|name| format!("docs/{name}.md"))
+            .collect();
+        let run = run_reading_agent(paths, 250).await;
+
+        assert!(run.model_calls <= 60, "paused only after {} calls", run.model_calls);
+        // 4 first reads, 5 allowed re-reads of each file, then the refusal.
+        assert_eq!(run.model_calls, 25);
+        assert_eq!(run.tool_calls, 24);
+
+        // The warning follows the 13th call: the third re-read of docs/a.md.
+        let first_warning = run
+            .new_messages
+            .iter()
+            .position(|message| {
+                message.role == "user" && message.content.as_text().starts_with("[系统提醒]")
+            })
+            .expect("a warning must be injected");
+        let reads_before_warning = run.new_messages[..first_warning]
+            .iter()
+            .filter(|message| is_tool_result_message(message))
+            .count();
+        assert_eq!(reads_before_warning, 13);
+        let warning = run.new_messages[first_warning].content.as_text();
+        assert!(warning.contains("第 3 次重读 docs/a.md"), "{warning}");
+
+        // The 25th call was refused, not run.
+        let refused: Vec<&AgentEvent> = run
+            .events
+            .iter()
+            .filter(|event| {
+                matches!(event, AgentEvent::ToolEnd { result, is_error: true, .. } if result.starts_with("[循环检测]"))
+            })
+            .collect();
+        assert_eq!(refused.len(), 1);
+        assert!(
+            matches!(refused[0], AgentEvent::ToolEnd { id, result, .. } if id == "read-24" && result.contains("docs/a.md")),
+            "{:?}",
+            refused[0]
+        );
+
+        // The turn ends with an explanation to the user.
+        let last = run.new_messages.last().expect("messages");
+        assert_eq!(last.role, "assistant");
+        let explanation = last.content.as_text();
+        assert!(explanation.contains("暂停"), "{explanation}");
+        assert!(explanation.contains("docs/a.md"), "{explanation}");
+        assert!(run.events.iter().any(|event| {
+            matches!(event, AgentEvent::Notice { code: Some(code), .. } if code == "read_loop_paused")
+        }));
+    }
+
+    /// Sixty different files: nothing is refused and the turn is not paused.
+    /// The 25th and 50th read-only call restate the user's request.
+    #[tokio::test]
+    async fn reading_sixty_different_files_is_reminded_but_never_blocked() {
+        let paths: Vec<String> = (0..60).map(|index| format!("src/file_{index}.rs")).collect();
+        let run = run_reading_agent(paths, 60).await;
+
+        assert_eq!(run.tool_calls, 60);
+        assert_eq!(run.model_calls, 61);
+        assert!(!run.events.iter().any(|event| {
+            matches!(event, AgentEvent::ToolEnd { result, .. } if result.starts_with("[循环检测]"))
+        }));
+        assert!(!run.events.iter().any(|event| {
+            matches!(event, AgentEvent::Notice { code: Some(code), .. } if code == "read_loop_paused")
+        }));
+        assert_eq!(run.new_messages.last().unwrap().content.as_text(), "done");
+
+        let reminders: Vec<String> = run
+            .new_messages
+            .iter()
+            .filter(|message| message.role == "user")
+            .map(|message| message.content.as_text())
+            .filter(|text| text.starts_with("[系统提醒]"))
+            .collect();
+        assert_eq!(reminders.len(), 2, "{reminders:?}");
+        assert!(reminders[0].contains("已连续进行 25 次只读调用"));
+        assert!(reminders[1].contains("已连续进行 50 次只读调用"));
+        assert!(reminders.iter().all(|text| text.contains(PINNED_USER_REQUEST)));
     }
 }
