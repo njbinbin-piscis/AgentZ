@@ -6,7 +6,7 @@
 
 状态：**1.0.0 工程基线已关闭（2026-10-19）**——所有宿主侧工程、WorkZ ↔ CodeZ 交接、脏缓冲区冲突保护、按轮撤销、旁路 token 计量、机密清理以及打包/E2E 闸门均已在 `1.0.0` 中解决并验证（见 `docs/upgrade/release-decision-1.0.0.md` 和 `docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md`）。外部硬件/证书事项在 `ADR-006` 下跟踪。下方的历史记录保留以供工程溯源。
 
-负责人：Piscis。创建：2026-09-29。更新：2026-11-02。
+负责人：Piscis。创建：2026-09-29。更新：2026-11-15。
 
 ## 状态索引（2026-11-02 针对 1.0.40 重新核实）
 
@@ -25,6 +25,10 @@
 | 8 | `plan_todo` 卡在 `in_progress` | **未解决。** 会统计未完成 todo（`open_todos`）并自动续跑，但从不自动标记为 `cancelled`/`pending` | `chat_turn/post_turn.rs` |
 | 21 | DeepSeek 工具调用配对 | **已解决（内核）。** `convert_messages` 跟踪 `pending_tool_ids` | `piscis-kernel/src/llm/openai.rs` |
 | 22 | DeepSeek / “think” 兼容性 | **部分解决。** `is_deepseek_thinking_model` 不区分大小写，并匹配带网关前缀、`think` 和 `-r1` 的名称；推理过程仍未在 UI 中显示 | `piscis-kernel/src/llm/openai.rs` |
+| 23 | `chat_ui` 必选项无法选中，表单无法提交 | **未解决**（2026-11-15，用户报告） | `src/components/chat/interactiveUi/`、`src/contexts/InteractiveCardsContext.tsx` |
+| 24 | 任务面板遮挡 checkpoint“从此处分叉”弹出菜单 | **未解决**（2026-11-15，用户报告） | `src/workspaces/codez/AssistantPanel.css`（层叠上下文）、`src/components/TaskPanel.css` |
+| 25 | 立即停止跳过了轮次收尾：工具计数漂移、无 checkpoint banner | **未解决**（2026-11-15，用户报告） | `src-tauri/src/commands/chat.rs`（`chat_cancel`）、`chat_turn/post_turn.rs` |
+| 26 | 上下文管理/压缩：重复调用工具不推进；压缩后丢失任务目标 | **未解决**（2026-11-15，用户报告） | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`、`bench_compact.rs` |
 
 Windows 打包目标：见 README。已验证的产物是 `.github/workflows/release.yml` 上传的 NSIS `.exe` 文件。
 
@@ -481,3 +485,51 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 - 浅色主题下 Markdown 代码块是黑底黑字（硬编码的深色背景加上仅深色的 highlight.js 配色）：通过主题变量 `--code-bg` / `--code-border` 以及 `components/hljs-light.css` 中的浅色覆盖修复。
 - WorkZ 不再要求打开文件夹。普通会话存储在配置目录下的内部 `free-sessions` 项目文件夹中；它们的工作目录是按会话的设置（会话状态帧中的 `cwd`）。
 - 限制：普通会话无法使用 worktree 隔离或仓库 Wiki；团队仍绑定到该范围的数据库。未在运行中的桌面应用中验证。
+
+---
+
+## 23. `chat_ui` 生成的选择卡片：任何选项都无法选中；必选题导致无法提交
+
+**状态（2026-11-15）。** **未解决。** 用户报告（附截图）。包含必选单选题的 `chat_ui` 表单能正常渲染，但点击任何选项都无法选中，必选校验永远不通过，卡片无法提交。
+
+**已有调查（不完整）。** `InteractiveCard` 的隔离 DOM/流式测试通过（`InteractiveCard.dom.test.tsx`、`InteractiveCard.streaming.test.tsx`），说明选择处理逻辑在隔离环境下正常；故障只出现在真实聊天渲染路径。未验证的假设：流式重渲染或 `chat_ui_patch` 数据更新重置了本地选择状态；消息流中存在遮挡层 / `pointer-events` 问题；轮次结束后卡片被渲染为禁用/只读。根因未确认；未做代码修改。
+
+**排查位置。** `src/components/chat/interactiveUi/`（`InteractiveCard.tsx`、`InteractiveUiRenderer.tsx`、`protocol.ts`、`patch.ts`、`visibility.ts`）、`src/contexts/InteractiveCardsContext.tsx`。
+
+**期望行为。** 活跃卡片上的选项可点击且有可见的选中态；选中后必选校验通过；提交能送达所选值。补充能复现真实路径故障的回归测试，而不仅是隔离组件测试。
+
+---
+
+## 24. 任务（Todo）面板遮挡 checkpoint“从此处分叉”弹出菜单
+
+**状态（2026-11-15）。** **未解决。** 用户报告：分叉弹出菜单与 Todo 面板重叠时，面板绘制在上层，菜单不可用。
+
+**证据 / 根因假设（未验证）。** 弹出层 `.agentz-fork-popover` 设置了 `z-index: 100100`（`src/workspaces/codez/AssistantPanel.css:661-665`），但它位于 `.agentz-assistant-messages` 内部，而后者设置了 `position: relative; z-index: 0`（`AssistantPanel.css:422-434`）——这会创建层叠上下文，弹出层再大的 z-index 也被困在这个 0 级上下文里，无法压过绘制在其上的兄弟面板。滚动容器的 `overflow-y: auto` 还可能裁剪弹出层。`ForkMenu` 定义在 `src/workspaces/codez/AssistantMessageList.tsx:70`。
+
+**期望行为。** 分叉弹出菜单始终绘制在 Todo 面板及任何兄弟元素之上。候选修复：用 portal 渲染弹出层并配合 `src/utils/popupPosition.ts` 定位，或移除/提升消息容器的层叠上下文。需在运行中的应用里打开面板并制造重叠来验证。
+
+---
+
+## 25. 立即停止跳过了轮次收尾：工具计数漂移、缺少 checkpoint banner
+
+**状态（2026-11-15）。** **未解决。** 用户报告。此前一次优化让停止按钮立即响应，但进行中的轮次不再被正常收尾：显示的工具调用计数与实际运行不一致（可能丢失了部分信息），中断后也没有生成 CHECKPOINT 分叉 banner——看起来像异常崩溃而非正常停止。
+
+**排查位置。** `chat_cancel`（`src-tauri/src/commands/chat.rs:726`）只设置取消标志就返回；收尾逻辑（持久化流式尾部、调和工具行、创建 checkpoint）在 `chat_turn/post_turn.rs`。修复批次 6 明确在用户停止时持久化部分输出——立即停止的改动似乎绕过或竞态破坏了该路径。前端入口：`src/services/tauri/chat.ts:400` 的 `chatCancel`。
+
+**期望行为。** 停止保持快速（UI 立即确认，如“正在停止…”状态），但轮次仍执行有界收尾：被中断的工具调用标记为中断态、计数与运行时对齐、部分文本持久化、发出 checkpoint/分叉 banner。历史记录中用户停止必须与崩溃可区分。
+
+---
+
+## 26. 上下文管理/压缩：重复调用工具不推进；压缩后丢失任务目标
+
+**状态（2026-11-15）。** **未解决。** 用户报告，实际观察到：agent 循环调用约 250 次 `file_read` 反复重读同一批文档而不推进任务；上下文指示器在轮内一路升到 100%，期间没有触发压缩。直到用户中断并发送新消息才执行压缩——而压缩后的上下文丢失了任务目标（agent 无法说出自己在做什么，直到被要求盘点上下文）。随后一次记录本清单的尝试又复现了同类模式：连续约 28 次 `file_search`。
+
+**子问题。**
+
+1. **没有推进/循环防护。** 没有任何机制检测重复的近似相同工具调用（同工具、同/近似参数、无状态变化）并打断循环或强制计划检查点。
+2. **轮内不强制压缩。** 上下文预算在单轮内到达 100%；L1（回执降级）/ L2（滚动摘要）两级压缩（`vendor/piscis-engine/piscis-kernel/src/agent/bench_compact.rs`、`compact_summarise`）似乎只在轮间运行。
+3. **摘要质量。** 压缩后工具结果被降级为 `[recall:…]` 标记，而摘要没有保留当前任务目标、未完成 todo 和工作假设——恢复需要用户介入。
+
+**排查位置。** `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`（轮次循环、压缩触发点）、`bench_compact.rs`（L1/L2）、`src/components/ContextUsageRing.tsx` 背后的宿主上下文估算器、压缩提示词模板。
+
+**期望行为。** (a) 重复检测器在小阈值后打断工具调用循环并注入纠正指令；(b) 压缩在轮内按预算水位（如 80–90%）触发，绝不让单轮到达 100%；(c) 压缩摘要必须钉住当前任务目标、计划/todo 状态和关键发现，使下一轮无需用户重新交代即可继续。关联：#7/#8（中止轮次的计划连续性）。

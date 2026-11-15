@@ -4,7 +4,7 @@
 
 Status: **1.0.0 Engineering Baseline Closed (2026-10-19)** — All host-side engineering, WorkZ ↔ CodeZ handoff, dirty buffer conflict protection, per-turn undo, side-channel token accounting, secret scrubbing, and bundle/E2E gates are resolved and verified in `1.0.0` (see `docs/upgrade/release-decision-1.0.0.md` and `docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md`). External hardware/certificate items are tracked under `ADR-006`. Historical notes below are retained for engineering provenance.
 
-Owner: Piscis. Created: 2026-09-29. Updated: 2026-11-02.
+Owner: Piscis. Created: 2026-09-29. Updated: 2026-11-15.
 
 ## Status index (re-verified 2026-11-02 against 1.0.40)
 
@@ -32,6 +32,10 @@ issue here does not change that matrix.
 | 8 | `plan_todo` stuck `in_progress` | **Open.** Open todos are counted (`open_todos`) and auto-continued, but never auto-marked `cancelled`/`pending` | `chat_turn/post_turn.rs` |
 | 21 | DeepSeek tool-call pairing | **Resolved (kernel).** `convert_messages` tracks `pending_tool_ids` | `piscis-kernel/src/llm/openai.rs` |
 | 22 | DeepSeek / "think" compatibility | **Partly resolved.** `is_deepseek_thinking_model` is case-insensitive and matches gateway-prefixed, `think` and `-r1` names; reasoning is still not shown in the UI | `piscis-kernel/src/llm/openai.rs` |
+| 23 | `chat_ui` required choice cannot be selected; form cannot submit | **Open** (2026-11-15, user report) | `src/components/chat/interactiveUi/`, `src/contexts/InteractiveCardsContext.tsx` |
+| 24 | Task panel covers the checkpoint "fork from here" popover | **Open** (2026-11-15, user report) | `src/workspaces/codez/AssistantPanel.css` (stacking context), `src/components/TaskPanel.css` |
+| 25 | Immediate stop skips turn wind-down: tool counts drift, no checkpoint banner | **Open** (2026-11-15, user report) | `src-tauri/src/commands/chat.rs` (`chat_cancel`), `chat_turn/post_turn.rs` |
+| 26 | Context/compaction: repeated tool calls without progress; post-compaction goal loss | **Open** (2026-11-15, user report) | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`, `bench_compact.rs` |
 
 Windows packaging target: see the README. Verified outputs are the NSIS `.exe`
 files uploaded by `.github/workflows/release.yml`.
@@ -877,3 +881,51 @@ Fixed in the local `piscis-engine` clone (`C:\Projects\piscis-engine`, commit `a
   per-session setting (`cwd` in the session state frame).
 - Limitations: plain sessions cannot use worktree isolation or the repo Wiki; teams
   still bind to the scope's database. Not verified in the running desktop app.
+
+---
+
+## 23. `chat_ui` generated choice cards: no option can be selected; required question blocks submit
+
+**Status (2026-11-15).** **Open.** User report with screenshot. A `chat_ui` form containing a required single-choice question renders, but clicking any option does not select it, so required validation never passes and the card cannot be submitted.
+
+**Investigation so far (incomplete).** Isolated DOM/streaming tests for `InteractiveCard` pass (`InteractiveCard.dom.test.tsx`, `InteractiveCard.streaming.test.tsx`), so the selection handler works in isolation; the failure is specific to the live chat rendering path. Unverified hypotheses: streaming re-renders or `chat_ui_patch` data updates resetting local selection state; an overlay / `pointer-events` issue in the message stream; the card rendered disabled/read-only after the turn ends. Root cause not identified; no code change made.
+
+**Where to look.** `src/components/chat/interactiveUi/` (`InteractiveCard.tsx`, `InteractiveUiRenderer.tsx`, `protocol.ts`, `patch.ts`, `visibility.ts`), `src/contexts/InteractiveCardsContext.tsx`.
+
+**Expected behavior.** Options on a live card are clickable and visibly selected; required validation passes once an option is chosen; submit delivers the selection. Add a regression test reproducing the live-path failure, not just the isolated component.
+
+---
+
+## 24. Task (Todo) panel covers the checkpoint "fork from here" popover
+
+**Status (2026-11-15).** **Open.** User report: when the fork popover overlaps the Todo panel, the panel paints on top and the menu is unusable.
+
+**Evidence / root-cause hypothesis (unverified).** The popover `.agentz-fork-popover` sets `z-index: 100100` (`src/workspaces/codez/AssistantPanel.css:661-665`), but it lives inside `.agentz-assistant-messages`, which sets `position: relative; z-index: 0` (`AssistantPanel.css:422-434`) — that creates a stacking context, so the popover's large z-index is trapped inside a level-0 context and cannot outrank a sibling panel painted above it. The scroll container's `overflow-y: auto` may also clip the popover. `ForkMenu` is defined in `src/workspaces/codez/AssistantMessageList.tsx:70`.
+
+**Expected behavior.** The fork popover always paints above the Todo panel and any other sibling. Candidate fixes: render the popover through a portal positioned with `src/utils/popupPosition.ts`, or remove/raise the stacking context on the messages container. Verify in the running app with the panel open and overlapping.
+
+---
+
+## 25. Immediate stop skips turn wind-down: tool counts drift, checkpoint banner missing
+
+**Status (2026-11-15).** **Open.** User report. A recent optimization made the stop button respond immediately, but the in-flight turn is no longer finalized properly: the displayed tool-call count diverges from what actually ran (some information may be lost), and no CHECKPOINT fork banner is produced after the interrupt — it looks like an abnormal crash rather than a clean stop.
+
+**Where to look.** `chat_cancel` (`src-tauri/src/commands/chat.rs:726`) only sets the cancel flag and returns; wind-down (persisting the streamed tail, reconciling tool rows, checkpoint creation) lives in `chat_turn/post_turn.rs`. Fix batch 6 explicitly persisted partial output on user stop — the immediate-stop change appears to have bypassed or raced that path. Frontend entry: `chatCancel` in `src/services/tauri/chat.ts:400`.
+
+**Expected behavior.** Stop stays fast (UI acknowledges immediately, e.g. a "stopping…" state) but the turn still runs a bounded wind-down: interrupted tool calls are marked as such, counts reconcile with the runtime, partial text is persisted, and the checkpoint/fork banner is emitted. A user stop must be distinguishable from a crash in the history.
+
+---
+
+## 26. Context management/compaction: repeated tool calls without progress; compaction loses the task goal
+
+**Status (2026-11-15).** **Open.** User report, observed live: the agent looped ~250 `file_read` calls re-reading the same documents without advancing the task; the context indicator climbed to 100% with no compaction during the turn. Only after the user interrupted and sent a new message did compaction run — and the resulting context had lost the task goal (the agent could not state what it was doing until asked to inventory its context). A later attempt to record these issues repeated the pattern with ~28 consecutive `file_search` calls.
+
+**Sub-problems.**
+
+1. **No progress/loop guard.** Nothing detects repeated near-identical tool calls (same tool, same/similar arguments, no state change) and breaks the loop or forces a plan checkpoint.
+2. **Compaction not enforced mid-turn.** The context budget reached 100% inside a single turn; the L1 (receipt demotion) / L2 (rolling summary) tiers (`vendor/piscis-engine/piscis-kernel/src/agent/bench_compact.rs`, `compact_summarise`) apparently only run between turns.
+3. **Summary quality.** After compaction, tool results were demoted to `[recall:…]` markers and the summary did not preserve the active task goal, open todos, or the current working hypothesis — recovery required user intervention.
+
+**Where to look.** `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs` (turn loop, compaction trigger), `bench_compact.rs` (L1/L2), the host context estimator behind `src/components/ContextUsageRing.tsx`, and the compaction prompt template.
+
+**Expected behavior.** (a) A repetition detector interrupts tool-call loops after a small threshold and injects a corrective instruction; (b) compaction triggers on a budget watermark mid-turn (e.g. 80–90%), never letting a turn hit 100%; (c) the compaction summary must pin the active task goal, plan/todo state, and key findings so the next turn continues without user re-briefing. Related: #7/#8 (plan continuity across aborted turns).
