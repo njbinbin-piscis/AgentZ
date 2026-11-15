@@ -119,7 +119,12 @@ fn parse_tool_calls(message: &Value) -> Result<Vec<ToolCall>> {
 fn is_dashscope_qwen_endpoint(base_url: &str, model: &str) -> bool {
     let url = base_url.to_lowercase();
     let model = model.to_lowercase();
-    url.contains("dashscope.aliyuncs.com") && (model.contains("qwen") || model.contains("qvq"))
+    // 阿里云百炼 MaaS 的 OpenAI 兼容端点与 DashScope 同语义：默认思考的 Qwen 模型
+    // 把推理放进 reasoning_content；不显式发 enable_thinking 时整轮可能只有思考、
+    // 没有可见答案（WorkZ「模型只输出了思考」报障的根因）。
+    let qwen_host = url.contains("dashscope.aliyuncs.com")
+        || (url.contains("maas.aliyuncs.com") && url.contains("compatible-mode"));
+    qwen_host && (model.contains("qwen") || model.contains("qvq"))
 }
 
 fn thinking_blocked_models() -> &'static std::sync::Mutex<std::collections::HashSet<String>> {
@@ -1262,6 +1267,17 @@ mod tests {
         );
         let body = client.build_body(&request_for_model("qwen3.6-plus"));
 
+        assert_eq!(body["enable_thinking"], Value::Bool(false));
+    }
+
+    #[test]
+    fn maas_qwen_disables_thinking_mode() {
+        // 回归锁：MaaS compatible-mode 端点必须与 DashScope 一样显式关闭默认思考。
+        let client = OpenAiClient::new(
+            "test-key",
+            "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        );
+        let body = client.build_body(&request_for_model("qwen4-max-preview"));
         assert_eq!(body["enable_thinking"], Value::Bool(false));
     }
 
