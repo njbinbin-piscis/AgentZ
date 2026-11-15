@@ -350,7 +350,9 @@ fn npm_global_bin_dir() -> Option<PathBuf> {
     static DIR: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
     DIR.get_or_init(|| {
         let npm = locate("npm")?;
-        let out = std::process::Command::new(&npm)
+        // npm on Windows is a .cmd shim; a bare Command would allocate a
+        // visible console window (the parent GUI app has none to inherit).
+        let out = piscis_kernel::proc::std_command(&npm)
             .args(["root", "-g"])
             .output()
             .ok()?;
