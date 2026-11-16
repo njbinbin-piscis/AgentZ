@@ -50,18 +50,14 @@ fn relative(value: &str, allow_root: bool) -> Result<PathBuf, String> {
     Ok(value.split('/').collect())
 }
 fn linked(meta: &std::fs::Metadata) -> bool {
-    if meta.file_type().is_symlink() {
-        return true;
-    }
     #[cfg(windows)]
-    {
+    let reparse_point = {
         use std::os::windows::fs::MetadataExt;
-        return meta.file_attributes() & 0x400 != 0;
-    }
+        meta.file_attributes() & 0x400 != 0
+    };
     #[cfg(not(windows))]
-    {
-        false
-    }
+    let reparse_point = false;
+    meta.file_type().is_symlink() || reparse_point
 }
 fn checked(root: &Path, relative: &Path) -> Result<PathBuf, String> {
     let mut candidate = root.to_path_buf();

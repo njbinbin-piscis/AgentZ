@@ -88,11 +88,7 @@ pub fn is_ignored_rel_path(rel_norm: &str) -> bool {
     }
 
     // Root-level single segment that is a known junk/artifact name.
-    if segments.len() == 1 && IGNORED_DIR_NAMES.contains(&segments[0]) {
-        return true;
-    }
-
-    false
+    segments.len() == 1 && IGNORED_DIR_NAMES.contains(&segments[0])
 }
 
 /// Entries that stay hidden even when the explorer's "show hidden files" is on
