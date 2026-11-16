@@ -45,22 +45,40 @@ export default function ExtensionHostProvider({
     }
 
     composerDbg("ExtensionHostProvider: schedule start", { projectDir, ready, enabled });
-    const timer = window.setTimeout(() => {
-      if (cancelled) return;
-      extensionUiStore.setHostError(null);
+    let retryTimer: number | undefined;
+    // Cold starts (node spawn under antivirus, slow disk) occasionally miss the
+    // ready/initialize deadline, leaving the host dead until the user toggles an
+    // extension by hand. Retry a few times with a forced restart instead.
+    const MAX_ATTEMPTS = 3;
+    const attemptStart = (attempt: number) => {
       void (async () => {
         try {
-          await extensionService.start(projectDir);
-          if (!cancelled) activeRef.current = true;
-        } catch (e) {
+          await extensionService.start(projectDir, attempt > 0 ? { force: true } : undefined);
           if (!cancelled) {
+            activeRef.current = true;
+            extensionUiStore.setHostError(null);
+          }
+        } catch (e) {
+          if (cancelled) return;
+          composerDbg("ExtensionHostProvider: start failed", { attempt, error: String(e) });
+          if (attempt + 1 < MAX_ATTEMPTS) {
+            retryTimer = window.setTimeout(() => {
+              if (!cancelled) attemptStart(attempt + 1);
+            }, 1500 * (attempt + 1));
+          } else {
             extensionUiStore.setHostError(String(e));
           }
         }
       })();
+    };
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      extensionUiStore.setHostError(null);
+      attemptStart(0);
     }, 200);
 
     return () => {
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
       // Only cancel a pending debounced start — never stop the host here.
       // Stopping on every effect cleanup caused ext-host teardown during chat
       // sends (black-screen freeze). Transitions are handled by start()'s

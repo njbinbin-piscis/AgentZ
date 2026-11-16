@@ -85,7 +85,7 @@ windows-sys = { version = "0.59", features = [
 # The kernel intentionally does NOT depend on tauri or any GUI crate.
 
 [target.'cfg(target_os = "linux")'.dependencies]
-secret-service = { path = "../../secret-service", version = "=5.1.0", default-features = false, features = ["rt-async-io-crypto-rust", "agentz-no-prompts"] }
+secret-service = { path = "../../secret-service", version = "=5.1.0", default-features = false, features = ["rt-async-io-crypto-rust"] }
 
 [lints]
 workspace = true

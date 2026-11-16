@@ -1,4 +1,6 @@
-//! Current-user Secret Service with encrypted sessions and explicit no-prompt policy.
+//! Current-user Secret Service with encrypted sessions. A locked default collection is
+//! unlocked through the desktop's own keyring prompt (e.g. GNOME Keyring); AgentZ never
+//! sees the keyring password and never creates a collection or session-only fallback.
 use anyhow::{ensure, Context, Result};
 use secret_service::{blocking::SecretService, EncryptionType};
 use std::collections::HashMap;
@@ -48,7 +50,7 @@ pub(super) fn protect(key: &[u8]) -> Result<Vec<u8>> {
     }
     let service = SecretService::connect(EncryptionType::Dh)
         .context("Linux encrypted credential service unavailable")?;
-    // No session-only fallback, collection creation, unlock, or prompt execution.
+    // No session-only fallback or collection creation. Unlocking may show the system prompt.
     let collection = service
         .get_default_collection()
         .context("Linux default credential collection unavailable")?;
@@ -68,7 +70,7 @@ pub(super) fn protect(key: &[u8]) -> Result<Vec<u8>> {
             false,
             "application/octet-stream",
         )
-        .context("Linux credential creation failed; interactive prompts are disabled");
+        .context("Linux credential creation failed");
     let item = match created {
         Ok(item) => item,
         Err(error) => {
@@ -156,7 +158,7 @@ pub(super) fn remove(reference: &[u8]) -> Result<()> {
     if let Some(item) = items.first() {
         item.ensure_unlocked()?;
         item.delete().with_context(|| {
-            format!("Secret Service cleanup failed for {account}; prompts disabled")
+            format!("Secret Service cleanup failed for {account}")
         })?;
     }
     Ok(())

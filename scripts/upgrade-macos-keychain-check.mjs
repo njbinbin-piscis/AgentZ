@@ -28,7 +28,7 @@ tempfile = "3"
 `);
 if (platform === 'linux') {
     const dependency = JSON.stringify(path.join(root, 'vendor/secret-service').replaceAll('\\', '/'));
-    fs.appendFileSync(path.join(output, 'Cargo.toml'), `secret-service = { path = ${dependency}, version = "=5.1.0", default-features = false, features = ["rt-async-io-crypto-rust", "agentz-no-prompts"] }\n`);
+    fs.appendFileSync(path.join(output, 'Cargo.toml'), `secret-service = { path = ${dependency}, version = "=5.1.0", default-features = false, features = ["rt-async-io-crypto-rust"] }\n`);
 }
 const source = name => JSON.stringify(path.join(root, 'vendor/piscis-engine/piscis-kernel/src/security', name).replaceAll('\\', '/'));
 fs.writeFileSync(path.join(output, 'src/lib.rs'), `pub mod security {

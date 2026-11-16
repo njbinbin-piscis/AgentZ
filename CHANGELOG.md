@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.70] - 2026-11-16
+
+### Fixed
+
+- **"Install" in an extension's recommendation popup did nothing.** `workbench.extensions.search` / `workbench.extensions.installExtension` were not implemented, so extensions such as Python (PyDev) could not offer to install their debugger. Given an extension id, the host now installs it from Open VSX, reports progress or the error as a toast, and restarts the extension host.
+- **Extension host sometimes not running after a restart.** A cold-start timeout left the host dead until an extension was toggled by hand. Local start now waits 30 s (was 15 s) and retries up to three times.
+- **Linux: settings could not be saved with "Linux credential collection is locked".** The Secret Service adapter refused to show any prompt. A locked default collection is now unlocked through the desktop's own keyring dialog. Not yet verified on a real Linux desktop.
+
 ## [1.0.69] - 2026-11-16
 
 ### Fixed

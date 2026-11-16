@@ -46,6 +46,7 @@ import type {
 import * as conv from "./typeConverters";
 import { uriToIdePath } from "../services/tauri/editorUri";
 import { ideApi } from "../services/tauri/ide";
+import { openVsxDownloadUrl, vsixInstallFromUrl } from "../services/tauri/vsix";
 import { diskStamps } from "../services/diskStamps";
 import { extensionUiStore } from "./extensionUiStore";
 import { compatStore } from "./compatStore";
@@ -73,6 +74,8 @@ const BUILTIN_COMMANDS = new Set([
   "workbench.action.openGlobalSettings",
   "workbench.view.extensions",
   "workbench.extensions.action.showInstalledExtensions",
+  "workbench.extensions.search",
+  "workbench.extensions.installExtension",
   "workbench.action.showCommands",
   "workbench.action.quickOpen",
   "workbench.action.terminal.toggleTerminal",
@@ -188,6 +191,31 @@ export class MainThreadCommands implements MainThreadCommandsShape {
       case "workbench.extensions.action.showInstalledExtensions":
         window.dispatchEvent(new CustomEvent("agentz-open-extensions"));
         return undefined;
+      case "workbench.extensions.search":
+      case "workbench.extensions.installExtension": {
+        // Extensions use these to offer "Install" for a recommended extension id.
+        // Install straight from Open VSX; anything that isn't an id just opens the panel.
+        const raw = args[0];
+        const extId = typeof raw === "string" ? raw.trim() : "";
+        const m = /^([\w-]+)\.([\w.-]+)$/.exec(extId);
+        if (!m) {
+          window.dispatchEvent(new CustomEvent("agentz-open-extensions"));
+          return undefined;
+        }
+        return (async () => {
+          void extensionUiStore.pushMessage(2, `Installing ${extId} from Open VSX…`, undefined, []);
+          try {
+            const url = await openVsxDownloadUrl(m[1], m[2]);
+            await vsixInstallFromUrl(url);
+            void extensionUiStore.pushMessage(2, `Installed ${extId}. Restarting extension host…`, undefined, []);
+            window.dispatchEvent(new CustomEvent("agentz-reload-window"));
+          } catch (e) {
+            console.error("[ext] install from Open VSX failed", extId, e);
+            void extensionUiStore.pushMessage(0, `Failed to install ${extId}: ${String(e)}`, undefined, []);
+            window.dispatchEvent(new CustomEvent("agentz-open-extensions"));
+          }
+        })();
+      }
       case "workbench.action.showCommands":
         window.dispatchEvent(new CustomEvent("agentz-open-palette", { detail: { mode: "commands" } }));
         return undefined;

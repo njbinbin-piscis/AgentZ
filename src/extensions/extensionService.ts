@@ -163,7 +163,7 @@ export class ExtensionService {
     // Register the ready waiter *before* spawning — the host can log "ready"
     // within milliseconds and we must not miss that line.
     // Remote deploys (upload + optional Node runtime) can take a while.
-    const readyWait = this.transport.waitForReady(remote.kind === "local" ? 15_000 : 180_000);
+    const readyWait = this.transport.waitForReady(remote.kind === "local" ? 30_000 : 180_000);
     const status = await invoke<{ authority: string | null }>("ext_host_start", { projectDir: hostDir, remote });
     await readyWait;
     // Process is up — reflect that immediately so manual start / status bar
