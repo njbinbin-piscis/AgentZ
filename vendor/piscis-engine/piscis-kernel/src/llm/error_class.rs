@@ -180,6 +180,18 @@ pub fn classify_error(msg: &str) -> ErrorClass {
         || lower.contains("incomplete message")
         || lower.contains("unexpected eof")
         || lower.contains("broken pipe")
+        // reqwest connect/TLS failures never reach an HTTP status, e.g.
+        // "request failed before HTTP response ... client error (Connect) |
+        // tls handshake eof". They are network blips, not permanent errors.
+        || lower.contains("before http response")
+        || lower.contains("error sending request")
+        || lower.contains("client error (connect)")
+        || lower.contains("tls handshake")
+        || lower.contains("handshake eof")
+        || lower.contains("dns error")
+        || lower.contains("connection reset")
+        || lower.contains("connection closed")
+        || lower.contains("connection refused")
     {
         return ErrorClass::UpstreamTransient;
     }
@@ -190,6 +202,24 @@ pub fn classify_error(msg: &str) -> ErrorClass {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn connect_and_tls_failures_are_transient_and_retryable() {
+        for msg in [
+            "OpenAI-compatible request failed before HTTP response: url=https://api.deepseek.com/v1/chat/completions flags=connect,request error=error sending request for url (https://api.deepseek.com/v1/chat/completions) sources=[client error (Connect) | tls handshake eof]",
+            "error sending request for url (https://x/y): dns error: failed to lookup address",
+            "tls handshake eof",
+        ] {
+            let class = classify_error(msg);
+            assert_eq!(class, ErrorClass::UpstreamTransient, "{msg}");
+            assert!(class.is_retryable());
+        }
+        // An explicit HTTP status still wins over incidental words.
+        assert_eq!(
+            classify_error("OpenAI API error 400: error sending request"),
+            ErrorClass::Unknown
+        );
+    }
 
     #[test]
     fn permanent_auth_dominates_mixed_retry_and_fallback_words() {

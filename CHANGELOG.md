@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.69] - 2026-11-16
+
+### Fixed
+
+- **App freezes and "Git approval identity timed out" in long sessions.** Every `Database::open` re-ran the legacy-data repair (O(memories x kois)) and several write-locking cleanup statements. The background-task panel polls every 5 s while a task runs, and session lists and per-turn state open the database too, so overlapping calls saturated the runtime and fought for the SQLite write lock (`database is locked`). That left the UI spinning, the typed message unsaved, background tasks impossible to stop, and the window slow to close. The repair now runs once per database file per process.
+- **A network blip no longer ends a long turn.** Connect, TLS-handshake and DNS failures (`client error (Connect) | tls handshake eof`) were classified as unknown and not retried; they are now transient and retried with backoff.
+- **Turn failures show the real cause.** `agent turn failed` now includes the full error chain (previously only `failed to append user message`) and is written to the log.
+
 ## [1.0.68] - 2026-11-16
 
 ### Fixed

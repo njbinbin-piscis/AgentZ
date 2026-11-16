@@ -644,7 +644,13 @@ pub async fn dispatch_host_turn(
 
     registration.release().await;
 
-    let response = result.map_err(|e| format!("agent turn failed: {e}"))?;
+    let response = result.map_err(|e| {
+        // `{e:#}` keeps the whole anyhow cause chain; plain `{e}` printed only
+        // the outermost context ("failed to append user message") and hid the
+        // actual SQLite/IO error.
+        tracing::error!("agent turn failed: {e:#}");
+        format!("agent turn failed: {e:#}")
+    })?;
     Ok(ChatResult {
         ok: response.ok,
         session_id: response.session_id,

@@ -775,6 +775,21 @@ fn map_im_session_binding_row(r: &Row<'_>) -> rusqlite::Result<ImSessionBinding>
     })
 }
 
+/// True the first time `path` is opened in this process. Heavy legacy-data
+/// repair in `migrate_with` only runs when this is true.
+fn data_maintenance_due(path: &Path) -> bool {
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock};
+    static DONE: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    let key = std::fs::canonicalize(path)
+        .unwrap_or_else(|_| path.to_path_buf())
+        .to_string_lossy()
+        .to_lowercase();
+    let set = DONE.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut guard = set.lock().unwrap_or_else(|e| e.into_inner());
+    guard.insert(key)
+}
+
 impl Database {
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)
@@ -787,7 +802,14 @@ impl Database {
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
 
         let db = Self { conn };
-        db.migrate()?;
+        // `open` is called from hot paths (task listing polls, session lists,
+        // per-turn state). The legacy-data repair pass below is O(memories x
+        // kois) and takes the SQLite write lock, so running it on every open
+        // saturated the runtime and caused `database is locked`. Run it once
+        // per database file per process; schema creation stays idempotent and
+        // cheap on every open.
+        let run_data_maintenance = data_maintenance_due(path);
+        db.migrate_with(run_data_maintenance)?;
         Ok(db)
     }
 
@@ -802,6 +824,10 @@ impl Database {
     }
 
     fn migrate(&self) -> Result<()> {
+        self.migrate_with(true)
+    }
+
+    fn migrate_with(&self, run_data_maintenance: bool) -> Result<()> {
         self.conn.execute_batch(
             "
             CREATE TABLE IF NOT EXISTS sessions (
@@ -1363,16 +1389,19 @@ impl Database {
             ",
         );
 
-        if let Ok(normalized) = self.normalize_identifier_references() {
-            if normalized > 0 {
-                tracing::info!(
-                    "Database startup: normalized {} legacy identifier references",
-                    normalized
-                );
+        if run_data_maintenance {
+            if let Ok(normalized) = self.normalize_identifier_references() {
+                if normalized > 0 {
+                    tracing::info!(
+                        "Database startup: normalized {} legacy identifier references",
+                        normalized
+                    );
+                }
             }
         }
 
         // Clean up orphaned Koi / pool records from older schemas that lacked FK constraints.
+        if run_data_maintenance {
         let _ = self.conn.execute_batch(
             "
             DELETE FROM koi_todos
@@ -1401,6 +1430,7 @@ impl Database {
               AND reply_to_message_id NOT IN (SELECT id FROM pool_messages);
         ",
         );
+        }
 
         // Triggers provide cascade-like cleanup for existing databases created before FK support.
         let _ = self.conn.execute_batch(
@@ -5640,6 +5670,23 @@ mod tests {
 
     const ATTACHMENT_SHA256: &str =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    #[test]
+    fn data_maintenance_runs_once_per_database_file() {
+        let dir = std::env::temp_dir().join(format!("piscis-maint-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("piscis.db");
+        assert!(super::data_maintenance_due(&path), "first open runs repair");
+        assert!(!super::data_maintenance_due(&path), "second open skips it");
+        let other = dir.join("other.db");
+        assert!(super::data_maintenance_due(&other), "other files are independent");
+        // Opening repeatedly stays functional and keeps the schema usable.
+        for _ in 0..3 {
+            let db = Database::open(&path).unwrap();
+            db.create_session(None).unwrap();
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn attachment_json(uri: &str, filename: &str) -> String {
         serde_json::json!([{
