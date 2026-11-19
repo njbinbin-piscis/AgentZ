@@ -425,6 +425,29 @@ pub async fn capture_snapshot(page: &Page, tab_id: &str, opts: SnapshotOptions) 
     Ok(output)
 }
 
+pub async fn get_ref_map_json(tab_id: &str) -> Value {
+    let s = SNAPSHOT_STORE.read().await;
+    let refs: Vec<Value> = s
+        .tabs
+        .get(tab_id)
+        .map(|t| {
+            t.refs
+                .iter()
+                .map(|(k, v)| {
+                    json!({
+                        "ref": k,
+                        "selector": v.selector,
+                        "role": v.role,
+                        "name": v.name,
+                        "rect": [v.rect_x, v.rect_y, v.rect_width, v.rect_height],
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    json!({ "refs": refs })
+}
+
 #[cfg(test)]
 mod generation_tests {
     use super::*;
@@ -489,27 +512,4 @@ mod generation_tests {
         commit_snapshot(tab, started, refs("#new"), "new".into()).await.unwrap();
         assert_eq!(resolve_ref(tab, "e1").await.unwrap().selector, "#new");
     }
-}
-
-pub async fn get_ref_map_json(tab_id: &str) -> Value {
-    let s = SNAPSHOT_STORE.read().await;
-    let refs: Vec<Value> = s
-        .tabs
-        .get(tab_id)
-        .map(|t| {
-            t.refs
-                .iter()
-                .map(|(k, v)| {
-                    json!({
-                        "ref": k,
-                        "selector": v.selector,
-                        "role": v.role,
-                        "name": v.name,
-                        "rect": [v.rect_x, v.rect_y, v.rect_width, v.rect_height],
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    json!({ "refs": refs })
 }
