@@ -1,0 +1,32 @@
+[package]
+name = "robotz-host"
+description = "RobotZ example host with a visual panel for mouse/keyboard/computer-use testing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "robotz-host"
+path = "src/main.rs"
+
+[dependencies]
+robotz-core.workspace = true
+robotz-toolset = { path = "../robotz-toolset" }
+robotz-automation = { path = "../robotz-automation" }
+anyhow.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+eframe = { version = "0.29", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui = "0.29"
+base64.workspace = true
+image = { workspace = true, features = ["png"] }
+chrono.workspace = true
+rmcp = { version = "1.7", features = ["client", "transport-child-process"] }
+
+[lints]
+workspace = true

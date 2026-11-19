@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  browserAdoptPopups,
   browserClickAt,
   browserClose,
   browserCloseTab,
@@ -577,12 +578,30 @@ export default function BrowserPanel({
             void refreshShot();
             void refreshScrollInfo();
           }, 350);
+          // A _blank link / window.open popup may still be loading; adopt it
+          // once it lands so the panel follows instead of freezing on the old
+          // page. Bounded retries mirror the panel's refresh poll.
+          for (let i = 0; i < 6; i++) {
+            await new Promise((r) => setTimeout(r, 400));
+            try {
+              const adopted = await browserAdoptPopups(sessionIdRef.current);
+              if (adopted > 0) {
+                await refreshTabs();
+                await syncAddressFromBackend();
+                await refreshShot();
+                await refreshScrollInfo();
+                break;
+              }
+            } catch {
+              break;
+            }
+          }
         }
       } catch (err) {
         setError(String(err));
       }
     },
-    [pickMode, refreshShot, refreshScrollInfo],
+    [pickMode, refreshShot, refreshScrollInfo, refreshTabs, syncAddressFromBackend],
   );
 
   // Forward typing to the focused page element. Printable characters go through

@@ -1,0 +1,16 @@
+[package]
+name = "robotz-toolset"
+description = "Shared RobotZ tool registry for MCP server and host apps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+robotz-core.workspace = true
+robotz-automation = { path = "../robotz-automation" }
+robotz-browser = { path = "../robotz-browser" }
+
+[lints]
+workspace = true

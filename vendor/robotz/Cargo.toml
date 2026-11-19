@@ -1,0 +1,53 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+# RobotZ — a standalone computer-use agent toolkit extracted from openpiscis.
+#
+# Layering:
+#   robotz-core        zero-dependency Tool/ToolResult/ImageData abstraction
+#                      plus the cross-platform `proc` spawn helper.
+#   robotz-automation  desktop control: screen capture, mouse/keyboard,
+#                      window management, Windows UIA, mouse calibration.
+#   robotz-browser     Chrome-DevTools-Protocol web automation.
+#   robotz-mcp         MCP server binary exposing the tools over stdio / HTTP.
+#
+# robotz-* crates carry an OPTIONAL `piscis-kernel` feature so the same tool
+# structs can be reused by openpiscis by implementing `piscis_kernel::Tool`.
+# With the feature OFF (the default) the crates depend on nothing from the
+# piscis ecosystem and can be open-sourced / embedded anywhere.
+
+[workspace.package]
+version = "0.1.14"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Piscis Team"]
+rust-version = "1.77.2"
+
+[workspace.dependencies]
+anyhow = "1"
+async-trait = "0.1"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
+robotz-core = { path = "crates/robotz-core" }
+
+[workspace.lints.rust]
+warnings = "warn"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+
+# Pin matches openpiscis / AgentZ / agent-workbench (tag v0.8.68 on piscis-engine).
+# For local engine hacking, uncomment:
+# [patch."https://github.com/njbinbin-piscis/piscis-engine.git"]
+# piscis-kernel = { path = "../piscis-engine/piscis-kernel" }
+# piscis-core = { path = "../piscis-engine/piscis-core" }

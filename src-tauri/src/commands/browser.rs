@@ -91,6 +91,21 @@ pub async fn browser_click_at(
         .map_err(|e| e.to_string())
 }
 
+/// Adopt popup targets opened by page JS (`target=_blank`, `window.open`) into
+/// this session's tabs. The panel calls this on its refresh poll so a popup
+/// that was still `about:blank` at click time is picked up once it loads.
+#[tauri::command]
+pub async fn browser_adopt_popups(
+    state: State<'_, AppState>,
+    session_id: Option<String>,
+) -> Result<usize, String> {
+    state
+        .browser
+        .adopt_popup_tabs(&session_of(session_id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn browser_pick_at(
     state: State<'_, AppState>,

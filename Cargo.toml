@@ -30,6 +30,10 @@ piscis-core = { path = "vendor/piscis-engine/piscis-core" }
 piscis-kernel = { path = "vendor/piscis-engine/piscis-kernel" }
 piscis-ide-tools = { path = "vendor/piscis-engine/piscis-ide-tools" }
 
+# Vendored RobotZ (v0.1.14 + popup-target adoption for the IDE browser panel).
+[patch."https://github.com/njbinbin-piscis/RobotZ.git"]
+robotz-browser = { path = "vendor/robotz/crates/robotz-browser" }
+
 [profile.dev]
 incremental = true
 

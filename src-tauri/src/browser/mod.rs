@@ -1018,12 +1018,89 @@ impl BrowserManager {
         // Real input events first: they move focus into inputs, follow links and
         // trigger form controls the way a user click does.
         if self.mouse_click(session_id, x, y, 1).await.is_ok() {
+            // A `target=_blank` link / window.open spawns a popup target that
+            // no one owns: the panel keeps showing the old page and the click
+            // looks dead. Adopt such popups into this session as tabs.
+            let _ = self.adopt_popup_tabs(session_id).await;
             return Ok(true);
         }
         let js = format!(
             "(() => {{ const el = document.elementFromPoint({x}, {y}); if (!el) return false; el.scrollIntoView({{block:'center',inline:'center'}}); el.click(); return true; }})()"
         );
-        Ok(self.eval(session_id, &js).await?.as_bool().unwrap_or(false))
+        let clicked = self.eval(session_id, &js).await?.as_bool().unwrap_or(false);
+        if clicked {
+            let _ = self.adopt_popup_tabs(session_id).await;
+        }
+        Ok(clicked)
+    }
+
+    /// Adopt unowned Chromium page targets (popups from `target=_blank` links
+    /// or `window.open`) into `session_id` as tabs, and make the newest one the
+    /// session's current tab so the panel follows the navigation. Returns the
+    /// number of adopted tabs. Best-effort: never fails the click itself.
+    pub async fn adopt_popup_tabs(&self, session_id: &str) -> Result<usize> {
+        let key = session_tab_id(session_id);
+        let owned: HashSet<String> = self
+            .owned_tabs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+            .flat_map(|set| set.iter().cloned())
+            .collect();
+        let mut mgr = tokio::time::timeout(PAGE_LOCK_WAIT, self.inner.lock())
+            .await
+            .map_err(|_| anyhow::anyhow!("browser is busy with another operation; try again"))?;
+        if !mgr.is_running() {
+            return Ok(0);
+        }
+        // robotz only tracks pages it created itself. Ask Chromium for the
+        // real target list; a live page whose URL matches none of our tracked
+        // pages is an unowned popup. (URL matching can miss a popup that shares
+        // its opener's URL — acceptable: such a popup shows identical content.)
+        // Chromium's own initial tab (chrome://new-tab-page, about:blank) is
+        // not a user popup; adopting it would strand the session on it.
+        let tracked = mgr.tracked_pages();
+        let mut tracked_urls = Vec::with_capacity(tracked.len());
+        for page in &tracked {
+            tracked_urls.push(page.url().await.ok().flatten().unwrap_or_default());
+        }
+        let live = mgr.live_pages().await.unwrap_or_default();
+        let mut adopted = Vec::new();
+        for page in live {
+            let url = page.url().await.ok().flatten().unwrap_or_default();
+            if url.is_empty()
+                || url == "about:blank"
+                || url.starts_with("chrome://")
+                || url.starts_with("edge://")
+                || url.starts_with("devtools://")
+            {
+                continue;
+            }
+            let target_id = page.target_id().inner().clone();
+            let tab = format!("{key}#popup-{target_id}");
+            if tracked_urls.iter().any(|u| u == &url) {
+                continue;
+            }
+            if owned.contains(&tab) {
+                // Already adopted earlier (possibly while still loading);
+                // refresh its URL so the tab strip shows where it landed.
+                self.note_url(&tab, &url);
+                continue;
+            }
+            mgr.register_page(&tab, page);
+            self.note_url(&tab, &url);
+            adopted.push(tab);
+        }
+        drop(mgr);
+        let count = adopted.len();
+        if let Some(newest) = adopted.last() {
+            self.remember(session_id, newest);
+            let _ = self.bind(session_id).await;
+            // The popup opens without our viewport override; match the panel.
+            let (w, h) = self.viewport_size(session_id).await;
+            let _ = self.set_viewport(session_id, w, h).await;
+        }
+        Ok(count)
     }
 
     /// Dispatch a genuine left click (move, press, release) at viewport
@@ -1596,6 +1673,66 @@ mod tests {
         assert!(mgr.is_open().await);
         mgr.close_session("t").await.unwrap();
         assert!(!mgr.is_open().await);
+    }
+
+    /// Panel link clicks: same-tab links navigate the session page; a
+    /// `target=_blank` link / `window.open` must not strand the user on the old
+    /// page (the popup target is invisible to the panel unless adopted).
+    #[tokio::test]
+    #[ignore = "requires local Chromium"]
+    async fn panel_link_clicks_follow_same_tab_and_blank_targets_live() {
+        let mgr = BrowserManager::new();
+        mgr.set_viewport("t", 900, 500).await.unwrap();
+        let dir = std::env::temp_dir().join(format!("agentz-links-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let index = dir.join("index.html");
+        let dest = dir.join("dest.html");
+        std::fs::write(
+            &index,
+            "<body style='margin:0;font:24px monospace'>\
+             <p style='margin:20px'><a id=same href='dest.html?via=same'>same</a></p>\
+             <p style='margin:20px'><a id=blank href='dest.html?via=blank' target='_blank'>blank</a></p>\
+             </body>",
+        )
+        .unwrap();
+        std::fs::write(&dest, "<body style='margin:0;font:24px monospace'>DEST</body>").unwrap();
+        let url = format!("file:///{}", index.to_string_lossy().replace('\\', "/"));
+        mgr.navigate("t", &url).await.expect("browser should launch");
+
+        // Same-tab link: the session page follows the href.
+        mgr.click_at("t", 30.0, 32.0).await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+        let after_same = mgr.current_url("t").await.unwrap();
+        assert!(after_same.contains("via=same"), "same-tab link did not navigate: {after_same}");
+
+        // Back, then the _blank link: the user must end up on the destination,
+        // either in this tab or in an adopted popup tab — never stuck on index.
+        mgr.navigate("t", &url).await.unwrap();
+        mgr.click_at("t", 30.0, 92.0).await.unwrap();
+        // The popup may still be loading at click time (about:blank is skipped
+        // by adoption). The panel polls; emulate that with a bounded retry.
+        let mut reached = false;
+        let mut after_blank = String::new();
+        let mut tabs = Vec::new();
+        for _ in 0..10 {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            let _ = mgr.adopt_popup_tabs("t").await;
+            after_blank = mgr.current_url("t").await.unwrap();
+            tabs = mgr.list_tab_info();
+            if after_blank.contains("via=blank")
+                || tabs.iter().any(|tab| tab.url.contains("via=blank"))
+            {
+                reached = true;
+                break;
+            }
+        }
+        assert!(
+            reached,
+            "_blank link stranded the user: current={after_blank} tabs={tabs:?}"
+        );
+
+        mgr.close_session("t").await.unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Panel input against a real page: drag / double-click selection, copying

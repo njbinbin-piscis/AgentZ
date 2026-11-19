@@ -255,6 +255,7 @@ pub fn run() {
             commands::browser::browser_set_surface,
             commands::browser::browser_screenshot,
             commands::browser::browser_click_at,
+            commands::browser::browser_adopt_popups,
             commands::browser::browser_mouse_click,
             commands::browser::browser_mouse_event,
             commands::browser::browser_selection_text,

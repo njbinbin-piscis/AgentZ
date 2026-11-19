@@ -115,6 +115,11 @@ export function browserClickAt(sessionId: string, x: number, y: number): Promise
   return invoke<boolean>("browser_click_at", { sessionId, x, y });
 }
 
+/** Adopt `target=_blank` / `window.open` popups into this session's tabs. */
+export function browserAdoptPopups(sessionId: string): Promise<number> {
+  return invoke<number>("browser_adopt_popups", { sessionId });
+}
+
 /** Real mouse click; `clickCount` 2 selects a word, 3 a paragraph. */
 export function browserMouseClick(
   sessionId: string,
