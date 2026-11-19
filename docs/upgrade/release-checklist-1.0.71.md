@@ -17,4 +17,5 @@
 
 ## CI
 
-- [ ] The `v1.0.71` Release workflow produces all installers (Linux, macOS, Windows x64 + ARM64).
+- [x] The `v1.0.71` Release workflow produces all installers (Linux, macOS, Windows x64 + ARM64) — run 44440919423 completed **success** 2026-11-19T02:35:58Z (~37 min); release "AgentZ v1.0.71" published with all **12 assets** (rpm ×2, AppImage ×2, deb ×2, dmg ×2, setup.exe ×2, app.tar.gz ×2).
+- [x] Main-branch CI clippy failure on the release commit (`items_after_test_module` in vendored robotz snapshot.rs, deny-warnings) fixed in `6d73208` and pushed; local `cargo clippy --workspace --all-targets` clean, robotz-browser tests 8/8. Release artifacts were built from the tag and are unaffected (the lint is test-module ordering only).
