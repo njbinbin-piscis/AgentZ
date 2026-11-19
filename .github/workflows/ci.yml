@@ -66,7 +66,16 @@ jobs:
       - run: npm run build:exthost
       - run: npm run build
       - name: cargo clippy (workspace, deny warnings)
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: |
+          set -o pipefail
+          cargo clippy --workspace --all-targets --message-format=short -- -D warnings 2>&1 | tee clippy.log
+      - name: Upload clippy log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clippy-log
+          path: clippy.log
+          retention-days: 7
       - name: cargo test (workspace)
         env:
           AGENTZ_TEST_INMEMORY_KEYRING: "1"

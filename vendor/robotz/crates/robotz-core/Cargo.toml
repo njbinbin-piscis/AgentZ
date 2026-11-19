@@ -12,3 +12,14 @@ anyhow = "1"
 async-trait = "0.1"
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
+
+[lints.rust]
+warnings = "deny"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+needless_return = "allow"
+module_inception = "allow"
+too_many_arguments = "allow"

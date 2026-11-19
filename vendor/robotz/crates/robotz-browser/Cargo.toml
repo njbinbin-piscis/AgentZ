@@ -35,3 +35,17 @@ piscis-kernel = { git = "https://github.com/njbinbin-piscis/piscis-engine.git", 
 [features]
 default = []
 piscis-kernel = ["dep:piscis-kernel"]
+
+# Match the AgentZ workspace lint policy (the upstream RobotZ workspace had the
+# same table; flattening the manifest dropped it, letting Linux-only clippy
+# warnings slip through CI's `-D warnings`).
+[lints.rust]
+warnings = "deny"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+needless_return = "allow"
+module_inception = "allow"
+too_many_arguments = "allow"
