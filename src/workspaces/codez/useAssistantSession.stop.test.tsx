@@ -174,7 +174,19 @@ beforeEach(() => {
   bridge.pages = 0;
   bridge.history = [];
   bridge.listeners.clear();
-  localStorage.clear();
+  // Some imported modules replace globalThis.localStorage with a partial stub
+  // (no clear()); install a complete in-memory Storage so the reset is reliable.
+  const store = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, String(v)),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+    key: (i: number) => [...store.keys()][i] ?? null,
+    get length() {
+      return store.size;
+    },
+  } satisfies Storage);
 });
 
 afterEach(() => {
