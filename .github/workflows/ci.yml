@@ -69,6 +69,13 @@ jobs:
         run: |
           set -o pipefail
           cargo clippy --workspace --all-targets --message-format=short -- -D warnings 2>&1 | tee clippy.log
+      - name: Print clippy diagnostics on failure
+        if: failure()
+        run: |
+          echo "===== clippy errors/warnings ====="
+          grep -E "error|warning" clippy.log | head -100 || true
+          echo "===== clippy log tail ====="
+          tail -60 clippy.log || true
       - name: Upload clippy log on failure
         if: failure()
         uses: actions/upload-artifact@v4
