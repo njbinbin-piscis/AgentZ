@@ -1,6 +1,6 @@
 [package]
 name = "agentz-desktop"
-version = "1.0.70"
+version = "1.0.71"
 description = "AgentZ — Cursor-like AI IDE desktop host"
 authors = ["AgentZ"]
 license = "Apache-2.0"
@@ -31,8 +31,10 @@ piscis-core = { workspace = true }
 piscis-kernel = { workspace = true }
 piscis-ide-tools = { workspace = true }
 
-# RobotZ browser tool
-robotz-browser = { git = "https://github.com/njbinbin-piscis/RobotZ.git", package = "robotz-browser", rev = "v0.1.14", features = ["piscis-kernel"] }
+# RobotZ browser tool — vendored source (v0.1.14 + popup-target adoption).
+# Direct path dep: a git dep + [patch] still needs the git rev resolvable, which
+# breaks offline builds; the workspace patch entry stays for transitive users.
+robotz-browser = { path = "../vendor/robotz/crates/robotz-browser", features = ["piscis-kernel"] }
 
 # Tauri runtime + the plugins the IDE workspace needs.
 tauri = { version = "2", features = [] }

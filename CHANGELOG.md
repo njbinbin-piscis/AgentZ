@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.71] - 2026-11-18
+
+### Fixed
+
+- **Links in the built-in browser could not be clicked (#27).** The panel is a screenshot + CDP view; same-tab links worked, but `target="_blank"` links and `window.open` created a new Chromium target that nothing owned, so the panel kept showing the old page and every such link looked dead. RobotZ is now vendored (`vendor/robotz`, workspace patch) with `tracked_pages` / `live_pages` / `register_page`; after each forwarded click the host adopts unowned popup targets as `{session}#popup-{targetId}` tabs, switches to the newest one and applies the panel viewport. Chromium's own initial tab (`chrome://new-tab-page`, `about:blank`) is excluded. The panel retries adoption for ~2.4 s so slow-loading popups are picked up. Verified by a live Chromium regression test (red before the fix, green after).
+
+### Changed
+
+- Stop-flow test harness installs a complete in-memory `Storage` stub (a partial `localStorage` stub from an imported module lacked `clear()` and broke the test in isolation runs).
+
 ## [1.0.70] - 2026-11-16
 
 ### Fixed
