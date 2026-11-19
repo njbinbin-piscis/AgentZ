@@ -29,6 +29,7 @@
 | 24 | checkpoint“从此处分叉”弹出菜单被任务面板挡住 | **已修复**（2026-11-15；自动化测试通过，尚未在运行中的应用里手工验证）。原因是滚动容器裁剪，不是 z-index | `src/workspaces/codez/AssistantMessageList.tsx`（`ForkMenu`） |
 | 25 | 立即停止跳过了轮次收尾：工具计数漂移、无 checkpoint banner | **已修复**（2026-11-15；自动化测试通过，尚未在运行中的应用里手工验证） | `loop_.rs`（`cancel_grace_secs_for`）、`chat_turn/post_turn.rs`（`classify_turn_outcome`）、`src/workspaces/codez/useAssistantSession.ts` |
 | 26 | 上下文管理/压缩：重复调用工具不推进；压缩后丢失任务目标 | **已修复，待另一台机器确认**（2026-11-15）。压缩一直在轮内运行，但压不下来 | `loop_.rs`（`compact_proactive`）、`piscis-kernel/src/agent/read_guard.rs`、`src-tauri/src/context_assembly.rs` |
+| 27 | 内置浏览器：`target=_blank` / `window.open` 链接看起来点不动 | **已修复**（2026-11-18；live 回归测试红→绿，尚未在运行中的应用里手工验证）。弹出的新 target 无人接管，面板停在旧页 | `src-tauri/src/browser/mod.rs`（`adopt_popup_tabs`）、`vendor/robotz/crates/robotz-browser/src/manager.rs`、`src/workspaces/codez/BrowserPanel.tsx` |
 
 Windows 打包目标：见 README。已验证的产物是 `.github/workflows/release.yml` 上传的 NSIS `.exe` 文件。
 
@@ -501,7 +502,7 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 - `src-tauri/src/commands/system_prompt.rs` 的 `chat_ui` 指引补充：option 的 value 必须是唯一的非空字符串。
 - 向导：切步时只给还没出现过的字段补初值；定义变化时才整体重置（`InteractiveCard.tsx`、`initValues.ts`）。
 
-**验证。** `InteractiveCard.options.test.tsx` 覆盖五种畸形选项（数字 value、仅 label、`id` 代替 value、字符串数组、重复 value）的点击、必选校验与提交值，以及向导前进再后退后值仍在；`normalize.test.ts` 与 `chat_ui_schema.rs` 的单测覆盖规范化函数和空选项错误。**尚未完成：** 在出问题的机器上重做当时的提问，确认卡片可选、可提交。如果那里仍然选不中，从上面三个未排除的假设继续查。
+**验证。** `InteractiveCard.options.test.tsx` 覆盖五种畸形选项（数字 value、仅 label、`id` 代替 value、字符串数组、重复 value）的点击、必选校验与提交值，以及向导前进再后退后值仍在；`normalize.test.ts` 与 `chat_ui_schema.rs` 的单测覆盖规范化函数和空选项错误。**2026-11-18 在本机 v1.0.70 复验：** 上述测试全部通过（vitest 10 文件 / 64 测试全绿；`cargo test --lib chat_ui` 17 通过）。**尚未完成：** 在出问题的机器上重做当时的提问，确认卡片可选、可提交。如果那里仍然选不中，从上面三个未排除的假设继续查。
 
 ---
 
@@ -513,7 +514,7 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 
 **修复。** `src/workspaces/codez/AssistantMessageList.tsx` 的 `ForkMenu` 把弹出层用 `createPortal` 渲染到 `document.body`，用 `src/utils/popupPosition.ts` 做 fixed 定位；上方空间不够时向下翻转；滚动、窗口 resize、点击外部或按 Esc 时关闭。`AssistantPanel.css` 中 `.agentz-fork-popover` 去掉了 `position: absolute; bottom`，保留 `z-index: 100100`。WorkZ 的消息流复用同一个 `ForkMenu`，一并生效。翻转以窗口为参照，不再以消息容器为参照。
 
-**验证。** `src/workspaces/codez/ForkMenu.test.tsx`：弹出层节点不在 `.agentz-assistant-messages` 内；锚点靠近顶部时向下翻转。**尚未完成：** 在 CodeZ 与 WorkZ 中各做一次手工验证（展开 Todo 面板，对最顶部一条消息点“从此处分叉”，菜单完整可见、可点）。
+**验证。** `src/workspaces/codez/ForkMenu.test.tsx`：弹出层节点不在 `.agentz-assistant-messages` 内；锚点靠近顶部时向下翻转。**2026-11-18 在本机 v1.0.70 复验：** `ForkMenu.test.tsx` 与 `TaskPanel.test.tsx` 通过。**尚未完成：** 在 CodeZ 与 WorkZ 中各做一次手工验证（展开 Todo 面板，对最顶部一条消息点“从此处分叉”，菜单完整可见、可点）。
 
 ---
 
@@ -535,7 +536,7 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 - 工具步骤新增 `cancelled` 状态（`src/components/toolCancel.ts`、`ToolTrace.tsx`）：没有启动就被取消的调用显示为“已取消”，不计入工具调用数，也不显示为错误。
 - 分叉行的条件改为“有 id，且有文本或有工具调用，且不在流式输出中”。
 
-**验证。** 内核测试覆盖：只读工具运行中取消不产生失败回执、写工具超过宽限才记失败、取消后 tool_use 与结果配对。宿主测试 `turn_outcome_tests`。前端测试 `useAssistantSession.stop.test.tsx`、`sessionTurnBookkeeping.test.ts`、`ToolTrace.cancelled.test.tsx`、`toolCancel.test.ts`、`agentTools.test.ts`、`AssistantMessageList.test.tsx`。**尚未完成：** 在运行中的应用里，分别在 `file_read`、`shell`、流式输出中各停止几次，确认会话不显示错误态、计数不跳变、分叉行出现、紧接着发送的新消息正常执行。
+**验证。** 内核测试覆盖：只读工具运行中取消不产生失败回执、写工具超过宽限才记失败、取消后 tool_use 与结果配对。宿主测试 `turn_outcome_tests`。前端测试 `useAssistantSession.stop.test.tsx`、`sessionTurnBookkeeping.test.ts`、`ToolTrace.cancelled.test.tsx`、`toolCancel.test.ts`、`agentTools.test.ts`、`AssistantMessageList.test.tsx`。**2026-11-18 在本机 v1.0.70 复验：** 内核全量 506 通过；宿主 `post_turn` 7 通过；前端停止流程相关测试全部通过。复验中发现并修复一处测试夹具缺陷：`useAssistantSession.stop.test.tsx` 调用 `localStorage.clear()`，但被导入模块的部分 stub 替换过的 `globalThis.localStorage` 没有 `clear`；现改为在 `beforeEach` 用 `vi.stubGlobal` 安装完整的内存 `Storage`（仅改测试，未动产品代码）。**尚未完成：** 在运行中的应用里，分别在 `file_read`、`shell`、流式输出中各停止几次，确认会话不显示错误态、计数不跳变、分叉行出现、紧接着发送的新消息正常执行。
 
 **已知限制。** 取消发生在等待权限确认期间时，该调用显示为“未启动”。
 
@@ -571,7 +572,7 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 - `src-tauri/src/context_assembly.rs`（`turn_history_budget`）与 `chat_turn/mod.rs`：历史预算改为“总预算 − 实测静态开销 − 5% 余量”，状态帧的开销也提前扣除。
 - `src/components/ContextUsageRing.tsx`：估算超过预算时显示 `100%+`，悬浮提示给出真实百分比、压缩次数和最近一次压缩的状态。
 
-**验证。** 内核测试覆盖：静态开销占预算 63% 时一次压缩后低于 auto 档、连续 10 轮只摘要一次；只剩滚动摘要时不调用模型；全部放得下时不摘要；摘要客户端始终报错时两轮内完成规则裁剪且用户请求原文仍在；摘要消息含用户请求、todo 与已读文件清单；轮换重读 4 个未变文件时出现警告、拦截并在 60 次调用内暂停，读 60 个不同文件不被拦截。宿主测试 `context_assembly::tests`（实测开销 5 万 token 的夹具）。前端测试 `ContextUsageRing.test.tsx`、`runEventProjection.test.ts`。**尚未完成：** 在出问题的机器上重做当时的文档任务，确认日志里没有连续的 `outcome=noop`、指示器不长期停在 100%、`file_read` 不再出现几十次重读。
+**验证。** 内核测试覆盖：静态开销占预算 63% 时一次压缩后低于 auto 档、连续 10 轮只摘要一次；只剩滚动摘要时不调用模型；全部放得下时不摘要；摘要客户端始终报错时两轮内完成规则裁剪且用户请求原文仍在；摘要消息含用户请求、todo 与已读文件清单；轮换重读 4 个未变文件时出现警告、拦截并在 60 次调用内暂停，读 60 个不同文件不被拦截。宿主测试 `context_assembly::tests`（实测开销 5 万 token 的夹具）。前端测试 `ContextUsageRing.test.tsx`、`runEventProjection.test.ts`。**2026-11-18 在本机 v1.0.70 复验：** 内核全量 506 通过（含 `read_guard` 8 项与压缩档位测试）；`runEventProjection.test.ts` 通过。**尚未完成：** 在出问题的机器上重做当时的文档任务，确认日志里没有连续的 `outcome=noop`、指示器不长期停在 100%、`file_read` 不再出现几十次重读。
 
 **已知限制。**
 
@@ -590,3 +591,21 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 **排查位置。** `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`（轮次循环、压缩触发点）、`bench_compact.rs`（L1/L2）、`src/components/ContextUsageRing.tsx` 背后的宿主上下文估算器、压缩提示词模板。
 
 **期望行为。** (a) 重复检测器在小阈值后打断工具调用循环并注入纠正指令；(b) 压缩在轮内按预算水位（如 80–90%）触发，绝不让单轮到达 100%；(c) 压缩摘要必须钉住当前任务目标、计划/todo 状态和关键发现，使下一轮无需用户重新交代即可继续。关联：#7/#8（中止轮次的计划连续性）。
+
+---
+
+## 27. 内置浏览器：`target=_blank` / `window.open` 链接看起来点不动
+
+**状态（2026-11-18）。** **已修复；live 回归测试红→绿，尚未在运行中的应用里手工验证。** 用户报告："内置浏览器的链接都无法点击，用户根本无法交互。"
+
+**根因（已用真实 Chromium live 测试实锤）。** 面板是"截图 + CDP 坐标转发"视图，点击链路本身正常——同页链接、按钮、输入框都有响应（已实测）。但 `target="_blank"` 链接或 `window.open` 会创建**无人接管的新 Chromium target**：robotz 管理器只跟踪自己创建的页面（`get_or_create_page`），chromiumoxide 的 handler 虽记录了弹出 target，却没人把它绑定为会话标签页。面板继续截旧页面的图，点击看起来就是死的。真实网站的链接大多在新标签页打开，所以症状表现为"所有链接都点不动"。修复前 `panel_link_clicks_follow_same_tab_and_blank_targets_live` 复现：点 `_blank` 链接后会话 URL 仍停在 `index.html`，标签列表只有旧标签。
+
+**修复。**
+
+- 将 RobotZ v0.1.14 vendor 到 `vendor/robotz`（workspace `[patch]`，与 piscis-engine 同一模式），给管理器新增三个 API：`tracked_pages()`、`live_pages()`（向 Chromium 要真实 target 列表）、`register_page(tab_id, page)`（接管已有 target 而不新建）。
+- 宿主 `src-tauri/src/browser/mod.rs` 新增 `adopt_popup_tabs(session_id)`：每次转发点击后，把 live target 与已跟踪 URL 对比；无主的非空白页成为 `{session}#popup-{targetId}` 标签，最新一个成为会话当前标签并套用面板视口。排除 Chromium 自带初始页（`chrome://new-tab-page`、`about:blank`），避免收养反而把会话困在初始页。已收养的 popup 会刷新 URL（点击时它可能还在加载）。
+- 新增 IPC `browser_adopt_popups`；面板（`BrowserPanel.tsx` `handleCanvasClick`）在点击后约 2.4 秒内重试收养，慢加载的 popup 落地后即被接管，随后刷新标签/地址栏/截图。
+
+**验证。** live 测试 `panel_link_clicks_follow_same_tab_and_blank_targets_live`（需本机 Chromium，`--ignored`）：同页链接正常导航；`_blank` 链接最终落在被收养标签里的目标页。修复前失败、修复后通过。browser 模块 7 项单测 + 3 项 live 测试全过；`cargo clippy` 干净；`tsc` 干净；`BrowserPanel.tabs.test.tsx` / `browserTab.test.ts` 通过。**尚未完成：** 在运行中的应用里用带 `_blank` 链接的真实网站（如搜索引擎结果页）手工确认。
+
+**已知限制。** 收养按 URL 匹配：与打开者 URL 完全相同的 popup 不会被收养（内容相同，面板显示仍正确）。页面 JS 在无用户点击时（定时器、onload）打开的 popup，要等下一次转发点击才被收养。
