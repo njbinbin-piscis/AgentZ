@@ -109,4 +109,33 @@ jobs:
       - name: cargo test (workspace)
         env:
           AGENTZ_TEST_INMEMORY_KEYRING: "1"
-        run: cargo test --workspace
+        run: |
+          set -o pipefail
+          cargo test --workspace 2>&1 | tee test.log
+      - name: Surface test failures on failure
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import pathlib, re
+          log = pathlib.Path("test.log").read_text(errors="replace")
+          lines = log.splitlines()
+          # failing test names + panic locations
+          for i, ln in enumerate(lines):
+              if re.search(r"^test .* \.\.\. FAILED|^failures:$|panicked at", ln):
+                  print(f"::error title=cargo test::{ln[:900]}")
+          # tail of each failing test's stdout section
+          m = re.findall(r"---- (.+?) stdout ----\n(.*?)(?=\n---- |\nfailures:|\Z)", log, re.S)
+          for name, body in m[:10]:
+              snippet = body.strip().replace("\n", " | ")[:800]
+              print(f"::error title=test {name}::{snippet}")
+          if not m:
+              for ln in lines[-40:]:
+                  print(ln[:900])
+          PY
+      - name: Upload test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log
+          path: test.log
+          retention-days: 7
