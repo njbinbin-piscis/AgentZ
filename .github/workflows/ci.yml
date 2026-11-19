@@ -68,36 +68,43 @@ jobs:
       - name: cargo clippy (workspace, deny warnings)
         run: |
           set -o pipefail
-          cargo clippy --workspace --all-targets --message-format=short -- -D warnings 2>&1 | tee clippy.log
-      - name: Print clippy diagnostics on failure
-        if: failure()
-        run: |
-          echo "===== clippy errors/warnings ====="
-          grep -E "error|warning" clippy.log | head -100 || true
-          echo "===== clippy log tail ====="
-          tail -60 clippy.log || true
-          # Surface diagnostics as check-run annotations (readable without auth).
+          cargo clippy --workspace --all-targets --message-format=json -- -D warnings > clippy.jsonl 2>&1 || true
           python3 - <<'PY'
-          import re, pathlib
-          log = pathlib.Path("clippy.log").read_text(errors="replace")
-          seen = set()
-          for m in re.finditer(r"^([^\s:]+\.rs):(\d+):(\d+): (error|warning)(\[[^\]]+\])?: (.*)$", log, re.M):
-              path, line, col, level, code, msg = m.groups()
-              key = (path, line, msg)
-              if key in seen:
+          import json, pathlib, sys
+          lines = pathlib.Path("clippy.jsonl").read_text(errors="replace").splitlines()
+          failed = False
+          count = 0
+          for ln in lines:
+              try:
+                  m = json.loads(ln)
+              except Exception:
                   continue
-              seen.add(key)
-              lvl = "error" if level == "error" else "warning"
-              print(f"::{lvl} file={path},line={line},col={col},title=clippy{code or ''}::{msg}")
-              if len(seen) >= 40:
-                  break
+              if m.get("reason") == "compiler-message":
+                  msg = m["message"]
+                  if msg["level"] in ("error", "warning"):
+                      failed = True
+                      sp = msg["spans"][0] if msg["spans"] else {}
+                      f, l, c = sp.get("file_name", "?"), sp.get("line_start", 1), sp.get("column_start", 1)
+                      code = (msg.get("code") or {}).get("code", "")
+                      text = msg["message"].replace("\n", " ")[:900]
+                      print(f"::{msg['level']} file={f},line={l},col={c},title=clippy {code}::{text}")
+                      count += 1
+                      if count >= 50:
+                          break
+              elif m.get("reason") == "build-finished" and not m.get("success"):
+                  failed = True
+          if count == 0 and failed:
+              print("::error title=clippy::no structured diagnostics; raw tail follows")
+              for ln in lines[-40:]:
+                  print(ln[:900])
+          sys.exit(1 if failed else 0)
           PY
       - name: Upload clippy log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: clippy-log
-          path: clippy.log
+          path: clippy.jsonl
           retention-days: 7
       - name: cargo test (workspace)
         env:
