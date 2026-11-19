@@ -76,6 +76,22 @@ jobs:
           grep -E "error|warning" clippy.log | head -100 || true
           echo "===== clippy log tail ====="
           tail -60 clippy.log || true
+          # Surface diagnostics as check-run annotations (readable without auth).
+          python3 - <<'PY'
+          import re, pathlib
+          log = pathlib.Path("clippy.log").read_text(errors="replace")
+          seen = set()
+          for m in re.finditer(r"^([^\s:]+\.rs):(\d+):(\d+): (error|warning)(\[[^\]]+\])?: (.*)$", log, re.M):
+              path, line, col, level, code, msg = m.groups()
+              key = (path, line, msg)
+              if key in seen:
+                  continue
+              seen.add(key)
+              lvl = "error" if level == "error" else "warning"
+              print(f"::{lvl} file={path},line={line},col={col},title=clippy{code or ''}::{msg}")
+              if len(seen) >= 40:
+                  break
+          PY
       - name: Upload clippy log on failure
         if: failure()
         uses: actions/upload-artifact@v4
