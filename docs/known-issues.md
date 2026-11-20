@@ -4,7 +4,7 @@
 
 Status: **1.0.0 Engineering Baseline Closed (2026-10-19)** — All host-side engineering, WorkZ ↔ CodeZ handoff, dirty buffer conflict protection, per-turn undo, side-channel token accounting, secret scrubbing, and bundle/E2E gates are resolved and verified in `1.0.0` (see `docs/upgrade/release-decision-1.0.0.md` and `docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md`). External hardware/certificate items are tracked under `ADR-006`. Historical notes below are retained for engineering provenance.
 
-Owner: Piscis. Created: 2026-09-29. Updated: 2026-11-15.
+Owner: Piscis. Created: 2026-09-29. Updated: 2026-11-19.
 
 ## Status index (re-verified 2026-11-02 against 1.0.40)
 
@@ -37,6 +37,14 @@ issue here does not change that matrix.
 | 25 | Immediate stop skips turn wind-down: tool counts drift, no checkpoint banner | **Fixed** (2026-11-15; automated tests pass, not yet checked by hand in the running app) | `loop_.rs` (`cancel_grace_secs_for`), `chat_turn/post_turn.rs` (`classify_turn_outcome`), `src/workspaces/codez/useAssistantSession.ts` |
 | 26 | Context/compaction: repeated tool calls without progress; post-compaction goal loss | **Fixed, awaiting confirmation on the other machine** (2026-11-15). Compaction always ran inside the turn but did not reduce the request | `loop_.rs` (`compact_proactive`), `piscis-kernel/src/agent/read_guard.rs`, `src-tauri/src/context_assembly.rs` |
 | 27 | Embedded browser: `target=_blank` / `window.open` links appear unclickable | **Fixed** (2026-11-18; live regression test red→green, not yet checked by hand in the running app). Popup targets were never adopted; the panel stayed on the old page | `src-tauri/src/browser/mod.rs` (`adopt_popup_tabs`), `vendor/robotz/crates/robotz-browser/src/manager.rs`, `src/workspaces/codez/BrowserPanel.tsx` |
+| 28 | Agent self-inspection blocked: `.agentz/REPO_MEMORY.md` and plans unreadable by file tools | **Open** (2026-11-19, observed in-session). The approval allowlist covers `plans/*.md` and tool-output spill only; repo memory and plan listing fall through to the `.agentz` deny rule, forcing shell workarounds | `src-tauri/src/runtime/approval.rs` (`is_allowed_plan_path` call site), `piscis-kernel/src/agent/plan_doc.rs` |
+| 29 | `code_run` fails instantly (exit 255, ~200 ms) on PowerShell syntax and multi-line `python -c` | **Open** (2026-11-19). cmd.exe rejects `$var`/`&&`-with-PS/newlines before the program starts; the error text does not say "wrong shell", so the model retries blindly. Same command succeeds via `shell` | `piscis-kernel/src/tools/code_run.rs` (description documents the rule; no pre-launch syntax guard) |
+| 30 | `file_search` grep rejects look-around regexes with a bare engine error | **Open** (2026-11-19). `regex` crate has no look-around; the error is returned verbatim with no rewrite hint, costing retry rounds | `piscis-kernel/src/tools/file_search.rs` (`regex::Regex::new`) |
+| 31 | Browser tool calls fail with "browser is busy" while a navigate holds the gate | **Open** (2026-11-19). Panel polling gives up after 250 ms by design, but agent actions share the same gate and surface the raw busy error instead of queueing briefly or returning a stale frame | `src-tauri/src/browser/mod.rs` (`with_page_limits`, `PANEL_POLL_LOCK_WAIT`) |
+| 32 | CI failure diagnostics invisible without GitHub auth (private repo) | **Mitigated** (2026-11-19). Job-log and artifact-download APIs return 401/403 for unauthenticated callers; workflows now emit clippy/test failures as check-run annotations (publicly readable). Root fix would be a read-only CI token in the environment | `.github/workflows/ci.yml` (annotation steps added in `a3c4b97`, `dec5909`) |
+| 33 | Vendored crates silently lose the workspace lint policy when manifests are flattened | **Fixed** (2026-11-19, `5af1234`). `[lints] workspace = true` was dropped during vendoring, so local clippy skipped deny-warnings and two Linux-only lints reached CI. Lint tables restored; recorded as a repo-memory pitfall | `vendor/robotz/crates/*/Cargo.toml` (`[lints]`) |
+| 34 | `memory_store search` misses notes on synonym mismatch ("提交方式" vs "推送方式") | **Open** (2026-11-19). Keyword search is literal; a near-miss query returns nothing and the agent proceeds without the stored procedure (caused a hung `git push origin main`). Notes now carry alias keywords, but retrieval itself is still exact-match | memory store search implementation; note `c1d28514` aliases |
+| 35 | `git stash drop` refused by safety policy even for verified-empty noise | **Open** (2026-11-19, minor). Destructive-git guard blocks all stash drops without an inspect-then-confirm path; harmless here but leaves stale stashes accumulating | command safety policy (destructive git operations) |
 
 Windows packaging target: see the README. Verified outputs are the NSIS `.exe`
 files uploaded by `.github/workflows/release.yml`.
@@ -1005,3 +1013,95 @@ The sub-problems as first recorded follow, kept for traceability.
 **Verification.** Live test `panel_link_clicks_follow_same_tab_and_blank_targets_live` (requires local Chromium, `--ignored`): same-tab link navigates; `_blank` link ends on the destination in an adopted tab. Failed before the fix, passes after. All 7 unit + 3 live browser tests pass; `cargo clippy` clean; `tsc` clean; `BrowserPanel.tabs.test.tsx` / `browserTab.test.ts` pass. **Not done yet:** hand-check in the running app on a real site with `_blank` links (e.g. a search engine results page).
 
 **Known limitations.** Adoption matches by URL: a popup that shares its opener's exact URL is not adopted (it shows identical content, so the panel view is still correct). Popups opened by page JS without a user click (timers, onload) are only adopted on the next forwarded click.
+
+---
+
+# Session friction log (2026-11-19) — tooling problems observed while fixing #27 and releasing 1.0.71
+
+The items below were collected from the agent's own tool-call failures during the browser-popup fix and the 1.0.71 release. Each entry states what failed, the verified cause in source, and what would remove the friction. They are deliberately split into **product defects** (fixable in this repo) and **model-behavior notes** (prompt/habit issues, listed so future prompt tuning can address them).
+
+## 28. Agent self-inspection blocked: `.agentz/REPO_MEMORY.md` and plan listing unreadable by file tools
+
+**Status (2026-11-19).** **Open.** Observed twice in one session: `file_search` on `.agentz` and `file_read` of `.agentz/REPO_MEMORY.md` both fail with "Host metadata and credential files are outside ordinary source permissions", while the system prompt instructs the agent to query/record repo memory and read plans from `.agentz/plans/`.
+
+**Cause (verified).** `src-tauri/src/runtime/approval.rs` denies any path containing a `.agentz` component, with exactly two exemptions: `is_allowed_plan_path` (only `{workspace}/.agentz/plans/*.md`) and `.agentz/logs/tool-output/`. `REPO_MEMORY.md`, `graph.json`, `plans.db` and directory listings of `.agentz` are not exempt. The dedicated `repo_memory` / `plan_write` tools work, but generic file tools — which the agent naturally reaches for first — are blocked, and the error message does not point to the dedicated tools.
+
+**Impact.** Wasted calls plus a shell workaround (`python -c "open(...).read()"`) that bypasses the very guard the product enforces — inconsistent security posture: the same bytes are readable via `code_run` but not via `file_read`.
+
+**Expected behavior.** Either (a) extend the allowlist to the agent's own working files (`REPO_MEMORY.md`, `plans/`, `AGENT_CODING_BRIEF.md`) for read-only file tools, or (b) make the denial message name the sanctioned tool ("use repo_memory query / plan_write"), and close the shell bypass for consistency. Option (a) matches the existing plan-doc exemption's rationale.
+
+## 29. `code_run` fails instantly (exit 255) on PowerShell syntax and multi-line `python -c`
+
+**Status (2026-11-19).** **Open.** Three failures in one session: `npx vitest ... | Select-Object` (PowerShell pipe), a multi-line `python -c "..."` script, and `cargo test ... && ...` chains where the second part used PS syntax. All returned exit 255 within ~200–400 ms with empty or unhelpful output; the identical commands succeeded through the `shell` tool (PowerShell interpreter).
+
+**Cause (verified).** `code_run` passes the command to cmd.exe unchanged (`piscis-kernel/src/tools/code_run.rs`). cmd.exe rejects `$var`, `Select-Object`, and embedded newlines before the target program starts; 255 is the shell's parse failure, not the program's exit code. The tool description documents "cmd.exe syntax … For PowerShell syntax use the shell tool", but nothing detects the mismatch at call time, and the raw failure carries no hint.
+
+**Impact.** Each mismatch costs a full retry round; under context pressure the model may keep retrying variants instead of switching tools (this session: 3 wasted calls).
+
+**Expected behavior.** A cheap pre-launch heuristic (presence of `$_`/`$env:`/`Select-Object`/`ForEach-Object`/here-strings, or a newline inside a quoted `-c` argument) should return a structured error: "this looks like PowerShell; use the shell tool with interpreter=powershell" — or auto-route. Multi-line `python -c` should be rejected with "write a script file and run it" guidance. Both are detectable without executing anything.
+
+## 30. `file_search` grep rejects look-around regexes with a bare engine error
+
+**Status (2026-11-19).** **Open.** `pattern="localStorage\b.*=(?!=)"` failed with "look-around, including look-ahead and look-behind, is not supported". The agent then burned ~8 further grep rounds approximating the same intent with character classes.
+
+**Cause (verified).** `file_search.rs` compiles patterns with the `regex` crate, which intentionally excludes look-around/backreferences. The compile error is surfaced verbatim with no rewrite suggestion.
+
+**Impact.** One failed call plus a long tail of近似 searches; the underlying need ("assignment, not comparison") is common in code search.
+
+**Expected behavior.** On a look-around compile error, return the engine limitation **plus a concrete rewrite hint** (e.g. "use `=[^=]` or search `=` then filter"), or optionally fall back to `fancy-regex` for the minority of patterns that need it. Document the supported syntax in the tool description so models avoid look-around up front.
+
+## 31. Browser tool calls fail with "browser is busy" while a navigate holds the gate
+
+**Status (2026-11-19).** **Open.** During CI-log inspection, `browser navigate` to GitHub timed out, and the next four calls (`wait_for`, `get_url` ×2, `close`) all returned "browser is busy; try again" for ~65 s until the navigation settled.
+
+**Cause (verified).** `with_page_limits` acquires the session gate with a bounded wait; panel polling uses `PANEL_POLL_LOCK_WAIT = 250 ms` and gives up fast by design. Agent actions use longer waits but still surface a raw busy error when a slow navigation (GitHub over a constrained network) holds the gate past the timeout. There is no queue-with-feedback and no stale-frame fallback for read-only actions.
+
+**Impact.** The agent cannot even *observe* browser state while one operation is slow; `close` being refused means a wedged navigation cannot be cancelled through the tool.
+
+**Expected behavior.** (a) Read-only actions (`get_url`, `get_title`, `list_tabs`, `screenshot`) should answer from cached state when the gate is held, marked stale; (b) `close`/cancel should not require the page gate; (c) busy errors should include the holder and elapsed time so the caller can decide to wait vs. abort.
+
+## 32. CI failure diagnostics invisible without GitHub auth (private repo)
+
+**Status (2026-11-19).** **Mitigated in workflows; environment gap remains.** While fixing main-branch CI after the 1.0.71 tag, job logs (`/logs` → 403) and artifact downloads (`/zip` → 401) were both inaccessible without a token; `gh` is not authenticated on this machine. Four CI rounds were spent blind before diagnostics were surfaced.
+
+**Cause.** GitHub requires authentication for log/artifact endpoints on private repos. The check-run **annotations** API is publicly readable, but nothing emitted annotations until we added them.
+
+**Fix applied.** `ci.yml` now parses `cargo clippy --message-format=json` into `::error file=…,line=…::` workflow commands (commit `a3c4b97`) and tees `cargo test` output, emitting FAILED/panic sections as annotations (`dec5909`). The next failure showed the exact lint (`useless_borrows_in_formatting`, tool.rs:617) immediately. Note: a first attempt using short-format text + regex matched nothing — JSON parsing is the reliable path.
+
+**Remaining gap.** A read-only CI token in the agent environment would restore full log access; until then, every new CI step that can fail should emit annotations, not rely on log download.
+
+## 33. Vendored crates silently lose the workspace lint policy when manifests are flattened
+
+**Status (2026-11-19).** **Fixed (`5af1234`); recorded as a repo-memory pitfall.** Vendoring RobotZ required expanding `[lints] workspace = true` into literal tables; the first pass dropped them entirely. Local Windows clippy then ran without deny-warnings, while CI (`-D warnings`, newer Linux clippy) failed on `items_after_test_module` and later `useless_borrows_in_formatting` — two lints invisible locally.
+
+**Lesson.** When vendoring any crate that inherits workspace lints, copy the upstream `[lints]` tables verbatim; verify with `cargo clippy --workspace --all-targets -- -D warnings` locally before pushing. Both robotz crates now carry the tables.
+
+## 34. `memory_store search` misses notes on synonym mismatch
+
+**Status (2026-11-19).** **Open (retrieval side); note side mitigated.** Asked to "提交推送", the agent searched memory for "git push 提交方式" and got nothing, because the stored procedure was titled "推送方式". It then ran bare `git push origin main` — the exact command the note warns hangs — and the push stalled until cancelled. A later `list` found the note immediately.
+
+**Cause.** Memory search is literal keyword matching; a one-word synonym difference returns zero hits with no "did you mean" or fuzzy fallback. The failure mode is silent: the agent concludes "no relevant memory" and proceeds on habit.
+
+**Mitigation applied.** The push-procedure note (`c1d28514`) now carries multiple retrieval aliases ("提交方式/推送方式/git push 方式") and a hard "check this note before any commit/push" preamble.
+
+**Expected behavior.** Search should tokenize and match synonyms/aliases (or at least fall back to substring/fuzzy matching and suggest near-misses), and high-stakes procedures should be injectable as always-on project rules rather than relying on recall.
+
+## 35. `git stash drop` refused by safety policy even for verified-empty noise
+
+**Status (2026-11-19).** **Open, minor.** After confirming a stash contained only EOL noise (`git stash show -p --ignore-cr-at-eol` empty), `git stash drop` was refused: "this command can permanently destroy work and no one is available to confirm". The stash remains; harmless, but stale stashes accumulate across sessions.
+
+**Cause.** The destructive-git guard treats all stash drops as irreversible without an inspect-then-confirm path, even when the agent has just proven the content is empty.
+
+**Expected behavior.** Allow a drop when preceded by a same-turn inspection showing no substantive diff, or offer a confirmation UI instead of a flat refusal. Low priority — the guard erring safe is correct; the friction is the missing escape hatch.
+
+---
+
+## Model-behavior notes (not product defects; for prompt/habit tuning)
+
+These caused wasted calls in the same session but are agent-side habits, listed so future system-prompt or skill updates can target them:
+
+- **M1. Pushed before consulting memory.** The correct SSH push procedure was stored, but the agent treated "先提交推送" as routine and ran the known-bad HTTPS command first. Rule to reinforce: *any git push/commit → search memory first* (now also written into the note itself).
+- **M2. Narrow search keywords.** Memory and grep queries used exact phrases ("提交方式", look-around regexes) instead of broad terms or `list`-then-filter; several rounds were lost to near-miss queries. Prefer wide queries + filtering over precise-but-fragile ones.
+- **M3. Read-only exploration spirals.** Twice the session hit the 25-consecutive-read reminder while hunting a stub/definition (localStorage stub hunt: ~15 greps; CI lint hunt: ~25 reads). The trigger to switch strategy (delegate, write a probe test, or run the code) came late. A live reproduction test would have replaced most of the localStorage hunt.
+- **M4. Inline multi-line scripts through cmd.exe.** Writing `.tmp-*.py` files and running them worked first try every time; inline `python -c` with newlines failed every time. Default to script files for anything beyond a one-liner.
+- **M5. Blind CI retries.** Before annotations existed, each CI fix was a guess pushed to a 3-minute feedback loop. The durable fix was instrumenting the loop (annotations), not guessing faster — generalize: *when a feedback channel is opaque, instrument it before iterating*.
