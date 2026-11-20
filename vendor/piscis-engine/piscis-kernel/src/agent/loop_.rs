@@ -3216,20 +3216,24 @@ impl AgentLoop {
                     };
                 if (tool_wants_confirm || destructive) && !user_disabled {
                     if self.confirmation_responses.is_none() && destructive {
-                        // Nobody can be asked (headless or background run): refuse.
-                        let reason = "Refused: this command can permanently destroy work and no one is available to confirm it.";
+                        // Nobody can be asked (headless or background run): refuse,
+                        // but carry the gate's guidance (e.g. how to inspect a stash
+                        // before dropping it) so the refusal is actionable (#35).
+                        let reason = format!(
+                            "Refused: this command can permanently destroy work and no one is available to confirm it. {msg}"
+                        );
                         warn!("Tool '{}' refused without a confirmer: {}", name, msg);
                         let _ = event_tx
                             .send(AgentEvent::ToolEnd {
                                 id: id.to_string(),
                                 name: name.to_string(),
-                                result: reason.into(),
+                                result: reason.clone(),
                                 is_error: true,
                             })
                             .await;
                         blocks.push(ContentBlock::ToolResult {
                             tool_use_id: id.to_string(),
-                            content: reason.into(),
+                            content: reason,
                             is_error: true,
                         });
                         return blocks;
@@ -7540,6 +7544,80 @@ mod tests {
             cancel: Arc::new(AtomicBool::new(false)),
             loop_halt: None,
         }
+    }
+
+    // ── #35: headless refusal of a destructive command must stay actionable ──
+
+    struct NoopLlmClient;
+    #[async_trait]
+    impl crate::llm::LlmClient for NoopLlmClient {
+        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
+            unreachable!("execute_single_tool test never calls the model")
+        }
+        async fn complete(&self, _req: LlmRequest) -> Result<LlmResponse> {
+            unreachable!("execute_single_tool test never calls the model")
+        }
+    }
+
+    struct EchoShellTool;
+    #[async_trait]
+    impl Tool for EchoShellTool {
+        fn name(&self) -> &str {
+            "shell"
+        }
+        fn description(&self) -> &str {
+            "test shell"
+        }
+        fn input_schema(&self) -> Value {
+            json!({"type": "object", "properties": {"command": {"type": "string"}}})
+        }
+        async fn call(&self, _input: Value, _ctx: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
+            Ok(crate::agent::tool::ToolResult::ok("executed"))
+        }
+    }
+
+    #[tokio::test]
+    async fn headless_stash_drop_refusal_carries_inspect_guidance() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(EchoShellTool));
+        let mut agent = tier_agent(
+            NoopLlmClient,
+            None,
+            crate::agent::harness::LayeredBudget::from_context_window(
+                TIER_TEST_CONTEXT_WINDOW,
+                TIER_TEST_MAX_TOKENS,
+            ),
+        );
+        agent.registry = Arc::new(registry);
+        // tier_agent defaults: confirmation_responses = None (headless).
+        let (tx, mut rx) = mpsc::channel(64);
+        let drain = tokio::spawn(async move { while rx.recv().await.is_some() {} });
+        let cancel = Arc::new(AtomicBool::new(false));
+        let blocks = agent
+            .execute_single_tool(
+                "t35",
+                "shell",
+                &json!({"command": "git stash drop stash@{0}"}),
+                &tier_tool_context("stash-refusal".into()),
+                &tx,
+                &cancel,
+            )
+            .await;
+        drop(tx);
+        drain.await.unwrap();
+        assert_eq!(blocks.len(), 1);
+        let ContentBlock::ToolResult { content, is_error, .. } = &blocks[0] else {
+            panic!("expected a tool result block");
+        };
+        assert!(is_error, "headless destructive command must be refused");
+        assert!(
+            content.contains("no one is available to confirm"),
+            "refusal must explain why: {content}"
+        );
+        assert!(
+            content.contains("git stash list") && content.contains("git stash show"),
+            "refusal must carry the inspect-then-confirm guidance (#35): {content}"
+        );
     }
 
     async fn run_tier_agent(

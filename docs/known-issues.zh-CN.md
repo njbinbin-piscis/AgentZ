@@ -37,7 +37,7 @@
 | 32 | 私有仓库 CI 失败诊断在无 GitHub 认证时不可见 | **已缓解**（2026-11-19）。日志/artifact 下载 API 对未认证调用返回 401/403；workflow 已改为把 clippy/test 失败发成 check-run annotations（公开可读）。根治需环境里配只读 CI token | `.github/workflows/ci.yml`（注解步骤加于 `a3c4b97`、`dec5909`） |
 | 33 | vendor crate 展开 manifest 时静默丢失 workspace lint 策略 | **已修复**（2026-11-19，`5af1234`）。vendoring 时丢了 `[lints] workspace = true`，本地 clippy 不执行 deny-warnings，两个 Linux 侧 lint 漏到 CI。lint 表已恢复，并记入仓库记忆 | `vendor/robotz/crates/*/Cargo.toml`（`[lints]`） |
 | 34 | `memory_store search` 因近义词不匹配漏检（"提交方式" vs "推送方式"） | **待修**（2026-11-19）。关键词搜索是字面匹配；一词之差返回空，agent 便按习惯行事（导致裸 `git push origin main` 挂起）。笔记已补别名关键词，但检索本身仍是精确匹配 | memory store 搜索实现；笔记 `c1d28514` 别名 |
-| 35 | `git stash drop` 即使已验证内容为空也被安全策略拒绝 | **待修**（2026-11-19，轻微）。破坏性 git 守卫对所有 stash drop 一律拒绝，无"先检查后确认"通道；此处无害但陈旧 stash 会累积 | 命令安全策略（破坏性 git 操作） |
+| 35 | `git stash drop` 即使已验证内容为空也被安全策略拒绝 | **已修复**（2026-11-20）。stash drop/clear 现在有专门的"先检查后确认"警告（`git stash list` + `git stash show -p <stash>`），无人确认时的拒绝消息也附带该指引，不再是裸的"no one is available to confirm"。确认仍是强制的——没有自动放行逃生通道 | `vendor/piscis-engine/piscis-kernel/src/policy/gate.rs`（`STASH_DELETE_PATTERN`）、`src/agent/loop_.rs`（拒绝原因） |
 | 36 | 内置浏览器：页面自关（`window.close`）后报 "set viewport failed" | **已修复**（2026-11-19；live 回归测试红→绿）。robotz 缓存了已死的 Page 句柄；`url()` 读帧缓存仍 Ok，失效句柄直达 CDP，后续所有动作失败 | `vendor/robotz/crates/robotz-browser/src/manager.rs`（`get_or_create_page` 存活探测） |
 
 Windows 打包目标：见 README。已验证的产物是 `.github/workflows/release.yml` 上传的 NSIS `.exe` 文件。
@@ -697,11 +697,11 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 
 ## 35. `git stash drop` 即使已验证内容为空也被安全策略拒绝
 
-**状态（2026-11-19）。** **待修，轻微。** 确认 stash 只含行尾噪声（`git stash show -p --ignore-cr-at-eol` 为空）后，`git stash drop` 被拒："this command can permanently destroy work and no one is available to confirm"。stash 留着；无害，但陈旧 stash 会跨会话累积。
+**状态（2026-11-20）。** **已修复。** 确认 stash 只含行尾噪声（`git stash show -p --ignore-cr-at-eol` 为空）后，`git stash drop` 被拒："this command can permanently destroy work and no one is available to confirm"。stash 留着；无害，但陈旧 stash 会跨会话累积。
 
-**根因。** 破坏性 git 守卫把所有 stash drop 视为不可逆，没有"先检查后确认"通道，即使 agent 刚证明内容为空。
+**根因。** 破坏性 git 守卫把所有 stash drop 视为不可逆，没有"先检查后确认"通道，即使 agent 刚证明内容为空。警告文案是笼统的"可能永久删除或覆盖文件"，用户无从判断；无人确认时的拒绝消息又把 gate 的提示整个丢掉。
 
-**期望行为。** 允许在同一轮内先检查、确认无实质 diff 后再 drop，或提供确认 UI 而非一律拒绝。优先级低——守卫偏安全是对的；摩擦在于缺少逃生通道。
+**修复。** `policy/gate.rs`：新增专门的 `STASH_DELETE_PATTERN`（也匹配 `git -C <dir> stash drop/clear`），给出点名具体检查命令的警告——`git stash list` 列出条目、`git stash show -p <stash>` 预览将丢失的改动——让确认弹窗成为知情决策。`agent/loop_.rs`：无确认通道（headless/后台）时，拒绝消息现在附带 gate 的指引，可操作而非死胡同。确认语义不变：任何模式下 stash 删除仍必须显式批准；刻意不提供自动放行逃生通道。测试：`stash_drop_warning_names_inspect_commands`、`other_destructive_commands_keep_generic_warning`（gate）、`headless_stash_drop_refusal_carries_inspect_guidance`（loop）——红→绿；内核全量 517 通过，clippy `-D warnings` 干净。
 
 ---
 

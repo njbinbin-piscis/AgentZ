@@ -46,10 +46,16 @@ static DESTRUCTIVE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"(?i)\bgit\s+clean\s+(-[a-z]*f|--force)").unwrap(),
         Regex::new(r"(?i)\bgit\s+checkout\s+(-f\b|--force\b|--\s+\.)").unwrap(),
         Regex::new(r"(?i)\bgit\s+restore\s+(--source[^|;&]*\s)?(--worktree\s+)?\.\s*$").unwrap(),
-        Regex::new(r"(?i)\bgit\s+(stash\s+(drop|clear)|branch\s+-D)\b").unwrap(),
+        Regex::new(r"(?i)\bgit\s+(?:-[^\s]+\s+[^\s]+\s+)*(stash\s+(drop|clear)|branch\s+-D)\b").unwrap(),
         Regex::new(r"(?i)\brimraf\b").unwrap(),
     ]
 });
+
+/// Stash deletion deserves an inspect-then-confirm path (#35): a generic
+/// "this is destructive" warning gives the user nothing to judge, so name the
+/// exact commands that reveal what would be lost before they approve.
+static STASH_DELETE_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)\bgit\s+(?:-[^\s]+\s+[^\s]+\s+)*stash\s+(drop|clear)\b").unwrap());
 
 static WARN_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
@@ -276,6 +282,11 @@ impl PolicyGate {
         }
         // Destroying work is never silent, in any mode.
         if DESTRUCTIVE_PATTERNS.iter().any(|p| p.is_match(command)) {
+            if STASH_DELETE_PATTERN.is_match(command) {
+                return PolicyDecision::Warn(format!(
+                    "{DESTRUCTIVE_WARNING_PREFIX}: this permanently deletes saved stash entries, which git cannot recover. Inspect before approving: run `git stash list` to see the entries, then `git stash show -p <stash>` (e.g. stash@{{0}}) to preview the exact changes that would be lost. Only allow the drop/clear after checking that content."
+                ));
+            }
             return PolicyDecision::Warn(format!(
                 "{DESTRUCTIVE_WARNING_PREFIX}: this can permanently delete or overwrite files that are not committed. Check the command before allowing it."
             ));
@@ -620,6 +631,44 @@ mod tests {
     fn allows_safe_echo() {
         let g = gate();
         assert_eq!(g.check_command("echo hello world"), PolicyDecision::Allow);
+    }
+
+    // ── #35: stash drop/clear must offer an inspect-then-confirm path ─────
+    #[test]
+    fn stash_drop_warning_names_inspect_commands() {
+        let g = gate();
+        for cmd in [
+            "git stash drop",
+            "git stash drop stash@{0}",
+            "git stash clear",
+            "git -C sub stash drop",
+        ] {
+            match g.check_command(cmd) {
+                PolicyDecision::Warn(msg) => {
+                    assert!(
+                        msg.contains("git stash list"),
+                        "{cmd}: warning must tell the user how to inspect first, got: {msg}"
+                    );
+                    assert!(
+                        msg.contains("git stash show"),
+                        "{cmd}: warning must name the content-preview command, got: {msg}"
+                    );
+                }
+                other => panic!("{cmd}: expected Warn, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn other_destructive_commands_keep_generic_warning() {
+        let g = gate();
+        match g.check_command("git reset --hard HEAD~1") {
+            PolicyDecision::Warn(msg) => {
+                assert!(msg.starts_with(DESTRUCTIVE_WARNING_PREFIX));
+                assert!(!msg.contains("git stash list"));
+            }
+            other => panic!("expected Warn, got {other:?}"),
+        }
     }
 
     // ── check_url ──────────────────────────────────────────────────────────
