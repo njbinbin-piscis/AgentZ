@@ -76,6 +76,8 @@ impl Tool for FileSearchTool {
            ** (any path segment), ? (single char). Example: '*.rs', '**/*.json', 'config*'. \
          - 'grep': Search file contents for a regex pattern. Returns matching lines with file path and line number. \
            Use 'include' to filter by file extension (e.g. '*.rs', '*.txt'). \
+           Regex syntax: the engine supports character classes, alternation, anchors and groups, but NOT look-around \
+           ((?=...), (?!...), (?<=...), (?<!...)) or backreferences. For 'assignment not comparison' use `=[^=]`, not `=(?!=)`. \
          \
          path must be a directory. A file path is an error (`Path is not a directory`), not an empty result. \
          To search one file, pass its parent directory and set include to that file name, or use file_read. \
@@ -340,8 +342,10 @@ impl FileSearchTool {
                 Ok(r) => r,
                 Err(e) => {
                     return Ok(ToolResult::err(format!(
-                        "Invalid regex '{}': {}",
-                        pattern, e
+                        "Invalid regex '{}': {}{}",
+                        pattern,
+                        e,
+                        regex_rewrite_hint(&e.to_string())
                     )))
                 }
             }
@@ -562,6 +566,26 @@ fn walk_dir_opts<F: FnMut(&Path) -> bool>(
     }
 }
 
+/// #30: the `regex` crate has no look-around/backreferences. When a pattern fails
+/// for that reason, append a concrete rewrite hint so the agent does not burn
+/// rounds approximating the same intent with character classes.
+fn regex_rewrite_hint(err: &str) -> String {
+    let lower = err.to_ascii_lowercase();
+    if lower.contains("look-around") || lower.contains("look-ahead") || lower.contains("look-behind")
+    {
+        return " The regex engine does not support look-around. Rewrite without it: \
+                e.g. 'assignment not comparison' → search `=[^=]` (or search `=` then filter); \
+                'word not followed by X' → match the word and exclude X in a second pass."
+            .to_string();
+    }
+    if lower.contains("backreference") {
+        return " The regex engine does not support backreferences. Match the repeated \
+                structure with an explicit character class or alternation instead."
+            .to_string();
+    }
+    String::new()
+}
+
 /// Convert a glob pattern to a regex string.
 /// Supports: * (match any chars except /), ** (match any path), ? (match single char)
 fn glob_to_regex(glob: &str) -> String {
@@ -769,6 +793,45 @@ mod tests {
         assert!(result.content.contains("REPO_MEMORY.md"), "{}", result.content);
         assert!(result.content.contains("p.md"), "{}", result.content);
         assert!(!result.content.contains("journal.db"), "{}", result.content);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #30: a look-around regex must return the engine limitation PLUS a concrete
+    /// rewrite hint, not a bare error that sends the agent into近似-search rounds.
+    #[tokio::test]
+    async fn grep_lookaround_error_includes_rewrite_hint() {
+        use crate::agent::tool::{Tool, ToolContext, ToolSettings};
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
+
+        let root =
+            std::env::temp_dir().join(format!("file-search-lookaround-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("a.rs"), "let x = 1;").unwrap();
+        let ctx = ToolContext {
+            session_id: "file-search".into(),
+            workspace_root: root.clone(),
+            bypass_permissions: false,
+            settings: Arc::new(ToolSettings::default()),
+            max_iterations: None,
+            memory_owner_id: "test".into(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel: Arc::new(AtomicBool::new(false)),
+            loop_halt: None,
+        };
+        let result = FileSearchTool
+            .call(
+                json!({ "action": "grep", "pattern": r"=(?!=)", "path": "." }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert!(result.is_error, "{}", result.content);
+        // Still reports the limitation...
+        assert!(result.content.contains("look-around"), "{}", result.content);
+        // ...but now also gives a usable rewrite path.
+        assert!(result.content.contains("=[^=]"), "{}", result.content);
         let _ = std::fs::remove_dir_all(&root);
     }
 }
