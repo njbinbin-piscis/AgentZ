@@ -156,6 +156,8 @@ Windows 打包目标：见 README。已验证的产物是 `.github/workflows/rel
 
 ## 7. 中止的轮次（600 秒）使下一轮丢失计划/todo 连续性
 
+**状态（2026-11-19，对照当前源码复核）。** **已解决。** 持久化计划路径已接通：交互式 `plan_todo` 工具启用时，`chat_turn/mod.rs` 打开 `agentz_task_state::plan::PlanStore`（SQLite，位于 `{project}/.agentz/plans.db`），并在每轮开始时用 `publish_recovered_projection()` 重新发布存储的计划。内存版 `new_plan_store()` 仅作为受限/非交互/远程范围的兜底，这些范围本就不提供持久化。
+
 **状态（2026-11-02）。** **仍部分未解决。** 计划存储仍由 `src-tauri/src/state.rs` 中的 `new_plan_store()` 创建并保存在内存中；重启后未完成的 todo 会丢失。
 
 **状态（2026-09-29）。** 宿主侧部分**已修复**——见*修复批次 1*。存储仍在内存中；跨重启持久化尚未处理。
@@ -185,6 +187,8 @@ Windows 打包目标：见 README。已验证的产物是 `.github/workflows/rel
 ---
 
 ## 8. 计划中途中止的轮次让 `plan_todo` 条目永远处于 `in_progress`
+
+**状态（2026-11-19，对照当前源码复核）。** **已修复（自动化测试通过；尚未在运行中的应用里手工验证）。** 面板"清除"调用 `cancelOpenPlanItems` → `chat_plan_apply` 的 `CancelOpenItems`，把持久化 SQLite 计划中所有 pending/in-progress 条目置为 `cancelled`，同时保持计划可写（`plan_intent.rs`）。非运行中任务的未完成条目显示为"未完成"且无转圈。
 
 **状态（2026-11-02）。** **仍未解决。** `chat_turn/post_turn.rs` 把 `pending`/`in_progress` 条目计为 `open_todos`，CodeZ 面板会自动续跑，但没有代码在异常结束时把它们改为 `cancelled`/`pending`。
 

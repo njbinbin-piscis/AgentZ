@@ -231,6 +231,8 @@ by real output.
 
 ## 7. Aborted turn (600s) drops plan/todo continuity for the next turn
 
+**Status (2026-11-19, re-verified against current source).** **Resolved.** The durable plan path is wired: `chat_turn/mod.rs` opens `agentz_task_state::plan::PlanStore` (SQLite at `{project}/.agentz/plans.db`) when the interactive `plan_todo` tool is enabled, and `publish_recovered_projection()` republishes the stored plan at every turn start. The in-memory `new_plan_store()` remains only as the fallback for restricted/noninteractive/remote scopes, where durability is intentionally not offered.
+
 **Status (2026-11-02).** **Still partly open.** The plan store is still created by `new_plan_store()` in `src-tauri/src/state.rs` and held in memory; open todos are lost on restart.
 
 **Status (2026-09-29).** Host-side portion **fixed** — see *Fix batch 1*. The store is still in-memory; cross-restart durability is not addressed.
@@ -285,6 +287,8 @@ shows it did not take effect after an abnormal termination.
 ---
 
 ## 8. Turn aborted mid-plan leaves `plan_todo` items `in_progress` forever
+
+**Status (2026-11-19, re-verified against current source).** **Fixed (automated tests pass; not verified by hand in a running app).** The panel's "Clear" calls `cancelOpenPlanItems` → `chat_plan_apply` with `CancelOpenItems`, which marks every pending/in-progress item `cancelled` in the durable SQLite plan while keeping the plan writable (`plan_intent.rs`). Unfinished items of a non-running task render as "Not finished" without a spinner.
 
 **Status (2026-11-02).** **Still open.** `chat_turn/post_turn.rs` counts `pending`/`in_progress` items as `open_todos` and the CodeZ panel auto-continues, but no code flips them to `cancelled`/`pending` on abnormal turn end.
 
