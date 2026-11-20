@@ -99,6 +99,13 @@ impl Tool for CodeRunTool {
             _ => return recovery_error("Missing required parameter: command", ctx, false),
         };
 
+        // #29: catch PowerShell-only syntax / multi-line inline scripts before
+        // cmd.exe rejects them with a bare exit-255, and point at the right tool.
+        #[cfg(windows)]
+        if let Some(hint) = prelaunch_shell_mismatch(command) {
+            return recovery_error(hint, ctx, false);
+        }
+
         let cwd = if let Some(cwd_str) = input["cwd"].as_str() {
             if std::path::Path::new(cwd_str).is_absolute() {
                 std::path::PathBuf::from(cwd_str)
@@ -448,6 +455,111 @@ fn looks_like_powershell(text: &str) -> bool {
     text.contains('$') || text.contains("@'") || text.contains("@\"")
 }
 
+/// #29: detect, BEFORE launching cmd.exe, commands that use PowerShell-only
+/// syntax or a multi-line inline `python -c` script. cmd.exe rejects these at
+/// parse time (instant exit 255 with no useful output), so the agent wastes
+/// retry rounds. Return a structured hint pointing at the right tool instead.
+/// Conservative: only flag unambiguous PowerShell constructs to avoid blocking
+/// legitimate cmd.exe commands.
+#[cfg(any(windows, test))]
+fn prelaunch_shell_mismatch(command: &str) -> Option<String> {
+    let lower = command.to_ascii_lowercase();
+
+    // Multi-line inline interpreter scripts: a newline inside a quoted -c/-e
+    // argument breaks cmd.exe parsing. Tell the agent to use a script file.
+    if (lower.contains("python -c") || lower.contains("python3 -c") || lower.contains("node -e"))
+        && command.contains('\n')
+    {
+        return Some(
+            "This inline script spans multiple lines, which cmd.exe cannot parse. \
+             Write the script to a file (e.g. .tmp-script.py) and run `python .tmp-script.py` instead."
+                .to_string(),
+        );
+    }
+
+    // Unambiguous PowerShell cmdlets / operators that cmd.exe does not understand.
+    const PS_MARKERS: &[&str] = &[
+        "select-object",
+        "select-string",
+        "foreach-object",
+        "where-object",
+        "get-childitem",
+        "get-content",
+        "set-content",
+        "out-string",
+        "out-file",
+        "write-host",
+        "write-output",
+        "invoke-expression",
+        "invoke-webrequest",
+        "new-object",
+        "measure-object",
+        "sort-object",
+        "group-object",
+        "format-table",
+        "format-list",
+        "$env:",
+        "@'",
+        "@\"",
+    ];
+    if PS_MARKERS.iter().any(|m| lower.contains(m)) {
+        return Some(
+            "This looks like PowerShell (cmdlets such as Select-Object/ForEach-Object, `$env:`, or here-strings), \
+             but code_run executes cmd.exe and fails instantly on them. \
+             Use the shell tool with interpreter \"powershell\" for this command."
+                .to_string(),
+        );
+    }
+
+    // A bare `$variable` token (PowerShell), but not cmd's %VAR% or a literal $
+    // inside a quoted program argument like a regex. Flag `$word` at a command
+    // position (start, or after a pipe/semicolon/&&).
+    if has_powershell_variable_token(command) {
+        return Some(
+            "This uses PowerShell `$variable` syntax, but code_run executes cmd.exe. \
+             Use the shell tool with interpreter \"powershell\", or cmd.exe `%VAR%` expansion."
+                .to_string(),
+        );
+    }
+
+    None
+}
+
+/// True when a `$identifier` appears at a command position (not merely inside a
+/// quoted argument), which is PowerShell rather than cmd.exe.
+#[cfg(any(windows, test))]
+fn has_powershell_variable_token(command: &str) -> bool {
+    let bytes = command.as_bytes();
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut at_cmd_pos = true;
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i] as char;
+        match c {
+            '\'' if !in_double => in_single = !in_single,
+            '"' if !in_single => in_double = !in_double,
+            '|' | ';' | '&' if !in_single && !in_double => at_cmd_pos = true,
+            '$' if !in_single && at_cmd_pos => {
+                // `$` followed by an identifier char or '{' at a command position.
+                if let Some(&n) = bytes.get(i + 1) {
+                    let n = n as char;
+                    if n.is_alphanumeric() || n == '_' || n == '{' {
+                        return true;
+                    }
+                }
+            }
+            _ => {
+                if !c.is_whitespace() && !in_single && !in_double {
+                    at_cmd_pos = false;
+                }
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
 #[cfg(any(windows, test))]
 fn diagnose(output: &str, command: &str) -> Option<String> {
     let out_lower = output.to_lowercase();
@@ -702,5 +814,84 @@ mod tests {
         )
         .unwrap();
         assert!(hint.contains("on PATH"));
+    }
+
+    /// #29: PowerShell-only constructs must be caught BEFORE launch with a
+    /// structured pointer to the shell tool, not after a bare exit-255 failure.
+    #[test]
+    fn prelaunch_flags_powershell_syntax() {
+        for cmd in [
+            "npx vitest run | Select-Object -Last 5",
+            "Get-ChildItem | ForEach-Object { $_.Name }",
+            "$env:PATH",
+            "@'\nhello\n'@",
+            "cargo test 2>&1 | Select-String error",
+        ] {
+            let hint = prelaunch_shell_mismatch(cmd);
+            assert!(hint.is_some(), "should flag: {cmd}");
+            let h = hint.unwrap();
+            assert!(h.contains("powershell"), "{cmd}: {h}");
+            assert!(h.contains("shell"), "{cmd}: {h}");
+        }
+    }
+
+    /// #29: a multi-line `python -c` script fails cmd.exe parsing; tell the agent
+    /// to write a script file instead of retrying inline variants.
+    #[test]
+    fn prelaunch_flags_multiline_inline_python() {
+        let cmd = "python -c \"import os\nprint(os.getcwd())\"";
+        let hint = prelaunch_shell_mismatch(cmd).expect("should flag multiline -c");
+        assert!(hint.to_ascii_lowercase().contains("script"), "{hint}");
+        assert!(hint.contains(".py"), "{hint}");
+    }
+
+    /// Ordinary cmd.exe commands must NOT be flagged (no false positives that
+    /// would block legitimate runs).
+    #[test]
+    fn prelaunch_allows_plain_cmd_commands() {
+        for cmd in [
+            "cargo test --offline",
+            "python main.py",
+            "python -c \"print('hi')\"",
+            "npm run build && echo done",
+            "git status -sb",
+            "echo %PATH%",
+        ] {
+            assert!(prelaunch_shell_mismatch(cmd).is_none(), "false positive: {cmd}");
+        }
+    }
+
+    /// #29 end-to-end: a PowerShell command through code_run returns the
+    /// structured hint and never launches (not_started), instead of exit 255.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn code_run_refuses_powershell_before_launch() {
+        use crate::agent::tool::ToolSettings;
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
+
+        let temp = tempfile::tempdir().expect("create tool workspace");
+        let ctx = ToolContext {
+            session_id: "code-run-ps-refuse".into(),
+            workspace_root: temp.path().to_path_buf(),
+            bypass_permissions: false,
+            settings: Arc::new(ToolSettings::default()),
+            max_iterations: None,
+            memory_owner_id: "test".into(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel: Arc::new(AtomicBool::new(false)),
+            loop_halt: None,
+        };
+        let result = CodeRunTool::default()
+            .call(
+                json!({"command": "Get-ChildItem | Select-Object -First 3"}),
+                &ctx,
+            )
+            .await
+            .expect("call code_run");
+        assert!(result.is_error, "{}", result.content);
+        assert!(result.content.contains("powershell"), "{}", result.content);
+        assert!(result.content.contains("\"termination\":\"not_started\""), "{}", result.content);
     }
 }
