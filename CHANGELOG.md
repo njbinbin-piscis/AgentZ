@@ -5,6 +5,22 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.72] - 2026-11-20
+
+### Fixed
+
+- **Agent self-inspection of `.agentz/` no longer needs approval (#28).** Reading the repo's own memory/plans/screenshots under `.agentz/` was gated like an outside-workspace path while shell could reach it anyway — an inconsistent security posture. The approval whitelist now allows read-only agent self-inspection paths, with tests.
+- **`code_run` fails fast on PowerShell syntax instead of a silent exit 255 (#29).** cmd.exe cannot parse PowerShell constructs or multi-line `python -c`; the tool now detects these before launch and returns an actionable hint (use the shell tool / a script file) instead of an unexplained instant failure.
+- **`file_search` grep explains look-around regex errors (#30).** The regex crate does not support look-around; a bare engine error is now accompanied by a rewrite hint.
+- **Browser stays observable and cancellable while a navigate holds the gate (#31).** Read-only panel polling falls back to the cached frame, `close` no longer depends on the page lock, and a busy error names the lock holder instead of a raw "browser is busy".
+- **`memory_store search` finds notes on near-miss queries (#34).** Search falls back to shared-token matching when the exact phrase misses, so synonym mismatches ("提交方式" vs "推送方式") no longer return nothing.
+- **`git stash drop/clear` gets an inspect-then-confirm path (#35).** The destructive-command warning now names the exact inspection commands (`git stash list`, `git stash show -p <stash>`) so the confirmation is an informed decision, and the headless refusal carries that guidance instead of a bare "no one is available to confirm". Confirmation remains mandatory in every mode.
+- **Embedded browser recovers after a page closes itself (#36).** `window.close()`/crashed tabs left a dead Page handle cached in robotz; `url()` reads the frame cache and stayed Ok, so every later CDP action failed with "set viewport failed". `get_or_create_page` now probes tracked handles with a real CDP round-trip and recreates dead pages. Verified by live Chromium regression tests (red→green).
+
+### Changed
+
+- CI emits clippy/test failures as check-run annotations (private-repo job logs/artifacts need auth), and vendored robotz crates inherit the workspace lint policy again (`[lints] workspace = true` restored).
+
 ## [1.0.71] - 2026-11-18
 
 ### Fixed
