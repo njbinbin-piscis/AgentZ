@@ -113,8 +113,10 @@ async fn background_actual_parameters_and_file_scope_are_checked_before_provider
                 .unwrap()
                 .is_error
         );
+        // #28: listing the agent's own `.agentz` working area is allowed even
+        // when the directory does not exist yet (fresh fixture / fresh repo).
         assert!(
-            tool.call(json!({"path":".agentz"}), &ctx)
+            !tool.call(json!({"path":".agentz"}), &ctx)
                 .await
                 .unwrap()
                 .is_error
@@ -821,7 +823,6 @@ async fn search_start_directory_is_bounded_before_delegate_execution() {
         for path in [
             outside.to_string_lossy().into_owned(),
             "../outside".into(),
-            ".agentz".into(),
         ] {
             assert!(matches!(
                 f.hooks
@@ -836,9 +837,24 @@ async fn search_start_directory_is_bounded_before_delegate_execution() {
                 HookDecision::Deny(_)
             ));
         }
+        // #28: the agent's own `.agentz` working area is a permitted search
+        // root even when absent; host-state entries are still skipped by the
+        // traversal guard.
+        assert!(matches!(
+            f.hooks
+                .before_tool(&ToolHookEvent {
+                    session_id: "task-a",
+                    tool_use_id: "self-inspect",
+                    tool_name: name,
+                    input: &json!({"path":".agentz"}),
+                    workspace_root: &f.root
+                })
+                .await,
+            HookDecision::Continue
+        ));
         assert_eq!(
             delegate.before.load(Ordering::SeqCst),
-            base + if name == "file_search" { 0 } else { 1 }
+            base + if name == "file_search" { 1 } else { 3 }
         );
         let input = json!({"path":"src"});
         let event = ToolHookEvent {
@@ -854,7 +870,7 @@ async fn search_start_directory_is_bounded_before_delegate_execution() {
         ));
         f.hooks.after_tool(&event, &ToolResult::ok("fixture")).await;
     }
-    assert_eq!(delegate.before.load(Ordering::SeqCst), base + 2);
+    assert_eq!(delegate.before.load(Ordering::SeqCst), base + 4);
 }
 
 #[cfg(windows)]

@@ -1009,17 +1009,19 @@ fn validate_search_path(root: &Path, raw: &str) -> Result<(), String> {
     } else {
         root.join(raw)
     };
-    if std::fs::canonicalize(&target).map_err(|e| e.to_string())? == root {
-        return Ok(());
-    }
     // The agent may list its own `.agentz` working area (plans, repo memory) for
-    // self-inspection; the traversal guard still skips host-state entries.
+    // self-inspection (#28); the traversal guard still skips host-state entries.
+    // Checked before canonicalize so a missing directory fails like any other
+    // absent path instead of leaking a raw OS error.
     {
         let rel = raw.replace('\\', "/");
         let rel = rel.trim_end_matches('/');
         if rel.eq_ignore_ascii_case(".agentz") || rel.eq_ignore_ascii_case(".agentz/plans") {
             return Ok(());
         }
+    }
+    if std::fs::canonicalize(&target).map_err(|e| e.to_string())? == root {
+        return Ok(());
     }
     validate_source_path(root, raw)
 }
