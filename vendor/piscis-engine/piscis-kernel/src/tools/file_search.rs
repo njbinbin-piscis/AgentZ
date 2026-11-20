@@ -37,6 +37,22 @@ pub fn is_secret_or_metadata(name: &str) -> bool {
     matches!(n.as_str(), ".agentz" | ".codez" | ".piscis" | ".secret_key" | ".env") || n.starts_with(".env.")
 }
 
+/// Host-state entries inside `.agentz` that searches must not read even when the
+/// agent explicitly targets its own working area: databases, config, credentials,
+/// indexes and logs. Working documents (REPO_MEMORY.md, AGENT_CODING_BRIEF.md,
+/// plans/*.md) are NOT host state and stay searchable.
+pub fn is_agentz_host_state(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    n.ends_with(".db")
+        || n.ends_with(".db-wal")
+        || n.ends_with(".db-shm")
+        || n.ends_with(".sqlite")
+        || n.ends_with(".json")
+        || n.ends_with(".log")
+        || n.starts_with(".env")
+        || n == ".secret_key"
+}
+
 pub fn is_excluded_search_directory(name: &str) -> bool {
     EXCLUDED_SEARCH_DIRECTORY_NAMES
         .iter()
@@ -512,11 +528,15 @@ fn walk_dir_opts<F: FnMut(&Path) -> bool>(
     for entry in entries.flatten() {
         let path = entry.path();
         let is_dir = path.is_dir();
-        if path
-            .file_name()
-            .map(os_text)
-            .is_some_and(|n| is_secret_or_metadata(&n))
-        {
+        let entry_name = path.file_name().map(os_text).unwrap_or_default();
+        // `.agentz` is the agent's own working area: searches may descend into it
+        // (repo memory, plans) but never read host-state entries inside. Other
+        // tool-state/secret directories stay fully skipped.
+        if is_secret_or_metadata(&entry_name) && !entry_name.eq_ignore_ascii_case(".agentz") {
+            continue;
+        }
+        let in_agentz = dir.file_name().map(os_text).as_deref() == Some(".agentz");
+        if in_agentz && is_agentz_host_state(&entry_name) {
             continue;
         }
         if is_dir {
@@ -708,6 +728,47 @@ mod tests {
                 result.content
             );
         }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// #28: searching the agent's own `.agentz` working area finds working
+    /// documents (repo memory, plans) but never descends into host-state files.
+    #[tokio::test]
+    async fn grep_agentz_finds_working_docs_not_host_state() {
+        use crate::agent::tool::{Tool, ToolContext, ToolSettings};
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
+
+        let root =
+            std::env::temp_dir().join(format!("file-search-agentz-{}", uuid::Uuid::new_v4()));
+        let az = root.join(".agentz");
+        std::fs::create_dir_all(az.join("plans")).unwrap();
+        std::fs::write(az.join("REPO_MEMORY.md"), "needle working doc").unwrap();
+        std::fs::write(az.join("plans").join("p.md"), "needle plan").unwrap();
+        std::fs::write(az.join("journal.db"), "needle secret state").unwrap();
+        let ctx = ToolContext {
+            session_id: "file-search".into(),
+            workspace_root: root.clone(),
+            bypass_permissions: false,
+            settings: Arc::new(ToolSettings::default()),
+            max_iterations: None,
+            memory_owner_id: "test".into(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel: Arc::new(AtomicBool::new(false)),
+            loop_halt: None,
+        };
+        let result = FileSearchTool
+            .call(
+                json!({ "action": "grep", "pattern": "needle", "path": ".agentz" }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("REPO_MEMORY.md"), "{}", result.content);
+        assert!(result.content.contains("p.md"), "{}", result.content);
+        assert!(!result.content.contains("journal.db"), "{}", result.content);
         let _ = std::fs::remove_dir_all(&root);
     }
 }

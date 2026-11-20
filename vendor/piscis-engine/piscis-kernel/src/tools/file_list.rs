@@ -10,6 +10,24 @@ use std::time::UNIX_EPOCH;
 
 const MAX_ENTRIES: usize = 500;
 
+/// Host-state entries inside `.agentz` that ordinary file tools must not expose:
+/// databases, config, credentials, indexes and logs. The agent's working
+/// documents (REPO_MEMORY.md, AGENT_CODING_BRIEF.md, plans/*.md) are NOT here.
+fn is_agentz_host_state(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    n.ends_with(".db")
+        || n.ends_with(".db-wal")
+        || n.ends_with(".db-shm")
+        || n.ends_with(".sqlite")
+        || n.ends_with(".json")
+        || n.ends_with(".log")
+        || n == "config.json"
+        || n == "graph.json"
+        || n == "index.db"
+        || n.starts_with(".env")
+        || n == ".secret_key"
+}
+
 pub struct FileListTool;
 
 #[async_trait]
@@ -195,6 +213,15 @@ fn collect_entries(
             continue;
         }
 
+        // Inside the agent's own `.agentz` working area, hide host-state files
+        // (databases, config, credentials) even when hidden entries are shown;
+        // working documents (repo memory, plans/*.md, coding brief) stay visible.
+        if dir.file_name().map(os_text).as_deref() == Some(".agentz")
+            && is_agentz_host_state(&name)
+        {
+            continue;
+        }
+
         // DirEntry already carries the find-data attributes. A second
         // metadata call can fail on cloud placeholders and long names, which
         // made real directories look like files and then disappear under dirs_only.
@@ -316,6 +343,31 @@ mod tests {
             .unwrap();
         assert!(!result.is_error, "{}", result.content);
         assert!(result.content.contains("中文文件.md"), "{}", result.content);
+    }
+
+    /// #28: listing the agent's own `.agentz` working area shows the working
+    /// files (repo memory, plans) but never host-state databases/config.
+    #[tokio::test]
+    async fn agentz_listing_shows_working_files_not_host_state() {
+        let temp = tempfile::tempdir().unwrap();
+        let az = temp.path().join(".agentz");
+        std::fs::create_dir_all(az.join("plans")).unwrap();
+        std::fs::write(az.join("REPO_MEMORY.md"), "x").unwrap();
+        std::fs::write(az.join("plans.db"), "secret").unwrap();
+        std::fs::write(az.join("approvals.db"), "secret").unwrap();
+        std::fs::write(az.join("plans").join("p.md"), "x").unwrap();
+        let result = FileListTool
+            .call(
+                json!({ "path": ".agentz", "include_hidden": true }),
+                &ctx(temp.path()),
+            )
+            .await
+            .unwrap();
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("REPO_MEMORY.md"), "{}", result.content);
+        assert!(result.content.contains("plans"), "{}", result.content);
+        assert!(!result.content.contains("plans.db"), "{}", result.content);
+        assert!(!result.content.contains("approvals.db"), "{}", result.content);
     }
 }
 

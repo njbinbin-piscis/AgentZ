@@ -934,7 +934,16 @@ async fn check_search_links(
                     continue;
                 }
                 let protected = name.to_lowercase();
-                if matches!(protected.as_str(), ".git" | ".agentz" | ".codez" | ".piscis" | ".secret_key" | ".env") || protected.starts_with(".env.") {
+                // `.agentz` is the agent's own working area: allow descending so
+                // searches/lists can reach repo memory and plans, but the kernel
+                // tool still filters host-state entries inside it.
+                if protected == ".agentz" {
+                    if kind.is_dir() && level < depth {
+                        pending.push((entry.path(), level + 1));
+                    }
+                    continue;
+                }
+                if matches!(protected.as_str(), ".git" | ".codez" | ".piscis" | ".secret_key" | ".env") || protected.starts_with(".env.") {
                     // Skip, don't fail the whole search: the search tool itself also
                     // never reads these entries (see file_search::is_secret_or_metadata).
                     continue;
@@ -1003,6 +1012,15 @@ fn validate_search_path(root: &Path, raw: &str) -> Result<(), String> {
     if std::fs::canonicalize(&target).map_err(|e| e.to_string())? == root {
         return Ok(());
     }
+    // The agent may list its own `.agentz` working area (plans, repo memory) for
+    // self-inspection; the traversal guard still skips host-state entries.
+    {
+        let rel = raw.replace('\\', "/");
+        let rel = rel.trim_end_matches('/');
+        if rel.eq_ignore_ascii_case(".agentz") || rel.eq_ignore_ascii_case(".agentz/plans") {
+            return Ok(());
+        }
+    }
     validate_source_path(root, raw)
 }
 fn validate_source_path(root: &Path, raw: &str) -> Result<(), String> {
@@ -1042,6 +1060,18 @@ fn validate_source_path(root: &Path, raw: &str) -> Result<(), String> {
     // Plan documents are the agent's own working files, not host metadata.
     if piscis_kernel::agent::plan_doc::is_allowed_plan_path(root, &relative.to_string_lossy()) {
         return Ok(());
+    }
+    // The agent's own working files under `.agentz` (repo memory, coding brief)
+    // are read by ordinary file tools per the system prompt; only these named
+    // Markdown documents are exempt — databases/config/credentials stay blocked.
+    {
+        let rel = relative.to_string_lossy().replace('\\', "/");
+        if matches!(
+            rel.as_str(),
+            ".agentz/REPO_MEMORY.md" | ".agentz/AGENT_CODING_BRIEF.md"
+        ) {
+            return Ok(());
+        }
     }
     // Tool-output spill files are written by the kernel itself and the tool
     // result explicitly tells the agent to file_read them; blocking that path
@@ -1100,6 +1130,32 @@ mod tests {
         assert!(validate_source_path(&root, ".agentz/logs/tool-output/new.txt").is_ok());
         assert!(validate_source_path(&root, ".agentz/logs/other.log").is_err());
         assert!(validate_source_path(&root, ".agentz/config.json").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #28: the agent's own working files under `.agentz` (repo memory, coding
+    /// brief, plan listing) must be readable by ordinary file tools — the system
+    /// prompt instructs the agent to query them. Host state (databases, config,
+    /// credentials) stays blocked.
+    #[test]
+    fn agent_working_files_under_agentz_are_readable_host_state_is_not() {
+        let dir = std::env::temp_dir().join(format!("agentz-selfinspect-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(dir.join(".agentz").join("plans")).unwrap();
+        std::fs::write(dir.join(".agentz").join("REPO_MEMORY.md"), "x").unwrap();
+        std::fs::write(dir.join(".agentz").join("AGENT_CODING_BRIEF.md"), "x").unwrap();
+        std::fs::write(dir.join(".agentz").join("plans.db"), "x").unwrap();
+        std::fs::write(dir.join(".agentz").join("approvals.db"), "x").unwrap();
+        let root = std::fs::canonicalize(&dir).unwrap();
+        // Readable working files.
+        assert!(validate_source_path(&root, ".agentz/REPO_MEMORY.md").is_ok());
+        assert!(validate_source_path(&root, ".agentz/AGENT_CODING_BRIEF.md").is_ok());
+        // Listing the plans directory and the .agentz root for self-inspection.
+        assert!(validate_search_path(&root, ".agentz/plans").is_ok());
+        assert!(validate_search_path(&root, ".agentz").is_ok());
+        // Host state remains blocked.
+        assert!(validate_source_path(&root, ".agentz/plans.db").is_err());
+        assert!(validate_source_path(&root, ".agentz/approvals.db").is_err());
+        assert!(validate_source_path(&root, ".agentz/graph.json").is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
