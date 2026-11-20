@@ -133,6 +133,37 @@ impl GuardedBrowserTool {
             manager,
         }
     }
+
+    /// #31: answer a read-only action from cached state when the gate is busy.
+    /// The result is marked stale so the caller knows it may lag the live page.
+    fn readonly_from_cache(&self, action: &str, session_id: &str) -> ToolResult {
+        match action {
+            "list_tabs" => ToolResult::ok(format!(
+                "{}\n(stale: gate busy, served from cached tab state)",
+                self.manager.session_tab_report(session_id)
+            )),
+            // get_url / get_title: only the URL is cached; title is not tracked.
+            _ => match self.manager.cached_url(session_id) {
+                Some(url) if action == "get_url" => ToolResult::ok(format!(
+                    "{url}\n(stale: gate busy, last known URL — may lag the live page)"
+                )),
+                Some(url) => ToolResult::ok(format!(
+                    "(stale: gate busy; title not cached. Last known URL: {url})"
+                )),
+                None => ToolResult::ok(
+                    "(stale: gate busy and no cached URL yet for this session)".to_string(),
+                ),
+            },
+        }
+    }
+}
+
+/// Clears the gate-holder marker when an action's guard drops (#31).
+struct GateHolderClear(Arc<StdMutex<Option<(String, std::time::Instant)>>>);
+impl Drop for GateHolderClear {
+    fn drop(&mut self) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
 }
 
 /// Tab id of a session's primary page. Extra tabs created inside the session
@@ -183,22 +214,54 @@ impl Tool for GuardedBrowserTool {
     }
 
     async fn call(&self, mut input: serde_json::Value, ctx: &ToolContext) -> Result<ToolResult> {
-        // Hold the session gate for the whole action so another session cannot
-        // retarget the shared "active tab" while RobotZ runs.
-        let Ok(_gate) = tokio::time::timeout(PAGE_LOCK_WAIT, self.manager.lock_ops()).await else {
-            return Ok(ToolResult::err(
-                "browser is busy; try again".to_string(),
-            ));
-        };
-
         let action = input
             .get("action")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_ascii_lowercase();
 
+        // #31: read-only actions answer from cached state when the gate is held,
+        // so a slow navigate never makes the browser wholly unobservable. They
+        // wait only briefly, then fall back to the last known URL / tab report.
+        let read_only = matches!(action.as_str(), "get_url" | "get_title" | "list_tabs");
+        let lock_wait = if read_only {
+            PANEL_POLL_LOCK_WAIT
+        } else {
+            PAGE_LOCK_WAIT
+        };
+        let started = std::time::Instant::now();
+        let gate = tokio::time::timeout(lock_wait, self.manager.lock_ops()).await;
+        let _gate = match gate {
+            Ok(g) => {
+                *self.manager.gate_holder.lock().unwrap_or_else(|e| e.into_inner()) =
+                    Some((ctx.session_id.clone(), std::time::Instant::now()));
+                g
+            }
+            Err(_) => {
+                if read_only {
+                    return Ok(self.readonly_from_cache(&action, &ctx.session_id));
+                }
+                return Ok(ToolResult::err(format!(
+                    "browser is busy ({}); waited {:.1}s for the gate. \
+                     Read-only actions (get_url/get_title/list_tabs) still answer from cache; \
+                     retry this action after the current operation finishes.",
+                    self.manager.gate_busy_detail(),
+                    started.elapsed().as_secs_f64()
+                )));
+            }
+        };
+        // Clear the holder marker when this action releases the gate.
+        let holder_slot = self.manager.gate_holder.clone();
+        let _clear = GateHolderClear(holder_slot);
+
         if action == "close" {
-            self.manager.close_session_locked(&ctx.session_id).await?;
+            // #31: closing must not depend on the page gate — a wedged navigate
+            // should still be cancellable. Drop our gate guard, then close with
+            // a bounded wait on the manager lock so a hung CDP call cannot block
+            // the cancel forever; session bookkeeping is cleared regardless.
+            drop(_clear);
+            drop(_gate);
+            self.manager.close_session_cancel(&ctx.session_id).await?;
             return Ok(ToolResult::ok(
                 "Closed this session's browser page. Other sessions were left open.",
             ));
@@ -423,6 +486,9 @@ pub struct BrowserManager {
     surfaces: Arc<StdMutex<HashMap<String, String>>>,
     /// Chromium tab id -> last URL this process navigated to.
     tab_urls: Arc<StdMutex<HashMap<String, String>>>,
+    /// #31: who holds the ops gate and since when, so a busy error can name the
+    /// holder and the wait instead of a bare "try again".
+    gate_holder: Arc<StdMutex<Option<(String, std::time::Instant)>>>,
 }
 
 impl Default for BrowserManager {
@@ -441,6 +507,7 @@ impl Default for BrowserManager {
             auto_screenshot: Arc::new(StdMutex::new(HashMap::new())),
             surfaces: Arc::new(StdMutex::new(HashMap::new())),
             tab_urls: Arc::new(StdMutex::new(HashMap::new())),
+            gate_holder: Arc::new(StdMutex::new(None)),
         }
     }
 }
@@ -457,6 +524,32 @@ impl BrowserManager {
 
     pub async fn lock_ops(&self) -> tokio::sync::MutexGuard<'_, ()> {
         self.ops.lock().await
+    }
+
+    /// #31: cached URL for a session's current tab (no Chromium round-trip).
+    pub fn cached_url(&self, session_id: &str) -> Option<String> {
+        let tab = self.current_tab(session_id);
+        self.tab_urls
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&tab)
+            .cloned()
+    }
+
+    /// #31: describe the current gate holder for a busy error.
+    fn gate_busy_detail(&self) -> String {
+        let holder = self
+            .gate_holder
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        match holder {
+            Some((who, since)) => format!(
+                "held by {who} for {:.1}s",
+                since.elapsed().as_secs_f64()
+            ),
+            None => "held by another operation".to_string(),
+        }
     }
 
     /// Tab the session will use, without launching Chromium.
@@ -757,6 +850,56 @@ impl BrowserManager {
         self.surfaces.lock().unwrap_or_else(|e| e.into_inner()).remove(&session_tab_id(session_id));
         if mgr.list_tabs().is_empty() && mgr.is_running() {
             let _ = mgr.close().await;
+        }
+        Ok(())
+    }
+
+    /// #31: cancel-friendly close. Clears this session's bookkeeping immediately
+    /// (so the panel/tool stop pointing at it), then attempts the CDP teardown
+    /// with a bounded wait on the manager lock. A wedged navigate holding that
+    /// lock must not make the session unclosable; if the lock cannot be taken in
+    /// time, the bookkeeping is still gone and the live tab is left for the next
+    /// operation to reconcile.
+    pub async fn close_session_cancel(&self, session_id: &str) -> Result<()> {
+        let key = session_tab_id(session_id);
+        let mut tabs = self
+            .owned_tabs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&key)
+            .unwrap_or_default();
+        if let Some(current) = self
+            .session_tabs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&key)
+        {
+            tabs.insert(current);
+        }
+        tabs.insert(key.clone());
+        for tab in &tabs {
+            self.trackers.lock().unwrap_or_else(|e| e.into_inner()).remove(tab);
+            self.viewports.lock().unwrap_or_else(|e| e.into_inner()).remove(tab);
+            self.tab_urls.lock().unwrap_or_else(|e| e.into_inner()).remove(tab);
+        }
+        self.surfaces.lock().unwrap_or_else(|e| e.into_inner()).remove(&key);
+
+        // Bounded attempt at the live teardown; never block the cancel forever.
+        if let Ok(mut mgr) = tokio::time::timeout(PANEL_POLL_OP_TIMEOUT, self.inner.lock()).await {
+            for tab in &tabs {
+                if mgr.list_tabs().iter().any(|t| t == tab) {
+                    let _ = mgr.close_tab(tab).await;
+                }
+            }
+            if mgr.list_tabs().is_empty() && mgr.is_running() {
+                let _ = mgr.close().await;
+            }
+        } else {
+            tracing::warn!(
+                target: "browser",
+                session = %session_id,
+                "close: manager lock busy; cleared session state, live tab left for reconciliation"
+            );
         }
         Ok(())
     }
@@ -1673,6 +1816,102 @@ mod tests {
         assert!(mgr.is_open().await);
         mgr.close_session("t").await.unwrap();
         assert!(!mgr.is_open().await);
+    }
+
+    fn busy_ctx(session: &str) -> ToolContext {
+        ToolContext {
+            session_id: session.to_string(),
+            workspace_root: std::path::PathBuf::from("."),
+            bypass_permissions: false,
+            settings: Arc::new(piscis_kernel::agent::tool::ToolSettings::default()),
+            max_iterations: None,
+            memory_owner_id: "test".to_string(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            loop_halt: None,
+        }
+    }
+
+    /// #31: while a navigate holds the gate, read-only actions must answer from
+    /// cached state (marked stale) instead of failing with a bare "busy" error.
+    #[tokio::test]
+    async fn readonly_actions_answer_from_cache_while_busy() {
+        let mgr = BrowserManager::new();
+        let tab = session_tab_id("busy-ro");
+        mgr.remember("busy-ro", &tab);
+        mgr.note_url(&tab, "https://example.com/page");
+        let tool = mgr.guarded_tool();
+        let ctx = busy_ctx("busy-ro");
+
+        // Hold the gate for longer than the read-only wait window.
+        let gate = mgr.lock_ops().await;
+
+        let res = tool
+            .call(serde_json::json!({ "action": "get_url" }), &ctx)
+            .await
+            .expect("get_url should not panic");
+        assert!(!res.is_error, "{}", res.content);
+        assert!(res.content.contains("https://example.com/page"), "{}", res.content);
+        assert!(res.content.to_ascii_lowercase().contains("stale"), "{}", res.content);
+
+        let res = tool
+            .call(serde_json::json!({ "action": "list_tabs" }), &ctx)
+            .await
+            .expect("list_tabs should not panic");
+        assert!(!res.is_error, "{}", res.content);
+        assert!(res.content.contains("session:busy-ro"), "{}", res.content);
+
+        drop(gate);
+    }
+
+    /// #31: a mutating action that cannot get the gate reports who holds it and
+    /// how long it has waited, not a bare "try again".
+    #[tokio::test]
+    async fn busy_mutating_action_reports_holder_and_wait() {
+        let mgr = BrowserManager::new();
+        mgr.remember("busy-mut", &session_tab_id("busy-mut"));
+        let tool = mgr.guarded_tool();
+        let ctx = busy_ctx("busy-mut");
+        let gate = mgr.lock_ops().await;
+
+        let res = tool
+            .call(serde_json::json!({ "action": "click", "selector": "#x" }), &ctx)
+            .await
+            .expect("click should not panic");
+        assert!(res.is_error, "{}", res.content);
+        let lower = res.content.to_ascii_lowercase();
+        assert!(lower.contains("busy"), "{}", res.content);
+        assert!(lower.contains("waited"), "{}", res.content);
+        drop(gate);
+    }
+
+    /// #31: close clears session bookkeeping even when the manager lock is held
+    /// by a wedged operation, so a stuck navigate cannot make the session
+    /// unclosable.
+    #[tokio::test]
+    async fn close_clears_state_even_when_manager_lock_busy() {
+        let mgr = BrowserManager::new();
+        let tab = session_tab_id("busy-close");
+        mgr.remember("busy-close", &tab);
+        mgr.note_url(&tab, "https://example.com/");
+        mgr.set_surface("busy-close", "codez");
+        let tool = mgr.guarded_tool();
+        let ctx = busy_ctx("busy-close");
+
+        // Hold the inner manager lock (simulates a wedged CDP operation).
+        let inner = mgr.shared();
+        let _mgr_guard = inner.lock().await;
+
+        let res = tool
+            .call(serde_json::json!({ "action": "close" }), &ctx)
+            .await
+            .expect("close should not panic");
+        assert!(!res.is_error, "{}", res.content);
+        // Bookkeeping cleared despite the busy manager lock.
+        assert!(mgr.tab_urls.lock().unwrap().is_empty());
+        assert!(mgr.surfaces.lock().unwrap().is_empty());
+        assert!(mgr.owned_tabs.lock().unwrap().is_empty());
     }
 
     /// Panel link clicks: same-tab links navigate the session page; a
