@@ -16,5 +16,5 @@
 
 ## CI
 
-- [ ] The `v1.0.72` Release workflow produces all installers (Linux, macOS, Windows x64 + ARM64) — 12 assets.
-- [ ] Main-branch CI green at the release commit.
+- [x] The `v1.0.72` Release workflow produces all installers (Linux, macOS, Windows x64 + ARM64) — run 44780484734 completed **success** 2026-11-20T01:56Z (~52 min); release "AgentZ v1.0.72" published with all **12 assets** (rpm ×2, AppImage ×2, deb ×2, dmg ×2, setup.exe ×2, app.tar.gz ×2).
+- [x] Main-branch CI green at `d1a83b0` (run 44785555593, Frontend + Desktop host both success). The release commit `1db26d2` initially failed CI: two `approval_execution` integration tests still asserted the pre-#28 behavior (`.agentz` search root denied). Root cause: `validate_search_path` canonicalized before the `.agentz` exemption, so a missing `.agentz` dir leaked a raw OS error; fixed in `d1a83b0` (exemption moved ahead of canonicalize, test expectations updated). Release artifacts were built from the tag and are unaffected (test-only change). Local note: git 2.24 lacks `init -b`, so two unrelated git-fixture tests fail locally but pass on CI.
