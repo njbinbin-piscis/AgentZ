@@ -577,6 +577,73 @@ fn default_memory_kind() -> String {
     "fact".to_string()
 }
 
+/// #34: build a broadened FTS5 query from a natural-language search string.
+/// The exact phrase is tried first by the caller; this produces an OR of tokens
+/// so wording that shares words (but not the whole phrase) still matches. CJK
+/// runs have no spaces, so they are split into overlapping bigrams; ASCII words
+/// are kept whole. Returns None when there is nothing usable to broaden to.
+fn broaden_memory_query(query: &str) -> Option<String> {
+    let mut tokens: Vec<String> = Vec::new();
+    let mut ascii_word = String::new();
+    let mut cjk_run: Vec<char> = Vec::new();
+
+    let flush_ascii = |word: &mut String, tokens: &mut Vec<String>| {
+        let w = word.trim().to_ascii_lowercase();
+        if w.len() >= 2 {
+            tokens.push(w);
+        }
+        word.clear();
+    };
+    let flush_cjk = |run: &mut Vec<char>, tokens: &mut Vec<String>| {
+        if run.len() == 1 {
+            tokens.push(run[0].to_string());
+        } else {
+            for pair in run.windows(2) {
+                tokens.push(pair.iter().collect());
+            }
+        }
+        run.clear();
+    };
+
+    for ch in query.chars() {
+        if is_cjk(ch) {
+            flush_ascii(&mut ascii_word, &mut tokens);
+            cjk_run.push(ch);
+        } else if ch.is_ascii_alphanumeric() {
+            flush_cjk(&mut cjk_run, &mut tokens);
+            ascii_word.push(ch);
+        } else {
+            flush_ascii(&mut ascii_word, &mut tokens);
+            flush_cjk(&mut cjk_run, &mut tokens);
+        }
+    }
+    flush_ascii(&mut ascii_word, &mut tokens);
+    flush_cjk(&mut cjk_run, &mut tokens);
+
+    // Dedupe, preserve order, drop FTS5 operators that could break the query.
+    let mut seen = std::collections::HashSet::new();
+    let terms: Vec<String> = tokens
+        .into_iter()
+        .filter(|t| !t.contains(['"', '*', '^', ':', '(', ')']))
+        .filter(|t| seen.insert(t.clone()))
+        .map(|t| format!("\"{t}\""))
+        .collect();
+    if terms.is_empty() {
+        None
+    } else {
+        Some(terms.join(" OR "))
+    }
+}
+
+fn is_cjk(ch: char) -> bool {
+    matches!(ch as u32,
+        0x4E00..=0x9FFF   // CJK Unified Ideographs
+        | 0x3400..=0x4DBF // Extension A
+        | 0x3040..=0x30FF // Hiragana + Katakana
+        | 0xAC00..=0xD7AF // Hangul syllables
+    )
+}
+
 /// Phase 4d: optional structured fields for [`Database::save_memory_structured`].
 /// All defaults preserve legacy `save_memory` behaviour.
 #[derive(Debug, Clone, Default)]
@@ -3504,6 +3571,32 @@ impl Database {
     /// Layer 3: project-shared memories (scope_type = 'project', scope_id = pool_session_id)
     /// Layer 4: global memories
     pub fn search_memories_scoped(
+        &self,
+        query: &str,
+        owner_id: &str,
+        pool_session_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Memory>> {
+        // #34: try the exact phrase first; if it yields nothing, retry with an
+        // OR-of-tokens query so near-synonym wording still matches shared words.
+        let exact = self.search_memories_scoped_inner(query, owner_id, pool_session_id, limit)?;
+        if !exact.is_empty() {
+            return Ok(exact);
+        }
+        if let Some(broadened) = broaden_memory_query(query) {
+            if broadened != query {
+                return self.search_memories_scoped_inner(
+                    &broadened,
+                    owner_id,
+                    pool_session_id,
+                    limit,
+                );
+            }
+        }
+        Ok(exact)
+    }
+
+    fn search_memories_scoped_inner(
         &self,
         query: &str,
         owner_id: &str,
@@ -6831,5 +6924,49 @@ mod tests {
                 .is_some(),
             "internal sessions for other pools must remain"
         );
+    }
+
+    /// #34: a multi-word query whose exact phrase is absent must still match via
+    /// individual tokens (OR fallback), so near-synonym wording does not silently
+    /// miss a stored memory. CJK runs are split into bigrams for the same reason.
+    #[test]
+    fn memory_search_falls_back_to_tokens_when_phrase_absent() {
+        let dir = std::env::temp_dir().join(format!("piscis-memsearch-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db = Database::open(&dir.join("piscis.db")).unwrap();
+        db.save_memory(
+            "git push 推送方式：使用 SSH BatchMode，避免 HTTPS 挂起",
+            "project",
+            0.9,
+            None,
+            "owner-a",
+            "private",
+            "",
+            None,
+        )
+        .unwrap();
+
+        // Exact phrase present → matches.
+        let exact = db
+            .search_memories_scoped("推送方式", "owner-a", None, 20)
+            .unwrap();
+        assert!(!exact.is_empty(), "exact phrase should match");
+
+        // Different wording, no exact phrase, but shares tokens (推送 / git).
+        let fuzzy = db
+            .search_memories_scoped("提交方式 git", "owner-a", None, 20)
+            .unwrap();
+        assert!(
+            !fuzzy.is_empty(),
+            "token fallback should match shared words even when the phrase differs"
+        );
+
+        // A wholly unrelated query still returns nothing (no false positives).
+        let none = db
+            .search_memories_scoped("kubernetes helm chart", "owner-a", None, 20)
+            .unwrap();
+        assert!(none.is_empty(), "unrelated query must not match");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

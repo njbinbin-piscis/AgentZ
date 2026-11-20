@@ -20,6 +20,8 @@ impl Tool for MemoryStoreTool {
          Actions: \
          - 'save': Save an important piece of information (default action when no action specified). \
          - 'search': Search memories by keyword. Use to check what you already know before saving duplicates. \
+           Matching tries the exact phrase first, then falls back to shared words (CJK is split into bigrams), \
+           so near-synonym wording still finds related memories; results may be broader than the literal query. \
          - 'list': List all stored memories (optionally filtered by category). \
          - 'delete': Delete a memory by its ID (get IDs from list or search). \
          \
