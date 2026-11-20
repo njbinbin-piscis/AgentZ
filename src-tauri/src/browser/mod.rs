@@ -1795,6 +1795,98 @@ mod tests {
         assert!(!mgr.is_open().await);
     }
 
+    /// Panel resize after a popup adoption / tab switch must not fail with
+    /// "set viewport failed": the session's current tab and the manager's
+    /// active page can diverge, and a stale/closed target rejects CDP commands.
+    #[tokio::test]
+    #[ignore = "requires local Chromium"]
+    async fn set_viewport_after_tab_switch_and_popup_live() {
+        let mgr = BrowserManager::new();
+        mgr.set_viewport("t", 900, 500).await.unwrap();
+        mgr.navigate("t", "about:blank").await.unwrap();
+
+        // A second tab created + switched the way the agent tool does it.
+        let second = format!("{}#2", session_tab_id("t"));
+        mgr.remember("t", &second);
+        mgr.bind("t").await.unwrap();
+        mgr.navigate("t", "about:blank").await.unwrap();
+        // Resize while the second tab is current (panel drag-resize path).
+        mgr.set_viewport("t", 700, 400).await.expect("viewport on second tab");
+        assert_eq!(mgr.viewport_size("t").await, (700, 400));
+
+        // Switch back to the first tab, then resize again.
+        mgr.remember("t", &session_tab_id("t"));
+        mgr.bind("t").await.unwrap();
+        mgr.set_viewport("t", 800, 600).await.expect("viewport after switch back");
+
+        // Simulate a popup adoption: register a live target under a popup id,
+        // make it current, resize — this is the adopt_popup_tabs tail path.
+        {
+            let mut m = mgr.inner.lock().await;
+            let live = m.live_pages().await.unwrap();
+            let tracked = m.tracked_pages();
+            let popup = live.into_iter().find(|p| {
+                !tracked.iter().any(|t| t.target_id() == p.target_id())
+            });
+            if let Some(p) = popup {
+                let tid = format!("{}#popup-{}", session_tab_id("t"), p.target_id().inner());
+                m.register_page(&tid, p);
+                drop(m);
+                mgr.remember("t", &tid);
+                mgr.bind("t").await.unwrap();
+                mgr.set_viewport("t", 640, 480).await.expect("viewport on adopted popup");
+            }
+        }
+
+        // Close the current tab out from under the session (external close),
+        // then resize: bind must recover instead of "set viewport failed".
+        let cur = mgr.current_tab("t");
+        mgr.close_owned_tab("t", &cur).await.unwrap();
+        mgr.set_viewport("t", 900, 500).await.expect("viewport after current tab closed");
+
+        mgr.close_session("t").await.unwrap();
+    }
+
+    /// The panel's navigate() calls syncViewport BEFORE browserNavigate. When
+    /// the session's remembered tab was closed inside the page (window.close,
+    /// a site closing its own popup) the stale handle must not surface as
+    /// "set viewport failed" — the viewport should be recorded and applied to
+    /// whatever page the session lands on next.
+    #[tokio::test]
+    #[ignore = "requires local Chromium"]
+    async fn set_viewport_with_stale_current_tab_live() {
+        let mgr = BrowserManager::new();
+        mgr.set_viewport("t", 900, 500).await.unwrap();
+        mgr.navigate("t", "about:blank").await.unwrap();
+
+        // Open a second tab, make it current, then close it *inside Chromium*
+        // (page.close bypasses close_owned_tab's re-focus logic, leaving the
+        // session remembering a dead tab — exactly what window.close does).
+        let second = format!("{}#2", session_tab_id("t"));
+        mgr.remember("t", &second);
+        mgr.bind("t").await.unwrap();
+        mgr.navigate("t", "about:blank").await.unwrap();
+        {
+            let mut m = mgr.inner.lock().await;
+            let page = m.active_page().await.unwrap();
+            (*page).clone().close().await.unwrap();
+        }
+        assert_eq!(mgr.current_tab("t"), second, "session still remembers the dead tab");
+
+        // Panel resize / pre-navigate syncViewport must not error out.
+        mgr.set_viewport("t", 800, 600)
+            .await
+            .expect("viewport with stale current tab should not fail");
+
+        // And the next navigate lands on a live page at the requested size.
+        mgr.navigate("t", "about:blank").await.unwrap();
+        let dims = mgr.eval("t", "[innerWidth, innerHeight]").await.unwrap();
+        assert_eq!(dims[0].as_u64(), Some(800), "viewport applied after recovery: {dims:?}");
+        assert_eq!(dims[1].as_u64(), Some(600), "viewport applied after recovery: {dims:?}");
+
+        mgr.close_session("t").await.unwrap();
+    }
+
     #[test]
     fn sessions_do_not_share_tabs_or_snapshot_generation() {
         let mgr = BrowserManager::new();

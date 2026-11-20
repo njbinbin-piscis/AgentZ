@@ -38,6 +38,7 @@
 | 33 | vendor crate 展开 manifest 时静默丢失 workspace lint 策略 | **已修复**（2026-11-19，`5af1234`）。vendoring 时丢了 `[lints] workspace = true`，本地 clippy 不执行 deny-warnings，两个 Linux 侧 lint 漏到 CI。lint 表已恢复，并记入仓库记忆 | `vendor/robotz/crates/*/Cargo.toml`（`[lints]`） |
 | 34 | `memory_store search` 因近义词不匹配漏检（"提交方式" vs "推送方式"） | **待修**（2026-11-19）。关键词搜索是字面匹配；一词之差返回空，agent 便按习惯行事（导致裸 `git push origin main` 挂起）。笔记已补别名关键词，但检索本身仍是精确匹配 | memory store 搜索实现；笔记 `c1d28514` 别名 |
 | 35 | `git stash drop` 即使已验证内容为空也被安全策略拒绝 | **待修**（2026-11-19，轻微）。破坏性 git 守卫对所有 stash drop 一律拒绝，无"先检查后确认"通道；此处无害但陈旧 stash 会累积 | 命令安全策略（破坏性 git 操作） |
+| 36 | 内置浏览器：页面自关（`window.close`）后报 "set viewport failed" | **已修复**（2026-11-19；live 回归测试红→绿）。robotz 缓存了已死的 Page 句柄；`url()` 读帧缓存仍 Ok，失效句柄直达 CDP，后续所有动作失败 | `vendor/robotz/crates/robotz-browser/src/manager.rs`（`get_or_create_page` 存活探测） |
 
 Windows 打包目标：见 README。已验证的产物是 `.github/workflows/release.yml` 上传的 NSIS `.exe` 文件。
 
@@ -709,3 +710,17 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 - **M3. 只读探索螺旋。** 会话两次触发 25 连读提醒（localStorage stub 追踪：约 15 次 grep；CI lint 追踪：约 25 次读）。切换策略的时机（delegate、写探针测试、直接跑代码）来得太晚。一个 live 复现测试本可替代大部分 localStorage 追踪。
 - **M4. 通过 cmd.exe 传内联多行脚本。** 写 `.tmp-*.py` 文件再运行每次都一次成功；带换行的内联 `python -c` 每次都失败。超过一行就默认写脚本文件。
 - **M5. 盲试 CI。** 注解存在之前，每次 CI 修复都是猜测推进 3 分钟反馈环。持久修复是给环装仪表（注解），而不是猜得更快——推广：*反馈通道不透明时，先装仪表再迭代*。
+
+---
+
+## 36. 内置浏览器：页面自关（`window.close`）后报 "set viewport failed"
+
+**状态（2026-11-19）。** **已修复；live 回归测试红→绿，尚未在运行中的应用里手工验证。** 用户报告：内置浏览器显示 "set viewport failed"。
+
+**根因（已用真实 Chromium live 测试实锤）。** 页面关闭自己的标签时——`window.close()`、网站关掉自己的 popup、或标签崩溃——死亡发生在 Chromium 内部，绕过了 `close_owned_tab` 的重新聚焦逻辑。robotz 管理器把已死的 `Page` 句柄留在 `pages` 映射里，`get_or_create_page` 无条件返回它。第一版存活探测用了 `page.url()`，但它只读 chromiumoxide 缓存的帧管理器（`handler/target.rs` 的 `TargetMessage::Url` 直接从 `frame_manager` 应答，不走 CDP 往返），对已死 target 仍返回 `Ok`。失效句柄随后直达 `SetDeviceMetricsOverride` 及之后所有 CDP 命令，报 "send failed because receiver is gone" → 表现为 "set viewport failed"。面板的 `navigate()` 在 `browserNavigate` *之前*先调 `syncViewport()`，所以连输入新地址都会报错而不是恢复。
+
+**修复。** `vendor/robotz/crates/robotz-browser/src/manager.rs` 的 `get_or_create_page`：返回已跟踪句柄前先用真实 CDP 往返探测（`page.evaluate("1")`，2 秒上限）；失败则丢弃句柄、在同一 tab id 下新建页面。宿主所有路径（`bind`、`with_active_page`、`set_viewport`、`navigate`）都经过此函数，一处探测治愈所有动作。代价：每次取页多一次 `Runtime.evaluate`（本地活 target 上亚毫秒级）。
+
+**验证。** 新增 live 测试 `set_viewport_with_stale_current_tab_live`（需本机 Chromium，`--ignored`）：开第二个标签，在 Chromium 内部用 `page.close()` 关掉它（与 `window.close` 完全等效），断言会话仍记得死标签，然后要求 `set_viewport` 成功、下一次 navigate 落在请求的尺寸上。修复前失败（"set viewport failed"），修复后通过。另加 `set_viewport_after_tab_switch_and_popup_live` 覆盖切换标签/popup 收养/关闭自有标签后的 resize。browser 模块 6 项单测 + 5 项 live 测试全过（live 测试需 `--test-threads=1`；并行启动 Chromium 会争用共享 profile 目录——既有问题，与本修复无关）。`cargo clippy --workspace --all-targets -- -D warnings` 干净；robotz-browser 测试 8/8。**尚未完成：** 在运行中的应用里用会调 `window.close` 的网站手工确认。
+
+**关联。** #27（popup 收养）引入的收养路径也可能让会话指向一个随后被页面关闭的 target；本修复同样覆盖。#31（busy 锁拒绝）是同一子系统的另一处摩擦。

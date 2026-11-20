@@ -212,7 +212,25 @@ impl BrowserManager {
         self.launch().await?;
 
         if let Some(page) = self.pages.get(tab_id) {
-            return Ok(page.clone());
+            // A tracked handle can go stale when the target dies outside our
+            // close_tab path (window.close, a site closing its own popup, a
+            // crashed tab). Probe with a real CDP round-trip — page.url() only
+            // reads the cached frame manager and stays Ok on a dead target.
+            // On failure drop the handle and fall through to create a fresh
+            // page instead of handing the caller a dead target ("send failed
+            // because receiver is gone").
+            let alive = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                page.evaluate("1"),
+            )
+            .await
+            .map(|r| r.is_ok())
+            .unwrap_or(false);
+            if alive {
+                return Ok(page.clone());
+            }
+            info!("Tracked tab '{tab_id}' is stale; recreating its page");
+            self.pages.remove(tab_id);
         }
 
         let browser = self
