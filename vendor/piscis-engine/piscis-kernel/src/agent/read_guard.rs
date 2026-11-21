@@ -25,6 +25,11 @@ pub(crate) const REREAD_WARN_AT: usize = 3;
 pub(crate) const REREAD_BLOCK_AT: usize = 6;
 /// Consecutive read-only calls after which the user request is restated.
 pub(crate) const READ_ONLY_STREAK_REMINDERS: [usize; 2] = [25, 50];
+/// Consecutive read-only calls (no write, no plan update) after which the turn
+/// is handed back to the user. The two reminders before it are advice the model
+/// can acknowledge and ignore; searching and reading *different* things never
+/// trips the re-read rules, so this is the backstop for explore-forever loops.
+pub(crate) const READ_ONLY_STREAK_PAUSE_AT: usize = 75;
 /// How many of the latest reads are considered when deciding to pause.
 pub(crate) const RECENT_READ_WINDOW: usize = 40;
 
@@ -49,6 +54,9 @@ pub(crate) struct ReadPause {
     pub window: usize,
     /// Files re-read most often, for the explanation.
     pub paths: Vec<String>,
+    /// Consecutive read-only calls when the pause is caused by an explore-only
+    /// streak rather than by unchanged re-reads; 0 otherwise.
+    pub streak: usize,
 }
 
 #[derive(Debug, Default)]
@@ -279,6 +287,16 @@ impl ReadGuard {
     pub(crate) fn pause_reason(&self) -> Option<ReadPause> {
         let rereads = self.recent.iter().filter(|read| read.unchanged).count();
         if rereads * 2 <= RECENT_READ_WINDOW {
+            if self.read_only_streak >= READ_ONLY_STREAK_PAUSE_AT {
+                let mut files: Vec<String> = self.files_read(5);
+                files.reverse();
+                return Some(ReadPause {
+                    rereads,
+                    window: self.recent.len(),
+                    paths: files,
+                    streak: self.read_only_streak,
+                });
+            }
             return None;
         }
         let mut counts: Vec<(&str, usize)> = Vec::new();
@@ -303,6 +321,7 @@ impl ReadGuard {
             rereads,
             window: self.recent.len(),
             paths,
+            streak: 0,
         })
     }
 
@@ -396,10 +415,10 @@ mod tests {
     }
 
     #[test]
-    fn sixty_distinct_files_are_never_blocked_and_only_draw_reminders() {
+    fn distinct_files_are_never_blocked_and_only_draw_reminders_until_the_streak_pause() {
         let mut guard = ReadGuard::default();
         let mut reminders = Vec::new();
-        for call in 1..=60 {
+        for call in 1..READ_ONLY_STREAK_PAUSE_AT {
             let verdict = read(&mut guard, &format!("src/file_{call}.rs"), &format!("body {call}"));
             assert_eq!(verdict, ReadVerdict::Allow, "call {call}");
             assert!(guard.pause_reason().is_none(), "call {call}");
@@ -408,6 +427,28 @@ mod tests {
             }
         }
         assert_eq!(reminders, vec![(25, 25), (50, 50)]);
+    }
+
+    #[test]
+    fn an_explore_only_streak_pauses_even_when_every_read_is_new() {
+        let mut guard = ReadGuard::default();
+        for call in 1..=READ_ONLY_STREAK_PAUSE_AT {
+            // Alternate a search and a read of different things each time.
+            let input = if call % 2 == 0 {
+                json!({ "action": "grep", "pattern": format!("p{call}"), "path": "src" })
+            } else {
+                json!({ "path": format!("src/f{call}.rs") })
+            };
+            let name = if call % 2 == 0 { "file_search" } else { "file_read" };
+            assert_eq!(guard.check(name, &input, true), ReadVerdict::Allow, "call {call}");
+            assert!(guard.pause_reason().is_none() || call == READ_ONLY_STREAK_PAUSE_AT);
+            guard.record(name, &input, true, &format!("body {call}"), false);
+        }
+        let pause = guard.pause_reason().expect("an explore-only streak must pause");
+        assert_eq!(pause.streak, READ_ONLY_STREAK_PAUSE_AT);
+        // A write is progress and clears it.
+        guard.record("file_edit", &json!({ "path": "src/a.rs" }), false, "ok", false);
+        assert!(guard.pause_reason().is_none());
     }
 
     #[test]

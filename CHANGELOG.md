@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.73] - 2026-11-21
+
+### Fixed
+
+- **Agent no longer loops on `file_search` / `file_read` through warnings (#37).** The loop detector now blocks after one ignored warning (stale warnings clear when the agent changes approach), and an explore-only streak of 75 consecutive read-only calls pauses the run even when every read is new. The pause message is streak-specific.
+- **`file_search` / `file_read` return actionable feedback.** Grep and glob report truncation and what was searched (files scanned, binary/oversize skips, definitive no-match); results are in deterministic order. `file_read` errors on an offset past EOF and caps large files read without `limit` at 400 lines with a continuation hint. Demoted tool receipts keep the line range and a search summary.
+- **`code_run` shell-mismatch false positives.** Cmdlet markers inside quoted text and here-string detection no longer reject valid commands.
+
+### Changed
+
+- **Kernel pin advanced to piscis-engine v0.8.75** (carries the AgentZ overlay sync and the fixes above).
 ## [1.0.72] - 2026-11-20
 
 ### Fixed

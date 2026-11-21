@@ -502,7 +502,20 @@ fn prelaunch_shell_mismatch(command: &str) -> Option<String> {
         "@'",
         "@\"",
     ];
-    if PS_MARKERS.iter().any(|m| lower.contains(m)) {
+    // Cmdlet names inside a quoted argument are data (`git commit -m "fix
+    // Select-Object bug"`, `rg "Get-Content"`), not syntax cmd.exe must parse.
+    // A here-string needs a newline right after the opener.
+    let unquoted = blank_quoted_text(&lower);
+    let here_string = lower.contains("@'\n")
+        || lower.contains("@\"\n")
+        || lower.contains("@'\r\n")
+        || lower.contains("@\"\r\n");
+    if here_string
+        || PS_MARKERS
+            .iter()
+            .filter(|m| !m.starts_with('@'))
+            .any(|m| unquoted.contains(m))
+    {
         return Some(
             "This looks like PowerShell (cmdlets such as Select-Object/ForEach-Object, `$env:`, or here-strings), \
              but code_run executes cmd.exe and fails instantly on them. \
@@ -523,6 +536,26 @@ fn prelaunch_shell_mismatch(command: &str) -> Option<String> {
     }
 
     None
+}
+
+/// `text` with everything inside single or double quotes replaced by spaces.
+#[cfg(any(windows, test))]
+fn blank_quoted_text(text: &str) -> String {
+    let mut quote: Option<char> = None;
+    text.chars()
+        .map(|c| match quote {
+            Some(q) if c == q => {
+                quote = None;
+                c
+            }
+            Some(_) => ' ',
+            None if c == '\'' || c == '"' => {
+                quote = Some(c);
+                c
+            }
+            None => c,
+        })
+        .collect()
 }
 
 /// True when a `$identifier` appears at a command position (not merely inside a
@@ -856,6 +889,10 @@ mod tests {
             "npm run build && echo done",
             "git status -sb",
             "echo %PATH%",
+            // Cmdlet names as data inside quotes are not PowerShell syntax.
+            "git commit -m \"fix Select-Object bug\"",
+            "rg \"Get-Content\" src",
+            "findstr /c:\"$env:\" notes.txt",
         ] {
             assert!(prelaunch_shell_mismatch(cmd).is_none(), "false positive: {cmd}");
         }

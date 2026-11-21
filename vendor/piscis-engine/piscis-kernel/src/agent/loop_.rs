@@ -154,6 +154,8 @@ const RESEARCH_CRITICAL_THRESHOLD: usize = 128;
 const RESEARCH_RECENT_WINDOW: usize = 64;
 const PING_PONG_WARNING: usize = 64;
 const PING_PONG_CRITICAL: usize = 128;
+/// Warnings about one identical call that may be ignored before it is blocked.
+const WARNINGS_BEFORE_BLOCK: usize = 1;
 const TOOL_RESULT_HARD_MAX_CHARS: usize = 48_000;
 const CONTEXT_SINGLE_RESULT_SHARE: f64 = 0.5;
 const CHECKPOINT_MAX_BYTES: usize = 8_000_000;
@@ -632,6 +634,9 @@ impl LoopDetectorState {
         norm_hash: u64,
     ) {
         let input_hash = stable_hash_input(name, input);
+        // Warnings count a run of the same call. Once something else has run,
+        // the model did change approach, so earlier warnings no longer count.
+        self.warned.retain(|hash, _| *hash == input_hash);
         self.history.push(ToolCallRecord {
             name: name.to_string(),
             input_hash,
@@ -665,7 +670,10 @@ impl LoopDetectorState {
             let hash = stable_hash_input(pending_name, pending_input);
             let n = self.warned.entry(hash).or_insert(0);
             *n += 1;
-            if *n > 3 {
+            // A warning is advice the model may only acknowledge in text. Run the
+            // identical call once after the first warning; the next identical
+            // call is refused (#37) instead of waiting for several more rounds.
+            if *n > WARNINGS_BEFORE_BLOCK {
                 result = LoopDetectionResult {
                     level: LoopLevel::Critical,
                     detector: result.detector,
@@ -5307,9 +5315,14 @@ impl AgentLoop {
                     .await;
                 let _ = event_tx
                     .send(AgentEvent::Notice {
-                        message: "检测到重复读取未变化的文件，本轮已暂停。".to_string(),
+                        message: if pause.streak > 0 {
+                            "已连续多次只读调用而没有任何进展，本轮已暂停。".to_string()
+                        } else {
+                            "检测到重复读取未变化的文件，本轮已暂停。".to_string()
+                        },
                         code: Some("read_loop_paused".to_string()),
                         details: Some(serde_json::json!({
+                            "streak": pause.streak,
                             "rereads": pause.rereads,
                             "window": pause.window,
                             "paths": pause.paths,
@@ -5550,6 +5563,18 @@ fn read_only_streak_reminder(streak: usize, user_request: &str) -> String {
 }
 
 fn read_pause_message(pause: &super::read_guard::ReadPause) -> String {
+    if pause.streak > 0 {
+        let files = if pause.paths.is_empty() {
+            String::new()
+        } else {
+            let lines: Vec<String> = pause.paths.iter().map(|path| format!("- {}", path)).collect();
+            format!("\n\n最近读过的内容：\n{}", lines.join("\n"))
+        };
+        return format!(
+            "我暂停了这一轮：已连续进行 {} 次只读调用（搜索/读取），期间没有修改文件，也没有更新计划，再继续搜索不太可能带来新的进展。{}\n\n已读到的内容都还在。请告诉我接下来希望我做什么，例如直接基于现有内容动手或回答，或者指出我还缺少哪部分信息。",
+            pause.streak, files
+        );
+    }
     let files = if pause.paths.is_empty() {
         String::new()
     } else {
@@ -6060,10 +6085,23 @@ mod tests {
         for n in 0..4 {
             record_run(&mut d, &input, n);
         }
-        for _ in 0..3 {
-            assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Warning);
-        }
+        // One ignored warning is allowed; the next identical call is refused.
+        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Warning);
         assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Critical);
+    }
+
+    #[test]
+    fn a_different_call_in_between_clears_earlier_warnings() {
+        let input = json!({"command": "node --test"});
+        let other = json!({"command": "ls"});
+        let batch = vec![("id".to_string(), "code_run".to_string(), input.clone())];
+        let mut d = fresh_detector();
+        for n in 0..4 {
+            record_run(&mut d, &input, n);
+        }
+        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Warning);
+        d.record("code_run", &other, 1, 1);
+        assert_eq!(d.warned.len(), 0, "warnings belong to a run of one call");
     }
 
     #[test]

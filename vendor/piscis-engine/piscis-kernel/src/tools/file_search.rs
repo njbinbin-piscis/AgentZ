@@ -269,6 +269,7 @@ impl FileSearchTool {
 
         let mut matches: Vec<String> = Vec::new();
         let mut skipped_dirs: Vec<String> = Vec::new();
+        let mut truncated = false;
         walk_dir_opts(
             root,
             0,
@@ -277,6 +278,7 @@ impl FileSearchTool {
             &mut skipped_dirs,
             &mut |path: &Path| {
                 if matches.len() >= max_results {
+                    truncated = true;
                     return false;
                 }
                 if path.is_file() {
@@ -309,13 +311,20 @@ impl FileSearchTool {
             )));
         }
 
-        Ok(ToolResult::ok(format!(
+        let mut body = format!(
             "Found {} file(s) matching '{}' under {}:\n{}",
             matches.len(),
             pattern,
             display_path_for_tool(root, workspace),
             matches.join("\n")
-        )))
+        );
+        if truncated {
+            body.push_str(&format!(
+                "\n\n[Results truncated at {max_results}: more files match. Narrow with path or a more specific pattern, \
+                 or raise max_results (max {MAX_RESULTS}). Do not re-run the same glob expecting different results.]"
+            ));
+        }
+        Ok(ToolResult::ok(body))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -361,6 +370,9 @@ impl FileSearchTool {
         let mut skipped: Vec<String> = Vec::new();
         let mut skipped_dirs: Vec<String> = Vec::new();
         let mut total_matches = 0usize;
+        let mut truncated = false;
+        let mut files_scanned = 0usize;
+        let mut binary_skipped = 0usize;
 
         walk_dir_opts(
             root,
@@ -370,6 +382,8 @@ impl FileSearchTool {
             &mut skipped_dirs,
             &mut |path: &Path| {
                 if total_matches >= max_results {
+                    // The walk stopped with files left unsearched.
+                    truncated = true;
                     return false;
                 }
                 if !path.is_file() {
@@ -407,16 +421,23 @@ impl FileSearchTool {
                 let content = match std::fs::read(path) {
                     Ok(bytes) => match decode_text(&bytes) {
                         Some(c) => c,
-                        None => return true,
+                        None => {
+                            binary_skipped += 1;
+                            return true;
+                        }
                     },
                     Err(_) => return true,
                 };
+                files_scanned += 1;
 
                 let lines: Vec<&str> = content.lines().collect();
                 let mut file_matches: Vec<String> = Vec::new();
 
                 for (i, line) in lines.iter().enumerate() {
                     if total_matches + file_matches.len() >= max_results {
+                        if lines[i..].iter().any(|l| re.is_match(l)) {
+                            truncated = true;
+                        }
                         break;
                     }
                     if re.is_match(line) {
@@ -460,12 +481,37 @@ impl FileSearchTool {
                 _ => String::new(),
             };
             let ignored_note = format_skipped_dirs_note(&skipped_dirs);
+            // An empty result is only conclusive when the model knows what was
+            // searched. Without this it re-runs variants of the pattern, or reads
+            // files one by one, to find out whether anything was skipped.
+            let mut coverage = format!(
+                " Searched {} text file(s) (max depth {}, case-{}sensitive).",
+                files_scanned,
+                max_depth,
+                if case_sensitive { "" } else { "in" }
+            );
+            if binary_skipped > 0 {
+                coverage.push_str(&format!(" {binary_skipped} binary/undecodable file(s) were not searched."));
+            }
+            if !skipped.is_empty() {
+                coverage.push_str(&format!(
+                    " {} file(s) over the size limit were not searched: {}.",
+                    skipped.len(),
+                    skipped.join(" ")
+                ));
+            }
+            if files_scanned == 0 {
+                coverage.push_str(" No files matched the path/filter, so the pattern was never tried; check path, include and file_extensions.");
+            } else {
+                coverage.push_str(" The search is complete: this is a definitive 'not found' for this pattern and scope. Widen the pattern or path rather than repeating it.");
+            }
             return Ok(ToolResult::ok(format!(
-                "No matches found for '{}' under {}{}{}",
+                "No matches found for '{}' under {}{}{}.{}",
                 pattern,
                 display_path_for_tool(root, workspace),
                 filter_note,
-                ignored_note
+                ignored_note,
+                coverage
             )));
         }
 
@@ -476,6 +522,13 @@ impl FileSearchTool {
             display_path_for_tool(root, workspace),
             results.join("\n")
         );
+        if truncated {
+            body.push_str(&format!(
+                "\n\n[Results truncated at {max_results}: more matches exist. The list above is the first {max_results} in path order. \
+                 Narrow with path, include or file_extensions, use a more specific pattern, or raise max_results (max {MAX_RESULTS}). \
+                 Do not re-run the same search expecting different results.]"
+            ));
+        }
         if !skipped.is_empty() {
             body.push_str("\n\nSkipped large files:\n");
             body.push_str(&skipped.join("\n"));
@@ -529,7 +582,12 @@ fn walk_dir_opts<F: FnMut(&Path) -> bool>(
         Ok(e) => e,
         Err(_) => return,
     };
-    for entry in entries.flatten() {
+    // Directory order is arbitrary and differs between runs and platforms. A
+    // result list cut at `max_results` must be the same list every time, or the
+    // model cannot tell a narrower query from a reshuffled one and keeps retrying.
+    let mut entries: Vec<_> = entries.flatten().collect();
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
         let path = entry.path();
         let is_dir = path.is_dir();
         let entry_name = path.file_name().map(os_text).unwrap_or_default();
@@ -832,6 +890,81 @@ mod tests {
         assert!(result.content.contains("look-around"), "{}", result.content);
         // ...but now also gives a usable rewrite path.
         assert!(result.content.contains("=[^=]"), "{}", result.content);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn search_ctx(root: &std::path::Path) -> crate::agent::tool::ToolContext {
+        use crate::agent::tool::{ToolContext, ToolSettings};
+        use std::sync::atomic::AtomicBool;
+        use std::sync::Arc;
+        ToolContext {
+            session_id: "file-search".into(),
+            workspace_root: root.to_path_buf(),
+            bypass_permissions: false,
+            settings: Arc::new(ToolSettings::default()),
+            max_iterations: None,
+            memory_owner_id: "test".into(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel: Arc::new(AtomicBool::new(false)),
+            loop_halt: None,
+        }
+    }
+
+    /// A list cut at max_results must say so, otherwise the model re-runs the
+    /// search (or reads files) to find out whether it saw everything.
+    #[tokio::test]
+    async fn grep_and_glob_say_when_results_were_truncated() {
+        let root = std::env::temp_dir().join(format!("file-search-trunc-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        for i in 0..6 {
+            std::fs::write(root.join(format!("f{i}.txt")), "needle\n").unwrap();
+        }
+        let ctx = search_ctx(&root);
+        let grep = FileSearchTool
+            .call(json!({"action": "grep", "pattern": "needle", "path": ".", "max_results": 3}), &ctx)
+            .await
+            .unwrap();
+        assert!(grep.content.contains("Found 3 match"), "{}", grep.content);
+        assert!(grep.content.contains("truncated"), "{}", grep.content);
+        // Deterministic: the same first three files every time.
+        assert!(grep.content.contains("f0.txt") && grep.content.contains("f2.txt"), "{}", grep.content);
+        assert!(!grep.content.contains("f5.txt"), "{}", grep.content);
+        let glob = FileSearchTool
+            .call(json!({"action": "glob", "pattern": "*.txt", "path": ".", "max_results": 3}), &ctx)
+            .await
+            .unwrap();
+        assert!(glob.content.contains("truncated"), "{}", glob.content);
+        // Complete results carry no truncation note.
+        let all = FileSearchTool
+            .call(json!({"action": "grep", "pattern": "needle", "path": ".", "max_results": 50}), &ctx)
+            .await
+            .unwrap();
+        assert!(!all.content.contains("truncated"), "{}", all.content);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// "No matches" must say what was searched so it reads as a conclusive answer.
+    #[tokio::test]
+    async fn grep_no_match_reports_what_was_searched() {
+        let root = std::env::temp_dir().join(format!("file-search-empty-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("a.txt"), "hello\n").unwrap();
+        std::fs::write(root.join("b.bin"), [0u8, 1, 2, 3]).unwrap();
+        let ctx = search_ctx(&root);
+        let res = FileSearchTool
+            .call(json!({"action": "grep", "pattern": "absent", "path": "."}), &ctx)
+            .await
+            .unwrap();
+        assert!(res.content.contains("No matches found"), "{}", res.content);
+        assert!(res.content.contains("Searched 1 text file"), "{}", res.content);
+        assert!(res.content.contains("binary"), "{}", res.content);
+        assert!(res.content.contains("definitive"), "{}", res.content);
+        let none = FileSearchTool
+            .call(json!({"action": "grep", "pattern": "x", "path": ".", "include": "*.nothing"}), &ctx)
+            .await
+            .unwrap();
+        assert!(none.content.contains("never tried"), "{}", none.content);
         let _ = std::fs::remove_dir_all(&root);
     }
 }

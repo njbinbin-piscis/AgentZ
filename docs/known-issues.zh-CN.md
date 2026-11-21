@@ -39,7 +39,7 @@
 | 34 | `memory_store search` 因近义词不匹配漏检（"提交方式" vs "推送方式"） | **待修**（2026-11-19）。关键词搜索是字面匹配；一词之差返回空，agent 便按习惯行事（导致裸 `git push origin main` 挂起）。笔记已补别名关键词，但检索本身仍是精确匹配 | memory store 搜索实现；笔记 `c1d28514` 别名 |
 | 35 | `git stash drop` 即使已验证内容为空也被安全策略拒绝 | **已修复**（2026-11-20）。stash drop/clear 现在有专门的"先检查后确认"警告（`git stash list` + `git stash show -p <stash>`），无人确认时的拒绝消息也附带该指引，不再是裸的"no one is available to confirm"。确认仍是强制的——没有自动放行逃生通道 | `vendor/piscis-engine/piscis-kernel/src/policy/gate.rs`（`STASH_DELETE_PATTERN`）、`src/agent/loop_.rs`（拒绝原因） |
 | 36 | 内置浏览器：页面自关（`window.close`）后报 "set viewport failed" | **已修复**（2026-11-19；live 回归测试红→绿）。robotz 缓存了已死的 Page 句柄；`url()` 读帧缓存仍 Ok，失效句柄直达 CDP，后续所有动作失败 | `vendor/robotz/crates/robotz-browser/src/manager.rs`（`get_or_create_page` 存活探测） |
-| 37 | 循环检测器 Warning 阶段拦不住"认错但继续重复"的循环 | **待修**（2026-11-21，会话内实测）。同一 `code_run`/`file_search` 调用重复 10+ 次；每次软性 `[系统提醒]` 都被口头承认，下一轮又发起相同调用。Warning 只注入文本且照常执行工具，直到 Critical 才有硬切换约束 | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`（`detect` 的 Warning 分支、`warning_reminder` 注入） |
+| 37 | 循环检测器 Warning 阶段拦不住"认错但继续重复"的循环 | **源码已修，未发布**（2026-11-21，会话内实测；修复见英文版第 37 节）。同一 `code_run`/`file_search` 调用重复 10+ 次；每次软性 `[系统提醒]` 都被口头承认，下一轮又发起相同调用。Warning 只注入文本且照常执行工具，直到 Critical 才有硬切换约束 | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`（`detect` 的 Warning 分支、`warning_reminder` 注入） |
 
 Windows 打包目标：见 README。已验证的产物是 `.github/workflows/release.yml` 上传的 NSIS `.exe` 文件。
 

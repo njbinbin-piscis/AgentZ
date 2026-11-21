@@ -182,12 +182,26 @@ fn render_file_read(input: &Value, full: &str, is_error: bool) -> String {
     if is_error {
         return append_error_hint(&format!("read file FAIL: {}", path_tail), full);
     }
-    let lines = full.lines().count();
-    let chars = full.chars().count();
-    format!(
-        "read file: {} ({} lines, {} chars)",
-        path_tail, lines, chars
-    )
+    // The tool's own header says which part of the file this was, which is what
+    // the model needs to decide it need not read that part again.
+    // "File: p (N lines total, showing lines a-b)".
+    let range = full.lines().next().and_then(|header| {
+        let rest = header.split("lines total, showing lines ").nth(1)?;
+        let shown = rest.trim_end_matches(')');
+        let total = header.rsplit('(').next()?.split(" lines total").next()?;
+        Some(format!("L{} of {}", shown, total))
+    });
+    match range {
+        Some(range) => format!("read file: {} ({})", path_tail, range),
+        None => {
+            let lines = full.lines().count();
+            let chars = full.chars().count();
+            format!(
+                "read file: {} ({} lines, {} chars)",
+                path_tail, lines, chars
+            )
+        }
+    }
 }
 
 fn render_file_write(input: &Value, full: &str, is_error: bool) -> String {
@@ -216,7 +230,49 @@ fn render_file_edit(tool_name: &str, input: &Value, full: &str, is_error: bool) 
     }
 }
 
+/// `file_search` receipts keep the query and what it found. A receipt that only
+/// says "file_search: src (23 entries)" is identical for every pattern, so the
+/// model cannot tell which searches it already ran and repeats them.
+fn render_file_search(input: &Value, full: &str, is_error: bool) -> String {
+    let action = input["action"].as_str().unwrap_or("search");
+    let pattern = truncate(input["pattern"].as_str().unwrap_or("").trim(), 40);
+    let path = truncate(input["path"].as_str().unwrap_or("."), 24);
+    let head = format!("file_search {} '{}' in {}", action, pattern, path);
+    if is_error {
+        return append_error_hint(&format!("{} FAIL", head), full);
+    }
+    let first = full.lines().next().unwrap_or("");
+    if first.starts_with("No ") {
+        return format!("{}: no matches", head);
+    }
+    // grep: "Found N match(es) ..."; glob: "Found N file(s) ...".
+    let count = first
+        .strip_prefix("Found ")
+        .and_then(|rest| rest.split_whitespace().next())
+        .unwrap_or("?");
+    let unit = if first.contains("file(s)") { "files" } else { "matches" };
+    let mut names: Vec<&str> = if unit == "files" {
+        full.lines().skip(1).map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('[')).collect()
+    } else {
+        full.lines()
+            .filter(|l| !l.starts_with(' ') && l.ends_with(':') && !l.starts_with("Found "))
+            .map(|l| l.trim_end_matches(':'))
+            .collect()
+    };
+    names.truncate(2);
+    let names: Vec<String> = names.iter().map(|n| tail_path(n, 28)).collect();
+    let truncated = if full.contains("[Results truncated") { " +truncated" } else { "" };
+    if names.is_empty() {
+        format!("{}: {} {}{}", head, count, unit, truncated)
+    } else {
+        format!("{}: {} {}{} e.g. {}", head, count, unit, truncated, names.join(", "))
+    }
+}
+
 fn render_file_listing(tool_name: &str, input: &Value, full: &str, is_error: bool) -> String {
+    if tool_name == "file_search" {
+        return render_file_search(input, full, is_error);
+    }
     let target = input["path"]
         .as_str()
         .or_else(|| input["query"].as_str())
@@ -593,6 +649,51 @@ mod tests {
         assert!(r.starts_with("read file: "));
         assert!(r.contains("src/main.rs"));
         assert!(r.contains("lines"));
+    }
+
+    #[test]
+    fn file_read_receipt_keeps_the_range_that_was_read() {
+        let r = render_receipt(
+            "file_read",
+            &json!({"path": "src/main.rs", "offset": 101, "limit": 100}),
+            "File: src/main.rs (900 lines total, showing lines 101-200)\n\n   101|x",
+            false,
+            None,
+        );
+        assert!(r.contains("L101-200 of 900"), "{r}");
+    }
+
+    #[test]
+    fn file_search_receipt_distinguishes_patterns_and_names_hits() {
+        let grep = |pattern: &str| {
+            render_receipt(
+                "file_search",
+                &json!({"action": "grep", "pattern": pattern, "path": "src"}),
+                "Found 3 match(es) for 'x' under src:\nsrc/a.rs:\n  src/a.rs:4:foo\nsrc/b.rs:\n  src/b.rs:9:foo",
+                false,
+                None,
+            )
+        };
+        let (a, b) = (grep("alpha"), grep("beta"));
+        assert_ne!(a, b, "receipts for different patterns must differ");
+        assert!(a.contains("'alpha'") && a.contains("3 matches"), "{a}");
+        assert!(a.contains("src/a.rs") && a.contains("src/b.rs"), "{a}");
+        let none = render_receipt(
+            "file_search",
+            &json!({"action": "grep", "pattern": "zzz", "path": "."}),
+            "No matches found for 'zzz' under .",
+            false,
+            None,
+        );
+        assert!(none.contains("no matches"), "{none}");
+        let cut = render_receipt(
+            "file_search",
+            &json!({"action": "glob", "pattern": "*.rs", "path": "."}),
+            "Found 50 file(s) matching '*.rs' under .:\na.rs\nb.rs\n\n[Results truncated at 50: more files match.]",
+            false,
+            None,
+        );
+        assert!(cut.contains("50 files") && cut.contains("+truncated"), "{cut}");
     }
 
     #[test]

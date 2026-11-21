@@ -28,9 +28,9 @@ reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], defau
 # ZIP extraction for Chrome for Testing downloads.
 zip = { version = "2", default-features = false, features = ["deflate"] }
 
-# Vendored at v0.8.74 (upstream robotz-browser pins v0.8.68); the Tool trait is
+# Vendored at v0.8.75 (upstream robotz-browser pins v0.8.68); the Tool trait is
 # compatible and the workspace patch below resolves both to this source.
-piscis-kernel = { git = "https://github.com/njbinbin-piscis/piscis-engine.git", package = "piscis-kernel", rev = "v0.8.74", optional = true }
+piscis-kernel = { git = "https://github.com/njbinbin-piscis/piscis-engine.git", package = "piscis-kernel", rev = "v0.8.75", optional = true }
 
 [features]
 default = []

@@ -7,6 +7,8 @@ use std::borrow::Cow;
 
 const MAX_TEXT_BYTES: u64 = 256 * 1024; // 256 KB
 const MAX_IMAGE_BYTES: u64 = 4 * 1024 * 1024; // 4 MB
+/// Lines returned from a file over `MAX_TEXT_BYTES` when no `limit` was given.
+const MAX_LINES_WITHOUT_LIMIT: usize = 400;
 
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 const UTF16_LE_BOM: &[u8] = &[0xFF, 0xFE];
@@ -314,8 +316,26 @@ impl Tool for FileReadTool {
 
         let lines: Vec<&str> = content.lines().collect();
         let total = lines.len();
+        if offset > total.max(1) {
+            // Previously rendered as "showing lines N+1-N" with an empty body, which
+            // reads like a glitch and invites a retry at a slightly different offset.
+            return Ok(ToolResult::err(format!(
+                "offset {} is past the end of {} ({} lines total). The file has no content from that line; read an earlier range, e.g. offset=1 limit=200.",
+                offset,
+                display_path_for_tool(&path, &ctx.workspace_root),
+                total
+            )));
+        }
         let start = (offset - 1).min(total);
-        let end = match limit {
+        // A big file read from the middle without a limit used to return everything
+        // after `offset` (the outline path above only covers offset 1). Cap it and
+        // hand back the next offset instead of flooding the context.
+        let capped_len = if limit.is_none() && metadata.len() > MAX_TEXT_BYTES {
+            Some(MAX_LINES_WITHOUT_LIMIT)
+        } else {
+            limit
+        };
+        let end = match capped_len {
             Some(l) => (start + l).min(total),
             None => total,
         };
@@ -333,7 +353,7 @@ impl Tool for FileReadTool {
                 "file_read path={} offset={} limit={}",
                 path_str,
                 end + 1,
-                limit.unwrap_or(200)
+                capped_len.unwrap_or(200)
             ));
         }
 
@@ -360,5 +380,56 @@ impl Tool for FileReadTool {
         } else {
             Ok(ToolResult::ok(body))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::agent::tool::ToolSettings;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    fn ctx(root: &std::path::Path) -> ToolContext {
+        ToolContext {
+            session_id: "file-read".into(),
+            workspace_root: root.to_path_buf(),
+            bypass_permissions: false,
+            settings: Arc::new(ToolSettings::default()),
+            max_iterations: None,
+            memory_owner_id: "test".into(),
+            pool_session_id: None,
+            tool_use_id: None,
+            cancel: Arc::new(AtomicBool::new(false)),
+            loop_halt: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn offset_past_end_is_an_explicit_error_not_an_empty_range() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+        let result = FileReadTool
+            .call(json!({ "path": "a.txt", "offset": 50 }), &ctx(dir.path()))
+            .await
+            .unwrap();
+        assert!(result.is_error, "{}", result.content);
+        assert!(result.content.contains("past the end"), "{}", result.content);
+        assert!(result.content.contains("2 lines total"), "{}", result.content);
+    }
+
+    #[tokio::test]
+    async fn big_file_read_from_the_middle_without_limit_is_capped_with_a_next_offset() {
+        let dir = tempfile::tempdir().unwrap();
+        let body: String = (1..=20_000).map(|i| format!("line {i} padding padding padding\n")).collect();
+        assert!(body.len() as u64 > MAX_TEXT_BYTES);
+        std::fs::write(dir.path().join("big.txt"), body).unwrap();
+        let result = FileReadTool
+            .call(json!({ "path": "big.txt", "offset": 101 }), &ctx(dir.path()))
+            .await
+            .unwrap();
+        assert!(!result.is_error, "{}", result.content);
+        assert!(result.content.contains("showing lines 101-500"), "{}", result.content);
+        assert!(!result.content.contains("line 501 "), "{}", result.content);
     }
 }
