@@ -6,7 +6,7 @@
 
 状态：**1.0.0 工程基线已关闭（2026-10-19）**——所有宿主侧工程、WorkZ ↔ CodeZ 交接、脏缓冲区冲突保护、按轮撤销、旁路 token 计量、机密清理以及打包/E2E 闸门均已在 `1.0.0` 中解决并验证（见 `docs/upgrade/release-decision-1.0.0.md` 和 `docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md`）。外部硬件/证书事项在 `ADR-006` 下跟踪。下方的历史记录保留以供工程溯源。
 
-负责人：Piscis。创建：2026-09-29。更新：2026-11-19。
+负责人：Piscis。创建：2026-09-29。更新：2026-11-21。
 
 ## 状态索引（2026-11-02 针对 1.0.40 重新核实）
 
@@ -39,6 +39,7 @@
 | 34 | `memory_store search` 因近义词不匹配漏检（"提交方式" vs "推送方式"） | **待修**（2026-11-19）。关键词搜索是字面匹配；一词之差返回空，agent 便按习惯行事（导致裸 `git push origin main` 挂起）。笔记已补别名关键词，但检索本身仍是精确匹配 | memory store 搜索实现；笔记 `c1d28514` 别名 |
 | 35 | `git stash drop` 即使已验证内容为空也被安全策略拒绝 | **已修复**（2026-11-20）。stash drop/clear 现在有专门的"先检查后确认"警告（`git stash list` + `git stash show -p <stash>`），无人确认时的拒绝消息也附带该指引，不再是裸的"no one is available to confirm"。确认仍是强制的——没有自动放行逃生通道 | `vendor/piscis-engine/piscis-kernel/src/policy/gate.rs`（`STASH_DELETE_PATTERN`）、`src/agent/loop_.rs`（拒绝原因） |
 | 36 | 内置浏览器：页面自关（`window.close`）后报 "set viewport failed" | **已修复**（2026-11-19；live 回归测试红→绿）。robotz 缓存了已死的 Page 句柄；`url()` 读帧缓存仍 Ok，失效句柄直达 CDP，后续所有动作失败 | `vendor/robotz/crates/robotz-browser/src/manager.rs`（`get_or_create_page` 存活探测） |
+| 37 | 循环检测器 Warning 阶段拦不住"认错但继续重复"的循环 | **待修**（2026-11-21，会话内实测）。同一 `code_run`/`file_search` 调用重复 10+ 次；每次软性 `[系统提醒]` 都被口头承认，下一轮又发起相同调用。Warning 只注入文本且照常执行工具，直到 Critical 才有硬切换约束 | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`（`detect` 的 Warning 分支、`warning_reminder` 注入） |
 
 Windows 打包目标：见 README。已验证的产物是 `.github/workflows/release.yml` 上传的 NSIS `.exe` 文件。
 
@@ -728,3 +729,17 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 **验证。** 新增 live 测试 `set_viewport_with_stale_current_tab_live`（需本机 Chromium，`--ignored`）：开第二个标签，在 Chromium 内部用 `page.close()` 关掉它（与 `window.close` 完全等效），断言会话仍记得死标签，然后要求 `set_viewport` 成功、下一次 navigate 落在请求的尺寸上。修复前失败（"set viewport failed"），修复后通过。另加 `set_viewport_after_tab_switch_and_popup_live` 覆盖切换标签/popup 收养/关闭自有标签后的 resize。browser 模块 6 项单测 + 5 项 live 测试全过（live 测试需 `--test-threads=1`；并行启动 Chromium 会争用共享 profile 目录——既有问题，与本修复无关）。`cargo clippy --workspace --all-targets -- -D warnings` 干净；robotz-browser 测试 8/8。**尚未完成：** 在运行中的应用里用会调 `window.close` 的网站手工确认。
 
 **关联。** #27（popup 收养）引入的收养路径也可能让会话指向一个随后被页面关闭的 target；本修复同样覆盖。#31（busy 锁拒绝）是同一子系统的另一处摩擦。
+
+## 37. 循环检测器 Warning 阶段拦不住"认错但继续重复"的循环
+
+**状态（2026-11-21）。** **待修。** 会话内同步 `piscis-engine` 上游时实测：agent 把*同一条* `python -c` 读 `output.rs` / `file_journal.rs` 第 198/281 行的调用发了十多次，同样的 `file_search` grep 也反复发起，即便循环检测器已经报警。每一轮 agent 都写一段道歉文本（"我又掉进了同一个坑…我停下来"），下一轮却又发起几乎相同的调用。检测器忠实地计数、警告、升级、最终阻断——但浪费了很多轮之后才到顶。
+
+**根因（已在源码核实）。** 逐工具循环检测器（`vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`）有两档严重度：
+- `LoopLevel::Warning`（如 `code_run` 同输入同结果 ≥4，`loop_.rs:880-890`；同参连续 ≥2，`loop_.rs:897-911`）**只把消息 push 进 `warning_messages`，工具照常执行**（`loop_.rs:4924-4930`）。注入的 `[系统提醒] … 请先基于现有结果收束、总结或切换方法`（`loop_.rs:5152-5156`）是劝导文本，不是约束。
+- `LoopLevel::Critical`（同结果 ≥8，`loop_.rs:869-879`；或同一 Warning 被忽略 >3 次，`loop_.rs:662-678`）才是真正阻断调用的档位（`loop_.rs:4916-4923`，合成错误见 `loop_.rs:5038-5050`）。
+
+于是从第一次 Warning 到最终 Critical 阻断之间有一段很宽的窗口，工具一直在跑。这套设计假设模型会理性响应软提醒；但陷入重复循环的模型恰恰处于非理性状态——它把警告*读成*需要回应的一段文本（道歉+总结），而不是必须遵守的行为边界（换方法）。agent 自身上下文又强化了这一点：挂着的 `in_progress` 待办加上"继续、不要停"的压力，让低成本的重复读文件显得像在推进，而真正的进展（改一行代码、跑一条不同的命令、向用户确认）被一再推迟。
+
+**影响。** 每次事件浪费数十轮冗余工具调用；用户可见的卡顿；检测器的升级阶梯被一种它根本打断不了的行为消耗到顶。这与 M3（只读探索螺旋）不同：M3 是过度读取的习惯；#37 是让一个*已被承认*的重复仍能继续执行的产品缺口。
+
+**期望行为 / 修复方向（未实现）。** 一旦对某个调用 hash 发过 Warning，而下一轮又发起相同 hash，就把该轮降级为硬约束而非重跑工具：例如只允许文本回复或*不同的*工具/参数，立即拒绝相同调用（而不是等 >3 次忽略警告之后）。让注入的提醒成为强制闸门，而非建议。可选地把重复次数暴露给用户以便更早介入。按用户要求记录；本会话刻意不修（用户已切换 agent）。

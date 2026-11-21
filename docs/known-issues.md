@@ -4,7 +4,7 @@
 
 Status: **1.0.0 Engineering Baseline Closed (2026-10-19)** — All host-side engineering, WorkZ ↔ CodeZ handoff, dirty buffer conflict protection, per-turn undo, side-channel token accounting, secret scrubbing, and bundle/E2E gates are resolved and verified in `1.0.0` (see `docs/upgrade/release-decision-1.0.0.md` and `docs/upgrade/adr/ADR-006-1.0-engineering-and-ux-baseline.md`). External hardware/certificate items are tracked under `ADR-006`. Historical notes below are retained for engineering provenance.
 
-Owner: Piscis. Created: 2026-09-29. Updated: 2026-11-19.
+Owner: Piscis. Created: 2026-09-29. Updated: 2026-11-21.
 
 ## Status index (re-verified 2026-11-02 against 1.0.40)
 
@@ -46,6 +46,7 @@ issue here does not change that matrix.
 | 34 | `memory_store search` misses notes on synonym mismatch ("提交方式" vs "推送方式") | **Open** (2026-11-19). Keyword search is literal; a near-miss query returns nothing and the agent proceeds without the stored procedure (caused a hung `git push origin main`). Notes now carry alias keywords, but retrieval itself is still exact-match | memory store search implementation; note `c1d28514` aliases |
 | 35 | `git stash drop` refused by safety policy even for verified-empty noise | **Fixed** (2026-11-20). Stash drop/clear now gets a specific inspect-then-confirm warning (`git stash list` + `git stash show -p <stash>`), and the headless refusal carries that guidance instead of a bare "no one is available to confirm". Confirmation is still mandatory — no auto-approve escape hatch | `vendor/piscis-engine/piscis-kernel/src/policy/gate.rs` (`STASH_DELETE_PATTERN`), `src/agent/loop_.rs` (refusal reason) |
 | 36 | Embedded browser: "set viewport failed" after a page closes itself (`window.close`) | **Fixed** (2026-11-19; live regression test red→green). robotz cached the dead Page handle; `url()` reads the frame cache and stayed Ok, so the stale handle reached CDP and every later action failed | `vendor/robotz/crates/robotz-browser/src/manager.rs` (`get_or_create_page` liveness probe) |
+| 37 | Loop detector Warning phase does not stop "acknowledge-but-repeat" cycles | **Open** (2026-11-21, observed in-session). Same `code_run`/`file_search` call repeated 10+ times; each soft `[系统提醒]` was verbally acknowledged, then the identical call re-issued. Warning only injects text and still executes the tool; no hard switch constraint until Critical | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs` (`detect` Warning arm, `warning_reminder` injection) |
 
 Windows packaging target: see the README. Verified outputs are the NSIS `.exe`
 files uploaded by `.github/workflows/release.yml`.
@@ -1124,3 +1125,17 @@ These caused wasted calls in the same session but are agent-side habits, listed 
 **Verification.** New live test `set_viewport_with_stale_current_tab_live` (requires local Chromium, `--ignored`): opens a second tab, closes it via `page.close()` inside Chromium (exactly what `window.close` does), asserts the session still remembers the dead tab, then requires `set_viewport` to succeed and the next navigate to land at the requested size. Failed before the fix ("set viewport failed"), passes after. Also added `set_viewport_after_tab_switch_and_popup_live` covering resize across tab switch / popup adoption / owned-tab close. All 6 browser unit tests + 5 live tests pass (live tests need `--test-threads=1`; parallel Chromium launches contend on the shared profile dir — pre-existing, unrelated). `cargo clippy --workspace --all-targets -- -D warnings` clean; robotz-browser tests 8/8. **Not done yet:** hand-check in the running app on a site that calls `window.close`.
 
 **Related.** #27 (popup adoption) introduced the adopted-popup path that can also leave a session pointing at a target the page later closes; this fix covers that case too. #31 (busy-gate lockouts) is a separate friction on the same subsystem.
+
+## 37. Loop detector Warning phase does not stop "acknowledge-but-repeat" cycles
+
+**Status (2026-11-21).** **Open.** Observed in-session while syncing `piscis-engine` upstream: the agent issued the *same* `python -c` read of `output.rs` / `file_journal.rs` line 198/281 more than ten times, and the same `file_search` grep repeatedly, even after the loop detector fired. Each round the agent wrote a text apology ("我又掉进了同一个坑…我停下来"), then on the next turn re-issued a near-identical call. The detector counted, warned, escalated, and finally blocked — but only after many wasted rounds.
+
+**Cause (verified in source).** The per-tool loop detector (`vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`) has two severities:
+- `LoopLevel::Warning` (e.g. `code_run` same input+outcome ≥4, `loop_.rs:880-890`; identical-args streak ≥2, `loop_.rs:897-911`) **only pushes a message into `warning_messages` and still executes the tool** (`loop_.rs:4924-4930`). The injected `[系统提醒] … 请先基于现有结果收束、总结或切换方法` (`loop_.rs:5152-5156`) is advisory text, not a constraint.
+- `LoopLevel::Critical` (same outcome ≥8, `loop_.rs:869-879`; or a Warning ignored >3 times, `loop_.rs:662-678`) is the only level that actually blocks the call (`loop_.rs:4916-4923`, synthetic error at `loop_.rs:5038-5050`).
+
+So between the first Warning and the eventual Critical block there is a wide window where the tool keeps running. The design assumes the model will rationally respond to a soft nudge; but a model stuck in a repetition loop is precisely in a non-rational state — it *reads* the warning as text to answer (apologize + summarize) rather than as a boundary to obey (change method). The agent's own context reinforced this: open `in_progress` todos plus "continue, don't stop" pressure made low-cost repeated reads feel like progress, while the real advance (edit a line, run a different command, ask the user) was deferred.
+
+**Impact.** Dozens of redundant tool rounds per incident; user-visible stalls; the detector's escalation ladder is consumed by a behavior it cannot actually interrupt until the top rung. This is distinct from M3 (read-only exploration spirals): M3 is the habit of over-reading; #37 is the product gap that lets an *acknowledged* repetition keep executing.
+
+**Expected behavior / fix direction (not implemented).** Once a Warning has been issued for a given call hash and the next turn re-issues the same hash, downgrade the turn to a hard constraint instead of re-running the tool: e.g. allow only a text reply or a *different* tool/arguments, and reject the identical call immediately (not after >3 ignored warnings). Make the injected reminder an enforced gate, not advice. Optionally surface the repetition count to the user so they can intervene earlier. Recorded per user request; deliberately left unfixed in this session (user switched agents).
