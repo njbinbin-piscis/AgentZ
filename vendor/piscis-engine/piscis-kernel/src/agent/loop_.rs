@@ -5560,9 +5560,16 @@ fn read_only_streak_reminder(streak: usize, user_request: &str) -> String {
             truncate_chars(request, PINNED_REQUEST_MAX_CHARS)
         )
     };
+    // The first nudge leaves room to keep exploring; later ones demand an action.
+    // Never phrased as a question for the user: the task is already assigned.
+    let action = if streak <= super::read_guard::READ_ONLY_STREAK_REMINDER_EVERY {
+        "如果已读到的内容足以完成请求，现在就开始动手或直接回答；如果还缺信息，只读取尚未读过的、具体的那一处。"
+    } else {
+        "继续只读不会带来新进展。本轮必须做且只做其中之一：1）把已有认识写成可运行的初稿（脚本、补丁、文件）并运行它，用真实结果决定下一步；2）更新计划并开始执行第一项；3）直接基于已读内容给出结论。不要向用户提问，任务已经交给你了。"
+    };
     format!(
-        "[系统提醒]\n已连续进行 {} 次只读调用，期间没有写入文件，也没有更新计划。{}\n请判断已读到的内容是否足以完成请求：足够就开始动手或直接回答；不够就说明还缺什么，只读取尚未读过的内容。",
-        streak, restated
+        "[系统提醒]\n已连续进行 {} 次只读调用，期间没有写入文件，也没有更新计划。{}\n{}",
+        streak, restated, action
     )
 }
 

@@ -27,3 +27,5 @@ AZ-077 macOS Keychain and AZ-078 Linux Secret Service are subsequent platform ad
 
 2026-11-22 (AgentZ 1.0.74): the pin advanced to tag `v0.8.76` (piscis-engine commit `5281fc6280432ceaff14e7e097d1cf5308e3722c`). Added since `v0.8.75`: removal of the read-only streak hard pause, `strip_resolved_turn_noise`, `ToolResult::usage_err`/`correctable_err` with `file_search`/`file_read`/`file_edit` call errors, and `tool_stats`. The kernel files in this directory match the tag except the AgentZ-only overlays listed in earlier entries.
 
+2026-11-22 (AgentZ 1.0.75): the pin advanced to tag `v0.8.77` (piscis-engine commit `efb4adcd73d3c1f05ba0c782d97105b6dce28bd6`). Added since `v0.8.76`: `file_search` grep file-path fallback and the repeating, escalating read-only reminders (`agent/{loop_,read_guard}.rs`, `tools/file_search.rs`).
+

@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.75] - 2026-11-22
+
+### Fixed
+
+- **`file_search` grep with a file as `path` no longer fails.** The agent repeatedly passed a file path to a directory-only search and burned rounds on the error. Grep now searches that file directly (parent directory with `include` = its name) and says so in the result; glob still reports the error with usage help.
+
+### Changed
+
+- **Read-only streak reminders repeat and escalate.** Previously only the 25th and 50th consecutive read-only call drew a reminder, phrased as an open question the agent could acknowledge and ignore (or turn into a question to the user). Now a reminder comes every 25 calls: the first leaves room to keep exploring, later ones require one concrete action (run a draft, update the plan, or conclude) and tell the agent not to ask the user. Still advisory; nothing is blocked.
+- **Kernel pin advanced to piscis-engine v0.8.77.**
 ## [1.0.74] - 2026-11-22
 
 ### Fixed

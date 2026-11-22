@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "agentz-desktop"
-version = "1.0.74"
+version = "1.0.75"
 dependencies = [
  "aes",
  "agentz-task-state",
@@ -2590,7 +2590,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.61.2",
 ]
 
 [[package]]

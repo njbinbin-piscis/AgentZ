@@ -172,7 +172,7 @@ impl Tool for FileSearchTool {
             None => return Ok(ToolResult::usage_err("Missing required parameter: pattern", FILE_SEARCH_HELP)),
         };
 
-        let root = if let Some(p) = input["path"].as_str() {
+        let mut root = if let Some(p) = input["path"].as_str() {
             if std::path::Path::new(p).is_absolute() {
                 PathBuf::from(p)
             } else {
@@ -196,6 +196,21 @@ impl Tool for FileSearchTool {
                 "Path does not exist: {}",
                 root.display()
             )));
+        }
+        // A file passed as `path` is a common slip. For grep, do what was meant:
+        // search that one file (parent directory + include = its name).
+        let mut file_note: Option<String> = None;
+        let mut include_override: Option<String> = None;
+        if action == "grep" && root.is_file() {
+            if let (Some(parent), Some(name)) = (root.parent(), root.file_name()) {
+                file_note = Some(format!(
+                    "[path was a file; searched only {} (path must be a directory, so the parent was searched with include={}).]\n",
+                    display_path_for_tool(&root, &ctx.workspace_root),
+                    name.to_string_lossy()
+                ));
+                include_override = Some(name.to_string_lossy().into_owned());
+                root = parent.to_path_buf();
+            }
         }
         if !root.is_dir() {
             let shown = display_path_for_tool(&root, &ctx.workspace_root);
@@ -231,7 +246,7 @@ impl Tool for FileSearchTool {
             ctx.workspace_root.clone()
         };
 
-        match action {
+        let result = match action {
             "glob" => self.do_glob(
                 pattern,
                 &root,
@@ -242,7 +257,7 @@ impl Tool for FileSearchTool {
                 include_ignored,
             ),
             "grep" => {
-                let include = input["include"].as_str();
+                let include = include_override.as_deref().or(input["include"].as_str());
                 let case_sensitive = input["case_sensitive"].as_bool().unwrap_or(false);
                 let context_lines = input["context_lines"].as_u64().unwrap_or(0) as usize;
                 self.do_grep(
@@ -259,6 +274,13 @@ impl Tool for FileSearchTool {
                 )
             }
             _ => Ok(ToolResult::usage_err(format!("Unknown action: {}", action), FILE_SEARCH_HELP)),
+        };
+        match (result, file_note) {
+            (Ok(mut res), Some(note)) if !res.is_error => {
+                res.content = format!("{note}{}", res.content);
+                Ok(res)
+            }
+            (result, _) => result,
         }
     }
 }
@@ -783,7 +805,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_path_is_an_error_not_no_matches() {
+    async fn glob_with_a_file_path_is_an_error_not_no_matches() {
         use crate::agent::tool::{Tool, ToolContext, ToolSettings};
         use std::sync::atomic::AtomicBool;
         use std::sync::Arc;
@@ -807,7 +829,7 @@ mod tests {
         };
         let file_path = file.to_string_lossy().to_string();
         let tool = FileSearchTool;
-        for (action, pattern) in [("grep", "needle"), ("glob", "*.md")] {
+        for (action, pattern) in [("glob", "*.md")] {
             let result = tool
                 .call(
                     json!({ "action": action, "pattern": pattern, "path": file_path }),
@@ -1011,5 +1033,23 @@ mod tests {
         assert!(missing.is_error);
         assert!(!crate::agent::message_utils::is_correctable_failure(&missing.content));
         assert!(FileSearchTool.description_minimal().len() < FileSearchTool.description().len() / 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// A file passed as `path` to grep is searched directly instead of failing.
+    #[tokio::test]
+    async fn grep_with_a_file_path_searches_that_file() {
+        let root = std::env::temp_dir().join(format!("file-search-fp-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("a.txt"), "needle here\n").unwrap();
+        std::fs::write(root.join("b.txt"), "needle there\n").unwrap();
+        let ctx = search_ctx(&root);
+        let res = FileSearchTool
+            .call(json!({"action": "grep", "pattern": "needle", "path": "a.txt"}), &ctx)
+            .await
+            .unwrap();
+        assert!(!res.is_error, "{}", res.content);
+        assert!(res.content.contains("path was a file"), "{}", res.content);
+        assert!(res.content.contains("a.txt") && !res.content.contains("b.txt:"), "{}", res.content);
         let _ = std::fs::remove_dir_all(&root);
     }}

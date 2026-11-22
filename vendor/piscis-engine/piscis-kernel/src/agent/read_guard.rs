@@ -24,7 +24,7 @@ pub(crate) const REREAD_WARN_AT: usize = 3;
 /// The re-read of unchanged content that is refused.
 pub(crate) const REREAD_BLOCK_AT: usize = 6;
 /// Consecutive read-only calls after which the user request is restated.
-pub(crate) const READ_ONLY_STREAK_REMINDERS: [usize; 2] = [25, 50];
+pub(crate) const READ_ONLY_STREAK_REMINDER_EVERY: usize = 25;
 /// How many of the latest reads are considered when deciding to pause.
 pub(crate) const RECENT_READ_WINDOW: usize = 40;
 
@@ -269,7 +269,7 @@ impl ReadGuard {
 
     /// `Some(n)` once, when the run of read-only calls reaches a reminder mark.
     pub(crate) fn take_streak_reminder(&mut self) -> Option<usize> {
-        let mark = *READ_ONLY_STREAK_REMINDERS.get(self.reminded)?;
+        let mark = READ_ONLY_STREAK_REMINDER_EVERY * (self.reminded + 1);
         if self.read_only_streak < mark {
             return None;
         }
@@ -411,7 +411,8 @@ mod tests {
                 reminders.push((call, mark));
             }
         }
-        assert_eq!(reminders, vec![(25, 25), (50, 50)]);
+        let expected: Vec<(usize, usize)> = (1..=8).map(|n| (n * 25, n * 25)).collect();
+        assert_eq!(reminders, expected);
     }
 
     #[test]
