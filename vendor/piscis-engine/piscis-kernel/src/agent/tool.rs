@@ -164,6 +164,12 @@ pub struct ToolResult {
     pub meta: Option<crate::tools::output::ToolMeta>,
 }
 
+/// Markers carried in a failed result's text so that the correctable-failure
+/// classification survives persistence and hydration.
+pub const USAGE_HELP_OPEN: &str = "[usage_help]";
+pub const USAGE_HELP_CLOSE: &str = "[/usage_help]";
+pub const CORRECTABLE_MARKER: &str = "[correctable]";
+
 impl ToolResult {
     pub fn ok(content: impl Into<String>) -> Self {
         Self {
@@ -188,6 +194,30 @@ impl ToolResult {
             image: None,
             meta: None,
         }
+    }
+    /// A call the caller got wrong (bad or missing parameters, wrong usage).
+    /// `help` is the detailed guidance kept out of the always-sent minimal
+    /// tool description; it travels only in this failed result. Once the same
+    /// tool later succeeds, the failed round is dropped from the request view
+    /// (see `message_utils::is_correctable_failure`). Environment failures
+    /// (missing file, permission, network) use [`ToolResult::err`] instead.
+    pub fn usage_err(content: impl Into<String>, help: &str) -> Self {
+        let mut text: String = content.into();
+        text.push('\n');
+        text.push_str(USAGE_HELP_OPEN);
+        text.push('\n');
+        text.push_str(help.trim());
+        text.push('\n');
+        text.push_str(USAGE_HELP_CLOSE);
+        Self::err(text)
+    }
+    /// Like [`ToolResult::usage_err`] when the message already says how to
+    /// fix the call and no extra help is needed.
+    pub fn correctable_err(content: impl Into<String>) -> Self {
+        let mut text: String = content.into();
+        text.push('\n');
+        text.push_str(CORRECTABLE_MARKER);
+        Self::err(text)
     }
     pub fn with_image(mut self, image: ImageData) -> Self {
         self.image = Some(image);

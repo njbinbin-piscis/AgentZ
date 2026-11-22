@@ -59,6 +59,16 @@ pub fn is_excluded_search_directory(name: &str) -> bool {
         .any(|excluded| excluded.eq_ignore_ascii_case(name))
 }
 
+/// Detailed usage kept out of the always-sent minimal description; returned
+/// only with a call-shape error.
+const FILE_SEARCH_HELP: &str = "file_search usage:\n\
+- action=glob: find files by NAME. pattern supports * (within a name), ** (any path segments), ? (one char). Examples: '*.rs', '**/*.json', 'config*'.\n\
+- action=grep: search file CONTENTS by regex; returns file:line matches. Filter with include='*.rs' or file_extensions=['rs'].\n\
+- Regex engine: classes, alternation, anchors, groups. NO look-around ((?=...) (?!...) (?<=...) (?<!...)) and NO backreferences. 'assignment, not comparison' = `=[^=]`.\n\
+- path must be a DIRECTORY (default: workspace root). To search one file, pass its parent directory and set include to the file name, or use file_read.\n\
+- Examples: {action:glob, pattern:'**/*.py', path:'src'}; {action:grep, pattern:'TBRuntime', path:'.'}; {action:grep, pattern:'password', include:'*.ini', path:'src'}.\n\
+- Other options: max_results (50, max 500), max_depth (10), case_sensitive, context_lines, include_ignored.";
+
 pub struct FileSearchTool;
 
 #[async_trait]
@@ -87,6 +97,14 @@ impl Tool for FileSearchTool {
          - Find a string: action=grep, pattern=TBRuntime, path=. \
          - Limit by name: action=grep, pattern=password, include=*.ini, path=src \
          Absolute directories must still be inside the authorized workspace (Windows C:\\MyProject, Linux and macOS /home/me/proj)."
+    }
+
+    fn description_minimal(&self) -> std::borrow::Cow<'_, str> {
+        std::borrow::Cow::Borrowed(
+            "Search inside a directory (path must be a directory, default workspace root). \
+             action=glob: find files by name pattern. action=grep: regex search of file contents \
+             (no look-around/backreferences); filter with include. Detailed usage is returned if a call is malformed.",
+        )
     }
 
     fn input_schema(&self) -> Value {
@@ -147,11 +165,11 @@ impl Tool for FileSearchTool {
     async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult> {
         let action = match input["action"].as_str() {
             Some(a) => a,
-            None => return Ok(ToolResult::err("Missing required parameter: action")),
+            None => return Ok(ToolResult::usage_err("Missing required parameter: action", FILE_SEARCH_HELP)),
         };
         let pattern = match input["pattern"].as_str() {
             Some(p) => p,
-            None => return Ok(ToolResult::err("Missing required parameter: pattern")),
+            None => return Ok(ToolResult::usage_err("Missing required parameter: pattern", FILE_SEARCH_HELP)),
         };
 
         let root = if let Some(p) = input["path"].as_str() {
@@ -181,9 +199,10 @@ impl Tool for FileSearchTool {
         }
         if !root.is_dir() {
             let shown = display_path_for_tool(&root, &ctx.workspace_root);
-            return Ok(ToolResult::err(format!(
-                "Path is not a directory: {shown}. path must be a directory. To search this file, pass its parent directory and set include to the file name, or use file_read."
-            )));
+            return Ok(ToolResult::usage_err(
+                format!("Path is not a directory: {shown}."),
+                FILE_SEARCH_HELP,
+            ));
         }
 
         let max_results = (input["max_results"].as_u64().unwrap_or(50) as usize).min(MAX_RESULTS);
@@ -239,7 +258,7 @@ impl Tool for FileSearchTool {
                     include_ignored,
                 )
             }
-            _ => Ok(ToolResult::err(format!("Unknown action: {}", action))),
+            _ => Ok(ToolResult::usage_err(format!("Unknown action: {}", action), FILE_SEARCH_HELP)),
         }
     }
 }
@@ -260,10 +279,10 @@ impl FileSearchTool {
         let re = match regex::Regex::new(&regex_pat) {
             Ok(r) => r,
             Err(e) => {
-                return Ok(ToolResult::err(format!(
-                    "Invalid glob pattern '{}': {}",
-                    pattern, e
-                )))
+                return Ok(ToolResult::usage_err(
+                    format!("Invalid glob pattern '{}': {}", pattern, e),
+                    FILE_SEARCH_HELP,
+                ))
             }
         };
 
@@ -350,12 +369,15 @@ impl FileSearchTool {
             match regex::Regex::new(&pat) {
                 Ok(r) => r,
                 Err(e) => {
-                    return Ok(ToolResult::err(format!(
-                        "Invalid regex '{}': {}{}",
-                        pattern,
-                        e,
-                        regex_rewrite_hint(&e.to_string())
-                    )))
+                    return Ok(ToolResult::usage_err(
+                        format!(
+                            "Invalid regex '{}': {}{}",
+                            pattern,
+                            e,
+                            regex_rewrite_hint(&e.to_string())
+                        ),
+                        FILE_SEARCH_HELP,
+                    ))
                 }
             }
         };
@@ -967,4 +989,27 @@ mod tests {
         assert!(none.content.contains("never tried"), "{}", none.content);
         let _ = std::fs::remove_dir_all(&root);
     }
-}
+
+    /// A malformed call carries the detailed usage (kept out of the minimal
+    /// description) and is classified correctable; an environment failure is not.
+    #[tokio::test]
+    async fn call_errors_carry_help_but_environment_errors_do_not() {
+        let root = std::env::temp_dir().join(format!("file-search-help-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let ctx = search_ctx(&root);
+        let bad = FileSearchTool
+            .call(json!({"action": "grep", "pattern": "(?=x)", "path": "."}), &ctx)
+            .await
+            .unwrap();
+        assert!(bad.is_error);
+        assert!(bad.content.contains("[usage_help]") && bad.content.contains("NO look-around"), "{}", bad.content);
+        assert!(crate::agent::message_utils::is_correctable_failure(&bad.content));
+        let missing = FileSearchTool
+            .call(json!({"action": "glob", "pattern": "*", "path": "nope"}), &ctx)
+            .await
+            .unwrap();
+        assert!(missing.is_error);
+        assert!(!crate::agent::message_utils::is_correctable_failure(&missing.content));
+        assert!(FileSearchTool.description_minimal().len() < FileSearchTool.description().len() / 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }}

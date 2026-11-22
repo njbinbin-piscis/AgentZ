@@ -179,7 +179,7 @@ impl Tool for FileReadTool {
     async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult> {
         let path_str = match input["path"].as_str() {
             Some(p) => p,
-            None => return Ok(ToolResult::err("Missing required parameter: path")),
+            None => return Ok(ToolResult::usage_err("Missing required parameter: path", "file_read usage: {path (required), offset (1-indexed start line), limit (max lines), mode: content|outline}. Relative paths resolve from the workspace root. Reads FILE content only; use file_list for directories. Non-UTF-8 files (GBK, UTF-16) are decoded for you and the header shows [encoding: ...]; file_write always writes UTF-8.")),
         };
 
         // Resolve path relative to workspace
@@ -319,7 +319,7 @@ impl Tool for FileReadTool {
         if offset > total.max(1) {
             // Previously rendered as "showing lines N+1-N" with an empty body, which
             // reads like a glitch and invites a retry at a slightly different offset.
-            return Ok(ToolResult::err(format!(
+            return Ok(ToolResult::correctable_err(format!(
                 "offset {} is past the end of {} ({} lines total). The file has no content from that line; read an earlier range, e.g. offset=1 limit=200.",
                 offset,
                 display_path_for_tool(&path, &ctx.workspace_root),

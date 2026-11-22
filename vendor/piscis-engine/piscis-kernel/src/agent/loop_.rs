@@ -5782,7 +5782,10 @@ fn decorate_tool_failure_for_agent(
     content: &str,
     is_error: bool,
 ) -> String {
-    if !is_error || content.contains("[ConstraintViolation]") {
+    if !is_error
+        || content.contains("[ConstraintViolation]")
+        || crate::agent::message_utils::is_correctable_failure(content)
+    {
         return content.to_string();
     }
 

@@ -86,9 +86,18 @@ fn has_real_user_turn_between(msgs: &[LlmMessage], start_idx: usize, end_idx: us
         .any(|(_, msg)| msg.role == "user" && !is_tool_result_carrier(msg))
 }
 
+/// True when the tool itself declared the failure a fixable call error
+/// (`ToolResult::usage_err` / `correctable_err`) or the host attached a
+/// schema-correction envelope. Environment failures never match.
+pub fn is_correctable_failure(content: &str) -> bool {
+    content.contains(crate::agent::tool::USAGE_HELP_OPEN)
+        || content.contains(crate::agent::tool::CORRECTABLE_MARKER)
+        || content.contains("[schema_correction tool=")
+}
+
 fn is_retryable_tool_failure(content: &str) -> bool {
     let lower = content.to_lowercase();
-    content.contains("[schema_correction tool=")
+    is_correctable_failure(content)
         || lower.contains("schema \u{4E0D}\u{5339}\u{914D}")
         || lower.contains("missing field")
         || lower.contains("missing required")
@@ -291,8 +300,9 @@ fn is_real_user_turn(msg: &LlmMessage) -> bool {
 }
 
 /// Once the user has moved on to a newer request, the earlier task's failure
-/// and loop-guard noise no longer helps: drop every errored tool exchange
-/// (failures, loop-detector and read-guard blocks, denials) and every
+/// and loop-guard noise no longer helps: drop every correctable failed tool
+/// exchange (bad-call errors with their help text), every loop-detector or
+/// read-guard block, and every
 /// `[系统提醒]` nudge that precedes the latest real user message. Successful
 /// tool history is untouched. Request view only; stored history is unchanged,
 /// and the current task keeps its own warnings so the model can change course.
@@ -306,11 +316,13 @@ pub fn strip_resolved_turn_noise(mut msgs: Vec<LlmMessage>) -> Vec<LlmMessage> {
             for block in blocks {
                 if let ContentBlock::ToolResult {
                     tool_use_id,
+                    content,
                     is_error: true,
-                    ..
                 } = block
                 {
-                    failed_ids.insert(tool_use_id.clone());
+                    if is_correctable_failure(content) || content.contains("[\u{5FAA}\u{73AF}\u{68C0}\u{6D4B}]") {
+                        failed_ids.insert(tool_use_id.clone());
+                    }
                 }
             }
         }
@@ -611,11 +623,13 @@ mod tests {
             role: "user".into(),
             content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                 tool_use_id: id.into(),
-                content: "x".into(),
+                content: if id.starts_with("bad") { format!("oops\n{}", crate::agent::tool::CORRECTABLE_MARKER) } else { "x".into() },
                 is_error,
             }]),
         };
         let msgs = vec![
+            LlmMessage { role: "assistant".into(), content: MessageContent::Blocks(vec![ContentBlock::ToolUse { id: "env1".into(), name: "file_read".into(), input: serde_json::json!({}) }]) },
+            LlmMessage { role: "user".into(), content: MessageContent::Blocks(vec![ContentBlock::ToolResult { tool_use_id: "env1".into(), content: "File not found".into(), is_error: true }]) },
             LlmMessage { role: "user".into(), content: MessageContent::text("task one") },
             use_msg("ok1"),
             res_msg("ok1", false),
@@ -630,8 +644,8 @@ mod tests {
             res_msg("bad2", true),
         ];
         let out = strip_resolved_turn_noise(msgs);
-        // task one, ok1 pair, task two, and the current turn's own failure stays.
-        assert_eq!(out.len(), 6);
+        // env failure kept; correctable failure and reminder dropped; current turn kept.
+        assert_eq!(out.len(), 8);
         assert!(out.iter().all(|m| !m.content.as_text().starts_with("[\u{7CFB}\u{7EDF}")));
         let ids: Vec<String> = out
             .iter()
@@ -646,7 +660,7 @@ mod tests {
                 _ => vec![],
             })
             .collect();
-        assert_eq!(ids, vec!["ok1".to_string(), "bad2".to_string()]);
+        assert_eq!(ids, vec!["env1".to_string(), "ok1".to_string(), "bad2".to_string()]);
     }
     #[test]
     fn strip_ephemeral_removes_wait_exchange() {

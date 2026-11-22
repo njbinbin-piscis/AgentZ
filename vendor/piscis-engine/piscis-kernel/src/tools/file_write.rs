@@ -372,6 +372,14 @@ mod file_write_size_limit_tests {
     }
 }
 
+/// Detailed usage kept out of the always-sent minimal description; returned
+/// only with a call-shape error.
+const FILE_EDIT_HELP: &str = "file_edit usage:\n\
+- Single edit: {path, old_string, new_string} replaces ONE exact occurrence.\n\
+- Batch: {path, edits:[{old_string,new_string},...]} - every old_string must appear exactly once, all are validated first and applied atomically in one write. Prefer batch for several changes to one file.\n\
+- old_string must be non-empty, copied exactly (whitespace included) and unique; add surrounding lines to disambiguate.\n\
+- Only UTF-8 / UTF-8-BOM files (BOM preserved; .ps1/.psm1/.psd1 are written with a BOM). Do NOT edit GBK/GB18030 files (file_read shows [encoding: gbk]); on Windows edit those via PowerShell, elsewhere use a program that selects the encoding.";
+
 pub struct FileEditTool;
 
 #[async_trait]
@@ -469,7 +477,7 @@ impl Tool for FileEditTool {
     async fn call(&self, input: Value, ctx: &ToolContext) -> Result<ToolResult> {
         let path_str = match input["path"].as_str() {
             Some(p) => p,
-            None => return Ok(ToolResult::err("Missing required parameter: path")),
+            None => return Ok(ToolResult::usage_err("Missing required parameter: path", FILE_EDIT_HELP)),
         };
 
         let path = if std::path::Path::new(path_str).is_absolute() {
@@ -489,23 +497,23 @@ impl Tool for FileEditTool {
         // Build the list of (old, new) pairs from either mode
         let mut pairs: Vec<(String, String)> = if let Some(edits_arr) = input["edits"].as_array() {
             if edits_arr.is_empty() {
-                return Ok(ToolResult::err("edits array is empty"));
+                return Ok(ToolResult::usage_err("edits array is empty", FILE_EDIT_HELP));
             }
             let mut pairs = Vec::with_capacity(edits_arr.len());
             for (i, edit) in edits_arr.iter().enumerate() {
                 let old = match edit["old_string"].as_str() {
                     Some(s) if !s.is_empty() => s.to_string(),
                     Some(_) => {
-                        return Ok(ToolResult::err(format!(
-                            "edits[{}].old_string cannot be empty",
-                            i
-                        )))
+                        return Ok(ToolResult::usage_err(
+                            format!("edits[{}].old_string cannot be empty", i),
+                            FILE_EDIT_HELP,
+                        ))
                     }
-                    None => return Ok(ToolResult::err(format!("edits[{}] missing old_string", i))),
+                    None => return Ok(ToolResult::usage_err(format!("edits[{}] missing old_string", i), FILE_EDIT_HELP)),
                 };
                 let new = match edit["new_string"].as_str() {
                     Some(s) => s.to_string(),
-                    None => return Ok(ToolResult::err(format!("edits[{}] missing new_string", i))),
+                    None => return Ok(ToolResult::usage_err(format!("edits[{}] missing new_string", i), FILE_EDIT_HELP)),
                 };
                 pairs.push((old, new));
             }
@@ -514,18 +522,20 @@ impl Tool for FileEditTool {
             let old_str =
                 match input["old_string"].as_str() {
                     Some(s) if !s.is_empty() => s.to_string(),
-                    Some(_) => return Ok(ToolResult::err(
+                    Some(_) => return Ok(ToolResult::usage_err(
                         "old_string cannot be empty — provide the exact text you want to replace",
+                        FILE_EDIT_HELP,
                     )),
                     None => {
-                        return Ok(ToolResult::err(
+                        return Ok(ToolResult::usage_err(
                             "Missing required parameter: old_string (or use edits array)",
+                            FILE_EDIT_HELP,
                         ))
                     }
                 };
             let new_str = match input["new_string"].as_str() {
                 Some(s) => s.to_string(),
-                None => return Ok(ToolResult::err("Missing required parameter: new_string")),
+                None => return Ok(ToolResult::usage_err("Missing required parameter: new_string", FILE_EDIT_HELP)),
             };
             vec![(old_str, new_str)]
         };
@@ -570,7 +580,7 @@ impl Tool for FileEditTool {
                     format!("edits[{}].old_string", i)
                 };
                 let hint = find_closest_context_hint(&content, old);
-                return Ok(ToolResult::err(format_err(
+                return Ok(ToolResult::correctable_err(format_err(
                     ToolErrorCode::MatchNotFound,
                     &format!("{} not found in file: {}", label, display_path_for_tool(&path, &ctx.workspace_root)),
                     &hint,
@@ -592,7 +602,7 @@ impl Tool for FileEditTool {
                     "Matches found at line(s): {}. Include more surrounding lines in old_string to make it unique.",
                     line_list
                 );
-                return Ok(ToolResult::err(format_err(
+                return Ok(ToolResult::correctable_err(format_err(
                     ToolErrorCode::MatchAmbiguous,
                     &format!(
                         "{} appears {} times in file (must appear exactly once): {}",
@@ -608,7 +618,7 @@ impl Tool for FileEditTool {
         for i in 0..pairs.len() {
             for j in (i + 1)..pairs.len() {
                 if pairs[i].0 == pairs[j].0 {
-                    return Ok(ToolResult::err(format!(
+                    return Ok(ToolResult::correctable_err(format!(
                         "edits[{}] and edits[{}] have the same old_string — each must be unique",
                         i, j
                     )));
