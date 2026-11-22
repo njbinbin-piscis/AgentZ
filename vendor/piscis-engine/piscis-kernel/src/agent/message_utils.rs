@@ -275,6 +275,67 @@ pub fn strip_ephemeral_tool_exchanges(mut msgs: Vec<LlmMessage>) -> Vec<LlmMessa
     msgs
 }
 
+/// `[系统提醒]` messages are host-injected nudges (loop warnings, read-only
+/// streak reminders). They are stored as plain user text but are not user turns.
+pub fn is_system_reminder_text(text: &str) -> bool {
+    text.trim_start().starts_with("[\u{7CFB}\u{7EDF}\u{63D0}\u{793A}]")
+}
+
+fn is_real_user_turn(msg: &LlmMessage) -> bool {
+    msg.role == "user"
+        && matches!(&msg.content, MessageContent::Text(t)
+            if !t.trim().is_empty()
+                && !is_system_reminder_text(t)
+                && !t.starts_with("[\u{4F1A}\u{8BDD}\u{6EDA}\u{52A8}\u{6458}\u{8981}]")
+                && !t.starts_with("[\u{5BF9}\u{8BDD}\u{6458}\u{8981}]"))
+}
+
+/// Once the user has moved on to a newer request, the earlier task's failure
+/// and loop-guard noise no longer helps: drop every errored tool exchange
+/// (failures, loop-detector and read-guard blocks, denials) and every
+/// `[系统提醒]` nudge that precedes the latest real user message. Successful
+/// tool history is untouched. Request view only; stored history is unchanged,
+/// and the current task keeps its own warnings so the model can change course.
+pub fn strip_resolved_turn_noise(mut msgs: Vec<LlmMessage>) -> Vec<LlmMessage> {
+    let Some(last_user) = msgs.iter().rposition(is_real_user_turn) else {
+        return msgs;
+    };
+    let mut failed_ids: HashSet<String> = HashSet::new();
+    for msg in &msgs[..last_user] {
+        if let MessageContent::Blocks(blocks) = &msg.content {
+            for block in blocks {
+                if let ContentBlock::ToolResult {
+                    tool_use_id,
+                    is_error: true,
+                    ..
+                } = block
+                {
+                    failed_ids.insert(tool_use_id.clone());
+                }
+            }
+        }
+    }
+    let mut idx = 0usize;
+    msgs.retain_mut(|msg| {
+        let i = idx;
+        idx += 1;
+        if i >= last_user {
+            return true;
+        }
+        match &mut msg.content {
+            MessageContent::Text(t) => !(msg.role == "user" && is_system_reminder_text(t)),
+            MessageContent::Blocks(blocks) => {
+                blocks.retain(|b| match b {
+                    ContentBlock::ToolUse { id, .. } => !failed_ids.contains(id),
+                    ContentBlock::ToolResult { tool_use_id, .. } => !failed_ids.contains(tool_use_id),
+                    _ => true,
+                });
+                !blocks.is_empty()
+            }
+        }
+    });
+    msgs
+}
 fn collect_tool_use_ids(msg: &LlmMessage) -> Vec<String> {
     match &msg.content {
         MessageContent::Blocks(blocks) => blocks
@@ -536,6 +597,57 @@ mod tests {
         )));
     }
 
+    #[test]
+    fn strip_resolved_turn_noise_drops_old_failures_and_reminders_only() {
+        let use_msg = |id: &str| LlmMessage {
+            role: "assistant".into(),
+            content: MessageContent::Blocks(vec![ContentBlock::ToolUse {
+                id: id.into(),
+                name: "file_read".into(),
+                input: serde_json::json!({"path": id}),
+            }]),
+        };
+        let res_msg = |id: &str, is_error: bool| LlmMessage {
+            role: "user".into(),
+            content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
+                tool_use_id: id.into(),
+                content: "x".into(),
+                is_error,
+            }]),
+        };
+        let msgs = vec![
+            LlmMessage { role: "user".into(), content: MessageContent::text("task one") },
+            use_msg("ok1"),
+            res_msg("ok1", false),
+            use_msg("bad1"),
+            res_msg("bad1", true),
+            LlmMessage {
+                role: "user".into(),
+                content: MessageContent::text("[\u{7CFB}\u{7EDF}\u{63D0}\u{793A}]\nloop"),
+            },
+            LlmMessage { role: "user".into(), content: MessageContent::text("task two") },
+            use_msg("bad2"),
+            res_msg("bad2", true),
+        ];
+        let out = strip_resolved_turn_noise(msgs);
+        // task one, ok1 pair, task two, and the current turn's own failure stays.
+        assert_eq!(out.len(), 6);
+        assert!(out.iter().all(|m| !m.content.as_text().starts_with("[\u{7CFB}\u{7EDF}")));
+        let ids: Vec<String> = out
+            .iter()
+            .flat_map(|m| match &m.content {
+                MessageContent::Blocks(b) => b
+                    .iter()
+                    .filter_map(|x| match x {
+                        ContentBlock::ToolUse { id, .. } => Some(id.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>(),
+                _ => vec![],
+            })
+            .collect();
+        assert_eq!(ids, vec!["ok1".to_string(), "bad2".to_string()]);
+    }
     #[test]
     fn strip_ephemeral_removes_wait_exchange() {
         let msgs = vec![

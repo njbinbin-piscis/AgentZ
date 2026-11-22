@@ -2190,7 +2190,9 @@ pub fn build_request_messages(
     recent_tool_carriers: usize,
 ) -> Vec<LlmMessage> {
     let messages = crate::agent::message_utils::sanitize_tool_use_result_pairing(
-        crate::agent::message_utils::strip_ephemeral_tool_exchanges(messages.to_vec()),
+        crate::agent::message_utils::strip_resolved_turn_noise(
+            crate::agent::message_utils::strip_ephemeral_tool_exchanges(messages.to_vec()),
+        ),
     );
     let turn_cutoff = turn_based_recent_start(&messages, recent_full_turns);
     let tool_cutoff = tool_carrier_recent_start(&messages, recent_tool_carriers);
@@ -2408,7 +2410,7 @@ fn turn_based_recent_start(messages: &[LlmMessage], recent_full_turns: usize) ->
     let mut turns_seen: usize = 0;
     for (i, msg) in messages.iter().enumerate().rev() {
         let is_user_text_boundary = msg.role == "user"
-            && matches!(&msg.content, MessageContent::Text(t) if !t.is_empty() && !is_compaction_summary_text(t));
+            && matches!(&msg.content, MessageContent::Text(t) if !t.is_empty() && !is_compaction_summary_text(t) && !crate::agent::message_utils::is_system_reminder_text(t));
         if is_user_text_boundary {
             turns_seen += 1;
             if turns_seen == recent_full_turns {
