@@ -127,6 +127,9 @@ pub fn run() {
             // Hydrate the persisted cloud marketplace base URL override.
             commands::marketplace::hydrate_cloud_base_override(app.handle());
             commands::settings::init_settings_lock(app.handle());
+            if let Ok(dir) = app.path().app_data_dir() {
+                piscis_kernel::tool_stats::set_persist_path(dir.join("tool-stats.json"));
+            }
             // Background tasks: route registry completions into session
             // continuations + UI events.
             if let Some(state) = app.try_state::<AppState>() {
@@ -139,6 +142,7 @@ pub fn run() {
         })
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
+            commands::tool_stats::tool_stats_snapshot,
             commands::project_scope::project_scope_pick,
             commands::project_scope::project_scope_restore,
             commands::project_scope::project_scope_revoke,

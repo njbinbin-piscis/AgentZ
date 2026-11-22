@@ -51,6 +51,7 @@ pub mod session;
 mod session_metadata;
 pub mod session_sources;
 pub mod settings;
+pub mod tool_stats;
 pub mod skill_evolution;
 pub mod skill_evolution_ctx;
 pub mod skill_review;

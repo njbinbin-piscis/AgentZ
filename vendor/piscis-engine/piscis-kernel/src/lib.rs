@@ -24,6 +24,7 @@ pub mod project_context;
 pub mod scheduler;
 pub mod security;
 pub mod store;
+pub mod tool_stats;
 pub mod tools;
 pub mod tool_recovery;
 

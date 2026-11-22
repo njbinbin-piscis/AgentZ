@@ -4091,6 +4091,7 @@ impl AgentLoop {
             let tool_defs = self
                 .registry
                 .to_tool_defs(crate::agent::tool::ToolDefMode::Minimal);
+            crate::tool_stats::note_def_sizes(&tool_defs);
 
             // Drain pending notifications (e.g. @mention alerts from other Koi)
             if let Some(ref rx_mutex) = self.notification_rx {
@@ -5123,6 +5124,7 @@ impl AgentLoop {
                         if crate::agent::message_utils::is_ephemeral_tool_call(name, input) {
                             continue;
                         }
+                        crate::tool_stats::record(&ctx.session_id, name, content, *is_error);
                         let rh = stable_hash_result(content);
                         loop_detector.record(name, input, rh, stable_hash_normalized(content));
                         if !blocked_tool_ids.contains(tool_use_id) {
