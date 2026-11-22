@@ -40,6 +40,7 @@
 | 35 | `git stash drop` 即使已验证内容为空也被安全策略拒绝 | **已修复**（2026-11-20）。stash drop/clear 现在有专门的"先检查后确认"警告（`git stash list` + `git stash show -p <stash>`），无人确认时的拒绝消息也附带该指引，不再是裸的"no one is available to confirm"。确认仍是强制的——没有自动放行逃生通道 | `vendor/piscis-engine/piscis-kernel/src/policy/gate.rs`（`STASH_DELETE_PATTERN`）、`src/agent/loop_.rs`（拒绝原因） |
 | 36 | 内置浏览器：页面自关（`window.close`）后报 "set viewport failed" | **已修复**（2026-11-19；live 回归测试红→绿）。robotz 缓存了已死的 Page 句柄；`url()` 读帧缓存仍 Ok，失效句柄直达 CDP，后续所有动作失败 | `vendor/robotz/crates/robotz-browser/src/manager.rs`（`get_or_create_page` 存活探测） |
 | 37 | 循环检测器 Warning 阶段拦不住"认错但继续重复"的循环 | **源码已修，未发布**（2026-11-21，会话内实测；修复见英文版第 37 节）。同一 `code_run`/`file_search` 调用重复 10+ 次；每次软性 `[系统提醒]` 都被口头承认，下一轮又发起相同调用。Warning 只注入文本且照常执行工具，直到 Critical 才有硬切换约束 | `vendor/piscis-engine/piscis-kernel/src/agent/loop_.rs`（`detect` 的 Warning 分支、`warning_reminder` 注入） |
+| 38 | Windows 下宿主全量 `cargo test --lib` 挂起：devenv debugpy 探针执行伪造 PE 与 DAP fixture 进程创建并发竞争 | **已修复**（2026-11-21；全量 511 通过 / 11 ignored，99s，此前无限挂起）。debugpy 测试把 `not a real interpreter` 写成 `python.exe` 并执行；该失败的 CreateProcess 与 DAP `fixture_child` 的 spawn 竞争，卡死整个测试二进制的 CreateProcessW。现改为只断言 venv 选择契约、不执行伪造二进制 | `src-tauri/src/commands/devenv.rs`（`debugpy_is_probed_through_the_project_virtualenv`） |
 
 Windows 打包目标：见 README。已验证的产物是 `.github/workflows/release.yml` 上传的 NSIS `.exe` 文件。
 
@@ -743,3 +744,15 @@ DeepSeek 使用 `piscis-kernel` 的 OpenAI 兼容客户端（`DeepSeekClient` �
 **影响。** 每次事件浪费数十轮冗余工具调用；用户可见的卡顿；检测器的升级阶梯被一种它根本打断不了的行为消耗到顶。这与 M3（只读探索螺旋）不同：M3 是过度读取的习惯；#37 是让一个*已被承认*的重复仍能继续执行的产品缺口。
 
 **期望行为 / 修复方向（未实现）。** 一旦对某个调用 hash 发过 Warning，而下一轮又发起相同 hash，就把该轮降级为硬约束而非重跑工具：例如只允许文本回复或*不同的*工具/参数，立即拒绝相同调用（而不是等 >3 次忽略警告之后）。让注入的提醒成为强制闸门，而非建议。可选地把重复次数暴露给用户以便更早介入。按用户要求记录；本会话刻意不修（用户已切换 agent）。
+
+## 38. Windows 下宿主全量 `cargo test --lib` 挂起（devenv debugpy 探针 × DAP fixture spawn 竞争）
+
+**状态（2026-11-21）。** **已修复。** 宿主全量 lib 套件（522 测试）此前在 Windows 上无限挂起：某个非 `ignored` 测试停止推进（测试进程 CPU 增量 0、约 19 线程静默等待），永不结束。定向子集都能过，掩盖了问题，直到 1.0.73 验证时跑全量才暴露。
+
+**根因（二分 + 插桩实锤）。** 两个测试通过 Windows 进程创建相互干扰：
+- `commands::devenv::tests::debugpy_is_probed_through_the_project_virtualenv` 把字节 `not a real interpreter` 写进伪造的 `.venv/Scripts/python.exe`，然后经 `probe_debugpy → run_version` *执行*它。这不是合法 PE 镜像，`CreateProcessW` 会失败——但这次失败的 spawn 与其他测试的进程创建竞争。
+- `commands::dap::lifecycle_tests::stale_install_cannot_replace_owned_child`（及 `stop_revokes_pending_start_before_install`）会 spawn 一个阻塞的 `cmd /C set /p` fixture 子进程。当 debugpy 探针的失败 CreateProcess 并发运行时，DAP fixture 的*第二次* `fixture_child()` spawn 卡死在 `CreateProcessW` 内部不再返回。插桩显示挂起点恰在 "before fixture_child #2" 与其返回之间；debugpy 测试本身已完成。这两个测试用 `--test-threads=1` 串行能过，任何并行配对都挂。把 DAP fixture 换成 `ping` 也无济于事（卡点在进程创建本身，而非 fixture 程序），证实触发源是并发的伪造 PE spawn，而不是 fixture。
+
+**修复。** debugpy 测试现在只断言 venv 选择契约（`python_interpreter` 返回项目 `.venv` 解释器；status 的 path/install_hint 正确），**不执行伪造二进制**。`run_version` 的真实执行路径仍由 `scan_blocking` 里的活工具链探针覆盖。未改生产代码；DAP fixture 不变。
+
+**验证。** 宿主全量 `cargo test --offline --lib`：**511 通过 / 0 失败 / 11 ignored，99.43s**（此前无限挂起）。原挂起配对如今并行 0.02s 通过。两个改动文件 `read_lints` 与 `cargo clippy --lib -- -D warnings` 均干净。

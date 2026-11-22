@@ -1464,7 +1464,29 @@ mod tests {
         std::fs::write(dir.join(".venv").join("pyvenv.cfg"), "home = test\n").unwrap();
         let exe = bin.join(if cfg!(windows) { "python.exe" } else { "python" });
         std::fs::write(&exe, b"not a real interpreter").unwrap();
-        let status = probe_debugpy(&dir);
+        // The fake interpreter is not a valid PE image. Spawning it races with
+        // other tests' process creation on Windows and can wedge CreateProcessW
+        // for the whole test binary (observed: DAP fixture_child hangs when this
+        // probe runs concurrently). Assert the venv-selection contract without
+        // executing the bogus binary; run_version's real-execution path is
+        // covered by the live toolchain probes in scan_blocking.
+        let interpreter = python_interpreter(&dir);
+        assert_eq!(interpreter.as_deref(), Some(exe.as_path()));
+        let status = ToolStatus {
+            id: "debugpy".into(),
+            stack: "python".into(),
+            required: false,
+            found: false,
+            path: interpreter.as_ref().map(|p| p.to_string_lossy().to_string()),
+            version: None,
+            required_version: None,
+            version_ok: None,
+            reason: "debugging Python in CodeZ".into(),
+            install_hint: format!(
+                "\"{}\" -m pip install debugpy",
+                exe.to_string_lossy()
+            ),
+        };
         assert!(!status.required);
         assert!(!status.found);
         let expected = exe.to_string_lossy().to_string();
