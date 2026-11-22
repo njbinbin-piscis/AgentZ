@@ -25,3 +25,5 @@ AZ-077 macOS Keychain and AZ-078 Linux Secret Service are subsequent platform ad
 
 2026-11-21 (AgentZ 1.0.73): the pin advanced to tag `v0.8.75` (piscis-engine commit `22ae2df70493e05c42d1bcf07caed7b57d166a25`). It contains the overlay sync of the 2026-11-15 entry (pushed by another agent as `f9671f5`) plus #37: `agent/{loop_,read_guard,tool_receipt}.rs`, `tools/{code_run,file_read,file_search}.rs`. Overlay files remaining local: AppContainer/DPAPI, `Cargo.toml` wiring, `security/*` changes (the `agentz-no-prompts` feature removal), and `piscis-cli`/engine `CHANGELOG.md` divergences. `tools/output.rs` differs by 2 lines from upstream (upstream-side edit).
 
+2026-11-22 (AgentZ 1.0.74): the pin advanced to tag `v0.8.76` (piscis-engine commit `5281fc6280432ceaff14e7e097d1cf5308e3722c`). Added since `v0.8.75`: removal of the read-only streak hard pause, `strip_resolved_turn_noise`, `ToolResult::usage_err`/`correctable_err` with `file_search`/`file_read`/`file_edit` call errors, and `tool_stats`. The kernel files in this directory match the tag except the AgentZ-only overlays listed in earlier entries.
+

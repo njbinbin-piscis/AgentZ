@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.74] - 2026-11-22
+
+### Fixed
+
+- **Agent could not finish long research tasks.** The 75-call explore-only hard pause added in 1.0.73 is removed: legitimate tasks read far more than 75 distinct files. The 25/50 read-only reminders stay, as do the identical-call and unchanged re-read guards.
+
+### Changed
+
+- **Resolved-turn noise no longer reaches the model.** Once the user sends a newer request, earlier turns' correctable failures, loop-detector / read-guard blocks and `[系统提醒]` nudges are dropped from the request view (stored history is unchanged). Reminders no longer count as turn boundaries.
+- **Correctable tool errors carry detailed help.** `ToolResult::usage_err` / `correctable_err` mark call-shape errors; environment errors stay plain and are never pruned. After the same tool later succeeds, the failed round and its help are dropped. `file_search` has a minimal description with its detailed usage returned only on a malformed call; `file_read` and `file_edit` call errors are marked.
+- **Per-tool call statistics.** `tool_stats` counts ok / correctable / blocked / environment outcomes, recovery after a correctable failure and each tool's minimal-definition size, persisted to `tool-stats.json` in the app data dir and readable through the `tool_stats_snapshot` command. Used to decide which tool descriptions can be shortened safely.
+- **Kernel pin advanced to piscis-engine v0.8.76.**
 ## [1.0.73] - 2026-11-21
 
 ### Fixed
