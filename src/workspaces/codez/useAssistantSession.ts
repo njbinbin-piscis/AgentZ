@@ -963,9 +963,10 @@ export function useAssistantSession({
   const applyDroppedPaths = useCallback(
     (paths: string[]) => {
       if (!projectDir) return;
-      const chips = paths.map((abs) =>
-        createFileRefChip(absPathToProjectRel(abs, projectDir), false),
-      );
+      const chips = paths.map((abs) => {
+        const rel = absPathToProjectRel(abs, projectDir);
+        return createFileRefChip(rel, false, rel === abs);
+      });
       setComposerChips((cur) => [...cur, ...chips]);
       taRef.current?.focus();
     },
@@ -1925,7 +1926,7 @@ export function useAssistantSession({
         addImageChip(picked.attachment, preview);
       } else if (picked.attachment.path) {
         const rel = absPathToProjectRel(picked.attachment.path, projectDir);
-        setComposerChips((cur) => [...cur, createFileRefChip(rel, false)]);
+        setComposerChips((cur) => [...cur, createFileRefChip(rel, false, rel === picked.attachment.path)]);
       }
       taRef.current?.focus();
     } catch (e) {

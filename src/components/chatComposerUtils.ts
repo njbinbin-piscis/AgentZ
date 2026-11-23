@@ -39,13 +39,22 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-/** Map an absolute path to a workspace-relative path when possible. */
+/**
+ * Map an absolute path to a workspace-relative path when it lies inside the
+ * project. A path outside the project is returned unchanged (absolute): reducing
+ * it to a bare file name loses the location, and the agent then cannot find the
+ * file the user dropped or picked.
+ */
 export function absPathToProjectRel(absPath: string, projectDir: string): string {
   const normRoot = projectDir.replace(/\\/g, "/").replace(/\/+$/, "");
   const norm = absPath.replace(/\\/g, "/");
-  if (norm.startsWith(`${normRoot}/`)) return norm.slice(normRoot.length + 1);
-  if (norm.startsWith(normRoot)) return norm.slice(normRoot.length).replace(/^\//, "");
-  return norm.split("/").pop() ?? norm;
+  // Windows drive paths are case-insensitive.
+  const ci = /^[A-Za-z]:\//.test(norm);
+  const a = ci ? norm.toLowerCase() : norm;
+  const r = ci ? normRoot.toLowerCase() : normRoot;
+  if (a === r) return "";
+  if (a.startsWith(`${r}/`)) return norm.slice(normRoot.length + 1);
+  return absPath;
 }
 
 export function modelLabel(p: LlmProviderConfig): string {

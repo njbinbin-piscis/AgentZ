@@ -14,6 +14,8 @@ export interface FileRefChip {
   kind: "file-ref";
   path: string;
   isDir: boolean;
+  /** path is an absolute path outside the project (keep its leading slash). */
+  absolute?: boolean;
 }
 
 export interface TerminalSnippetChip {
@@ -45,12 +47,13 @@ export function createBrowserElementChip(element: PickedElement): BrowserElement
   };
 }
 
-export function createFileRefChip(path: string, isDir = false): FileRefChip {
+export function createFileRefChip(path: string, isDir = false, absolute = false): FileRefChip {
   return {
     id: `fr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     kind: "file-ref",
     path,
     isDir,
+    ...(absolute ? { absolute: true } : {}),
   };
 }
 
@@ -81,7 +84,8 @@ export function createTerminalSnippetChip(
 }
 
 /** Token stored in session history; backend expands to full context. */
-export function fileRefPlaceholder(path: string): string {
+export function fileRefPlaceholder(path: string, absolute = false): string {
+  if (absolute) return `@${path}`;
   const rel = path.replace(/^[/\\]+/, "");
   return `@${rel}`;
 }
@@ -95,7 +99,7 @@ export function chipToPromptToken(chip: ComposerChip): string {
     case "browser-element":
       return browserElementPlaceholder(chip.element);
     case "file-ref":
-      return fileRefPlaceholder(chip.path);
+      return fileRefPlaceholder(chip.path, chip.absolute);
     case "terminal-snippet":
       return terminalSnippetPlaceholder(chip.snippetId);
     case "image-attachment":

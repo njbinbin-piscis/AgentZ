@@ -37,20 +37,30 @@ pub async fn reveal_in_folder(path: String) -> Result<(), String> {
         return Err(format!("Path not found: {path}"));
     }
 
+    // A folder is opened (its contents shown); a file is highlighted in its parent.
     #[cfg(target_os = "windows")]
     {
-        let arg = format!("/select,\"{}\"", p.to_string_lossy().replace('/', "\\"));
-        piscis_kernel::proc::tokio_command("explorer")
-            .arg(arg)
-            .spawn()
+        let native = p.to_string_lossy().replace('/', "\\");
+        let mut cmd = piscis_kernel::proc::tokio_command("explorer");
+        if p.is_dir() {
+            cmd.arg(native);
+        } else {
+            // No manual quotes: Rust quotes an argument containing spaces itself, and
+            // embedded quotes get backslash-escaped, which makes explorer ignore the
+            // selection and fall back to its default folder.
+            cmd.arg(format!("/select,{native}"));
+        }
+        cmd.spawn()
             .map_err(|e| format!("Failed to reveal '{path}': {e}"))?;
     }
 
     #[cfg(target_os = "macos")]
     {
-        piscis_kernel::proc::tokio_command("open")
-            .arg("-R")
-            .arg(&path)
+        let mut cmd = piscis_kernel::proc::tokio_command("open");
+        if !p.is_dir() {
+            cmd.arg("-R");
+        }
+        cmd.arg(&path)
             .spawn()
             .map_err(|e| format!("Failed to reveal '{path}': {e}"))?;
     }
