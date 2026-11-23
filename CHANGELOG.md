@@ -5,6 +5,12 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.76] - 2026-11-23
+
+### Fixed
+
+- **Files dragged in from outside the project lost their path.** The composer reduced any path outside the project to a bare file name, so the agent could not find the file. Such files now keep their absolute path (also for files picked with the attach button); a sibling directory sharing the project path prefix is no longer mistaken for inside the project, and Windows drive paths compare case-insensitively.
+- **"Open in file manager" opened the default folder (Windows).** The reveal command passed `/select,"path"` with manual quotes, which Rust escapes, so explorer ignored it. Folders are now opened directly and files are selected with an unquoted `/select,path`; macOS opens folders directly and reveals files with `open -R`.
 ## [1.0.75] - 2026-11-22
 
 ### Fixed
