@@ -157,6 +157,15 @@ pub fn classify_error(msg: &str) -> ErrorClass {
         return ErrorClass::RateLimited;
     }
 
+    // The stream was cut while a tool call was still being streamed (see
+    // `openai::undrained_tool_bufs_message`). Nothing was executed, and it is a
+    // dropped connection rather than a malformed reply, so it is retried like
+    // any other mid-stream disconnect. Must precede the generic protocol_error
+    // match below, which the same message also satisfies.
+    if lower.contains("undrained tool call") {
+        return ErrorClass::UpstreamTransient;
+    }
+
     if lower.contains("protocol_error")
         || lower.contains("missing 'choices'")
         || lower.contains("returned empty choices")
@@ -415,4 +424,13 @@ mod tests {
             ErrorClass::ToolArgsInvalid
         );
     }
-}
+
+    #[test]
+    fn a_stream_cut_mid_tool_call_is_transient_not_a_protocol_error() {
+        let msg = "protocol_error: stream ended with 1 undrained tool call(s) still buffered \
+                   [file_write(id=call_x, args_len=5784)] — the connection likely closed mid tool-call";
+        let class = classify_error(msg);
+        assert_eq!(class, ErrorClass::UpstreamTransient);
+        assert!(class.is_retryable());
+        assert_eq!(classify_error("protocol_error: missing 'choices'"), ErrorClass::ProtocolError);
+    }}
