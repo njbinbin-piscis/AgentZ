@@ -29,3 +29,5 @@ AZ-077 macOS Keychain and AZ-078 Linux Secret Service are subsequent platform ad
 
 2026-11-22 (AgentZ 1.0.75): the pin advanced to tag `v0.8.77` (piscis-engine commit `efb4adcd73d3c1f05ba0c782d97105b6dce28bd6`). Added since `v0.8.76`: `file_search` grep file-path fallback and the repeating, escalating read-only reminders (`agent/{loop_,read_guard}.rs`, `tools/file_search.rs`).
 
+2026-11-25 (AgentZ 1.0.77): the pin advanced to tag `v0.8.78` (piscis-engine commit `9c5cd60459249d0954a78a404d522679c93b175a`). Added since `v0.8.77`: `llm/error_class.rs` classifies a stream cut mid tool call as a transient (retryable) failure.
+

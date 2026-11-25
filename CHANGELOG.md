@@ -5,6 +5,16 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.77] - 2026-11-25
+
+### Fixed
+
+- **A stream cut mid tool call failed the whole turn.** "stream ended with N undrained tool call(s)" matched the generic `protocol_error` rule and was never retried. It is a dropped connection with nothing executed, so it is now classified as a transient upstream failure and retried on the same model with backoff.
+- **Opening an unpreviewable file landed in the Documents folder (Windows).** The path was handed to `explorer` with mixed separators. `open_path` now normalizes the path and uses `ShellExecuteW`, so the file opens in its registered program; when no program is registered the file is revealed in its folder with the file selected (macOS: same fallback when `open` fails).
+
+### Changed
+
+- **Kernel pin advanced to piscis-engine v0.8.78.**
 ## [1.0.76] - 2026-11-23
 
 ### Fixed
