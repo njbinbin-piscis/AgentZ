@@ -7,7 +7,10 @@ use tauri::AppHandle;
 
 use super::data_scope::resolve_global_config_dir;
 
-/// Open a path with the OS default handler (file → default app, dir → file manager).
+/// Open a path with the OS default handler (file → its registered program, dir →
+/// file manager). A file with no registered program is revealed in the file
+/// manager instead (its folder, file selected) so the click still goes somewhere
+/// useful.
 #[tauri::command]
 pub async fn open_path(path: String) -> Result<(), String> {
     let p = Path::new(&path);
@@ -16,19 +19,79 @@ pub async fn open_path(path: String) -> Result<(), String> {
     }
 
     #[cfg(target_os = "windows")]
-    let program = "explorer";
-    #[cfg(target_os = "macos")]
-    let program = "open";
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let program = "xdg-open";
+    {
+        // Mixed separators ("C:\proj/src/a.docx") make the shell fall back to the
+        // default Documents folder, so hand it a clean native path.
+        let native = path.replace('/', "\\");
+        let target = native.clone();
+        let outcome = tokio::task::spawn_blocking(move || shell_execute_open(&target))
+            .await
+            .map_err(|e| format!("Failed to open '{path}': {e}"))?;
+        return match outcome {
+            Ok(()) => Ok(()),
+            // No program is registered for this file type: show it in its folder.
+            Err(_) if p.is_file() => reveal_in_folder(native).await,
+            Err(code) => Err(format!("Failed to open '{path}' (shell code {code})")),
+        };
+    }
 
-    piscis_kernel::proc::tokio_command(program)
-        .arg(&path)
-        .spawn()
-        .map_err(|e| format!("Failed to open '{path}': {e}"))?;
-    Ok(())
+    #[cfg(target_os = "macos")]
+    {
+        let status = piscis_kernel::proc::tokio_command("open")
+            .arg(&path)
+            .status()
+            .await
+            .map_err(|e| format!("Failed to open '{path}': {e}"))?;
+        if status.success() {
+            return Ok(());
+        }
+        if p.is_file() {
+            return reveal_in_folder(path).await;
+        }
+        return Err(format!("Failed to open '{path}'"));
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        piscis_kernel::proc::tokio_command("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open '{path}': {e}"))?;
+        Ok(())
+    }
 }
 
+/// `ShellExecuteW(open)`: success is any value above 32; otherwise the value is
+/// the error code (31 = no association).
+#[cfg(target_os = "windows")]
+fn shell_execute_open(path: &str) -> Result<(), i32> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+
+    const SW_SHOWNORMAL: i32 = 1;
+    let wide: Vec<u16> = std::ffi::OsStr::new(path)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let verb: Vec<u16> = "open\0".encode_utf16().collect();
+    // SAFETY: both buffers are NUL-terminated and outlive the call; the other
+    // pointers are documented as optional.
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            verb.as_ptr(),
+            wide.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    } as isize;
+    if result > 32 {
+        Ok(())
+    } else {
+        Err(result as i32)
+    }
+}
 /// Reveal a file or folder in the system file manager (select/highlight when supported).
 #[tauri::command]
 pub async fn reveal_in_folder(path: String) -> Result<(), String> {
