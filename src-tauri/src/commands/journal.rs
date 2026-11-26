@@ -57,6 +57,21 @@ pub async fn journal_get_turn_diffs(
         .map_err(|e| e.to_string())
 }
 
+/// Baseline-vs-disk diff for one pending file (independent of git).
+#[tauri::command]
+pub async fn journal_get_pending_diff(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_dir: Option<String>,
+    session_id: String,
+    path: String,
+) -> Result<Option<JournalFileDiff>, String> {
+    let _lease = state.environment_access.execution().await;
+    let journal = open_task_journal(project_dir.as_deref(), &session_id).await?;
+    journal
+        .get_pending_file_diff(&session_id, &path)
+        .map_err(|e| e.to_string())
+}
+
 /// Agent edits awaiting review across the whole session, reconciled with disk.
 #[tauri::command]
 pub async fn journal_list_pending(

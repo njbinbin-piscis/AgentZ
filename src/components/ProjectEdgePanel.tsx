@@ -7,6 +7,7 @@ import {
   sortArtifactPaths,
   type ArtifactSortMode,
 } from "../workspaces/workz/artifactPaths";
+import { journalGetPendingDiff } from "../services/tauri/chat";
 import EdgeBookmarkDrawer from "./EdgeBookmarkDrawer";
 import "./ProjectEdgePanel.css";
 
@@ -128,6 +129,37 @@ export default function ProjectEdgePanel({
       .filter((a): a is { path: string; name: string; dir: string } => Boolean(a));
   }, [flatArtifacts, artifactQuery, artifactSort]);
 
+  // Click a pending change: show the agent's before/after (journal baseline vs.
+  // disk). A workspace that handles the event opens a diff tab; otherwise (or
+  // when no baseline is available) fall back to opening the file itself.
+  const openChange = useCallback(
+    async (relPath: string) => {
+      const sessionId = pendingReview?.sessionId;
+      if (projectDir && sessionId) {
+        try {
+          const diff = await journalGetPendingDiff(projectDir, sessionId, relPath);
+          if (diff) {
+            const ev = new CustomEvent("agentz-open-agent-diff", {
+              cancelable: true,
+              detail: {
+                path: relPath,
+                before: diff.before ?? "",
+                after: diff.after,
+                existed: diff.existed,
+              },
+            });
+            window.dispatchEvent(ev);
+            if (ev.defaultPrevented) return;
+          }
+        } catch (e) {
+          console.warn("[AgentZ] pending diff unavailable", relPath, e);
+        }
+      }
+      onSelectPath(relPath);
+    },
+    [projectDir, pendingReview?.sessionId, onSelectPath],
+  );
+
   const handleClose = useCallback(() => {
     setForceDismissed(true);
     setPreviewPath(null);
@@ -218,8 +250,7 @@ export default function ProjectEdgePanel({
                       <button
                         type="button"
                         className="agentz-edge-change"
-                        disabled={deleted}
-                        onClick={() => onSelectPath(c.rel_path)}
+                        onClick={() => void openChange(c.rel_path)}
                         title={deleted ? `${c.rel_path} (${t("agent.changeDeleted")})` : c.rel_path}
                       >
                         <span className={`agentz-edge-change-badge ${c.status}`}>

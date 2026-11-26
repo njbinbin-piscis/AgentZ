@@ -151,7 +151,8 @@ describe("ProjectEdgePanel artifacts", () => {
     expect(json).not.toContain("untracked.txt");
     const rows = root!.root.findAllByProps({ className: "agentz-edge-change" });
     expect(rows.map((r) => r.props.title)).toEqual(["src/a.ts", "old.md (agent.changeDeleted)"]);
-    expect(rows[1].props.disabled).toBe(true);
+    // Deleted files stay clickable: the diff shows what the agent removed.
+    expect(rows[1].props.disabled).toBeFalsy();
     const acts = root!.root.findAll(
       (n) => n.type === "button" && typeof n.props.className === "string" && n.props.className.startsWith("agentz-edge-change-act"),
     );

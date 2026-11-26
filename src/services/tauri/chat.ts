@@ -460,6 +460,19 @@ export function journalGetTurnDiffs(
   });
 }
 
+/** Pre-edit baseline vs. current disk for one pending file; null when not pending. */
+export function journalGetPendingDiff(
+  projectDir: string,
+  sessionId: string,
+  path: string,
+): Promise<JournalFileDiff | null> {
+  return invoke<JournalFileDiff | null>("journal_get_pending_diff", {
+    projectDir,
+    sessionId,
+    path,
+  });
+}
+
 /** Agent edits awaiting review across the whole session (net vs. disk). */
 export function journalListPending(
   projectDir: string,

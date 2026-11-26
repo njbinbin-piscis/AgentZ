@@ -306,9 +306,20 @@ export function FileEditCard({ item, diff }: { item: ToolTraceItem; diff: FileEd
           type="button"
           className="agentz-edit-card-file"
           title={t("chat.fileEditOpen", { path: diff.path })}
-          onClick={() =>
-            window.dispatchEvent(new CustomEvent("agentz-open-file", { detail: { path: diff.path } }))
-          }
+          onClick={() => {
+            // Open this edit as a before/after diff tab; workspaces without a
+            // diff tab leave the event unhandled, so fall back to the file.
+            const side = (drop: "add" | "remove") =>
+              diff.ops.filter((op) => op.type !== drop).map((op) => op.text).join("\n");
+            const ev = new CustomEvent("agentz-open-agent-diff", {
+              cancelable: true,
+              detail: { path: diff.path, before: side("add"), after: side("remove") },
+            });
+            window.dispatchEvent(ev);
+            if (!ev.defaultPrevented) {
+              window.dispatchEvent(new CustomEvent("agentz-open-file", { detail: { path: diff.path } }));
+            }
+          }}
         >
           <span className="agentz-edit-card-name">{base}</span>
           {dir && <span className="agentz-edit-card-dir">{dir}</span>}

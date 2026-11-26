@@ -31,3 +31,5 @@ AZ-077 macOS Keychain and AZ-078 Linux Secret Service are subsequent platform ad
 
 2026-11-25 (AgentZ 1.0.77): the pin advanced to tag `v0.8.78` (piscis-engine commit `9c5cd60459249d0954a78a404d522679c93b175a`). Added since `v0.8.77`: `llm/error_class.rs` classifies a stream cut mid tool call as a transient (retryable) failure.
 
+2026-11-26 (AgentZ 1.0.78): the pin advanced to tag `v0.8.79` (piscis-engine commit `5da4da27f6ef0b8d3aecc9b520304e435b2157ab`). Added since `v0.8.78`: `FileJournal::get_pending_file_diff` (`agent/file_journal.rs`), the baseline-vs-disk diff of one pending file.
+

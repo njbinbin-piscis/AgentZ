@@ -5,6 +5,17 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.78] - 2026-11-26
+
+### Added
+
+- **Diff tab for pending agent changes.** Clicking a change in the Changes panel shows the pre-edit baseline from the file journal against the current disk content (no git needed); new/deleted files are shown as all-added/all-removed.
+- **Chat edit card opens a diff.** Clicking the file name on a `+N -N` card opens that edit as a diff tab (falls back to opening the file where no diff tab exists).
+
+### Changed
+
+- **Kernel pin advanced to piscis-engine v0.8.79.**
+
 ## [1.0.77] - 2026-11-25
 
 ### Fixed

@@ -1079,6 +1079,34 @@ export function useCodezWorkspace({
     [projectDir, tabs, setTabs],
   );
 
+  // ─── Agent-change diff (journal baseline vs. disk) ───────────────
+  useEffect(() => {
+    const onAgentDiff = (e: Event) => {
+      const d = (e as CustomEvent<{ path: string; before: string; after: string }>).detail;
+      if (!d?.path) return;
+      e.preventDefault();
+      const diffPath = `diff:agent:${d.path}`;
+      const tab: OpenTab = {
+        path: diffPath,
+        name: `${d.path} (agent)`,
+        language: null,
+        content: d.after,
+        isDirty: false,
+        isReadOnly: true,
+        isDiff: true,
+        originalContent: d.before,
+      };
+      setTabs((prev) =>
+        prev.some((t) => t.path === diffPath)
+          ? prev.map((t) => (t.path === diffPath ? tab : t))
+          : [...prev, tab],
+      );
+      setActiveTabPath(diffPath);
+    };
+    window.addEventListener("agentz-open-agent-diff", onAgentDiff);
+    return () => window.removeEventListener("agentz-open-agent-diff", onAgentDiff);
+  }, [setTabs]);
+
   // ─── Handle editor content change ───────────────────────────────
   const handleEditorChange = useCallback(
     (value: string) => {

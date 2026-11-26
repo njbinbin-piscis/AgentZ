@@ -76,8 +76,15 @@ describe("ToolTrace edit card", () => {
     ]);
 
     root.root.findByProps({ className: "agentz-edit-card-file" }).props.onClick();
-    expect(dispatchEvent.mock.calls[0][0].type).toBe("agentz-open-file");
-    expect(dispatchEvent.mock.calls[0][0].detail).toEqual({ path: "src/app/main.ts" });
+    expect(dispatchEvent.mock.calls[0][0].type).toBe("agentz-open-agent-diff");
+    expect(dispatchEvent.mock.calls[0][0].detail).toEqual({
+      path: "src/app/main.ts",
+      before: "old()",
+      after: "fresh()\nmore()",
+    });
+    // Unhandled by the workspace -> falls back to opening the file.
+    expect(dispatchEvent.mock.calls[1][0].type).toBe("agentz-open-file");
+    expect(dispatchEvent.mock.calls[1][0].detail).toEqual({ path: "src/app/main.ts" });
     await act(async () => root.unmount());
   });
 });

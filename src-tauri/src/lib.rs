@@ -493,6 +493,7 @@ pub fn run() {
             // File journal — Review / Undo of a turn's edits
             commands::journal::journal_list_changes,
             commands::journal::journal_get_turn_diffs,
+            commands::journal::journal_get_pending_diff,
             commands::journal::journal_undo_turn,
             commands::journal::journal_list_pending,
             commands::journal::journal_keep,

@@ -472,6 +472,40 @@ impl FileJournal {
         Ok(out)
     }
 
+    /// Diff for one still-pending file: the content before the session's first
+    /// pending edit (the review baseline, `None` when the agent created it)
+    /// against what is on disk now. `None` when the path has no pending change.
+    pub fn get_pending_file_diff(
+        &self,
+        session_id: &str,
+        rel_path: &str,
+    ) -> Result<Option<JournalFileDiff>> {
+        let row: Option<(i64, bool, Option<Vec<u8>>)> = {
+            let conn = self.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT id, existed, before_content FROM file_snapshots
+                 WHERE session_id = ?1 AND rel_path = ?2
+                   AND applied = 1 AND undone = 0 AND kept = 0
+                 ORDER BY id ASC LIMIT 1",
+                params![session_id, rel_path],
+                |r| Ok((r.get(0)?, r.get::<_, i64>(1)? != 0, r.get(2)?)),
+            )
+            .optional()?
+        };
+        let Some((id, existed, before_blob)) = row else {
+            return Ok(None);
+        };
+        let before = before_blob.map(|b| String::from_utf8_lossy(&b).into_owned());
+        let after = std::fs::read_to_string(self.abs_path(rel_path)).unwrap_or_default();
+        Ok(Some(JournalFileDiff {
+            id,
+            rel_path: rel_path.to_string(),
+            existed,
+            before,
+            after,
+        }))
+    }
+
     fn read_change_contents(&self, change_id: i64) -> Result<(Option<String>, String)> {
         let conn = self.conn.lock().unwrap();
         let (rel, before_blob): (String, Option<Vec<u8>>) = conn.query_row(
@@ -599,6 +633,28 @@ mod undo_tests {
         let mut out = Vec::new();
         walk(&dir.join(".agentz").join("rollback-backups"), &mut out);
         out
+    }
+    #[test]
+    fn pending_diff_uses_the_first_pending_baseline_and_current_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = FileJournal::open(dir.path(), dir.path().join("journal.db")).unwrap();
+        std::fs::write(dir.path().join("a.txt"), b"original").unwrap();
+        let _turn = journal.begin_turn("a");
+        change(&journal, "a", "one", "a.txt", b"first edit", true);
+        change(&journal, "a", "two", "a.txt", b"second edit", true);
+        change(&journal, "a", "three", "new.rs", b"fresh", true);
+
+        let a = journal.get_pending_file_diff("a", "a.txt").unwrap().unwrap();
+        assert!(a.existed);
+        assert_eq!(a.before.as_deref(), Some("original"));
+        assert_eq!(a.after, "second edit");
+        let n = journal.get_pending_file_diff("a", "new.rs").unwrap().unwrap();
+        assert!(!n.existed);
+        assert_eq!(n.before, None);
+        assert_eq!(n.after, "fresh");
+        assert!(journal.get_pending_file_diff("a", "other.txt").unwrap().is_none());
+        journal.keep_paths("a", Some(&["a.txt".to_string()])).unwrap();
+        assert!(journal.get_pending_file_diff("a", "a.txt").unwrap().is_none());
     }
     #[test]
     fn undo_backs_up_what_it_overwrites_and_what_it_deletes() {
