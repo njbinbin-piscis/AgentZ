@@ -206,6 +206,9 @@ impl<'a> ContextBuilder<'a> {
         // tool_result — which never happens mid-iteration.
         let sanitized =
             crate::agent::message_utils::sanitize_tool_use_result_pairing(superseded_free);
+        // Same as the agent loop's request view: a call repeated over
+        // consecutive rounds is shown to the model once.
+        let sanitized = crate::agent::loop_::collapse_repeated_tool_rounds(sanitized);
 
         let msgs_dropped = msgs_in.saturating_sub(sanitized.len());
 

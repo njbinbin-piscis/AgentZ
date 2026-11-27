@@ -1158,6 +1158,8 @@ const en = {
       "The system prompt and tool definitions take {{percent}}% of the context budget, leaving too little room for the conversation; compaction cannot help. Disable some MCP tools or skills and try again.",
     noticeReadLoopPaused:
       "The assistant kept re-reading files that had not changed, so this turn was paused. Tell it what to do next.",
+    noticeLoopHalted:
+      "The assistant kept repeating the same tool call after a warning and a refusal, so this turn ended. Its last reply says where it got stuck.",
     noticeModelFallback: "Model \"{{from}}\" is unavailable; continuing with the fallback model \"{{to}}\".",
     planClearFailed: "Could not clear the todos: {{error}}",
     chipTerminal: "Terminal",

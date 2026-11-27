@@ -32,6 +32,8 @@ export function agentNoticeText(t: TFunction, notice: AgentNotice): string {
     }
     case "read_loop_paused":
       return t("chat.noticeReadLoopPaused");
+    case "loop_halted":
+      return t("chat.noticeLoopHalted");
     case "model_fallback": {
       const from = detail(notice.details, "from");
       const to = detail(notice.details, "to");

@@ -287,7 +287,8 @@ pub fn strip_ephemeral_tool_exchanges(mut msgs: Vec<LlmMessage>) -> Vec<LlmMessa
 /// `[系统提醒]` messages are host-injected nudges (loop warnings, read-only
 /// streak reminders). They are stored as plain user text but are not user turns.
 pub fn is_system_reminder_text(text: &str) -> bool {
-    text.trim_start().starts_with("[\u{7CFB}\u{7EDF}\u{63D0}\u{793A}]")
+    // Must stay identical to the prefix the agent loop writes (提醒, not 提示).
+    text.trim_start().starts_with("[系统提醒]")
 }
 
 fn is_real_user_turn(msg: &LlmMessage) -> bool {
@@ -637,7 +638,7 @@ mod tests {
             res_msg("bad1", true),
             LlmMessage {
                 role: "user".into(),
-                content: MessageContent::text("[\u{7CFB}\u{7EDF}\u{63D0}\u{793A}]\nloop"),
+                content: MessageContent::text("[系统提醒]\nloop"),
             },
             LlmMessage { role: "user".into(), content: MessageContent::text("task two") },
             use_msg("bad2"),
@@ -646,7 +647,7 @@ mod tests {
         let out = strip_resolved_turn_noise(msgs);
         // env failure kept; correctable failure and reminder dropped; current turn kept.
         assert_eq!(out.len(), 8);
-        assert!(out.iter().all(|m| !m.content.as_text().starts_with("[\u{7CFB}\u{7EDF}")));
+        assert!(out.iter().all(|m| !m.content.as_text().starts_with("[系统提醒]")));
         let ids: Vec<String> = out
             .iter()
             .flat_map(|m| match &m.content {

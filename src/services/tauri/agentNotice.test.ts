@@ -16,10 +16,17 @@ describe("agentNoticeText", () => {
     ).toBe('chat.noticeStaticOverhead:{"percent":"63"}');
   });
 
-  it("localizes the read-loop pause and the model fallback", () => {
+  it("localizes the read-loop pause, the loop halt and the model fallback", () => {
     expect(agentNoticeText(t, { message: "检测到重复读取…", code: "read_loop_paused" })).toBe(
       "chat.noticeReadLoopPaused",
     );
+    expect(
+      agentNoticeText(t, {
+        message: "同样的工具调用在提醒和拒绝之后仍被重复，本轮已结束。",
+        code: "loop_halted",
+        details: { hits: ["Tool 'shell' was refused again"] },
+      }),
+    ).toBe("chat.noticeLoopHalted");
     expect(
       agentNoticeText(t, {
         message: "主模型「a」当前不可用…",

@@ -5,6 +5,18 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.80] - 2026-11-27
+
+### Fixed
+
+- **Dead loops were warned but never ended.** Identical unchanged tool calls now escalate before the next LLM request: warn (3rd), refuse that call (4th), end the turn with a handoff note (5th). A novel call or result resets the ladder. Poll/wait-like calls wait for eight unchanged results; rotating read-only re-reads stay with the read guard.
+- **Loop reminders were never recognized.** `is_system_reminder_text` matched `[系统提示]` while the loop wrote `[系统提醒]`, so reminders stayed in the request and counted as user turns.
+- **Repeated tool rounds reinforced the loop in the request view.** Consecutive identical calls collapse to one real result (with a repetition note); refusals and intervening reminders are dropped before the model sees them. Stored history is untouched.
+
+### Changed
+
+- **Kernel pin advanced to piscis-engine v0.8.80.**
+
 ## [1.0.79] - 2026-11-27
 
 ### Fixed

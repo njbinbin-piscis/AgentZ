@@ -1,4 +1,4 @@
-﻿# AgentZ vendored engine baseline
+# AgentZ vendored engine baseline
 
 This source snapshot starts at piscis-engine commit `527e55496caf4437e4265e02869f0a8c764549f6` (tag `v0.8.68`). The initial integration applied AZ-029 and AZ-079. Subsequent changes include AZ-034 Windows AppContainer execution, AZ-081 excluded-directory traversal, AZ-082 LSP response resource scope, AZ-030 Windows DPAPI key protection, and AZ-083 AppContainer descendant test handshake. Their implementation and validation records are in `docs/upgrade/evidence/`.
 
@@ -33,3 +33,4 @@ AZ-077 macOS Keychain and AZ-078 Linux Secret Service are subsequent platform ad
 
 2026-11-26 (AgentZ 1.0.78): the pin advanced to tag `v0.8.79` (piscis-engine commit `5da4da27f6ef0b8d3aecc9b520304e435b2157ab`). Added since `v0.8.78`: `FileJournal::get_pending_file_diff` (`agent/file_journal.rs`), the baseline-vs-disk diff of one pending file.
 
+2026-11-27 (AgentZ 1.0.80): the pin advanced to tag `v0.8.80` (piscis-engine commit `abb882435a01e44ad030533982278593814d4cb6`). Added since `v0.8.79`: dead-loop strike ladder and handoff (`agent/loop_.rs`), request-view collapse of repeated tool rounds (`agent/loop_.rs`, `agent/harness/context_builder.rs`), and the `[系统提醒]` recognition fix (`agent/message_utils.rs`).

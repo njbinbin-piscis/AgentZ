@@ -154,8 +154,17 @@ const RESEARCH_CRITICAL_THRESHOLD: usize = 128;
 const RESEARCH_RECENT_WINDOW: usize = 64;
 const PING_PONG_WARNING: usize = 64;
 const PING_PONG_CRITICAL: usize = 128;
-/// Warnings about one identical call that may be ignored before it is blocked.
-const WARNINGS_BEFORE_BLOCK: usize = 1;
+/// Loop hits in a row, with no new result in between, at which the repeated
+/// call is refused (other tools keep working) and at which the turn is handed
+/// back to the user. The first hit only warns and still runs the call.
+const STRIKES_BEFORE_BLOCK: usize = 2;
+const STRIKES_BEFORE_HALT: usize = 3;
+/// Trailing calls that only repeated an earlier call and its result.
+const STALE_CYCLE_THRESHOLD: usize = 6;
+/// Identical status checks or waits with an unchanged result before a nudge.
+const POLL_NO_PROGRESS_THRESHOLD: usize = 8;
+/// Starts the synthetic result of a call a loop guard refused to run.
+const LOOP_BLOCK_PREFIX: &str = "[循环检测]";
 const TOOL_RESULT_HARD_MAX_CHARS: usize = 48_000;
 const CONTEXT_SINGLE_RESULT_SHARE: f64 = 0.5;
 const CHECKPOINT_MAX_BYTES: usize = 8_000_000;
@@ -370,7 +379,23 @@ const VISION_LOOP_CONSECUTIVE_THRESHOLD: usize = 15;
 
 /// Tools that are known polling/status-checking tools. These get stricter
 /// no-progress detection (inspired by OpenClaw's known_poll_no_progress).
-const KNOWN_POLL_TOOLS: &[&str] = &["process_control", "shell", "powershell_query"];
+const KNOWN_POLL_TOOLS: &[&str] = &["process_control", "powershell_query"];
+/// Command fragments that mean "wait": repeating such a command is how an
+/// agent waits for a build or a server, not a loop.
+const WAIT_COMMAND_MARKERS: &[&str] = &["sleep", "timeout /t", "wait-process", "wait-job", "wait-event"];
+
+/// Status checks and waits. They count as a loop only once their result has
+/// stopped changing for a while (`POLL_NO_PROGRESS_THRESHOLD`).
+fn is_poll_like_call(name: &str, input: &serde_json::Value) -> bool {
+    if KNOWN_POLL_TOOLS.iter().any(|t| name.contains(t)) {
+        return true;
+    }
+    if name != "code_run" && !name.contains("shell") {
+        return false;
+    }
+    let text = input.to_string().to_lowercase();
+    WAIT_COMMAND_MARKERS.iter().any(|marker| text.contains(marker))
+}
 const KNOWLEDGE_GATHERING_TOOLS: &[&str] = &["web_search", "browser"];
 /// Keywords that identify screenshot / vision-analyze tools. Substring
 /// match (case-insensitive) — covers typical names like
@@ -565,6 +590,16 @@ struct ToolCallRecord {
     /// reruns that differ only in timings still compare equal.
     #[serde(default)]
     norm_hash: u64,
+    /// The same call had already returned the same (normalized) result.
+    #[serde(default)]
+    stale: bool,
+    /// A status check or wait (`is_poll_like_call`).
+    #[serde(default)]
+    poll_like: bool,
+    /// Already answered with a same-outcome refusal. Refused calls are not
+    /// recorded, so without this the command would stay refused for good.
+    #[serde(default)]
+    outcome_refused: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -587,11 +622,47 @@ struct LoopDetectorState {
     /// the moment any substantive action runs (click, type, hotkey,
     /// drag, file edit, shell command, …).
     consecutive_vision_only_turns: usize,
-    /// Warnings already issued per call hash; ignored warnings escalate to a block.
-    warned: HashMap<u64, usize>,
+    /// Tool batches in a row that hit a loop detector with no new result in
+    /// between. 1 warns, `STRIKES_BEFORE_BLOCK` refuses the repeated call,
+    /// `STRIKES_BEFORE_HALT` ends the turn with a handoff.
+    strikes: usize,
+    /// The batch being checked already counted as a strike.
+    batch_hit: bool,
+    /// The batch being recorded produced a call or a result not seen before.
+    batch_novel: bool,
 }
 
 impl LoopDetectorState {
+    fn new(history: Vec<ToolCallRecord>) -> Self {
+        Self {
+            history,
+            consecutive_vision_only_turns: 0,
+            strikes: 0,
+            batch_hit: false,
+            batch_novel: false,
+        }
+    }
+
+    /// Call before checking the tool calls of one model reply.
+    fn begin_batch(&mut self) {
+        self.batch_hit = false;
+        self.batch_novel = false;
+    }
+
+    /// Call after the results of that reply were recorded. A batch that hit
+    /// no detector and brought something new means the model did change
+    /// course, so earlier strikes no longer count.
+    fn end_batch(&mut self) {
+        if !self.batch_hit && self.batch_novel {
+            self.strikes = 0;
+        }
+    }
+
+    /// The current batch is the one that used up the last strike.
+    fn should_halt(&self) -> bool {
+        self.batch_hit && self.strikes >= STRIKES_BEFORE_HALT
+    }
+
     /// Rebuild the window from persisted history so a new turn does not start
     /// with a clean slate while the model is still repeating itself.
     fn seed_from_messages(&mut self, messages: &[LlmMessage]) {
@@ -608,8 +679,12 @@ impl LoopDetectorState {
                     ContentBlock::ToolResult {
                         tool_use_id,
                         content,
-                        ..
+                        is_error,
                     } => {
+                        // A refused call never ran; it is not part of the history.
+                        if *is_error && content.starts_with(LOOP_BLOCK_PREFIX) {
+                            continue;
+                        }
                         if let Some((name, input)) = calls.get(tool_use_id) {
                             self.record(
                                 name,
@@ -623,9 +698,12 @@ impl LoopDetectorState {
                 }
             }
         }
+        self.begin_batch();
     }
 
-    /// Record a completed tool call with its result hash.
+    /// Record a tool call that ran, with its result hash. Calls refused by a
+    /// loop guard are not recorded: the run of identical calls they belong to
+    /// must stay intact so the next repeat is still recognised.
     fn record(
         &mut self,
         name: &str,
@@ -634,14 +712,21 @@ impl LoopDetectorState {
         norm_hash: u64,
     ) {
         let input_hash = stable_hash_input(name, input);
-        // Warnings count a run of the same call. Once something else has run,
-        // the model did change approach, so earlier warnings no longer count.
-        self.warned.retain(|hash, _| *hash == input_hash);
+        let stale = self
+            .history
+            .iter()
+            .any(|r| r.name == name && r.input_hash == input_hash && r.norm_hash == norm_hash);
+        if !stale {
+            self.batch_novel = true;
+        }
         self.history.push(ToolCallRecord {
             name: name.to_string(),
             input_hash,
             result_hash,
             norm_hash,
+            stale,
+            poll_like: is_poll_like_call(name, input),
+            outcome_refused: false,
         });
         if self.history.len() > TOOL_CALL_HISTORY_SIZE {
             self.history.remove(0);
@@ -657,33 +742,43 @@ impl LoopDetectorState {
     /// dispatched in parallel) — that is exactly the “commit to action”
     /// pattern the vision-loop detector is trying to encourage, so it
     /// should reset the consecutive-vision streak.
+    ///
+    /// `read_only` is whether the pending tool only reads. Rotating re-reads
+    /// are `ReadGuard`'s job, so the stale-cycle detector leaves them alone.
+    ///
+    /// Every batch with a hit is one strike (see `strikes`): the first only
+    /// warns and the call still runs; from the second on the repeated call is
+    /// refused; the third makes `should_halt` true.
     fn detect(
         &mut self,
         pending_name: &str,
         pending_input: &serde_json::Value,
         batch: &[(String, String, serde_json::Value)],
+        read_only: bool,
     ) -> LoopDetectionResult {
-        let mut result = self.detect_inner(pending_name, pending_input, batch);
-        if result.level == LoopLevel::Warning
-            && !matches!(result.detector, Some(LoopDetector::VisionLoop))
+        let mut result = self.detect_inner(pending_name, pending_input, batch, read_only);
+        if result.level == LoopLevel::Ok
+            || matches!(result.detector, Some(LoopDetector::VisionLoop))
         {
-            let hash = stable_hash_input(pending_name, pending_input);
-            let n = self.warned.entry(hash).or_insert(0);
-            *n += 1;
-            // A warning is advice the model may only acknowledge in text. Run the
-            // identical call once after the first warning; the next identical
-            // call is refused (#37) instead of waiting for several more rounds.
-            if *n > WARNINGS_BEFORE_BLOCK {
-                result = LoopDetectionResult {
-                    level: LoopLevel::Critical,
-                    detector: result.detector,
-                    count: result.count,
-                    message: format!(
-                        "Tool '{}' was blocked: repeated warnings about this identical call were ignored. Do not retry it. Tell the user what is failing and ask how to proceed.",
-                        pending_name
-                    ),
-                };
-            }
+            return result;
+        }
+        if !self.batch_hit {
+            self.batch_hit = true;
+            self.strikes += 1;
+        }
+        if self.strikes >= STRIKES_BEFORE_BLOCK {
+            result.level = LoopLevel::Critical;
+            result.message = if self.strikes >= STRIKES_BEFORE_HALT {
+                format!(
+                    "Tool '{}' was refused again: the same call kept repeating after a warning and a refusal, and it returns nothing new.",
+                    pending_name
+                )
+            } else {
+                format!(
+                    "Tool '{}' was refused: the same call kept repeating after a warning and returns nothing new. Other tools still work: change the arguments or the approach and carry on with the task.",
+                    pending_name
+                )
+            };
         }
         result
     }
@@ -693,8 +788,10 @@ impl LoopDetectorState {
         pending_name: &str,
         pending_input: &serde_json::Value,
         batch: &[(String, String, serde_json::Value)],
+        read_only: bool,
     ) -> LoopDetectionResult {
         let pending_hash = stable_hash_input(pending_name, pending_input);
+        let poll_like = is_poll_like_call(pending_name, pending_input);
 
         // 1. Global circuit breaker: same tool+input with no progress
         let no_progress_streak = self.count_no_progress_streak(pending_name, pending_hash);
@@ -710,28 +807,18 @@ impl LoopDetectorState {
             };
         }
 
-        // 2. Known poll tools: stricter thresholds for status-checking tools
-        let is_poll = KNOWN_POLL_TOOLS.iter().any(|t| pending_name.contains(t));
-        if is_poll {
-            let streak = self.count_same_tool_streak(pending_name, pending_hash);
-            if streak >= CRITICAL_THRESHOLD {
-                return LoopDetectionResult {
-                    level: LoopLevel::Critical,
-                    detector: Some(LoopDetector::KnownPollNoProgress),
-                    count: streak,
-                    message: format!(
-                        "轮询工具 '{}' 已连续调用{}次且无进展，强制终止。请检查目标状态或换一种方法。",
-                        pending_name, streak
-                    ),
-                };
-            }
-            if streak >= WARNING_THRESHOLD {
+        // 2. Status checks and waits: repeating them is normal while something
+        // is still running, so they only count once the result has stopped
+        // changing for a while.
+        if poll_like {
+            let streak = self.count_unchanged_streak(pending_name, pending_hash);
+            if streak >= POLL_NO_PROGRESS_THRESHOLD {
                 return LoopDetectionResult {
                     level: LoopLevel::Warning,
                     detector: Some(LoopDetector::KnownPollNoProgress),
                     count: streak,
                     message: format!(
-                        "轮询工具 '{}' 已连续调用{}次，结果无变化。建议检查是否需要换一种方法或增加等待时间。",
+                        "Tool '{}' returned the same result {} times in a row. Checking again right away will not change it: wait longer between checks, or find out why nothing is changing.",
                         pending_name, streak
                     ),
                 };
@@ -859,28 +946,32 @@ impl LoopDetectorState {
         // legitimately return the same content.
         let runs_commands = pending_name == "code_run";
         if runs_commands {
-            if let Some(last) = self
+            if let Some(last_norm) = self
                 .history
                 .iter()
                 .rev()
                 .find(|r| r.name == pending_name && r.input_hash == pending_hash)
+                .map(|r| r.norm_hash)
             {
-                let same = self
-                    .history
-                    .iter()
-                    .filter(|r| {
-                        r.name == pending_name
-                            && r.input_hash == pending_hash
-                            && r.norm_hash == last.norm_hash
-                    })
-                    .count();
+                let is_same_outcome = |r: &ToolCallRecord| {
+                    r.name == pending_name
+                        && r.input_hash == pending_hash
+                        && r.norm_hash == last_norm
+                        && !r.outcome_refused
+                };
+                let same = self.history.iter().filter(|r| is_same_outcome(r)).count();
                 if same >= 8 {
+                    // One refusal per eight identical outcomes; the count
+                    // starts over afterwards.
+                    for record in self.history.iter_mut().filter(|r| is_same_outcome(r)) {
+                        record.outcome_refused = true;
+                    }
                     return LoopDetectionResult {
                         level: LoopLevel::Critical,
                         detector: Some(LoopDetector::GlobalCircuitBreaker),
                         count: same,
                         message: format!(
-                            "Tool '{}' was run {} times with the same outcome and no progress. Stop retrying: report to the user what is failing and ask for direction.",
+                            "Tool '{}' was run {} times with the same outcome, so this run was refused. The changes made in between did not affect the outcome: find out why before running it again, or take a different approach.",
                             pending_name, same
                         ),
                     };
@@ -899,20 +990,42 @@ impl LoopDetectorState {
             }
         }
 
-        // 3.9. Early nudge: the same call several rounds in a row. The generic
-        // thresholds below are deliberately high; this one only asks the model
-        // to change approach before some providers reject the repetition.
-        if !KNOWN_POLL_TOOLS.contains(&pending_name) {
-            let streak = self.count_same_tool_streak(pending_name, pending_hash);
+        // 3.9. The same call, with the same result, several rounds in a row.
+        // A result that keeps changing (a growing log, a progress figure) is
+        // not a loop and is left alone.
+        if !poll_like {
+            let streak = self.count_unchanged_streak(pending_name, pending_hash);
             if streak >= 2 {
                 return LoopDetectionResult {
                     level: LoopLevel::Warning,
                     detector: Some(LoopDetector::GenericRepeat),
                     count: streak + 1,
                     message: format!(
-                        "Tool '{}' was called with identical arguments {} times in a row. Change the arguments or approach, or report what is blocking you.",
+                        "Tool '{}' was called with identical arguments {} times in a row and the result did not change. Repeating it gives nothing new: change the arguments or the approach.",
                         pending_name,
                         streak + 1
+                    ),
+                };
+            }
+        }
+
+        // 3.95. A cycle of any length (A→B→A→B, A→B→C→A→B→C): the last calls
+        // all repeated an earlier call and got the earlier result, and the
+        // pending call was made before too. Reads are left to `ReadGuard`.
+        if !poll_like && !read_only {
+            let stale = self.stale_tail();
+            let seen_before = self
+                .history
+                .iter()
+                .any(|r| r.name == pending_name && r.input_hash == pending_hash);
+            if stale >= STALE_CYCLE_THRESHOLD && seen_before {
+                return LoopDetectionResult {
+                    level: LoopLevel::Warning,
+                    detector: Some(LoopDetector::GenericRepeat),
+                    count: stale,
+                    message: format!(
+                        "The last {} tool calls only repeated earlier calls and returned the same results, and tool '{}' was already called with these arguments. This cycle produces nothing new: change the approach.",
+                        stale, pending_name
                     ),
                 };
             }
@@ -970,12 +1083,28 @@ impl LoopDetectorState {
         count
     }
 
-    /// Count consecutive calls to the same tool+input at the tail of history.
-    fn count_same_tool_streak(&self, name: &str, input_hash: u64) -> usize {
+    /// Count consecutive calls to the same tool+input at the tail of history
+    /// whose result, digits and timings aside, never changed.
+    fn count_unchanged_streak(&self, name: &str, input_hash: u64) -> usize {
+        let Some(last) = self.history.last() else {
+            return 0;
+        };
         self.history
             .iter()
             .rev()
-            .take_while(|r| r.name == name && r.input_hash == input_hash)
+            .take_while(|r| {
+                r.name == name && r.input_hash == input_hash && r.norm_hash == last.norm_hash
+            })
+            .count()
+    }
+
+    /// Number of trailing calls that only repeated an earlier call and its
+    /// result. Waits and status checks end the run: they repeat by design.
+    fn stale_tail(&self) -> usize {
+        self.history
+            .iter()
+            .rev()
+            .take_while(|r| r.stale && !r.poll_like)
             .count()
     }
 
@@ -2279,74 +2408,210 @@ pub fn build_request_view_messages(
     collapse_repeated_tool_rounds(out)
 }
 
-/// One assistant tool round (a single tool call plus its single result) as
-/// two adjacent messages, used to find identical consecutive rounds.
-fn single_tool_round(messages: &[LlmMessage], i: usize) -> Option<(String, String)> {
-    let (a, b) = (messages.get(i)?, messages.get(i + 1)?);
-    if a.role != "assistant" || b.role != "user" {
-        return None;
+/// A tool call as it is compared across rounds: name plus arguments, without
+/// the per-call `_trace_id`.
+fn request_call_signature(name: &str, input: &serde_json::Value) -> String {
+    let mut normalized = input.clone();
+    if let Some(obj) = normalized.as_object_mut() {
+        obj.remove("_trace_id");
     }
-    let (MessageContent::Blocks(ab), MessageContent::Blocks(bb)) = (&a.content, &b.content) else {
-        return None;
-    };
-    let mut uses = ab.iter().filter_map(|x| match x {
-        ContentBlock::ToolUse { id, name, input } => Some((id, name, input)),
-        _ => None,
-    });
-    let (id, name, input) = uses.next()?;
-    if uses.next().is_some() {
-        return None;
-    }
-    let mut results = bb.iter().filter_map(|x| match x {
-        ContentBlock::ToolResult { tool_use_id, .. } => Some(tool_use_id),
-        _ => None,
-    });
-    if results.next()? != id || results.next().is_some() {
-        return None;
-    }
-    Some((name.clone(), input.to_string()))
+    format!("{}::{}", name, normalized)
 }
 
-/// Some providers (e.g. Qwen on DashScope) reject a request with HTTP 400 when
-/// the history holds the same tool call (same name and arguments) in several
-/// consecutive rounds. Keep only the last round of every such run and note the
-/// repetition in its result, so the model still learns it was repeating
-/// itself. Operates on the request view only; stored history is untouched.
-pub fn collapse_repeated_tool_rounds(messages: Vec<LlmMessage>) -> Vec<LlmMessage> {
-    let mut drop = vec![false; messages.len()];
-    let mut notes: HashMap<usize, usize> = HashMap::new();
+/// One assistant message with tool calls and the user message carrying all
+/// of their results.
+struct RequestToolRound {
+    /// Index of the assistant message; the results are in the next message.
+    asst: usize,
+    /// Per call: signature, tool_use id, and whether the call actually ran
+    /// (its result is not a loop-guard refusal).
+    calls: Vec<(String, String, bool)>,
+    /// Only host reminders lie between the previous round and this one.
+    follows_previous: bool,
+}
+
+fn is_collapse_skippable_interstitial(msg: &LlmMessage) -> bool {
+    msg.role == "user"
+        && matches!(
+            &msg.content,
+            MessageContent::Text(t) if crate::agent::message_utils::is_system_reminder_text(t)
+        )
+}
+
+fn request_tool_rounds(messages: &[LlmMessage]) -> Vec<RequestToolRound> {
+    let mut rounds: Vec<RequestToolRound> = Vec::new();
     let mut i = 0;
-    while i < messages.len() {
-        let Some(sig) = single_tool_round(&messages, i) else {
+    while i + 1 < messages.len() {
+        let (a, b) = (&messages[i], &messages[i + 1]);
+        let (MessageContent::Blocks(ab), MessageContent::Blocks(bb)) = (&a.content, &b.content)
+        else {
             i += 1;
             continue;
         };
-        let mut j = i + 2;
-        while single_tool_round(&messages, j).as_ref() == Some(&sig) {
-            j += 2;
+        if a.role != "assistant" || b.role != "user" {
+            i += 1;
+            continue;
         }
-        let rounds = (j - i) / 2;
-        if rounds >= 2 {
-            drop[i..j - 2].fill(true);
-            notes.insert(j - 1, rounds);
+        let results: HashMap<&str, bool> = bb
+            .iter()
+            .filter_map(|x| match x {
+                ContentBlock::ToolResult {
+                    tool_use_id,
+                    content,
+                    is_error,
+                } => Some((
+                    tool_use_id.as_str(),
+                    !(*is_error && content.starts_with(LOOP_BLOCK_PREFIX)),
+                )),
+                _ => None,
+            })
+            .collect();
+        let uses = ab
+            .iter()
+            .filter(|x| matches!(x, ContentBlock::ToolUse { .. }))
+            .count();
+        let calls: Vec<(String, String, bool)> = ab
+            .iter()
+            .filter_map(|x| match x {
+                ContentBlock::ToolUse { id, name, input } => results
+                    .get(id.as_str())
+                    .map(|ran| (request_call_signature(name, input), id.clone(), *ran)),
+                _ => None,
+            })
+            .collect();
+        if uses == 0 || calls.len() != uses || results.len() != uses {
+            i += 1;
+            continue;
         }
-        i = j;
+        let follows_previous = rounds.last().is_some_and(|prev| {
+            messages[prev.asst + 2..i]
+                .iter()
+                .all(is_collapse_skippable_interstitial)
+        });
+        rounds.push(RequestToolRound {
+            asst: i,
+            calls,
+            follows_previous,
+        });
+        i += 2;
     }
+    rounds
+}
+
+/// Close a run of one identical call over consecutive rounds: keep its latest
+/// occurrence that actually ran (else the latest), drop the rest.
+fn close_repeat_chain(
+    chain: Vec<(String, bool)>,
+    dropped: &mut HashSet<String>,
+    notes: &mut HashMap<String, usize>,
+) {
+    if chain.len() < 2 {
+        return;
+    }
+    let keep = chain
+        .iter()
+        .rposition(|(_, ran)| *ran)
+        .unwrap_or(chain.len() - 1);
+    for (n, (id, _)) in chain.iter().enumerate() {
+        if n == keep {
+            notes.insert(id.clone(), chain.len());
+        } else {
+            dropped.insert(id.clone());
+        }
+    }
+}
+
+/// Remove repeated tool calls from the request view before it goes to the
+/// model: a history full of the same call teaches the model to make it again,
+/// and some providers (Qwen on DashScope) answer such a history with HTTP 400.
+///
+/// When the same call (name and arguments) appears in consecutive tool rounds,
+/// only one occurrence stays: the latest that actually ran, so a real result
+/// is never traded for a later loop-guard refusal. Its result gets a note
+/// saying how often the call was repeated. Rounds count as consecutive when nothing
+/// but host `[系统提醒]` nudges lies between them; a nudge that led to a
+/// dropped repeat is dropped with it, the latest one stays. Calls that share a
+/// round with other calls are handled one by one. Stored history is untouched.
+pub fn collapse_repeated_tool_rounds(messages: Vec<LlmMessage>) -> Vec<LlmMessage> {
+    let rounds = request_tool_rounds(&messages);
+    let mut dropped: HashSet<String> = HashSet::new();
+    let mut notes: HashMap<String, usize> = HashMap::new();
+    let mut open: HashMap<String, Vec<(String, bool)>> = HashMap::new();
+    for round in &rounds {
+        let ended: Vec<String> = open
+            .keys()
+            .filter(|sig| {
+                !round.follows_previous || !round.calls.iter().any(|call| &call.0 == *sig)
+            })
+            .cloned()
+            .collect();
+        for sig in ended {
+            if let Some(chain) = open.remove(&sig) {
+                close_repeat_chain(chain, &mut dropped, &mut notes);
+            }
+        }
+        let mut seen: HashSet<&str> = HashSet::new();
+        for (sig, id, ok) in &round.calls {
+            if seen.insert(sig.as_str()) {
+                open.entry(sig.clone()).or_default().push((id.clone(), *ok));
+            }
+        }
+    }
+    for (_, chain) in open.drain() {
+        close_repeat_chain(chain, &mut dropped, &mut notes);
+    }
+    if dropped.is_empty() {
+        return messages;
+    }
+
+    // The nudges in front of a round that disappears go with it.
+    let mut drop_msg = vec![false; messages.len()];
+    for (n, round) in rounds.iter().enumerate() {
+        let gone = round.calls.iter().all(|call| dropped.contains(&call.1));
+        if gone && round.follows_previous && n > 0 {
+            drop_msg[rounds[n - 1].asst + 2..round.asst].fill(true);
+        }
+    }
+
     messages
         .into_iter()
         .enumerate()
-        .filter(|(idx, _)| !drop[*idx])
-        .map(|(idx, mut m)| {
-            if let (Some(n), MessageContent::Blocks(blocks)) = (notes.get(&idx), &mut m.content) {
+        .filter_map(|(idx, mut m)| {
+            if drop_msg[idx] {
+                return None;
+            }
+            if let MessageContent::Blocks(blocks) = &mut m.content {
+                let is_tool_block = |b: &ContentBlock| {
+                    matches!(
+                        b,
+                        ContentBlock::ToolUse { .. } | ContentBlock::ToolResult { .. }
+                    )
+                };
+                let had_tool_blocks = blocks.iter().any(is_tool_block);
+                blocks.retain(|b| match b {
+                    ContentBlock::ToolUse { id, .. } => !dropped.contains(id),
+                    ContentBlock::ToolResult { tool_use_id, .. } => !dropped.contains(tool_use_id),
+                    _ => true,
+                });
+                if had_tool_blocks && !blocks.iter().any(is_tool_block) {
+                    return None;
+                }
                 for b in blocks.iter_mut() {
-                    if let ContentBlock::ToolResult { content, .. } = b {
-                        content.push_str(&format!(
-                            "\n[Note: this identical call was made {n} times in a row; earlier repeats were omitted. Change the arguments or approach instead of repeating it.]"
-                        ));
+                    if let ContentBlock::ToolResult {
+                        tool_use_id,
+                        content,
+                        ..
+                    } = b
+                    {
+                        if let Some(n) = notes.get(tool_use_id) {
+                            content.push_str(&format!(
+                                "\n[Note: this identical call was made {n} times in a row; only this result is shown. If the result is not changing, calling it again gives nothing new: change the arguments or the approach.]"
+                            ));
+                        }
                     }
                 }
             }
-            m
+            Some(m)
         })
         .collect()
 }
@@ -4028,11 +4293,12 @@ impl AgentLoop {
         let effective_system_prompt = self.compose_system_prompt(&messages, &ctx);
 
         let max_iterations = ctx.max_iterations.unwrap_or(DEFAULT_MAX_ITERATIONS as u32) as usize;
-        let mut loop_detector = LoopDetectorState {
-            history: restored_loop_history.clone().unwrap_or_default(),
-            consecutive_vision_only_turns: 0,
-            warned: HashMap::new(),
-        };
+        let mut loop_detector =
+            LoopDetectorState::new(restored_loop_history.clone().unwrap_or_default());
+        // Set when the loop detector used up its last strike: the next model
+        // reply is the handoff note that ends the turn. Holds the text used
+        // when the model does not write one.
+        let mut loop_handoff: Option<String> = None;
         if restored_loop_history.is_none() {
             loop_detector.seed_from_messages(&messages);
         }
@@ -4820,6 +5086,38 @@ impl AgentLoop {
                     .await;
             }
 
+            // The loop detector ended the tool phase: this reply is the handoff
+            // note. Tool calls in it are not run, and neither the thinking
+            // nudge nor the unfinished-todo reminder may reopen the turn.
+            if let Some(fallback) = loop_handoff.take() {
+                if !tool_calls.is_empty() {
+                    warn!(
+                        "Loop HALT [{}]: ignoring {} tool call(s) in the handoff reply",
+                        ctx.session_id,
+                        tool_calls.len()
+                    );
+                }
+                let handoff = if text_buf.trim().is_empty() {
+                    let _ = event_tx
+                        .send(AgentEvent::TextDelta {
+                            delta: fallback.clone(),
+                        })
+                        .await;
+                    fallback
+                } else {
+                    text_buf.clone()
+                };
+                let asst_msg = LlmMessage {
+                    role: "assistant".into(),
+                    content: MessageContent::text(&handoff),
+                };
+                new_messages.push(asst_msg.clone());
+                messages.push(asst_msg.clone());
+                self.persist_message(&ctx.session_id, &asst_msg, turn_index)
+                    .await;
+                break;
+            }
+
             // If no tool calls, check for unfinished plan_todo items before exiting.
             // If any todo is still in_progress or pending, inject a reminder and continue.
             if tool_calls.is_empty() {
@@ -4921,8 +5219,14 @@ impl AgentLoop {
             // Critical = block the tool call; Warning = inject hint but continue.
             let mut blocked_tool_ids: Vec<String> = Vec::new();
             let mut warning_messages: Vec<String> = Vec::new();
+            loop_detector.begin_batch();
             for (id, name, input) in &tool_calls {
-                let detection = loop_detector.detect(name, input, &tool_calls);
+                let read_only = self
+                    .registry
+                    .get(name)
+                    .map(|t| t.is_read_only())
+                    .unwrap_or(false);
+                let detection = loop_detector.detect(name, input, &tool_calls, read_only);
                 match detection.level {
                     LoopLevel::Critical => {
                         warn!(
@@ -4942,6 +5246,10 @@ impl AgentLoop {
                     LoopLevel::Ok => {}
                 }
             }
+            // Third strike: this batch still gets its results, then the model
+            // is asked for a handoff note instead of another tool round.
+            let loop_halt = loop_detector.should_halt();
+            let loop_hits = warning_messages.clone();
 
             // Re-reads of content that has not changed. The detector above
             // compares exact arguments over a long window; this one follows
@@ -5056,14 +5364,14 @@ impl AgentLoop {
                         .unwrap_or_else(|| format!("工具 '{}' 被循环检测器阻断。", name));
                     tool_result_blocks.push(ContentBlock::ToolResult {
                         tool_use_id: id.clone(),
-                        content: format!("[循环检测] {}", msg),
+                        content: format!("{} {}", LOOP_BLOCK_PREFIX, msg),
                         is_error: true,
                     });
                     let _ = event_tx
                         .send(AgentEvent::ToolEnd {
                             id: id.clone(),
                             name: name.clone(),
-                            result: format!("[循环检测] {}", msg),
+                            result: format!("{} {}", LOOP_BLOCK_PREFIX, msg),
                             is_error: true,
                         })
                         .await;
@@ -5125,9 +5433,9 @@ impl AgentLoop {
                             continue;
                         }
                         crate::tool_stats::record(&ctx.session_id, name, content, *is_error);
-                        let rh = stable_hash_result(content);
-                        loop_detector.record(name, input, rh, stable_hash_normalized(content));
                         if !blocked_tool_ids.contains(tool_use_id) {
+                            let rh = stable_hash_result(content);
+                            loop_detector.record(name, input, rh, stable_hash_normalized(content));
                             let read_only = self
                                 .registry
                                 .get(name)
@@ -5156,14 +5464,21 @@ impl AgentLoop {
                 }
             }
 
-            let warning_reminder = if all_tools_blocked {
+            loop_detector.end_batch();
+
+            // The task was handed over to be finished, so a warning or a
+            // refusal asks for a different approach, not for the turn to end.
+            // Only the third strike in a row ends it, with a handoff note.
+            let warning_reminder = if loop_halt {
+                Some(loop_handoff_request(&loop_hits))
+            } else if !blocked_tool_ids.is_empty() {
                 Some(format!(
-                    "[系统提醒]\n{}\n本轮所有工具调用都已被循环检测器阻断。现在必须停止继续沿用刚才的工具路径，直接基于已有证据给出当前最佳答复；如果信息仍有缺口，请明确列出不确定项、现有判断依据与后续建议，不要继续调用工具。",
+                    "[系统提醒]\n{}\n上述调用已被拒绝执行，其余工具仍然可用。请换一种做法继续完成任务：修改参数、换用别的工具，或先处理其他步骤。如果再次重复同样的调用，本轮将结束并交回用户。",
                     warning_messages.join("\n")
                 ))
-            } else if !warning_messages.is_empty() && blocked_tool_ids.is_empty() {
+            } else if !warning_messages.is_empty() {
                 Some(format!(
-                    "[系统提醒]\n{}\n请先基于现有结果收束、总结或切换方法，不要机械重复刚才的工具路径。",
+                    "[系统提醒]\n{}\n重复同样的调用不会带来新信息。请换一种做法继续推进任务：修改参数、换用别的工具，或先处理其他步骤。",
                     warning_messages.join("\n")
                 ))
             } else {
@@ -5267,6 +5582,21 @@ impl AgentLoop {
                     .await;
             }
 
+            if loop_halt && !cancelled_after_batch && read_pause.is_none() {
+                warn!(
+                    "Loop HALT [{}]: third strike in a row, asking for a handoff note",
+                    ctx.session_id
+                );
+                let _ = event_tx
+                    .send(AgentEvent::Notice {
+                        message: "同样的工具调用在提醒和拒绝之后仍被重复，本轮已结束。".to_string(),
+                        code: Some("loop_halted".to_string()),
+                        details: Some(serde_json::json!({ "hits": loop_hits })),
+                    })
+                    .await;
+                loop_handoff = Some(loop_halt_fallback(&loop_hits));
+            }
+
             // Write checkpoint after each iteration (with size guard)
             if let Some(ref db_arc) = self.db {
                 let db = db_arc.lock().await;
@@ -5363,6 +5693,23 @@ impl AgentLoop {
                     break;
                 }
             }
+        }
+
+        // The loop detector ended the tool phase on the last allowed iteration,
+        // so the model never got to write the handoff note.
+        if let Some(fallback) = loop_handoff.take().filter(|_| !cancel.load(Ordering::Relaxed)) {
+            let _ = event_tx
+                .send(AgentEvent::TextDelta {
+                    delta: fallback.clone(),
+                })
+                .await;
+            let asst_msg = LlmMessage {
+                role: "assistant".into(),
+                content: MessageContent::text(&fallback),
+            };
+            new_messages.push(asst_msg.clone());
+            self.persist_message(&ctx.session_id, &asst_msg, turn_index)
+                .await;
         }
 
         // Mark checkpoint as completed so it won't be resumed next run
@@ -5595,6 +5942,30 @@ fn read_pause_message(pause: &super::read_guard::ReadPause) -> String {
     format!(
         "我暂停了这一轮：最近 {} 次读取中有 {} 次读到的是没有变化的内容，继续读下去不会有新的进展。{}\n\n已读到的内容都还在。请告诉我接下来希望我做什么，例如直接基于现有内容完成任务，或者指出我还缺少哪部分信息。",
         pause.window, pause.rereads, files
+    )
+}
+
+/// Third loop strike: the last message of the turn's tool phase. Tools stay
+/// declared (some providers reject a history with tool calls and no tool
+/// list), but whatever the model calls next is not run.
+fn loop_handoff_request(hits: &[String]) -> String {
+    format!(
+        "[系统提醒]\n{}\n同样的调用在提醒和拒绝之后仍被重复，继续下去不会有新的结果，所以本轮到此结束。现在不要再调用任何工具，直接写一份交接说明：\n1. 已经完成了什么；\n2. 卡在哪一步：哪个调用，得到了什么结果；\n3. 已经试过哪些做法；\n4. 建议下一步怎么做，或者需要用户提供什么。",
+        hits.join("\n")
+    )
+}
+
+/// What the user reads when the model did not write the handoff note itself.
+fn loop_halt_fallback(hits: &[String]) -> String {
+    let details = if hits.is_empty() {
+        String::new()
+    } else {
+        let lines: Vec<String> = hits.iter().map(|hit| format!("- {}", hit)).collect();
+        format!("\n\n{}", lines.join("\n"))
+    };
+    format!(
+        "我结束了这一轮：同样的工具调用在提醒和拒绝之后仍被重复，继续下去不会有新的结果。{}\n\n之前的工具结果都还在。请告诉我换一种什么做法，或者补充我缺少的信息，我再继续。",
+        details
     )
 }
 
@@ -6055,67 +6426,147 @@ mod tests {
     }
 
     fn fresh_detector() -> super::LoopDetectorState {
-        super::LoopDetectorState {
-            history: Vec::new(),
-            consecutive_vision_only_turns: 0,
-            warned: HashMap::new(),
-        }
+        super::LoopDetectorState::new(Vec::new())
     }
 
-    fn record_run(d: &mut super::LoopDetectorState, input: &Value, n: u32) {
+    /// One model reply with a single tool call, driven the way the agent loop
+    /// drives the detector: check, run unless refused, record. Returns the
+    /// level and whether the turn has to end.
+    fn check_round(
+        d: &mut super::LoopDetectorState,
+        name: &str,
+        input: &Value,
+        result: &str,
+    ) -> (super::LoopLevel, bool) {
+        let batch = vec![("id".to_string(), name.to_string(), input.clone())];
+        d.begin_batch();
+        let level = d.detect(name, input, &batch, false).level;
+        let halt = d.should_halt();
+        if level != super::LoopLevel::Critical {
+            d.record(
+                name,
+                input,
+                super::stable_hash_result(result),
+                super::stable_hash_normalized(result),
+            );
+        }
+        d.end_batch();
+        (level, halt)
+    }
+
+    /// A test run that keeps failing the same way, followed by a new edit.
+    fn run_then_edit(d: &mut super::LoopDetectorState, input: &Value, n: u32) -> super::LoopLevel {
         let content = format!("tests {n}ms\nfail 5\n[recovery_v1]\n{{\"operation_id\":\"op{n}\"}}");
-        d.record(
-            "code_run",
-            input,
-            super::stable_hash_result(&content),
-            super::stable_hash_normalized(&content),
-        );
-        // An edit between runs keeps the consecutive-repeat nudge out of the way.
-        d.record("file_edit", &json!({"n": n}), u64::from(n), u64::from(n));
+        let (level, _) = check_round(d, "code_run", input, &content);
+        check_round(d, "file_edit", &json!({"n": n}), "ok");
+        level
     }
 
     #[test]
-    fn code_run_with_same_outcome_warns_then_blocks() {
+    fn code_run_with_same_outcome_warns_then_is_refused_once() {
+        use super::LoopLevel::{Critical, Ok, Warning};
         let input = json!({"command": "node --test"});
-        let batch = vec![("id".to_string(), "code_run".to_string(), input.clone())];
         let mut d = fresh_detector();
-        for n in 0..3 {
-            record_run(&mut d, &input, n);
-        }
-        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Ok);
-        record_run(&mut d, &input, 3);
-        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Warning);
-        for n in 4..8 {
-            record_run(&mut d, &input, n);
-        }
-        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Critical);
+        let levels: Vec<_> = (0..10).map(|n| run_then_edit(&mut d, &input, n)).collect();
+        assert_eq!(levels[..4], [Ok; 4]);
+        // The edits in between are new work, so the warnings do not escalate.
+        assert_eq!(levels[4..8], [Warning; 4]);
+        // Eight identical outcomes: one refusal, then the count starts over.
+        assert_eq!(levels[8], Critical);
+        assert_eq!(levels[9], Ok);
     }
 
     #[test]
-    fn ignored_warnings_escalate_to_a_block() {
-        let input = json!({"command": "node --test"});
-        let batch = vec![("id".to_string(), "code_run".to_string(), input.clone())];
+    fn an_identical_call_is_warned_then_refused_then_ends_the_turn() {
+        use super::LoopLevel::{Critical, Ok, Warning};
+        let input = json!({"command": "npm run build"});
         let mut d = fresh_detector();
-        for n in 0..4 {
-            record_run(&mut d, &input, n);
-        }
-        // One ignored warning is allowed; the next identical call is refused.
-        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Warning);
-        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Critical);
+        let round = |d: &mut super::LoopDetectorState| {
+            check_round(d, "shell", &input, "error: cannot find module")
+        };
+        assert_eq!(round(&mut d), (Ok, false));
+        assert_eq!(round(&mut d), (Ok, false));
+        // Third identical call: warned, still run.
+        assert_eq!(round(&mut d), (Warning, false));
+        assert_eq!(d.history.len(), 3);
+        // Fourth: refused. A refused call is not part of the history.
+        assert_eq!(round(&mut d), (Critical, false));
+        assert_eq!(d.history.len(), 3);
+        // Fifth: refused, and the turn ends.
+        assert_eq!(round(&mut d), (Critical, true));
     }
 
     #[test]
-    fn a_different_call_in_between_clears_earlier_warnings() {
-        let input = json!({"command": "node --test"});
-        let other = json!({"command": "ls"});
-        let batch = vec![("id".to_string(), "code_run".to_string(), input.clone())];
+    fn a_new_call_in_between_clears_the_strikes() {
+        use super::LoopLevel::{Critical, Ok, Warning};
+        let input = json!({"command": "npm run build"});
         let mut d = fresh_detector();
-        for n in 0..4 {
-            record_run(&mut d, &input, n);
+        for _ in 0..2 {
+            check_round(&mut d, "shell", &input, "error: cannot find module");
         }
-        assert_eq!(d.detect("code_run", &input, &batch).level, super::LoopLevel::Warning);
-        d.record("code_run", &other, 1, 1);
-        assert_eq!(d.warned.len(), 0, "warnings belong to a run of one call");
+        assert_eq!(check_round(&mut d, "shell", &input, "error: cannot find module").0, Warning);
+        assert_eq!(check_round(&mut d, "shell", &input, "error: cannot find module").0, Critical);
+        // The model changes course: the earlier strikes no longer count.
+        assert_eq!(check_round(&mut d, "file_edit", &json!({"path": "a.ts"}), "ok"), (Ok, false));
+        assert_eq!(d.strikes, 0);
+        assert_eq!(check_round(&mut d, "shell", &input, "error: cannot find module").0, Ok);
+    }
+
+    #[test]
+    fn a_result_that_keeps_changing_is_not_a_loop() {
+        let input = json!({"command": "tail build.log"});
+        let mut d = fresh_detector();
+        for step in ["configure", "compile", "link", "bundle", "sign", "pack", "upload", "verify"] {
+            let (level, halt) = check_round(&mut d, "shell", &input, &format!("step: {step}"));
+            assert_eq!((level, halt), (super::LoopLevel::Ok, false), "{step}");
+        }
+    }
+
+    #[test]
+    fn waits_and_status_checks_get_room_before_they_count() {
+        use super::LoopLevel::{Critical, Ok, Warning};
+        let input = json!({"command": "sleep 5; curl -s localhost:3000/health"});
+        let mut d = fresh_detector();
+        let levels: Vec<_> = (0..11)
+            .map(|_| check_round(&mut d, "shell", &input, "connection refused"))
+            .collect();
+        assert!(levels[..8].iter().all(|round| *round == (Ok, false)), "{levels:?}");
+        assert_eq!(levels[8], (Warning, false));
+        assert_eq!(levels[9], (Critical, false));
+        assert_eq!(levels[10], (Critical, true));
+    }
+
+    #[test]
+    fn a_cycle_of_repeated_calls_is_caught() {
+        use super::LoopLevel::{Critical, Ok, Warning};
+        let build = json!({"command": "npm run build"});
+        let lint = json!({"command": "npm run lint"});
+        let mut d = fresh_detector();
+        let mut levels = Vec::new();
+        for n in 0..11 {
+            let (input, result) = if n % 2 == 0 { (&build, "build failed") } else { (&lint, "lint failed") };
+            levels.push(check_round(&mut d, "shell", input, result));
+        }
+        // Two new calls, then six that only repeat them.
+        assert!(levels[..8].iter().all(|round| *round == (Ok, false)), "{levels:?}");
+        assert_eq!(levels[8], (Warning, false));
+        assert_eq!(levels[9], (Critical, false));
+        assert_eq!(levels[10], (Critical, true));
+    }
+
+    #[test]
+    fn rotating_reads_are_left_to_the_read_guard() {
+        let a = json!({"path": "a.md"});
+        let b = json!({"path": "b.md"});
+        let mut d = fresh_detector();
+        for n in 0..8 {
+            let input = if n % 2 == 0 { &a } else { &b };
+            d.record("doc_read", input, 1, 1);
+        }
+        let batch = vec![("id".to_string(), "doc_read".to_string(), a.clone())];
+        d.begin_batch();
+        assert_eq!(d.detect("doc_read", &a, &batch, true).level, super::LoopLevel::Ok);
+        assert_eq!(d.detect("doc_read", &a, &batch, false).level, super::LoopLevel::Warning);
     }
 
     #[test]
@@ -6125,12 +6576,46 @@ mod tests {
         for n in 0..5 {
             msgs.extend(tool_round(&format!("c{n}"), input.clone()));
         }
+        // A call the loop guard refused never ran, so it is not seeded.
+        msgs.extend(refused_round("c5", input.clone()));
         // tool_round uses `read_file`; seeding keeps whatever tool name was used.
         let mut d = fresh_detector();
         d.seed_from_messages(&msgs);
         assert_eq!(d.history.len(), 5);
+        assert_eq!(d.strikes, 0);
     }
 
+    fn refused_round(id: &str, args: Value) -> Vec<LlmMessage> {
+        let mut round = tool_round(id, args);
+        round[1].content = MessageContent::Blocks(vec![ContentBlock::ToolResult {
+            tool_use_id: id.into(),
+            content: "[循环检测] Tool 'read_file' was refused".into(),
+            is_error: true,
+        }]);
+        round
+    }
+
+    fn reminder(text: &str) -> LlmMessage {
+        LlmMessage {
+            role: "user".into(),
+            content: MessageContent::text(format!("[系统提醒]\n{text}")),
+        }
+    }
+
+    fn tool_result_ids(messages: &[LlmMessage]) -> Vec<String> {
+        messages
+            .iter()
+            .filter_map(|m| match &m.content {
+                MessageContent::Blocks(blocks) => Some(blocks),
+                _ => None,
+            })
+            .flatten()
+            .filter_map(|b| match b {
+                ContentBlock::ToolResult { tool_use_id, .. } => Some(tool_use_id.clone()),
+                _ => None,
+            })
+            .collect()
+    }
 
     #[test]
     fn different_arguments_are_not_collapsed() {
@@ -6138,6 +6623,87 @@ mod tests {
         msgs.extend(tool_round("a", json!({"path": "x"})));
         msgs.extend(tool_round("b", json!({"path": "y"})));
         assert_eq!(super::collapse_repeated_tool_rounds(msgs).len(), 4);
+    }
+
+    /// What a loop leaves in the history: the call, a warning, the call
+    /// refused, a second reminder. The model is shown the real result once
+    /// and the latest reminder.
+    #[test]
+    fn a_warned_and_refused_repeat_collapses_to_the_real_result_and_the_last_reminder() {
+        let mut msgs = vec![LlmMessage {
+            role: "user".into(),
+            content: MessageContent::text("go"),
+        }];
+        msgs.extend(tool_round("a0", json!({"path": "x"})));
+        msgs.extend(tool_round("a1", json!({"path": "x", "_trace_id": "t1"})));
+        msgs.push(reminder("warned"));
+        msgs.extend(refused_round("a2", json!({"path": "x"})));
+        msgs.push(reminder("refused"));
+
+        let out = super::collapse_repeated_tool_rounds(msgs);
+        assert_eq!(out.len(), 4, "request, one round, last reminder");
+        assert_eq!(tool_result_ids(&out), ["a1"]);
+        let MessageContent::Blocks(b) = &out[2].content else { panic!() };
+        let ContentBlock::ToolResult { content, is_error, .. } = &b[0] else { panic!() };
+        assert!(!is_error);
+        assert!(content.starts_with("same"), "{content}");
+        assert!(content.contains("3 times in a row"), "{content}");
+        assert!(out[3].content.as_text().ends_with("refused"));
+    }
+
+    #[test]
+    fn a_repeat_inside_a_parallel_round_is_removed_without_touching_its_neighbours() {
+        let mut msgs = tool_round("a0", json!({"path": "x"}));
+        msgs.push(LlmMessage {
+            role: "assistant".into(),
+            content: MessageContent::Blocks(vec![
+                ContentBlock::ToolUse { id: "a1".into(), name: "read_file".into(), input: json!({"path": "x"}) },
+                ContentBlock::ToolUse { id: "b1".into(), name: "read_file".into(), input: json!({"path": "y"}) },
+            ]),
+        });
+        msgs.push(LlmMessage {
+            role: "user".into(),
+            content: MessageContent::Blocks(vec![
+                ContentBlock::ToolResult {
+                    tool_use_id: "a1".into(),
+                    content: "[循环检测] refused".into(),
+                    is_error: true,
+                },
+                ContentBlock::ToolResult { tool_use_id: "b1".into(), content: "y".into(), is_error: false },
+            ]),
+        });
+
+        let out = super::collapse_repeated_tool_rounds(msgs);
+        assert_eq!(out.len(), 4);
+        assert_eq!(tool_result_ids(&out), ["a0", "b1"]);
+        let uses: Vec<&str> = out
+            .iter()
+            .filter_map(|m| match &m.content {
+                MessageContent::Blocks(blocks) => Some(blocks),
+                _ => None,
+            })
+            .flatten()
+            .filter_map(|b| match b {
+                ContentBlock::ToolUse { id, .. } => Some(id.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(uses, ["a0", "b1"], "every tool call left has its result");
+    }
+
+    #[test]
+    fn a_user_message_between_identical_calls_keeps_both() {
+        let mut msgs = tool_round("a0", json!({"path": "x"}));
+        msgs.push(LlmMessage {
+            role: "assistant".into(),
+            content: MessageContent::text("done"),
+        });
+        msgs.push(LlmMessage {
+            role: "user".into(),
+            content: MessageContent::text("read it again please"),
+        });
+        msgs.extend(tool_round("a1", json!({"path": "x"})));
+        assert_eq!(super::collapse_repeated_tool_rounds(msgs).len(), 6);
     }
 
     #[test]
@@ -10365,5 +10931,258 @@ mod tests {
         assert!(reminders[0].contains("已连续进行 25 次只读调用"));
         assert!(reminders[1].contains("已连续进行 50 次只读调用"));
         assert!(reminders.iter().all(|text| text.contains(PINNED_USER_REQUEST)));
+    }
+    // ── Repeated-call guard, through the loop ────────────────────────────────
+
+    /// A build that fails the same way every time. Not read-only.
+    struct StuckBuildTool {
+        calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl Tool for StuckBuildTool {
+        fn name(&self) -> &str {
+            "build_step"
+        }
+        fn description(&self) -> &str {
+            "fixture build whose result never changes for one command"
+        }
+        fn input_schema(&self) -> Value {
+            json!({"type":"object","properties":{"command":{"type":"string"}}})
+        }
+        async fn call(&self, input: Value, _ctx: &ToolContext) -> Result<crate::agent::tool::ToolResult> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            let command = input.get("command").and_then(Value::as_str).unwrap_or("?");
+            Ok(crate::agent::tool::ToolResult::ok(format!(
+                "{command}: error: cannot find module 'core'"
+            )))
+        }
+    }
+
+    /// Text and tool results of a message, as the model reads them.
+    fn shown_text(message: &LlmMessage) -> String {
+        match &message.content {
+            MessageContent::Text(text) => text.clone(),
+            MessageContent::Blocks(blocks) => blocks
+                .iter()
+                .filter_map(|block| match block {
+                    ContentBlock::Text { text } => Some(text.as_str()),
+                    ContentBlock::ToolResult { content, .. } => Some(content.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+        }
+    }
+
+    #[derive(Clone, Copy, PartialEq)]
+    enum StuckModel {
+        /// Repeats the build until asked for a handoff note, then writes it.
+        WritesHandoff,
+        /// Repeats the build no matter what it is told.
+        NeverStops,
+        /// Repeats the build until it is refused, then tries something else.
+        ChangesCourse,
+    }
+
+    struct StuckClient {
+        mode: StuckModel,
+        requests: Arc<std::sync::Mutex<Vec<Vec<LlmMessage>>>>,
+    }
+
+    #[async_trait]
+    impl crate::llm::LlmClient for StuckClient {
+        async fn stream(&self, _req: LlmRequest, _tx: mpsc::Sender<LlmChunk>) -> Result<()> {
+            unreachable!("stuck fixture uses complete")
+        }
+
+        async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
+            let last_text = req.messages.last().map(shown_text).unwrap_or_default();
+            let refused_before = req
+                .messages
+                .iter()
+                .any(|m| shown_text(m).contains("已被拒绝执行"));
+            let call = {
+                let mut requests = self.requests.lock().unwrap();
+                requests.push(req.messages.clone());
+                requests.len()
+            };
+            let build = |command: &str| LlmResponse {
+                content: String::new(),
+                tool_calls: vec![crate::llm::ToolCall {
+                    id: format!("build-{call}"),
+                    name: "build_step".into(),
+                    input: json!({ "command": command }),
+                }],
+                input_tokens: 1,
+                output_tokens: 1,
+            };
+            let say = |text: &str| LlmResponse {
+                content: text.into(),
+                tool_calls: vec![],
+                input_tokens: 1,
+                output_tokens: 1,
+            };
+            Ok(match self.mode {
+                StuckModel::WritesHandoff if last_text.contains("交接说明") => {
+                    say("交接：make 一直报 cannot find module 'core'，需要先确认依赖是否安装。")
+                }
+                StuckModel::ChangesCourse if last_text.contains("make install") => say("done"),
+                StuckModel::ChangesCourse if refused_before => build("make install"),
+                _ => build("make"),
+            })
+        }
+    }
+
+    struct StuckRun {
+        new_messages: Vec<LlmMessage>,
+        events: Vec<AgentEvent>,
+        requests: Vec<Vec<LlmMessage>>,
+        tool_calls: usize,
+    }
+
+    async fn run_stuck_agent(mode: StuckModel) -> StuckRun {
+        let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let tool_calls = Arc::new(AtomicUsize::new(0));
+        let mut agent = tier_agent(
+            StuckClient {
+                mode,
+                requests: requests.clone(),
+            },
+            None,
+            crate::agent::harness::LayeredBudget::with_total(1_000_000),
+        );
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(StuckBuildTool {
+            calls: tool_calls.clone(),
+        }));
+        agent.registry = Arc::new(registry);
+
+        let mut ctx = tier_tool_context("stuck-run".into());
+        ctx.bypass_permissions = true;
+        ctx.max_iterations = Some(40);
+        let (event_tx, mut event_rx) = mpsc::channel(64);
+        let collector = tokio::spawn(async move {
+            let mut events = Vec::new();
+            while let Some(event) = event_rx.recv().await {
+                events.push(event);
+            }
+            events
+        });
+        let (new_messages, _, _) = agent
+            .run(
+                vec![make_text_msg("user", PINNED_USER_REQUEST)],
+                event_tx,
+                Arc::new(AtomicBool::new(false)),
+                ctx,
+            )
+            .await
+            .expect("stuck run");
+        let requests = requests.lock().unwrap().clone();
+        StuckRun {
+            new_messages,
+            events: collector.await.expect("event collector"),
+            requests,
+            tool_calls: tool_calls.load(Ordering::SeqCst),
+        }
+    }
+
+    fn refused_tool_ids(events: &[AgentEvent]) -> Vec<String> {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                AgentEvent::ToolEnd { id, result, is_error: true, .. }
+                    if result.starts_with("[循环检测]") =>
+                {
+                    Some(id.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn loop_halted(events: &[AgentEvent]) -> bool {
+        events.iter().any(|event| {
+            matches!(event, AgentEvent::Notice { code: Some(code), .. } if code == "loop_halted")
+        })
+    }
+
+    fn reminders_in(messages: &[LlmMessage]) -> Vec<String> {
+        messages
+            .iter()
+            .filter(|message| message.role == "user")
+            .map(|message| message.content.as_text())
+            .filter(|text| text.starts_with("[系统提醒]"))
+            .collect()
+    }
+
+    /// The same failing build over and over: the third call is warned, the
+    /// fourth and fifth are refused, then the model writes a handoff note and
+    /// the turn ends.
+    #[tokio::test]
+    async fn a_repeated_call_is_warned_refused_and_ends_with_a_handoff_note() {
+        let run = run_stuck_agent(StuckModel::WritesHandoff).await;
+
+        assert_eq!(run.tool_calls, 3, "only the first three calls ran");
+        assert_eq!(run.requests.len(), 6, "five tool rounds and the handoff note");
+        assert_eq!(refused_tool_ids(&run.events), ["build-4", "build-5"]);
+        assert!(loop_halted(&run.events));
+
+        let reminders = reminders_in(&run.new_messages);
+        assert_eq!(reminders.len(), 3, "{reminders:?}");
+        assert!(reminders[0].contains("请换一种做法继续推进任务"), "{}", reminders[0]);
+        assert!(reminders[1].contains("其余工具仍然可用"), "{}", reminders[1]);
+        assert!(reminders[2].contains("交接说明"), "{}", reminders[2]);
+
+        let last = run.new_messages.last().expect("messages");
+        assert_eq!(last.role, "assistant");
+        assert!(last.content.as_text().starts_with("交接："), "{}", last.content.as_text());
+
+        // What the model was sent when asked for the note: the build once,
+        // with its real result, and only the latest reminder.
+        let handoff_request = run.requests.last().unwrap();
+        assert_eq!(tool_result_ids(handoff_request), ["build-3"]);
+        let shown: Vec<String> = handoff_request.iter().map(shown_text).collect();
+        assert!(
+            shown.iter().any(|text| text.contains("cannot find module") && text.contains("5 times in a row")),
+            "{shown:?}"
+        );
+        assert!(!shown.iter().any(|text| text.contains("[循环检测]")), "{shown:?}");
+        assert_eq!(reminders_in(handoff_request).len(), 1, "{shown:?}");
+
+        // No request ever carried the same call in two consecutive rounds.
+        for request in &run.requests {
+            assert!(tool_result_ids(request).len() <= 1, "{:?}", tool_result_ids(request));
+        }
+    }
+
+    /// A model that answers the handoff request with yet another tool call:
+    /// the call is not run and the user still gets an explanation.
+    #[tokio::test]
+    async fn a_model_that_never_stops_gets_a_written_explanation_instead() {
+        let run = run_stuck_agent(StuckModel::NeverStops).await;
+
+        assert_eq!(run.tool_calls, 3);
+        assert_eq!(run.requests.len(), 6);
+        assert_eq!(refused_tool_ids(&run.events), ["build-4", "build-5"]);
+        assert!(loop_halted(&run.events));
+        let last = run.new_messages.last().expect("messages");
+        assert_eq!(last.role, "assistant");
+        let text = last.content.as_text();
+        assert!(text.starts_with("我结束了这一轮"), "{text}");
+        assert!(text.contains("build_step"), "{text}");
+    }
+
+    /// A model that takes the refusal as a cue to try something else carries
+    /// on with the task: nothing ends the turn for it.
+    #[tokio::test]
+    async fn a_model_that_changes_course_after_a_refusal_keeps_working() {
+        let run = run_stuck_agent(StuckModel::ChangesCourse).await;
+
+        assert_eq!(refused_tool_ids(&run.events), ["build-4"]);
+        assert!(!loop_halted(&run.events));
+        // Three `make` runs, then `make install`.
+        assert_eq!(run.tool_calls, 4);
+        assert_eq!(run.new_messages.last().unwrap().content.as_text(), "done");
     }
 }

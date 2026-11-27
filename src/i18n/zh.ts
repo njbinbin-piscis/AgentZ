@@ -1127,6 +1127,7 @@ const zh = {
     noticeStaticOverhead:
       "系统提示词与工具定义已占上下文预算的 {{percent}}%，留给对话的空间不足，压缩无法缓解。请停用部分 MCP 工具或技能后重试。",
     noticeReadLoopPaused: "检测到反复读取没有变化的文件，本轮已暂停。请告诉助手下一步要做什么。",
+    noticeLoopHalted: "助手在提醒和拒绝之后仍重复同一个工具调用，本轮已结束。卡在哪一步见助手的最后一条回复。",
     noticeModelFallback: "主模型「{{from}}」当前不可用，已切换到备选模型「{{to}}」继续处理。",
     planClearFailed: "无法清除待办：{{error}}",
     chipTerminal: "终端",
