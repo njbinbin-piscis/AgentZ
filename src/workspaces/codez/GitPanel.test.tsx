@@ -1,6 +1,7 @@
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GitPanel from "./GitPanel";
+import { ProjectEdgeProvider } from "../../contexts/ProjectEdgeContext";
 import { ideApi } from "../../services/tauri/ide";
 
 vi.mock("react-i18next", () => ({
@@ -31,12 +32,12 @@ describe("GitPanel empty state", () => {
   async function render() {
     await act(async () => {
       root = create(
-        <GitPanel
+        <ProjectEdgeProvider><GitPanel
           projectDir="/plain-folder"
           onDiffClick={() => {}}
           onOpenFile={() => {}}
           onRefresh={async () => {}}
-        />,
+        /></ProjectEdgeProvider>,
       );
     });
     await act(async () => {});

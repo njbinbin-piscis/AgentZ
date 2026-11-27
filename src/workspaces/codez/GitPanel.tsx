@@ -1,8 +1,20 @@
-import { Fragment, useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ideApi } from "../../services/tauri/ide";
 import { confirmDialog } from "../../services/tauri/confirm";
+import { useProjectEdgeState } from "../../contexts/ProjectEdgeContext";
 import type { GitFileStatus, GitRepoSnapshot, BranchInfo } from "./types";
+
+/** Discard buttons used to show "↺", which reads as "refresh". */
+function TrashGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+    </svg>
+  );
+}
 
 interface GitPanelProps {
   projectDir: string;
@@ -245,7 +257,7 @@ function GitRepoSection({
                 onClick={() => void handleDiscardAll(changed.map((s) => s.path))}
                 title={t("ide.discardAll") || "Discard All Changes"}
               >
-                ↺
+                <TrashGlyph />
               </button>
               <button
                 className="git-inline-btn"
@@ -354,7 +366,7 @@ function GitFileRow({
             onClick={onDiscard}
             title={t("ide.discard") || "Discard Changes"}
           >
-            ↺
+            <TrashGlyph />
           </button>
           <button className="git-inline-btn" onClick={onStage} title={t("ide.stage") || "Stage"}>
             +
@@ -426,6 +438,16 @@ export default function GitPanel({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // The workspace refresh (agent turn end, file watcher, commits) republishes git
+  // status; mirror it here so the panel never keeps showing committed files.
+  const sharedGit = useProjectEdgeState((s) => s.gitChanges);
+  const sharedGitSeen = useRef(sharedGit);
+  useEffect(() => {
+    if (sharedGitSeen.current === sharedGit) return;
+    sharedGitSeen.current = sharedGit;
+    void refresh();
+  }, [sharedGit, refresh]);
 
   const handleMutate = useCallback(async () => {
     await refresh();

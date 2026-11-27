@@ -33,6 +33,8 @@ export default function ProjectEdgeShell({ projectDir, visible = true }: Project
   const [presentArtifacts, setPresentArtifacts] = useState<string[]>([]);
   const reviewSessionRef = useRef<string | null>(null);
   reviewSessionRef.current = pendingReview?.sessionId ?? null;
+  const pendingReviewRef = useRef<{ rel_path: string }[]>([]);
+  pendingReviewRef.current = pendingReview?.changes ?? [];
   const artifactsRef = useRef({ paths: artifacts, sessionId: artifactsSessionId });
   artifactsRef.current = { paths: artifacts, sessionId: artifactsSessionId };
 
@@ -67,16 +69,50 @@ export default function ProjectEdgeShell({ projectDir, visible = true }: Project
     void reloadArtifacts();
   }, [artifacts, artifactsSessionId, reloadArtifacts]);
 
+  // Files that were dirty in git on the previous refresh. A pending agent edit
+  // whose file goes dirty -> clean was committed (or reverted) outside the
+  // review, so accept it instead of leaving a stale entry. Never-seen-dirty
+  // files are left alone: a clean status alone could also mean "not a repo".
+  const prevDirtyRef = useRef<Set<string>>(new Set());
+  const autoKeepCommitted = useCallback(
+    async (changes: { path: string }[]) => {
+      const now = new Set(changes.map((c) => c.path.replace(/\\/g, "/")));
+      const prev = prevDirtyRef.current;
+      prevDirtyRef.current = now;
+      const sid = reviewSessionRef.current;
+      const pending = pendingReviewRef.current;
+      if (!projectDir || !sid || prev.size === 0 || pending.length === 0) return;
+      const sameFile = (rel: string, g: string) =>
+        rel === g || g.endsWith("/" + rel) || rel.endsWith("/" + g);
+      const committed = pending
+        .map((c) => c.rel_path.replace(/\\/g, "/"))
+        .filter(
+          (rel) =>
+            [...prev].some((g) => sameFile(rel, g)) && ![...now].some((g) => sameFile(rel, g)),
+        );
+      if (committed.length === 0) return;
+      try {
+        await journalKeep(projectDir, sid, committed);
+        await reloadReview();
+      } catch {
+        /* best-effort */
+      }
+    },
+    [projectDir, reloadReview],
+  );
+
   const refreshAll = useCallback(() => {
     const git = projectDir
       ? ideApi
           .gitStatus(projectDir)
-          .then(setGitChanges)
+          .then(async (changes) => {
+            setGitChanges(changes);
+            await autoKeepCommitted(changes);
+          })
           .catch(() => setGitChanges([]))
       : Promise.resolve(setGitChanges([]));
     return Promise.allSettled([git, reloadReview(), reloadArtifacts()]);
-  }, [projectDir, setGitChanges, reloadReview, reloadArtifacts]);
-
+  }, [projectDir, setGitChanges, reloadReview, reloadArtifacts, autoKeepCommitted]);
   useEffect(() => registerWorkspaceRefresh("git", refreshAll), [registerWorkspaceRefresh, refreshAll]);
 
   useEffect(() => {

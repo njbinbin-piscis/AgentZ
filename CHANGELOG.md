@@ -5,6 +5,14 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.79] - 2026-11-27
+
+### Fixed
+
+- **Git panel stayed dirty after the agent committed.** It only loaded status on open; it now reloads whenever the workspace republishes git status (turn end, watcher, commit).
+- **Discard buttons looked like refresh.** The `↺` glyph on discard/discard-all is now a trash icon; the real refresh control remains the header `↻`.
+- **Pending Changes drawer entries survived a commit.** When a reviewed file goes from dirty to clean in git, its pending journal entry is auto-kept so the drawer clears.
+
 ## [1.0.78] - 2026-11-26
 
 ### Added
