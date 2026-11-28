@@ -11,6 +11,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type * as Monaco from "monaco-editor";
+import { languageRegistry } from "../../extensions/languageRegistry";
 import { fileUriString } from "./editorUri";
 
 // ─── Tauri command wrappers ──────────────────────────────────────────────
@@ -70,6 +71,14 @@ export function monacoLanguageForFile(filePath: string): string | null {
     if (lower.endsWith(ext)) return lang;
   }
   return null;
+}
+
+/**
+ * Like {@link monacoLanguageForFile}, but also consults installed-extension
+ * `contributes.languages`. Kept separate so unit tests of the built-in map stay pure.
+ */
+export function monacoLanguageForFileWithExtensions(filePath: string): string | null {
+  return languageRegistry.languageIdForFile(filePath) ?? monacoLanguageForFile(filePath);
 }
 
 // ─── File extension → LSP language mapping ─────────────────────────────

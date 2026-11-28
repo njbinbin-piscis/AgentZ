@@ -12,7 +12,7 @@ import {
 import type { OpenTab } from "./types";
 import {
   languageForFile,
-  monacoLanguageForFile,
+  monacoLanguageForFileWithExtensions as monacoLanguageForFile,
   registerLspProviders,
   type LspProvidersRegistration,
   type LspHealth,

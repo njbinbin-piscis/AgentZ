@@ -1,4 +1,6 @@
 /** SVG file / folder icons for the explorer (separate from filename text). */
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { languageRegistry } from "../../extensions/languageRegistry";
 
 interface FileIconProps {
   name?: string;
@@ -116,6 +118,22 @@ export default function FileIcon({ name, isDir, expanded }: FileIconProps) {
       <span className="file-tree-icon-wrap">
         <Chevron open={!!expanded} />
         <FolderSvg open={!!expanded} />
+      </span>
+    );
+  }
+
+  const themeIcon = name ? languageRegistry.iconPathForFile(name) : undefined;
+  if (themeIcon) {
+    let src = themeIcon;
+    try {
+      src = convertFileSrc(themeIcon);
+    } catch {
+      /* browser / test */
+    }
+    return (
+      <span className="file-tree-icon-wrap file-tree-icon-file">
+        <span className="file-tree-chevron-spacer" />
+        <img src={src} alt="" width={16} height={16} className="file-tree-theme-icon" />
       </span>
     );
   }

@@ -24,6 +24,8 @@ import { extensionService } from "../../extensions/extensionService";
 import { compatStore } from "../../extensions/compatStore";
 import { satisfies } from "../../extensions/semver";
 import { HOST_VSCODE_VERSION } from "../../extensions/common/protocol";
+import { languageRegistry } from "../../extensions/languageRegistry";
+import { applyTextMateToMonaco } from "../../extensions/textmate";
 import CompatIcon from "./CompatIcon";
 import "./ExtensionsPanel.css";
 
@@ -63,11 +65,20 @@ export default function ExtensionsManager({ projectDir = null }: ExtensionsManag
 
   const refreshInstalled = useCallback(async () => {
     try {
-      setInstalled(await vsixList());
+      const list = await vsixList();
+      setInstalled(list);
+      languageRegistry.ingest(list);
+      if (monaco) {
+        void languageRegistry.applyToMonaco(monaco).then(() => applyTextMateToMonaco(monaco));
+        const icons = languageRegistry.allIconThemes();
+        if (icons[0] && !languageRegistry.getActiveIconThemeId()) {
+          void languageRegistry.setActiveIconTheme(icons[0].id);
+        }
+      }
     } catch (e) {
       console.error("vsix_list failed", e);
     }
-  }, []);
+  }, [monaco]);
 
   useEffect(() => {
     void refreshInstalled();
