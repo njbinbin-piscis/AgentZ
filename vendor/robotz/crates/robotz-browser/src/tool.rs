@@ -434,10 +434,7 @@ impl BrowserTool {
         let (page, tab_id) = self.page_ctx(input).await?;
         crate::snapshot::invalidate_tab(&tab_id).await;
 
-        let _ = page
-            .goto(&url)
-            .await
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        crate::nav::navigate_until_interactive(&page, &url, Duration::from_secs(12)).await?;
         self.wait_until_navigation_ready(&page, DEFAULT_TIMEOUT_MS)
             .await?;
 
@@ -1626,10 +1623,7 @@ impl BrowserTool {
         drop(mgr);
 
         if url != "about:blank" {
-            let _ = page
-                .goto(&url)
-                .await
-                .map_err(|e| anyhow::anyhow!("{}", e))?;
+            crate::nav::navigate_until_interactive(&page, &url, Duration::from_secs(12)).await?;
         }
         Ok(ToolResult::ok(format!("New tab created: {}", tab_id)))
     }

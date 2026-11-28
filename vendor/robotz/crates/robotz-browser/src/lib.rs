@@ -10,6 +10,7 @@
 
 pub mod download;
 pub mod manager;
+pub mod nav;
 pub mod snapshot;
 pub mod tool;
 

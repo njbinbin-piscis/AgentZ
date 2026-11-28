@@ -4,7 +4,7 @@
 
 > 本文是 [README.md](README.md) 的中文翻译。两者不一致时以英文版为准。
 
-AgentZ 是一个桌面 AI IDE（当前源码版本 **1.0.80**；本地工程与自动化验收门禁已通过，参见 [1.0.0 发布决策](docs/upgrade/release-decision-1.0.0.md)）。它把编辑器和自治智能体放在同一个应用里，共用一套 agent 内核：人可以在编辑器里逐处改代码，也可以把一个目标交给智能体，在隔离的 git worktree 里做完再评审。
+AgentZ 是一个桌面 AI IDE（当前源码版本 **1.0.81**；本地工程与自动化验收门禁已通过，参见 [1.0.0 发布决策](docs/upgrade/release-decision-1.0.0.md)）。它把编辑器和自治智能体放在同一个应用里，共用一套 agent 内核：人可以在编辑器里逐处改代码，也可以把一个目标交给智能体，在隔离的 git worktree 里做完再评审。
 
 界面有三种一等模式，顶栏切换：
 
@@ -27,7 +27,7 @@ AgentZ 是一个桌面 AI IDE（当前源码版本 **1.0.80**；本地工程与�
 - **语言与调试。** LSP 经 WebSocket 桥接到语言服务器。调试走 DAP：断点、调用栈，调试适配器可以跑在本机或远程。
 - **对话。** 流式 Markdown、工具调用折叠显示、停止、排队下一条消息、会话列表（新建、切换、删除、分叉）。从检查点分叉时可以选择仅复制上下文或复制完整历史。用 `@路径` 引用文件，`@codebase` / `@graph` 引用代码索引和代码图。选中代码后按 ⌘K / Ctrl-K 做行内编辑，结果以绿/红 inline diff 呈现，Enter 接受、Esc 撤销。Tab 补全显示 ghost text。
 - **代码地图。** 依赖图和体量热力图，背后是增量代码图索引（[docs/graph-schema.md](docs/graph-schema.md)）。
-- **内置浏览器。** 页面截图和元素可以送进对话；浏览器工具使用 [RobotZ](https://github.com/njbinbin-piscis/RobotZ)（`robotz-browser` v0.1.14）。
+- **内置浏览器。** 页面截图和元素可以送进对话；浏览器工具使用 [RobotZ](https://github.com/njbinbin-piscis/RobotZ)（`robotz-browser` v0.1.15）。
 - **扩展。** 真正执行 `.vsix` 里的 JavaScript，而不是只读 `package.json` 贡献点。见下方「扩展宿主」。
 
 ## WorkZ

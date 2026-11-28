@@ -1,7 +1,7 @@
 [package]
 name = "robotz-browser"
 description = "Chrome DevTools Protocol web automation tool for RobotZ"
-version = "0.1.14"
+version = "0.1.15"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Piscis Team"]

@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-AgentZ is a desktop AI IDE (current source version **1.0.80**; local engineering and automated acceptance gates pass, see the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md)). It puts an editor and autonomous agents in one app on a shared agent kernel. You can edit code by hand in the editor, or hand a goal to an agent that works in an isolated git worktree and comes back for review.
+AgentZ is a desktop AI IDE (current source version **1.0.81**; local engineering and automated acceptance gates pass, see the [1.0.0 release decision](docs/upgrade/release-decision-1.0.0.md)). It puts an editor and autonomous agents in one app on a shared agent kernel. You can edit code by hand in the editor, or hand a goal to an agent that works in an isolated git worktree and comes back for review.
 
 The UI has three first-class modes, switched from the title bar:
 
@@ -25,7 +25,7 @@ Open a local folder, or connect to a remote host from the status bar and open a 
 - **Language and debugging.** LSP is bridged to language servers over WebSocket. Debugging uses DAP with breakpoints and call stacks; the debug adapter can run locally or remotely.
 - **Chat.** Streaming Markdown, collapsible tool calls, stop, queueing the next message, and a session list (new, switch, delete, fork). Forking from a checkpoint can copy only the recent context or the full history. Reference files with `@path`, and the code index and code graph with `@codebase` / `@graph`. Select code and press ⌘K / Ctrl-K for inline edits shown as a green/red inline diff; Enter accepts, Esc reverts. Tab completion shows ghost text.
 - **Code map.** Dependency graph and size heat map, backed by an incremental code-graph index ([docs/graph-schema.md](docs/graph-schema.md)).
-- **Built-in browser.** Page screenshots and elements can be sent to the chat. Browser tools use [RobotZ](https://github.com/njbinbin-piscis/RobotZ) (`robotz-browser` v0.1.14).
+- **Built-in browser.** Page screenshots and elements can be sent to the chat. Browser tools use [RobotZ](https://github.com/njbinbin-piscis/RobotZ) (`robotz-browser` v0.1.15).
 - **Extensions.** Actually runs the JavaScript inside `.vsix` packages instead of only reading `package.json` contributions. See [Extension host](#extension-host) below.
 
 ## WorkZ

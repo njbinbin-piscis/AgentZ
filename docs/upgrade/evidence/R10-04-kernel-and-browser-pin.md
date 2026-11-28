@@ -1,8 +1,14 @@
 # R10-04 Evidence: Kernel 5-Phase Contract & RobotZ Browser Snapshot Generation Pin
 
 - **Task ID**: `R10-04` (`r10-04-kernel-browser-pin`)
-- **Date**: 2026-10-19
+- **Date**: 2026-10-19 (updated 2026-11-28 for AgentZ 1.0.81 / `robotz-browser` v0.1.15)
 - **Status**: Completed
+
+## 0. Navigation settle pin (AgentZ 1.0.81)
+
+- **Root cause**: `chromiumoxide` `Page::goto` waits until the main frame and every child frame fire `load` (`REQUEST_TIMEOUT` 30s). Hanging images/iframes surfaced as `navigation failed` / `Request timed out.`
+- **Pin**: `vendor/robotz/crates/robotz-browser` v0.1.15 exports `nav::navigate_until_interactive`. AgentZ panel navigate and RobotZ `BrowserTool::{navigate,new_tab}` call it instead of `goto`.
+- **Verify**: `cargo test --manifest-path vendor/robotz/crates/robotz-browser/Cargo.toml --lib nav:: -- --ignored` and `cargo test --manifest-path src-tauri/Cargo.toml --lib browser::tests::navigate_slow_subresource_live -- --ignored`.
 
 ## 1. Changes Implemented
 

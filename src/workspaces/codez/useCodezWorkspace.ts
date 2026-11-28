@@ -238,16 +238,16 @@ export function useCodezWorkspace({
         void openExternal(url).catch(() => {});
         return;
       }
+      // Show the panel immediately so a slow page is visibly loading.
+      onBrowserOpenChange?.(true);
+      setActiveTabPath(BROWSER_TAB_PATH);
       try {
         const opened = await rewriteRemoteBrowserUrl(projectDir, url);
         await browserNavigate(getActiveChatSession() ?? "", opened);
       } catch (e) {
         // eslint-disable-next-line no-alert
         window.alert(String(e));
-        return;
       }
-      onBrowserOpenChange?.(true);
-      setActiveTabPath(BROWSER_TAB_PATH);
     },
     [projectDir, onBrowserOpenChange],
   );

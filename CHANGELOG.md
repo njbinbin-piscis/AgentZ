@@ -5,6 +5,15 @@ All notable changes to AgentZ are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.81] - 2026-11-28
+
+### Fixed
+
+- **Built-in browser hung ~30s then showed `Navigation failed.`** `chromiumoxide`'s `Page::goto` waits for the main frame and every child iframe to fire `load`. A hanging image, iframe, or analytics beacon timed out the navigate. Navigation now uses `location.assign` plus a bounded interactive/complete poll (shared in `robotz-browser`), so slow subresources no longer fail the open. Chat link clicks open the browser panel immediately; Tauri errors keep the full cause chain.
+
+### Changed
+
+- **`robotz-browser` advanced to v0.1.15** (vendored): `navigate` / `new_tab` share `nav::navigate_until_interactive`.
 ## [1.0.80] - 2026-11-27
 
 ### Fixed

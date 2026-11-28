@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "agentz-desktop"
-version = "1.0.80"
+version = "1.0.81"
 dependencies = [
  "aes",
  "agentz-task-state",
@@ -4919,7 +4919,7 @@ dependencies = [
 
 [[package]]
 name = "robotz-browser"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "anyhow",
  "async-trait",

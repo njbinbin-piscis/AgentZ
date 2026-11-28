@@ -62,7 +62,7 @@ pub async fn browser_navigate(
         .browser
         .navigate(&session_of(session_id), &url)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| format!("{e:#}"))
 }
 
 #[tauri::command]

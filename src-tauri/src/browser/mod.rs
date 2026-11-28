@@ -1099,11 +1099,12 @@ impl BrowserManager {
         let target = normalise_url(url);
         let final_url = self
             .with_page(session_id, |page| async move {
-                page.goto(target.as_str())
-                    .await
-                    .context("navigation failed")?;
-                // Pages that never fire `load` must not pin the browser lock.
-                let _ = tokio::time::timeout(NAV_SETTLE_TIMEOUT, page.wait_for_navigation()).await;
+                robotz_browser::nav::navigate_until_interactive(
+                    &page,
+                    target.as_str(),
+                    NAV_SETTLE_TIMEOUT,
+                )
+                .await?;
                 current_url(&page).await
             })
             .await?;
@@ -2139,5 +2140,59 @@ mod tests {
         assert_eq!(mgr.tracker(&b).current_generation(), 1);
         assert_eq!(mgr.tracker(&a).current_generation(), 2);
         assert_eq!(mgr.session_tab_report("sess-a"), "No open browser tabs.");
+    }
+
+    /// Thin regression: panel navigate uses robotz_browser::nav and must not
+    /// hang 30s on a page whose subresource never finishes loading.
+    #[tokio::test]
+    #[ignore = "requires local Chromium"]
+    async fn navigate_slow_subresource_live() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            while let Ok((mut sock, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 2048];
+                    let n = sock.read(&mut buf).await.unwrap_or(0);
+                    let req = String::from_utf8_lossy(&buf[..n]);
+                    let path = req
+                        .lines()
+                        .next()
+                        .and_then(|l| l.split_whitespace().nth(1))
+                        .unwrap_or("/");
+                    let body = match path {
+                        "/slow" => "<h1>OK</h1><img src=\"/hang\">",
+                        "/hang" => {
+                            tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+                            return;
+                        }
+                        _ => "",
+                    };
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    let _ = sock.write_all(resp.as_bytes()).await;
+                });
+            }
+        });
+
+        let mgr = BrowserManager::new();
+        let t0 = std::time::Instant::now();
+        let url = mgr
+            .navigate("diag", &format!("http://{addr}/slow"))
+            .await
+            .expect("navigate through hanging image");
+        let dt = t0.elapsed();
+        assert!(url.contains("/slow"), "{url}");
+        assert!(
+            dt < std::time::Duration::from_secs(8),
+            "panel navigate took {dt:?} — still waiting for full load?"
+        );
+        let _ = mgr.close_session("diag").await;
+        server.abort();
     }
 }
