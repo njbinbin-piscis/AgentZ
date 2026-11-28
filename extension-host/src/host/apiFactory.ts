@@ -170,6 +170,46 @@ function matchDocumentSelector(
 
 const noopDisposable = () => new types.Disposable(() => undefined);
 
+/**
+ * Wrap a vscode.* namespace so unknown members log once and return a no-op
+ * instead of throwing. Keeps extensions that probe ahead of our surface alive.
+ */
+function wrapMissingApiNamespace(
+  ns: Record<string, unknown>,
+  pathPrefix: string,
+  extId: string,
+  report: (apiPath: string) => void,
+): Record<string, unknown> {
+  const warned = new Set<string>();
+  return new Proxy(ns, {
+    get(target, prop, receiver) {
+      if (typeof prop === "symbol") return Reflect.get(target, prop, receiver);
+      const key = String(prop);
+      if (key === "then") return undefined;
+      if (Object.prototype.hasOwnProperty.call(target, key) || key in target) {
+        return Reflect.get(target, prop, receiver);
+      }
+      const full = `${pathPrefix}.${key}`;
+      if (!warned.has(full)) {
+        warned.add(full);
+        report(full);
+        // eslint-disable-next-line no-console
+        console.warn(`[ext] ${extId} used unimplemented API: ${full}`);
+      }
+      // Callable no-op that also acts as an empty object for chaining.
+      const stub = (..._args: unknown[]) => undefined;
+      return new Proxy(stub, {
+        get() {
+          return stub;
+        },
+        apply() {
+          return undefined;
+        },
+      });
+    },
+  });
+}
+
 export function createApiFactory(services: Services) {
   const s = services;
 
@@ -791,40 +831,51 @@ export function createApiFactory(services: Services) {
     const toExtensionObject = (desc: ExtensionDescriptionDto) =>
       buildExtensionObject(desc, activateExt);
 
+    const reportMissing = (apiPath: string) => {
+      void s.commands.executeCommand("_agentz.reportMissingApi", apiPath).catch(() => undefined);
+    };
+    const wrap = (ns: Record<string, unknown>, name: string) =>
+      wrapMissingApiNamespace(ns, `vscode.${name}`, extension.id, reportMissing);
+
+    const windowNs = {
+      ...window,
+      createWebviewPanel: (viewType: string, title: string, showOptions: any, options?: any) =>
+        s.webviews.createWebviewPanel(viewType, title, showOptions, options, extension.extensionPath),
+    };
+
     return {
       // Export all concrete runtime classes and enums from types-impl
       ...types,
-      // namespaces
-      commands,
-      window: {
-        ...window,
-        createWebviewPanel: (viewType: string, title: string, showOptions: any, options?: any) =>
-          s.webviews.createWebviewPanel(viewType, title, showOptions, options, extension.extensionPath),
-      },
-      workspace,
-      languages,
-      scm,
-      tasks,
-      debug,
-      tests,
-      notebooks,
-      env,
-      lm,
-      authentication,
-      comments,
-      chat,
-      extensions: {
-        getExtension: (id: string) => {
-          const list = allExtensions ? allExtensions() : [extension];
-          const found = list.find((e) => e.id.toLowerCase() === id.toLowerCase());
-          return found ? toExtensionObject(found) : undefined;
-        },
-        get all() {
-          const list = allExtensions ? allExtensions() : [extension];
-          return list.map(toExtensionObject);
-        },
-        onDidChange: new types.EventEmitter<void>().event,
-      },
+      // namespaces (proxied so unknown members warn once instead of throwing)
+      commands: wrap(commands as unknown as Record<string, unknown>, "commands"),
+      window: wrap(windowNs as unknown as Record<string, unknown>, "window"),
+      workspace: wrap(workspace as unknown as Record<string, unknown>, "workspace"),
+      languages: wrap(languages as unknown as Record<string, unknown>, "languages"),
+      scm: wrap(scm as unknown as Record<string, unknown>, "scm"),
+      tasks: wrap(tasks as unknown as Record<string, unknown>, "tasks"),
+      debug: wrap(debug as unknown as Record<string, unknown>, "debug"),
+      tests: wrap(tests as unknown as Record<string, unknown>, "tests"),
+      notebooks: wrap(notebooks as unknown as Record<string, unknown>, "notebooks"),
+      env: wrap(env as unknown as Record<string, unknown>, "env"),
+      lm: wrap(lm as unknown as Record<string, unknown>, "lm"),
+      authentication: wrap(authentication as unknown as Record<string, unknown>, "authentication"),
+      comments: wrap(comments as unknown as Record<string, unknown>, "comments"),
+      chat: wrap(chat as unknown as Record<string, unknown>, "chat"),
+      extensions: wrap(
+        {
+          getExtension: (id: string) => {
+            const list = allExtensions ? allExtensions() : [extension];
+            const found = list.find((e) => e.id.toLowerCase() === id.toLowerCase());
+            return found ? toExtensionObject(found) : undefined;
+          },
+          get all() {
+            const list = allExtensions ? allExtensions() : [extension];
+            return list.map(toExtensionObject);
+          },
+          onDidChange: new types.EventEmitter<void>().event,
+        } as unknown as Record<string, unknown>,
+        "extensions",
+      ),
       l10n: {
         t: (message: string | { message: string; args?: Record<string, unknown> | unknown[] }, ...args: unknown[]) => {
           const raw = typeof message === "string" ? message : message.message;

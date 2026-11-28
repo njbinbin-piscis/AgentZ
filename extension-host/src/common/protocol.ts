@@ -204,8 +204,8 @@ export interface InitDataDto {
   extensionsDir?: string;
 }
 
-/** The VS Code API version this host implements; used for engines.vscode checks. */
-export const HOST_VSCODE_VERSION = "1.96.0";
+/** The VS Code API version this host advertises; used for engines.vscode checks. */
+export const HOST_VSCODE_VERSION = "1.105.0";
 
 /** Per-extension compatibility verdict produced during initialization. */
 export interface ExtensionCompatDto {
@@ -213,8 +213,14 @@ export interface ExtensionCompatDto {
   displayName?: string;
   version: string;
   enginesVscode?: string;
+  /**
+   * Hard gate: false only for unsupported proposed APIs (or activation crash).
+   * An engines.vscode mismatch is soft — see softWarning — and still activates.
+   */
   compatible: boolean;
   reason?: string;
+  /** engines.vscode ahead of the host; activation still proceeds. */
+  softWarning?: string;
   unsupportedProposals?: string[];
   activated: boolean;
 }

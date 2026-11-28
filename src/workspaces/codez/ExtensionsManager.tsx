@@ -10,8 +10,8 @@ import {
   vsixUninstall,
   vsixSetEnabled,
   openVsxSearch,
-  openVsxDownloadUrl,
   openVsxMeta,
+  openVsxPickCompatible,
   type VsixManifest,
   type VsixTheme,
   type InstalledExtension,
@@ -151,8 +151,26 @@ export default function ExtensionsManager({ projectDir = null }: ExtensionsManag
       setWorking(key);
       setError(null);
       try {
-        const url = r.files?.download ?? (await openVsxDownloadUrl(r.namespace, r.name, r.version));
+        const pick = await openVsxPickCompatible(
+          r.namespace,
+          r.name,
+          HOST_VSCODE_VERSION,
+          r.version,
+          satisfies,
+        );
+        const url = pick.download ?? r.files?.download;
+        if (!url) throw new Error("no download URL in Open VSX metadata");
         await vsixInstallFromUrl(url);
+        if (pick.fellBack) {
+          setHostMsg(
+            tr("extensions.installFellBack", {
+              from: r.version,
+              to: pick.version,
+            }),
+          );
+        } else if (!pick.compatible) {
+          setHostMsg(tr("extensions.installSoftCompat", { version: pick.version }));
+        }
         await refreshInstalled();
         await restartHost();
       } catch (e) {
@@ -161,7 +179,7 @@ export default function ExtensionsManager({ projectDir = null }: ExtensionsManag
         setWorking(null);
       }
     },
-    [refreshInstalled, restartHost],
+    [refreshInstalled, restartHost, tr],
   );
 
   const installVsixFull = useCallback(async () => {
@@ -461,17 +479,17 @@ export default function ExtensionsManager({ projectDir = null }: ExtensionsManag
             <span className="agentz-ext-ver">{tr("extensions.compatHost", { version: compat.hostVersion })}</span>
           </div>
           {(() => {
-            const incompatible = compat.extensions.filter((e) => !e.compatible);
-            const versionIncompatible = incompatible.filter(
-              (e) => !e.reason?.startsWith("Activation error:"),
-            );
-            const activationFailed = incompatible.filter((e) =>
+            const softVersion = compat.extensions.filter((e) => !!e.softWarning);
+            const activationFailed = compat.extensions.filter((e) =>
               e.reason?.startsWith("Activation error:"),
             );
-            const proposalUsers = compat.extensions.filter((e) => e.unsupportedProposals?.length);
+            const proposalBlocked = compat.extensions.filter(
+              (e) => !e.compatible && !!e.unsupportedProposals?.length,
+            );
             if (
-              incompatible.length === 0 &&
-              proposalUsers.length === 0 &&
+              softVersion.length === 0 &&
+              activationFailed.length === 0 &&
+              proposalBlocked.length === 0 &&
               compat.missingApis.length === 0
             ) {
               return (
@@ -482,13 +500,13 @@ export default function ExtensionsManager({ projectDir = null }: ExtensionsManag
             }
             return (
               <>
-                {versionIncompatible.length > 0 && (
+                {softVersion.length > 0 && (
                   <div className="agentz-compat-group">
                     <div className="agentz-compat-group-title">{tr("extensions.compatVersion")}</div>
-                    {versionIncompatible.map((e) => (
+                    {softVersion.map((e) => (
                       <div key={e.id} className="agentz-compat-row warn">
                         <span>{e.displayName || e.id}</span>
-                        <span className="agentz-compat-reason">{e.reason}</span>
+                        <span className="agentz-compat-reason">{e.softWarning}</span>
                       </div>
                     ))}
                   </div>
@@ -504,10 +522,10 @@ export default function ExtensionsManager({ projectDir = null }: ExtensionsManag
                     ))}
                   </div>
                 )}
-                {proposalUsers.length > 0 && (
+                {proposalBlocked.length > 0 && (
                   <div className="agentz-compat-group">
                     <div className="agentz-compat-group-title">{tr("extensions.compatProposals")}</div>
-                    {proposalUsers.map((e) => (
+                    {proposalBlocked.map((e) => (
                       <div key={e.id} className="agentz-compat-row">
                         <span>{e.displayName || e.id}</span>
                         <span className="agentz-compat-reason">{e.unsupportedProposals?.join(", ")}</span>

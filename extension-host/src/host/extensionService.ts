@@ -208,15 +208,18 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
   /** Evaluate engines.vscode + enabledApiProposals against this host. */
   private checkCompat(d: ExtensionDescriptionDto): ExtensionCompatDto {
     const enginesVscode = d.engines?.vscode;
-    let compatible = true;
-    let reason: string | undefined;
+    let softWarning: string | undefined;
     if (enginesVscode && enginesVscode !== "*") {
       if (!satisfies(HOST_VSCODE_VERSION, enginesVscode)) {
-        compatible = false;
-        reason = `requires VS Code ${enginesVscode}, host implements ${HOST_VSCODE_VERSION}`;
+        softWarning = `requires VS Code ${enginesVscode}, host advertises ${HOST_VSCODE_VERSION} (soft-compat: activating anyway)`;
       }
     }
     const unsupported = (d.enabledApiProposals ?? []).filter((p) => !SUPPORTED_PROPOSALS.has(p));
+    // Only unsupported proposed APIs hard-block activation. Version skew is a warning.
+    const compatible = unsupported.length === 0;
+    const reason = unsupported.length
+      ? `unsupported proposed API: ${unsupported.join(", ")}`
+      : softWarning;
     return {
       id: d.id,
       displayName: d.displayName,
@@ -224,6 +227,7 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
       enginesVscode,
       compatible,
       reason,
+      softWarning,
       unsupportedProposals: unsupported.length ? unsupported : undefined,
       activated: compatible && !d.main,
     };
@@ -326,6 +330,9 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
     if (compat && !compat.compatible) {
       this.logger(`[ext] skipping incompatible ${id}: ${compat.reason}`);
       return Promise.reject(new Error(`incompatible: ${compat.reason}`));
+    }
+    if (compat?.softWarning) {
+      this.logger(`[ext] soft-compat ${id}: ${compat.softWarning}`);
     }
     if (compat?.unsupportedProposals) {
       this.logger(`[ext] ${id} uses unsupported proposed API: ${compat.unsupportedProposals.join(", ")}`);

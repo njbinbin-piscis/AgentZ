@@ -106,6 +106,77 @@ export async function openVsxMeta(namespace: string, name: string, version?: str
   return { download: data.files?.download, enginesVscode: data.engines?.vscode };
 }
 
+/** List published versions newest-first (Open VSX `/versions`). */
+export async function openVsxVersions(namespace: string, name: string): Promise<string[]> {
+  const res = await fetch(`https://open-vsx.org/api/${namespace}/${name}/versions`);
+  if (!res.ok) throw new Error(`Open VSX versions failed: ${res.status}`);
+  const data = (await res.json()) as { versions?: Record<string, string> };
+  return Object.keys(data.versions ?? {});
+}
+
+export interface OpenVsxPick {
+  version: string;
+  download?: string;
+  enginesVscode?: string;
+  /** True when engines.vscode is satisfied by `hostVersion`. */
+  compatible: boolean;
+  /** True when we fell back from the marketplace's advertised latest. */
+  fellBack: boolean;
+}
+
+/**
+ * Prefer the newest Open VSX version whose engines.vscode satisfies the host.
+ * If none do, return the latest anyway (soft-compat install).
+ */
+export async function openVsxPickCompatible(
+  namespace: string,
+  name: string,
+  hostVersion: string,
+  preferredVersion?: string,
+  satisfiesFn: (version: string, range: string) => boolean = () => true,
+  maxProbe = 12,
+): Promise<OpenVsxPick> {
+  const versions = preferredVersion
+    ? [preferredVersion, ...(await openVsxVersions(namespace, name).catch(() => [] as string[])).filter((v) => v !== preferredVersion)]
+    : await openVsxVersions(namespace, name);
+  if (versions.length === 0) {
+    const meta = await openVsxMeta(namespace, name, preferredVersion);
+    const range = meta.enginesVscode;
+    const ok = !range || range === "*" || satisfiesFn(hostVersion, range);
+    return {
+      version: preferredVersion ?? "latest",
+      download: meta.download,
+      enginesVscode: range,
+      compatible: ok,
+      fellBack: false,
+    };
+  }
+  let latestMeta: OpenVsxMeta | undefined;
+  for (const version of versions.slice(0, maxProbe)) {
+    const meta = await openVsxMeta(namespace, name, version);
+    if (!latestMeta) latestMeta = meta;
+    const range = meta.enginesVscode;
+    if (!range || range === "*" || satisfiesFn(hostVersion, range)) {
+      return {
+        version,
+        download: meta.download,
+        enginesVscode: range,
+        compatible: true,
+        fellBack: preferredVersion ? version !== preferredVersion : version !== versions[0],
+      };
+    }
+  }
+  const fallbackVersion = versions[0];
+  const meta = latestMeta ?? (await openVsxMeta(namespace, name, fallbackVersion));
+  return {
+    version: fallbackVersion,
+    download: meta.download,
+    enginesVscode: meta.enginesVscode,
+    compatible: false,
+    fellBack: false,
+  };
+}
+
 /** Prompt for a `.vsix` file. Returns null if cancelled. */
 export async function openVsixDialog(): Promise<string | null> {
   const selected = await open({

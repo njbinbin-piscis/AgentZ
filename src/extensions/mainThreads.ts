@@ -143,6 +143,13 @@ export class MainThreadCommands implements MainThreadCommandsShape {
         }
         return undefined;
       }
+      case "_agentz.reportMissingApi": {
+        const apiPath = args[0];
+        if (typeof apiPath === "string" && apiPath.trim()) {
+          compatStore.recordMissingPath(apiPath.trim());
+        }
+        return undefined;
+      }
       case "setContext":
         if (typeof args[0] === "string") {
           this.contextKeys.set(args[0], args[1]);

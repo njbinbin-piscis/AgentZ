@@ -46,8 +46,12 @@ class CompatStore {
 
   recordMissing(proxyNid: number, method: string): void {
     const name = proxyNames.get(proxyNid) ?? `proxy#${proxyNid}`;
-    const key = `${name}.${method}`;
-    if (this.missing.has(key)) return;
+    this.recordMissingPath(`${name}.${method}`);
+  }
+
+  /** vscode.* path or MainThread method an extension/host probed for. */
+  recordMissingPath(key: string): void {
+    if (!key || this.missing.has(key)) return;
     this.missing.add(key);
     this.commit();
   }
