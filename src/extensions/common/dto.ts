@@ -210,6 +210,8 @@ export interface WebviewPanelDto {
   title: string;
   viewColumn?: number;
   options: WebviewOptionsDto;
+  /** Absolute file path when this webview is a custom editor for a document. */
+  editorResource?: string;
 }
 
 // ── SCM ─────────────────────────────────────────────────────────────────────

@@ -655,6 +655,7 @@ export class MainThreadWebviews implements MainThreadWebviewsShape {
           title: panel.title,
           html: "",
           enableScripts: panel.options?.enableScripts === true,
+          editorResource: panel.editorResource,
         });
       });
   }

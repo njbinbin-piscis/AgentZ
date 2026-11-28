@@ -4,6 +4,8 @@ import CodeEditor, { type EditorConflictBannerProps } from "./CodeEditor";
 import ImagePreview from "./ImagePreview";
 import MarkdownPreview from "./MarkdownPreview";
 import NotebookEditor from "../../extensions/notebook/NotebookEditor";
+import { customEditorRegistry } from "../../extensions/customEditorRegistry";
+import CustomEditorHost from "../../extensions/ui/CustomEditorHost";
 import { isHtmlPath, isMarkdownPath, isPreviewablePath } from "./FileIcon";
 import type { OpenTab, TabViewMode } from "./types";
 import "./MarkdownPreview.css";
@@ -107,6 +109,18 @@ export default function FileViewer({
       <div className="agentz-file-view-body">
         <PreviewErrorBoundary resetKey={tab.path} onError={() => setPreviewBroken(true)}>
           <NotebookEditor content={tab.content ?? ""} onChange={onChange} />
+        </PreviewErrorBoundary>
+        {previewBroken && <div className="agentz-preview-failed">{t("ide.previewFailed")}</div>}
+      </div>
+    );
+  }
+
+  const custom = !tab.isDiff ? customEditorRegistry.match(tab.path) : undefined;
+  if (custom && !tab.isReadOnly) {
+    return (
+      <div className="agentz-file-view-body">
+        <PreviewErrorBoundary resetKey={`${tab.path}:${custom.viewType}`} onError={() => setPreviewBroken(true)}>
+          <CustomEditorHost filePath={tab.path} contribution={custom} />
         </PreviewErrorBoundary>
         {previewBroken && <div className="agentz-preview-failed">{t("ide.previewFailed")}</div>}
       </div>

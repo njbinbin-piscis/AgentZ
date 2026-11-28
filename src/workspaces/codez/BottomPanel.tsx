@@ -223,16 +223,20 @@ export default function BottomPanel({
 
         {current === "webviews" && (
           <div className="ide-bottom-pane scroll">
-            {ui.webviews.length === 0 ? (
-              <div className="agentz-ext-panel-empty">{t("extensions.noWebviews") || "No webviews open."}</div>
-            ) : (
-              ui.webviews.map((wv) => (
+            {(() => {
+              const panels = ui.webviews.filter((wv) => !wv.editorResource);
+              if (panels.length === 0) {
+                return (
+                  <div className="agentz-ext-panel-empty">{t("extensions.noWebviews") || "No webviews open."}</div>
+                );
+              }
+              return panels.map((wv) => (
                 <div key={wv.handle} className="agentz-ext-webview-section">
                   <div className="agentz-ext-view-title">{wv.title}</div>
                   <WebviewHost webview={wv} />
                 </div>
-              ))
-            )}
+              ));
+            })()}
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { customEditorRegistry } from "../extensions/customEditorRegistry";
 
 /**
  * Where a clicked link goes. The webview must never navigate to it itself
@@ -68,6 +69,8 @@ const SYSTEM_OPEN_EXT = new Set([
 export function opensWithSystem(path: string, opts: { pdfPreview: boolean }): boolean {
   const clean = stripQueryAndHash(path);
   if (/[\\/]$/.test(clean)) return true; // a folder
+  // Prefer an installed custom editor over the OS default program.
+  if (customEditorRegistry.match(clean)) return false;
   const ext = clean.split(/[\\/]/).pop()?.split(".").pop()?.toLowerCase() ?? "";
   if (ext === "pdf") return !opts.pdfPreview;
   return SYSTEM_OPEN_EXT.has(ext);

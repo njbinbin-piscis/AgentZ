@@ -25,6 +25,7 @@ import { compatStore } from "../../extensions/compatStore";
 import { satisfies } from "../../extensions/semver";
 import { HOST_VSCODE_VERSION } from "../../extensions/common/protocol";
 import { languageRegistry } from "../../extensions/languageRegistry";
+import { customEditorRegistry } from "../../extensions/customEditorRegistry";
 import { applyTextMateToMonaco } from "../../extensions/textmate";
 import CompatIcon from "./CompatIcon";
 import "./ExtensionsPanel.css";
@@ -68,6 +69,7 @@ export default function ExtensionsManager({ projectDir = null }: ExtensionsManag
       const list = await vsixList();
       setInstalled(list);
       languageRegistry.ingest(list);
+      customEditorRegistry.ingest(list);
       if (monaco) {
         void languageRegistry.applyToMonaco(monaco).then(() => applyTextMateToMonaco(monaco));
         const icons = languageRegistry.allIconThemes();

@@ -178,6 +178,11 @@ export interface ExtHostTreeViewsShape {
 export interface ExtHostWebviewsShape {
   $onMessage(handle: string, message: unknown): void;
   $onDidDispose(handle: string): void;
+  /**
+   * Resolve a registered custom editor for `viewType` against `resource` (file URI).
+   * Returns the webview panel handle, or null if no provider is registered.
+   */
+  $resolveCustomEditor(viewType: string, resource: dto.UriComponents, title: string): Promise<string | null>;
 }
 
 export interface ExtHostTaskShape {

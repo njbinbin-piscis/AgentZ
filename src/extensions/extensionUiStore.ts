@@ -53,6 +53,8 @@ export interface WebviewState {
   title: string;
   html: string;
   enableScripts: boolean;
+  /** Absolute path when this webview is hosting a custom editor document. */
+  editorResource?: string;
 }
 
 export interface ScmProviderState {

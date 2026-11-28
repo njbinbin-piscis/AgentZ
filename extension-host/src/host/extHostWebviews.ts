@@ -1,11 +1,32 @@
 // ExtHostWebviews: backs vscode.window.createWebviewPanel. HTML is pushed to the
 // renderer which hosts it in a sandboxed iframe; messages flow both ways.
+// Also hosts registerCustomEditorProvider / $resolveCustomEditor.
 
 import { IRPCProtocol } from "../common/proxyIdentifier";
+import type { UriComponents } from "../common/dto";
 import { ExtHostWebviewsShape, MainContext, MainThreadWebviewsShape } from "../common/protocol";
 import { randomUUID } from "node:crypto";
+import * as fs from "fs";
 import { asWebviewResourceUri, normalizeWebviewResourcePath } from "./webviewResourceUri";
-import { Disposable, EventEmitter, ViewColumn } from "./types-impl";
+import { Disposable, EventEmitter, Uri, ViewColumn } from "./types-impl";
+
+type CustomEditorProvider = {
+  openCustomDocument?: (
+    uri: Uri,
+    openContext: { backupId?: string },
+    token: { isCancellationRequested: boolean },
+  ) => Promise<unknown> | unknown;
+  resolveCustomEditor?: (
+    document: unknown,
+    webviewPanel: WebviewPanel,
+    token: { isCancellationRequested: boolean },
+  ) => Promise<void> | void;
+  resolveCustomTextEditor?: (
+    document: unknown,
+    webviewPanel: WebviewPanel,
+    token: { isCancellationRequested: boolean },
+  ) => Promise<void> | void;
+};
 
 class Webview {
   private _html = "";
@@ -74,13 +95,21 @@ class WebviewPanel {
 export class ExtHostWebviews implements ExtHostWebviewsShape {
   private readonly proxy: MainThreadWebviewsShape;
   private readonly panels = new Map<string, WebviewPanel>();
+  private readonly customEditors = new Map<string, { provider: CustomEditorProvider; extensionPath: string }>();
   private seq = 0;
 
   constructor(rpc: IRPCProtocol) {
     this.proxy = rpc.getProxy(MainContext.MainThreadWebviews);
   }
 
-  createWebviewPanel(viewType: string, title: string, showOptions: number | { viewColumn: number }, options?: { enableScripts?: boolean; retainContextWhenHidden?: boolean; localResourceRoots?: Array<{ fsPath?: string }> }, extensionPath = ""): WebviewPanel {
+  createWebviewPanel(
+    viewType: string,
+    title: string,
+    showOptions: number | { viewColumn: number },
+    options?: { enableScripts?: boolean; retainContextWhenHidden?: boolean; localResourceRoots?: Array<{ fsPath?: string }> },
+    extensionPath = "",
+    editorResource?: string,
+  ): WebviewPanel {
     const handle = `webview-${this.seq++}`;
     const viewColumn = typeof showOptions === "number" ? showOptions : showOptions.viewColumn;
     const webview = new Webview(handle, this.proxy);
@@ -98,8 +127,70 @@ export class ExtHostWebviews implements ExtHostWebviewsShape {
       title,
       viewColumn,
       options: webview.options,
+      editorResource,
     });
     return panel;
+  }
+
+  registerCustomEditorProvider(
+    viewType: string,
+    provider: CustomEditorProvider,
+    _options?: unknown,
+    extensionPath = "",
+  ): Disposable {
+    this.customEditors.set(viewType, { provider, extensionPath });
+    return new Disposable(() => {
+      const cur = this.customEditors.get(viewType);
+      if (cur?.provider === provider) this.customEditors.delete(viewType);
+    });
+  }
+
+  async $resolveCustomEditor(
+    viewType: string,
+    resource: UriComponents,
+    title: string,
+  ): Promise<string | null> {
+    const entry = this.customEditors.get(viewType);
+    if (!entry) return null;
+    const uri = Uri.from(resource);
+    const panel = this.createWebviewPanel(
+      viewType,
+      title || uri.fsPath.split(/[/\\]/).pop() || viewType,
+      ViewColumn.One,
+      { enableScripts: true },
+      entry.extensionPath,
+      uri.fsPath,
+    );
+    const token = { isCancellationRequested: false };
+    try {
+      if (typeof entry.provider.resolveCustomTextEditor === "function") {
+        const content =
+          uri.scheme === "file" && uri.fsPath && fs.existsSync(uri.fsPath)
+            ? fs.readFileSync(uri.fsPath, "utf8")
+            : "";
+        const document = {
+          uri,
+          fileName: uri.fsPath,
+          getText: () => content,
+          languageId: "plaintext",
+          version: 1,
+          isDirty: false,
+          isUntitled: false,
+          lineCount: content.split(/\r?\n/).length,
+        };
+        await entry.provider.resolveCustomTextEditor(document, panel, token);
+      } else if (typeof entry.provider.resolveCustomEditor === "function") {
+        const document =
+          typeof entry.provider.openCustomDocument === "function"
+            ? await entry.provider.openCustomDocument(uri, {}, token)
+            : { uri };
+        await entry.provider.resolveCustomEditor(document, panel, token);
+      }
+    } catch (err) {
+      panel.dispose();
+      throw err;
+    }
+    return panel.handle;
   }
 
   $onMessage(handle: string, message: unknown): void {

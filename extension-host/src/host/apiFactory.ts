@@ -313,7 +313,11 @@ export function createApiFactory(services: Services) {
       s.webviews.createWebviewPanel(viewType, title, showOptions, options),
     registerWebviewViewProvider: () => s.webviews.registerWebviewViewProvider(),
     registerWebviewPanelSerializer: noopDisposable,
-    registerCustomEditorProvider: noopDisposable,
+    registerCustomEditorProvider: (
+      viewType: string,
+      provider: unknown,
+      options?: unknown,
+    ) => s.webviews.registerCustomEditorProvider(viewType, provider as never, options),
     registerUriHandler: noopDisposable,
     registerFileDecorationProvider: noopDisposable,
     registerTerminalLinkProvider: noopDisposable,
@@ -917,6 +921,17 @@ export function createApiFactory(services: Services) {
       ...window,
       createWebviewPanel: (viewType: string, title: string, showOptions: any, options?: any) =>
         s.webviews.createWebviewPanel(viewType, title, showOptions, options, extension.extensionPath),
+      registerCustomEditorProvider: (
+        viewType: string,
+        provider: unknown,
+        options?: unknown,
+      ) =>
+        s.webviews.registerCustomEditorProvider(
+          viewType,
+          provider as never,
+          options,
+          extension.extensionPath,
+        ),
     };
 
     return {

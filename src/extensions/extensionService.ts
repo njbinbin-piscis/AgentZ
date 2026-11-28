@@ -388,6 +388,18 @@ export class ExtensionService {
     return this.handles.commands.execute(id, args);
   }
 
+  /**
+   * Ask the extension host to resolve a custom editor for `viewType` + file path.
+   * Activates `onCustomEditor:viewType` first. Returns the webview handle or null.
+   */
+  async resolveCustomEditor(viewType: string, filePath: string, title?: string): Promise<string | null> {
+    if (!this.rpc) return null;
+    await this.activateByEvent(`onCustomEditor:${viewType}`).catch(() => undefined);
+    const webviews = this.rpc.getProxy(ExtHostContext.ExtHostWebviews);
+    const uri = monaco.Uri.file(filePath);
+    return webviews.$resolveCustomEditor(viewType, conv.uriToDto(uri), title ?? filePath);
+  }
+
   listCommands(): string[] {
     return this.handles?.commands.list() ?? [];
   }
