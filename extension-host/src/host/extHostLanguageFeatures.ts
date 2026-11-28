@@ -106,6 +106,41 @@ export class ExtHostLanguageFeatures implements ExtHostLanguageFeaturesShape {
     this.proxy.$registerSignatureHelpProvider(handle, selectorToLanguages(selector), triggerCharacters);
     return this.disposable(handle);
   }
+  registerTypeDefinitionProvider(selector: DocumentSelector, provider: any): types.Disposable {
+    const handle = this.register(provider);
+    this.proxy.$registerTypeDefinitionProvider(handle, selectorToLanguages(selector));
+    return this.disposable(handle);
+  }
+  registerImplementationProvider(selector: DocumentSelector, provider: any): types.Disposable {
+    const handle = this.register(provider);
+    this.proxy.$registerImplementationProvider(handle, selectorToLanguages(selector));
+    return this.disposable(handle);
+  }
+  registerRenameProvider(selector: DocumentSelector, provider: any): types.Disposable {
+    const handle = this.register(provider);
+    this.proxy.$registerRenameProvider(handle, selectorToLanguages(selector));
+    return this.disposable(handle);
+  }
+  registerFoldingRangeProvider(selector: DocumentSelector, provider: any): types.Disposable {
+    const handle = this.register(provider);
+    this.proxy.$registerFoldingRangeProvider(handle, selectorToLanguages(selector));
+    return this.disposable(handle);
+  }
+  registerCodeLensProvider(selector: DocumentSelector, provider: any): types.Disposable {
+    const handle = this.register(provider);
+    this.proxy.$registerCodeLensProvider(handle, selectorToLanguages(selector));
+    return this.disposable(handle);
+  }
+  registerDocumentLinkProvider(selector: DocumentSelector, provider: any): types.Disposable {
+    const handle = this.register(provider);
+    this.proxy.$registerDocumentLinkProvider(handle, selectorToLanguages(selector));
+    return this.disposable(handle);
+  }
+  registerDocumentRangeFormattingEditProvider(selector: DocumentSelector, provider: any): types.Disposable {
+    const handle = this.register(provider);
+    this.proxy.$registerDocumentRangeFormattingProvider(handle, selectorToLanguages(selector));
+    return this.disposable(handle);
+  }
 
   // ── RPC: provider invocation ──────────────────────────────────────────────
 
@@ -184,6 +219,109 @@ export class ExtHostLanguageFeatures implements ExtHostLanguageFeaturesShape {
     const ctx = { triggerKind: 1, isRetrigger: false };
     const result = await provider.provideSignatureHelp(this.docFor(uri), conv.toPosition(position), NONE, ctx);
     return result ? conv.fromSignatureHelp(result) : undefined;
+  }
+
+  async $provideTypeDefinition(handle: number, uri: dto.UriComponents, position: dto.IPosition): Promise<dto.LocationDto[] | undefined> {
+    const provider = this.providers.get(handle) as any;
+    if (!provider?.provideTypeDefinition) return undefined;
+    return normalizeLocations(await provider.provideTypeDefinition(this.docFor(uri), conv.toPosition(position), NONE));
+  }
+
+  async $provideImplementation(handle: number, uri: dto.UriComponents, position: dto.IPosition): Promise<dto.LocationDto[] | undefined> {
+    const provider = this.providers.get(handle) as any;
+    if (!provider?.provideImplementation) return undefined;
+    return normalizeLocations(await provider.provideImplementation(this.docFor(uri), conv.toPosition(position), NONE));
+  }
+
+  async $provideRenameEdits(
+    handle: number,
+    uri: dto.UriComponents,
+    position: dto.IPosition,
+    newName: string,
+  ): Promise<dto.WorkspaceEditDto | undefined> {
+    const provider = this.providers.get(handle) as any;
+    if (!provider?.provideRenameEdits) return undefined;
+    const result = await provider.provideRenameEdits(this.docFor(uri), conv.toPosition(position), newName, NONE);
+    return result ? conv.fromWorkspaceEdit(result) : undefined;
+  }
+
+  async $resolveRenameLocation(
+    handle: number,
+    uri: dto.UriComponents,
+    position: dto.IPosition,
+  ): Promise<{ range: dto.IRange; placeholder: string } | undefined> {
+    const provider = this.providers.get(handle) as any;
+    if (!provider?.prepareRename) return undefined;
+    const result = await provider.prepareRename(this.docFor(uri), conv.toPosition(position), NONE);
+    if (!result) return undefined;
+    if (result.range) {
+      return { range: conv.fromRange(result.range), placeholder: result.placeholder ?? "" };
+    }
+    return { range: conv.fromRange(result), placeholder: "" };
+  }
+
+  async $provideFoldingRanges(
+    handle: number,
+    uri: dto.UriComponents,
+  ): Promise<Array<{ start: number; end: number; kind?: number }> | undefined> {
+    const provider = this.providers.get(handle) as any;
+    if (!provider?.provideFoldingRanges) return undefined;
+    const result = await provider.provideFoldingRanges(this.docFor(uri), {}, NONE);
+    if (!result) return undefined;
+    return result.map((r: any) => ({
+      start: r.start,
+      end: r.end,
+      kind: typeof r.kind === "number" ? r.kind : r.kind?.value,
+    }));
+  }
+
+  async $provideCodeLenses(
+    handle: number,
+    uri: dto.UriComponents,
+  ): Promise<Array<{ range: dto.IRange; command?: dto.CommandDto }> | undefined> {
+    const provider = this.providers.get(handle) as any;
+    if (!provider?.provideCodeLenses) return undefined;
+    const result = await provider.provideCodeLenses(this.docFor(uri), NONE);
+    if (!result) return undefined;
+    return result.map((l: any) => ({
+      range: conv.fromRange(l.range),
+      command: l.command
+        ? { id: l.command.command ?? l.command.id, title: l.command.title, arguments: l.command.arguments }
+        : undefined,
+    }));
+  }
+
+  async $provideDocumentLinks(
+    handle: number,
+    uri: dto.UriComponents,
+  ): Promise<Array<{ range: dto.IRange; target?: string; tooltip?: string }> | undefined> {
+    const provider = this.providers.get(handle) as any;
+    if (!provider?.provideDocumentLinks) return undefined;
+    const result = await provider.provideDocumentLinks(this.docFor(uri), NONE);
+    if (!result) return undefined;
+    return result.map((l: any) => ({
+      range: conv.fromRange(l.range),
+      target: l.target?.toString?.() ?? (typeof l.target === "string" ? l.target : undefined),
+      tooltip: l.tooltip,
+    }));
+  }
+
+  async $provideDocumentRangeFormattingEdits(
+    handle: number,
+    uri: dto.UriComponents,
+    range: dto.IRange,
+  ): Promise<dto.TextEditDto[] | undefined> {
+    const provider = this.providers.get(handle) as any;
+    if (!provider?.provideDocumentRangeFormattingEdits) return undefined;
+    const opts = { tabSize: 2, insertSpaces: true };
+    const result = await provider.provideDocumentRangeFormattingEdits(
+      this.docFor(uri),
+      conv.toRange(range),
+      opts,
+      NONE,
+    );
+    if (!result) return undefined;
+    return result.map((e: types.TextEdit) => conv.fromTextEdit(e));
   }
 }
 

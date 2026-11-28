@@ -75,6 +75,13 @@ export interface MainThreadLanguageFeaturesShape {
   $registerFormattingProvider(handle: number, selector: string[]): void;
   $registerCodeActionProvider(handle: number, selector: string[]): void;
   $registerSignatureHelpProvider(handle: number, selector: string[], triggerCharacters: string[]): void;
+  $registerTypeDefinitionProvider(handle: number, selector: string[]): void;
+  $registerImplementationProvider(handle: number, selector: string[]): void;
+  $registerRenameProvider(handle: number, selector: string[]): void;
+  $registerFoldingRangeProvider(handle: number, selector: string[]): void;
+  $registerCodeLensProvider(handle: number, selector: string[]): void;
+  $registerDocumentLinkProvider(handle: number, selector: string[]): void;
+  $registerDocumentRangeFormattingProvider(handle: number, selector: string[]): void;
   $unregister(handle: number): void;
 }
 
@@ -153,6 +160,14 @@ export interface ExtHostLanguageFeaturesShape {
   $provideDocumentFormattingEdits(handle: number, uri: dto.UriComponents): Promise<dto.TextEditDto[] | undefined>;
   $provideCodeActions(handle: number, uri: dto.UriComponents, range: dto.IRange): Promise<dto.CodeActionDto[] | undefined>;
   $provideSignatureHelp(handle: number, uri: dto.UriComponents, position: dto.IPosition): Promise<dto.SignatureHelpDto | undefined>;
+  $provideTypeDefinition(handle: number, uri: dto.UriComponents, position: dto.IPosition): Promise<dto.LocationDto[] | undefined>;
+  $provideImplementation(handle: number, uri: dto.UriComponents, position: dto.IPosition): Promise<dto.LocationDto[] | undefined>;
+  $provideRenameEdits(handle: number, uri: dto.UriComponents, position: dto.IPosition, newName: string): Promise<dto.WorkspaceEditDto | undefined>;
+  $resolveRenameLocation(handle: number, uri: dto.UriComponents, position: dto.IPosition): Promise<{ range: dto.IRange; placeholder: string } | undefined>;
+  $provideFoldingRanges(handle: number, uri: dto.UriComponents): Promise<Array<{ start: number; end: number; kind?: number }> | undefined>;
+  $provideCodeLenses(handle: number, uri: dto.UriComponents): Promise<Array<{ range: dto.IRange; command?: dto.CommandDto }> | undefined>;
+  $provideDocumentLinks(handle: number, uri: dto.UriComponents): Promise<Array<{ range: dto.IRange; target?: string; tooltip?: string }> | undefined>;
+  $provideDocumentRangeFormattingEdits(handle: number, uri: dto.UriComponents, range: dto.IRange): Promise<dto.TextEditDto[] | undefined>;
 }
 
 export interface ExtHostDocumentsShape {

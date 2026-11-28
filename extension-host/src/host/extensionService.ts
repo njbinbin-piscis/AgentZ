@@ -310,12 +310,45 @@ export class ExtHostExtensionService implements ExtHostExtensionServiceShape {
         onDidChange: new EventEmitter<void>().event,
         canSendRequest: () => false,
       },
-      secrets: {
-        get: () => Promise.resolve(undefined),
-        store: () => Promise.resolve(),
-        delete: () => Promise.resolve(),
-        onDidChange: new EventEmitter<{ key: string }>().event,
-      },
+      secrets: (() => {
+        const secretsFile = globalStorageDir
+          ? path.join(globalStorageDir, "secrets.json")
+          : "";
+        const load = (): Record<string, string> => {
+          if (!secretsFile || !fs.existsSync(secretsFile)) return {};
+          try {
+            return JSON.parse(fs.readFileSync(secretsFile, "utf8")) as Record<string, string>;
+          } catch {
+            return {};
+          }
+        };
+        const save = (data: Record<string, string>) => {
+          if (!secretsFile) return;
+          try {
+            fs.mkdirSync(path.dirname(secretsFile), { recursive: true });
+            fs.writeFileSync(secretsFile, JSON.stringify(data), "utf8");
+          } catch {
+            /* ignore */
+          }
+        };
+        const emitter = new EventEmitter<{ key: string }>();
+        return {
+          get: async (key: string) => load()[key],
+          store: async (key: string, value: string) => {
+            const data = load();
+            data[key] = value;
+            save(data);
+            emitter.fire({ key });
+          },
+          delete: async (key: string) => {
+            const data = load();
+            delete data[key];
+            save(data);
+            emitter.fire({ key });
+          },
+          onDidChange: emitter.event,
+        };
+      })(),
     };
   }
 

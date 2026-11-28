@@ -262,8 +262,43 @@ export function createApiFactory(services: Services) {
     showInformationMessage: (m: string, ...r: unknown[]) => s.window.showInformationMessage(m, ...r),
     showWarningMessage: (m: string, ...r: unknown[]) => s.window.showWarningMessage(m, ...r),
     showErrorMessage: (m: string, ...r: unknown[]) => s.window.showErrorMessage(m, ...r),
-    showOpenDialog: () => Promise.resolve(undefined),
-    showSaveDialog: () => Promise.resolve(undefined),
+    showOpenDialog: async (options?: {
+      canSelectFiles?: boolean;
+      canSelectFolders?: boolean;
+      canSelectMany?: boolean;
+      filters?: Record<string, string[]>;
+      openLabel?: string;
+      title?: string;
+      defaultUri?: types.Uri;
+    }) => {
+      const picked = await s.commands.executeCommand<string[] | string | null>(
+        "_agentz.showOpenDialog",
+        {
+          canSelectFiles: options?.canSelectFiles !== false,
+          canSelectFolders: options?.canSelectFolders === true,
+          canSelectMany: options?.canSelectMany === true,
+          filters: options?.filters,
+          title: options?.title ?? options?.openLabel,
+          defaultPath: options?.defaultUri?.fsPath,
+        },
+      );
+      if (!picked) return undefined;
+      const paths = Array.isArray(picked) ? picked : [picked];
+      return paths.filter(Boolean).map((p) => types.Uri.file(p));
+    },
+    showSaveDialog: async (options?: {
+      filters?: Record<string, string[]>;
+      saveLabel?: string;
+      title?: string;
+      defaultUri?: types.Uri;
+    }) => {
+      const picked = await s.commands.executeCommand<string | null>("_agentz.showSaveDialog", {
+        filters: options?.filters,
+        title: options?.title ?? options?.saveLabel,
+        defaultPath: options?.defaultUri?.fsPath,
+      });
+      return picked ? types.Uri.file(picked) : undefined;
+    },
     showWorkspaceFolderPick: () => Promise.resolve(undefined),
     createStatusBarItem: (
       a?: string | types.StatusBarAlignment,
@@ -443,6 +478,17 @@ export function createApiFactory(services: Services) {
       const existing = s.documents.getDocument(uri.toJSON());
       if (existing) return existing;
       try {
+        const virtual = await s.workspace.provideTextDocumentContent(uri);
+        if (virtual !== undefined) {
+          s.documents.$acceptModelOpened({
+            uri: uri.toJSON(),
+            languageId: "plaintext",
+            versionId: 1,
+            lines: virtual.split(/\r?\n/),
+            eol: "\n",
+          });
+          return s.documents.getDocument(uri.toJSON());
+        }
         if (uri.scheme === "file" && uri.fsPath && fs.existsSync(uri.fsPath)) {
           const content = await fs.promises.readFile(uri.fsPath, "utf8");
           const ext = path.extname(uri.fsPath).toLowerCase();
@@ -596,7 +642,8 @@ export function createApiFactory(services: Services) {
     registerTaskProvider: (type: string, provider: any) => s.tasks.registerTaskProvider(type, provider),
     registerNotebookSerializer: (viewType: string, serializer: any) =>
       s.notebook.registerNotebookSerializer(viewType, serializer),
-    registerTextDocumentContentProvider: noopDisposable,
+    registerTextDocumentContentProvider: (scheme: string, provider: { provideTextDocumentContent: (uri: types.Uri) => string | Thenable<string> }) =>
+      s.workspace.registerTextDocumentContentProvider(scheme, provider),
     registerFileSystemProvider: noopDisposable,
     registerPortAttributesProvider: noopDisposable,
     applyEdit: () => s.workspace.applyEdit(),
@@ -654,8 +701,10 @@ export function createApiFactory(services: Services) {
         provideDefinition: (doc: unknown, pos: unknown, tok: unknown) =>
           provider?.provideDeclaration?.(doc, pos, tok),
       }),
-    registerTypeDefinitionProvider: noopDisposable,
-    registerImplementationProvider: noopDisposable,
+    registerTypeDefinitionProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerTypeDefinitionProvider(sel, provider),
+    registerImplementationProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerImplementationProvider(sel, provider),
     registerReferenceProvider: (sel: any, provider: any) =>
       s.languageFeatures.registerReferenceProvider(sel, provider),
     registerDocumentHighlightProvider: (sel: any, provider: any) =>
@@ -665,21 +714,26 @@ export function createApiFactory(services: Services) {
     registerWorkspaceSymbolProvider: noopDisposable,
     registerDocumentFormattingEditProvider: (sel: any, provider: any) =>
       s.languageFeatures.registerDocumentFormattingEditProvider(sel, provider),
-    registerDocumentRangeFormattingEditProvider: noopDisposable,
+    registerDocumentRangeFormattingEditProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerDocumentRangeFormattingEditProvider(sel, provider),
     registerOnTypeFormattingEditProvider: noopDisposable,
     registerCodeActionsProvider: (sel: any, provider: any) =>
       s.languageFeatures.registerCodeActionsProvider(sel, provider),
-    registerCodeLensProvider: noopDisposable,
+    registerCodeLensProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerCodeLensProvider(sel, provider),
     registerSignatureHelpProvider: (sel: any, provider: any, ...triggers: string[]) =>
       s.languageFeatures.registerSignatureHelpProvider(
         sel,
         provider,
         Array.isArray(triggers[0]) ? triggers[0] : triggers,
       ),
-    registerRenameProvider: noopDisposable,
-    registerDocumentLinkProvider: noopDisposable,
+    registerRenameProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerRenameProvider(sel, provider),
+    registerDocumentLinkProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerDocumentLinkProvider(sel, provider),
     registerColorProvider: noopDisposable,
-    registerFoldingRangeProvider: noopDisposable,
+    registerFoldingRangeProvider: (sel: any, provider: any) =>
+      s.languageFeatures.registerFoldingRangeProvider(sel, provider),
     registerSelectionRangeProvider: noopDisposable,
     registerCallHierarchyProvider: noopDisposable,
     registerTypeHierarchyProvider: noopDisposable,
@@ -693,8 +747,36 @@ export function createApiFactory(services: Services) {
     registerDocumentDropEditProvider: noopDisposable,
     registerDocumentPasteEditProvider: noopDisposable,
     createDiagnosticCollection: (name?: string) => s.workspace.createDiagnosticCollection(name),
-    getLanguages: () => Promise.resolve<string[]>([]),
-    setTextDocumentLanguage: (doc: unknown) => Promise.resolve(doc),
+    getLanguages: async () => {
+      const ids = new Set<string>([
+        "plaintext",
+        "typescript",
+        "javascript",
+        "json",
+        "markdown",
+        "rust",
+        "python",
+        "html",
+        "css",
+        "yaml",
+        "toml",
+        "shellscript",
+      ]);
+      for (const d of s.documents.all()) {
+        if (d.languageId) ids.add(d.languageId);
+      }
+      return [...ids];
+    },
+    setTextDocumentLanguage: async (doc: { uri?: types.Uri; languageId?: string }, languageId: string) => {
+      if (doc?.uri) {
+        const dto = doc.uri.toJSON?.() ?? doc.uri;
+        const existing = s.documents.getDocument(dto as never);
+        if (existing && typeof (existing as { languageId?: string }).languageId !== "undefined") {
+          (existing as { languageId: string }).languageId = languageId;
+        }
+      }
+      return doc;
+    },
   };
 
   const scm = {

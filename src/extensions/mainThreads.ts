@@ -150,6 +150,49 @@ export class MainThreadCommands implements MainThreadCommandsShape {
         }
         return undefined;
       }
+      case "_agentz.showOpenDialog": {
+        return (async () => {
+          const { open } = await import("@tauri-apps/plugin-dialog");
+          const opts = (args[0] ?? {}) as {
+            canSelectFiles?: boolean;
+            canSelectFolders?: boolean;
+            canSelectMany?: boolean;
+            filters?: Record<string, string[]>;
+            title?: string;
+            defaultPath?: string;
+          };
+          const filters = opts.filters
+            ? Object.entries(opts.filters).map(([name, extensions]) => ({ name, extensions }))
+            : undefined;
+          const selected = await open({
+            multiple: opts.canSelectMany === true,
+            directory: opts.canSelectFolders === true && opts.canSelectFiles === false,
+            filters,
+            title: opts.title,
+            defaultPath: opts.defaultPath,
+          });
+          if (selected == null) return null;
+          return selected;
+        })();
+      }
+      case "_agentz.showSaveDialog": {
+        return (async () => {
+          const { save } = await import("@tauri-apps/plugin-dialog");
+          const opts = (args[0] ?? {}) as {
+            filters?: Record<string, string[]>;
+            title?: string;
+            defaultPath?: string;
+          };
+          const filters = opts.filters
+            ? Object.entries(opts.filters).map(([name, extensions]) => ({ name, extensions }))
+            : undefined;
+          return save({
+            filters,
+            title: opts.title,
+            defaultPath: opts.defaultPath,
+          });
+        })();
+      }
       case "setContext":
         if (typeof args[0] === "string") {
           this.contextKeys.set(args[0], args[1]);
@@ -408,6 +451,107 @@ export class MainThreadLanguageFeatures implements MainThreadLanguageFeaturesSha
           },
           dispose: () => undefined,
         };
+      },
+    });
+    this.store(handle, d);
+  }
+  $registerTypeDefinitionProvider(handle: number, selector: string[]): void {
+    const d = monaco.languages.registerTypeDefinitionProvider(selector, {
+      provideTypeDefinition: async (model, position) => {
+        const locs = await this.extHost.$provideTypeDefinition(handle, conv.uriToDto(model.uri), conv.toDtoPosition(position));
+        return locs ? locs.map(conv.toMonacoLocation) : undefined;
+      },
+    });
+    this.store(handle, d);
+  }
+  $registerImplementationProvider(handle: number, selector: string[]): void {
+    const d = monaco.languages.registerImplementationProvider(selector, {
+      provideImplementation: async (model, position) => {
+        const locs = await this.extHost.$provideImplementation(handle, conv.uriToDto(model.uri), conv.toDtoPosition(position));
+        return locs ? locs.map(conv.toMonacoLocation) : undefined;
+      },
+    });
+    this.store(handle, d);
+  }
+  $registerRenameProvider(handle: number, selector: string[]): void {
+    const d = monaco.languages.registerRenameProvider(selector, {
+      provideRenameEdits: async (model, position, newName) => {
+        const edit = await this.extHost.$provideRenameEdits(
+          handle,
+          conv.uriToDto(model.uri),
+          conv.toDtoPosition(position),
+          newName,
+        );
+        return edit ? this.toMonacoWorkspaceEdit(edit) : null;
+      },
+      resolveRenameLocation: async (model, position) => {
+        const loc = await this.extHost.$resolveRenameLocation(
+          handle,
+          conv.uriToDto(model.uri),
+          conv.toDtoPosition(position),
+        );
+        if (!loc) return null;
+        return { range: conv.toMonacoRange(loc.range), text: loc.placeholder };
+      },
+    });
+    this.store(handle, d);
+  }
+  $registerFoldingRangeProvider(handle: number, selector: string[]): void {
+    const d = monaco.languages.registerFoldingRangeProvider(selector, {
+      provideFoldingRanges: async (model) => {
+        const ranges = await this.extHost.$provideFoldingRanges(handle, conv.uriToDto(model.uri));
+        return ranges?.map((r) => ({
+          start: r.start,
+          end: r.end,
+          kind: r.kind !== undefined ? (r.kind as unknown as monaco.languages.FoldingRangeKind) : undefined,
+        }));
+      },
+    });
+    this.store(handle, d);
+  }
+  $registerCodeLensProvider(handle: number, selector: string[]): void {
+    const d = monaco.languages.registerCodeLensProvider(selector, {
+      provideCodeLenses: async (model) => {
+        const lenses = await this.extHost.$provideCodeLenses(handle, conv.uriToDto(model.uri));
+        if (!lenses) return { lenses: [], dispose: () => undefined };
+        return {
+          lenses: lenses.map((l) => ({
+            range: conv.toMonacoRange(l.range),
+            command: l.command
+              ? { id: l.command.id, title: l.command.title, arguments: l.command.arguments }
+              : undefined,
+          })),
+          dispose: () => undefined,
+        };
+      },
+    });
+    this.store(handle, d);
+  }
+  $registerDocumentLinkProvider(handle: number, selector: string[]): void {
+    const d = monaco.languages.registerLinkProvider(selector, {
+      provideLinks: async (model) => {
+        const links = await this.extHost.$provideDocumentLinks(handle, conv.uriToDto(model.uri));
+        if (!links) return { links: [] };
+        return {
+          links: links.map((l) => ({
+            range: conv.toMonacoRange(l.range),
+            url: l.target,
+            tooltip: l.tooltip,
+          })),
+        };
+      },
+    });
+    this.store(handle, d);
+  }
+  $registerDocumentRangeFormattingProvider(handle: number, selector: string[]): void {
+    const d = monaco.languages.registerDocumentRangeFormattingEditProvider(selector, {
+      provideDocumentRangeFormattingEdits: async (model, range) => {
+        const edits = await this.extHost.$provideDocumentRangeFormattingEdits(
+          handle,
+          conv.uriToDto(model.uri),
+          conv.fromMonacoRange(range),
+        );
+        return edits ? edits.map(conv.toMonacoTextEdit) : undefined;
       },
     });
     this.store(handle, d);

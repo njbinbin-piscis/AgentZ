@@ -410,6 +410,24 @@ export class ExtHostWorkspace implements ExtHostWorkspaceShape, ExtHostConfigura
     return new ExtHostFileSystem(this.proxy);
   }
 
+  private contentProviders = new Map<string, { provideTextDocumentContent: (uri: Uri) => string | Thenable<string> }>();
+
+  registerTextDocumentContentProvider(
+    scheme: string,
+    provider: { provideTextDocumentContent: (uri: Uri) => string | Thenable<string> },
+  ): Disposable {
+    this.contentProviders.set(scheme, provider);
+    return new Disposable(() => {
+      if (this.contentProviders.get(scheme) === provider) this.contentProviders.delete(scheme);
+    });
+  }
+
+  async provideTextDocumentContent(uri: Uri): Promise<string | undefined> {
+    const provider = this.contentProviders.get(uri.scheme);
+    if (!provider) return undefined;
+    return provider.provideTextDocumentContent(uri);
+  }
+
   registerFileSystemWatcher(
     globPattern: string | RelativePattern,
     ignoreCreateEvents?: boolean,

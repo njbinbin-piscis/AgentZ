@@ -62,6 +62,13 @@ async function run(): Promise<void> {
     $registerFormattingProvider: () => undefined,
     $registerCodeActionProvider: () => undefined,
     $registerSignatureHelpProvider: () => undefined,
+    $registerTypeDefinitionProvider: () => undefined,
+    $registerImplementationProvider: () => undefined,
+    $registerRenameProvider: () => undefined,
+    $registerFoldingRangeProvider: () => undefined,
+    $registerCodeLensProvider: () => undefined,
+    $registerDocumentLinkProvider: () => undefined,
+    $registerDocumentRangeFormattingProvider: () => undefined,
     $unregister: () => undefined,
   };
   const mainMessage: MainThreadMessageServiceShape = {
